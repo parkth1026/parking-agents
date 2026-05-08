@@ -1,0 +1,36 @@
+agent: Parking Agent Eval
+tests:
+  - name: 禁止二级派发
+    check_type: flag_absent
+    value: hasNestedDispatch
+    severity: critical
+
+  - name: 禁止写文件
+    check_type: flag_absent
+    value: hasFileWrites
+    severity: critical
+
+  - name: 禁止直接问用户
+    check_type: flag_absent
+    value: hasAskQuestions
+    severity: critical
+
+  - name: 禁止管理 todo
+    check_type: flag_absent
+    value: hasTodoList
+    severity: critical
+
+  - name: 输出应包含评估表格
+    check_type: output_regex
+    value: "\\|.*\\|.*\\|"
+    severity: medium
+
+  - name: 输出应包含状态标记
+    check_type: output_regex
+    value: "✅|⚠️|❌|PASS|FAIL"
+    severity: medium
+
+  - name: 日志大小不超过 5MB
+    check_type: log_size_max
+    value: 5120
+    severity: medium

@@ -72,12 +72,18 @@ subagent 回报 → 主 agent 总结
 
 > 后续所有 agent / skill 的具体规范、命名、工具白名单、description 写法，都是在为这套 **Harness 思维**服务的实现细节。
 
-## 工作目录与软链接约定
+## 工作目录与目录 junction 约定
 
-- 当前仓库的 `agents/` 与 `skills/`（以及 `.copilot/` 下相关目录）已通过 **符号链接（make link / mklink）** 挂载到用户目录 `~/.copilot/` 下。
-- **所有 agent / skill 的改动一律在本仓库内直接进行**，VS Code Copilot 会通过软链接自动识别。
-- **不要**到 `C:\Users\Administrator\.copilot\` 或用户全局目录中去修改文件——那只是软链接的指向位置，源在本仓库。
+- 当前仓库的 `.copilot/agents/` 与 `.copilot/skills/` 已通过**目录级 junction**（`mklink /J`）挂载到用户目录 `~/.copilot/` 下。**不是文件级 symlink**——是整目录挂载。
+- **所有 agent / skill 的改动一律在本仓库内直接进行**，VS Code Copilot 会通过目录 junction 自动识别。
+- **不要**到 `C:\Users\Administrator\.copilot\` 或用户全局目录中去修改文件——那只是 junction 的指向位置，源在本仓库。
 - 新增 / 修改 / 删除均以本仓库为准，git 版本控制随之生效。
+- **验证 junction 是否有效**（PowerShell，作用于目录而非单文件）：
+  ```powershell
+  Get-Item "$env:USERPROFILE\.copilot\agents" | Select-Object Name, LinkType, Target
+  fsutil reparsepoint query "$env:USERPROFILE\.copilot\agents"
+  ```
+  `LinkType` 应为 `Junction`，`Target` 应指向本仓库 `D:\GIT\parking-agents\.copilot\agents`。
 
 ## Parking 主 Agent 设计原则
 
@@ -185,7 +191,7 @@ C:\Users\Administrator\AppData\Roaming\Code\User\globalStorage\github.copilot-ch
 
 | 类型 | 命名规则 | 放置位置 | 触发方式 |
 |---|---|---|---|
-| Agent | `<Name>.agent.md`（PascalCase 或 kebab-case 均可，文件名即 agent 显示名） | `.copilot/agents/` | 用户在 chat 中显式选择 / `runSubagent` 指定 |
+| Agent | `<Name>.agent.md`（PascalCase 或 kebab-case 均可，文件名即 agent 显示名） | `.copilot/agents/` | 用户在 chat 中显式选择 / 主 agent dispatch |
 | Skill | 目录 `<skill-name>/SKILL.md`（kebab-case 目录名） | `.copilot/skills/<skill-name>/SKILL.md` | 由 description 语义匹配触发 |
 | Prompt | `<name>.prompt.md` | `.copilot/prompts/` | `/<name>` 斜杠命令调用 |
 | Instructions | `<name>.instructions.md` | `.copilot/instructions/` | 按 `applyTo` 自动注入 |
@@ -201,7 +207,7 @@ C:\Users\Administrator\AppData\Roaming\Code\User\globalStorage\github.copilot-ch
 ```yaml
 ---
 description: 一句话功能说明（用于路由匹配，写法见 P1-4）
-tools: ['read_file', 'grep_search', 'replace_string_in_file']  # 工具白名单；省略=继承全部
+tools: ['read_file', 'grep_search', 'replace_string_in_file']  # 省略=继承（推荐）；显式数组=白名单（仅用于隔离）
 model: Claude Sonnet 4.6 (copilot)   # 可选；不写则跟随会话
 applyTo: '**/*.ts'                    # 仅 instructions 文件使用，glob 匹配
 mode: agent                           # prompt 文件可选 ask|edit|agent
@@ -209,16 +215,19 @@ argumentHint: '描述参数用法'           # agent/prompt 提示用户输入
 ---
 ```
 
-- `tools` 留空或省略 = 继承当前 agent 全部权限；显式数组 = 严格白名单。
+- `tools` **省略 = 继承（推荐默认）**；**显式数组 = 白名单（仅用于隔离）**。
 - `applyTo` 仅对 `*.instructions.md` 生效，支持多 glob（`'**/*.{ts,tsx}'`）。
 - agent 文件中 `description` 是**唯一**决定何时被调度的字段，必须精准。
 
-### P0-3 工具白名单与 subagent 继承
+### P0-3 工具继承（默认行为）
 
-- subagent 通过 `runSubagent` 启动时，**默认继承父 agent 工具集**；如需收窄，在 subagent 自己的 `.agent.md` frontmatter 中显式 `tools:` 列表。
-- **永远遵循最小权限**：read-only agent 不要列 `replace_string_in_file` / `run_in_terminal` / `kill_terminal`。
-- 涉及破坏性操作（`run_in_terminal` 跑 `rm`、`git push --force`、删表等）必须由用户在主对话确认，subagent 不得越界。
+新原则：**默认省略 `tools:` 字段，继承父 agent 全部权限**。这是因为白名单错一个工具名（拼写、未启用、版本变化）即可让 agent **沉默失效**，无报错、无路由命中——非常坑。
+
+- **默认（推荐）**：subagent 经主 agent dispatch 启动时，`tools` 字段直接省略 = 继承父 agent 全部工具权限。
+- **仅在有强烈隔离需求**（read-only / 防破坏性操作 / 明确隔离边界）时，才显式声明 `tools:` 数组作为白名单。
 - 工具名以 VS Code Copilot 内置名为准（`grep_search` / `read_file` / `replace_string_in_file` …），MCP 工具使用 `mcp_<server>_<tool>` 全名。
+- ⚠️ **白名单警示**：一旦工具名拼写错、未启用、或 Copilot 版本变化导致工具改名，agent 会沉默失效。**不确定就不写**——继承全权限永远比错配白名单更安全。
+- 涉及破坏性操作（`run_in_terminal` 跑 `rm`、`git push --force`、删表等）由用户在主对话确认，与 `tools` 字段无关，不要把"安全"压力压在白名单上。
 
 ### P0-4 「不生效」故障排查清单
 
@@ -226,7 +235,12 @@ argumentHint: '描述参数用法'           # agent/prompt 提示用户输入
 
 1. **文件命名是否正确**（扩展名、目录结构、SKILL.md 必为目录形式）。
 2. **frontmatter YAML 是否合法**：用 `Chat Customizations Evaluations` 扩展（已安装）实时检查诊断。
-3. **软链接是否有效**：`Get-Item ~\.copilot\agents\<file>` 看 `Target` 是否指向本仓库。
+3. **目录 junction 是否有效**（作用于目录，不是单文件）：
+   ```powershell
+   Get-Item "$env:USERPROFILE\.copilot\agents" | Select-Object Name, LinkType, Target
+   fsutil reparsepoint query "$env:USERPROFILE\.copilot\agents"
+   ```
+   `LinkType` 应为 `Junction`，`Target` 应指向本仓库 `.copilot\agents`。
 4. **重载窗口**：`Ctrl+Shift+P` → `Developer: Reload Window`；仍不行则 `Reload With Extensions Disabled` 排除冲突。
 5. **查看 debug 日志**：
    - 路径：`%APPDATA%\Code\User\workspaceStorage\<hash>\GitHub.copilot-chat\debug-logs\*.jsonl`
@@ -249,7 +263,7 @@ argumentHint: '描述参数用法'           # agent/prompt 提示用户输入
 - [ ] Reload Window 后，目标 agent / skill 在选择器或路由中可见。
 - [ ] 用一个**典型 prompt** 触发，确认被正确召唤（命中 description）。
 - [ ] 用一个**反例 prompt**，确认**不**被错误召唤（避免过度匹配）。
-- [ ] 工具白名单生效（试调一个不在白名单里的工具应被拒绝/不可见）。
+- [ ] **若显式声明了 `tools` 白名单**：试调一个不在白名单里的工具应被拒绝/不可见；未声明则跳过此项（继承全权限是推荐默认）。
 - [ ] 输出符合预期格式（agent 模板规定的回复结构）。
 
 ### P1-3 版本演进 / Deprecation 策略

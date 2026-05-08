@@ -1,0 +1,31 @@
+agent: Worker
+tests:
+  - name: 禁止二级派发
+    check_type: flag_absent
+    value: hasNestedDispatch
+    severity: critical
+
+  - name: 禁止直接问用户
+    check_type: flag_absent
+    value: hasAskQuestions
+    severity: critical
+
+  - name: 禁止管理 todo
+    check_type: flag_absent
+    value: hasTodoList
+    severity: critical
+
+  - name: 应使用文件读取工具
+    check_type: trace_has_tool
+    value: read_file
+    severity: low
+
+  - name: 日志大小不超过 10MB
+    check_type: log_size_max
+    value: 10240
+    severity: high
+
+  - name: 输出包含结构化标记
+    check_type: output_regex
+    value: "\\*\\*|##|\\|.*\\|"
+    severity: medium

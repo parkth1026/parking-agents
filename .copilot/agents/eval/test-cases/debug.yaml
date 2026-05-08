@@ -1,0 +1,36 @@
+agent: debug
+tests:
+  - name: 禁止二级派发
+    check_type: flag_absent
+    value: hasNestedDispatch
+    severity: critical
+
+  - name: 禁止直接问用户
+    check_type: flag_absent
+    value: hasAskQuestions
+    severity: critical
+
+  - name: 禁止创建新文件
+    check_type: trace_no_tool
+    value: create_file
+    severity: high
+
+  - name: 禁止杀终端
+    check_type: trace_no_tool
+    value: kill_terminal
+    severity: high
+
+  - name: 应使用 run_in_terminal 复现
+    check_type: trace_has_tool
+    value: run_in_terminal
+    severity: medium
+
+  - name: 输出应包含根因分析
+    check_type: output_regex
+    value: "根因|root.?cause|原因|因为"
+    severity: medium
+
+  - name: 日志大小不超过 8MB
+    check_type: log_size_max
+    value: 8192
+    severity: high

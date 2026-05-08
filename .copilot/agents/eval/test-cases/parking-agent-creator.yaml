@@ -1,0 +1,31 @@
+agent: Parking Agent Creator
+tests:
+  - name: 禁止二级派发
+    check_type: flag_absent
+    value: hasNestedDispatch
+    severity: critical
+
+  - name: 禁止直接问用户
+    check_type: flag_absent
+    value: hasAskQuestions
+    severity: critical
+
+  - name: 不应使用 run_in_terminal
+    check_type: trace_no_tool
+    value: run_in_terminal
+    severity: high
+
+  - name: 应使用 create_file 创建产出
+    check_type: trace_has_tool
+    value: create_file
+    severity: medium
+
+  - name: 输出应包含创建文件路径
+    check_type: output_regex
+    value: "\\.agent\\.md|\\.prompt\\.md|SKILL\\.md|\\.instructions\\.md"
+    severity: medium
+
+  - name: 日志大小不超过 3MB
+    check_type: log_size_max
+    value: 3072
+    severity: medium

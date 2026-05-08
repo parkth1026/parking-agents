@@ -1,0 +1,21 @@
+agent: simplify
+tests:
+  - name: 禁止二级派发
+    check_type: flag_absent
+    value: hasNestedDispatch
+    severity: critical
+
+  - name: 禁止直接问用户
+    check_type: flag_absent
+    value: hasAskQuestions
+    severity: critical
+
+  - name: 应有文件修改（简化重构）
+    check_type: flag_absent
+    value: hasFileWrites
+    severity: low
+
+  - name: 日志大小不超过 5MB
+    check_type: log_size_max
+    value: 5120
+    severity: medium

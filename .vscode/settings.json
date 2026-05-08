@@ -1,10 +1,6 @@
 {
   "chatCustomizationsEvaluations.customDiagnostics": [
     {
-      "name": "Read-only agent must not include write tools",
-      "description": "Applies only to `.agent.md` files whose YAML frontmatter `description` contains any of the keywords: \"read-only\", \"只读\", \"评估\", \"lint\", \"validate\", \"audit\", or \"report only\". For such read-only / evaluation agents, flag a diagnostic on the `tools:` line if the tool list contains ANY of these write-capable tools: `replace_string_in_file`, `multi_replace_string_in_file`, `create_file`, `create_directory`, `edit_notebook_file`, `insert_edit_into_file`. Message: 'Read-only/eval agent should not declare write tools — violates least-privilege principle.' Do NOT flag if the agent description clearly indicates it creates or modifies files."
-    },
-    {
       "name": "Agent description must start with 'Use when:'",
       "description": "Applies only to `.agent.md` files. Inspect the YAML frontmatter `description` field. If its trimmed text does NOT start with the literal prefix `Use when:` (case-insensitive, allowing a leading quote), emit an information-level diagnostic on the `description:` line. Message: 'Agent description should start with \"Use when:\" to clearly signal invocation conditions to the dispatcher.' Skip this check for files named `Parking.agent.md` or `Worker.agent.md` (frozen templates)."
     },
@@ -18,7 +14,7 @@
     },
     {
       "name": "Subagents must not nest other subagents",
-      "description": "Applies only to `.agent.md` files whose basename is NOT `Parking.agent.md` and NOT `Master.agent.md` (those are the only allowed dispatcher agents). For all other agent files, scan the markdown body (text outside YAML frontmatter) for the literal token `runSubagent` (case-insensitive). If found, emit a warning-level diagnostic on the matching line. Message: 'Non-dispatcher agents must not nest subagent calls. The Parking architecture mandates a flat single-layer dispatch chain — only the main dispatcher (Parking/Master) may invoke subagents.'"
+      "description": "Applies only to `.agent.md` files whose basename is NOT `Parking.agent.md` and NOT `Master.agent.md` (those are the only allowed dispatcher agents). EXEMPTION: also skip this rule for any agent whose YAML frontmatter `description` contains dispatcher keywords (case-insensitive): `dispatch`, `schedule`, `route`, `orchestrator`, `delegate` — those are dispatcher-class agents and are allowed to invoke subagents. For all remaining (non-dispatcher) agent files, scan the markdown body (text outside YAML frontmatter) for the literal token `runSubagent` (case-insensitive), but ONLY flag occurrences that semantically express 'invoking / dispatching a subagent' in prose. IGNORE occurrences inside fenced code blocks (```...```) or inline code spans (`...`) — those are documentation/literal references, not actual nested calls. If a real semantic match is found, emit a warning-level diagnostic on the matching line. Message: 'Non-dispatcher agents must not nest subagent calls. The Parking architecture mandates a flat single-layer dispatch chain — only the main dispatcher (Parking/Master, or agents with dispatcher keywords in their description) may invoke subagents.'"
     }
   ]
 }
