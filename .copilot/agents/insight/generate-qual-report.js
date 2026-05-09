@@ -17,6 +17,18 @@
 const fs = require('fs');
 const path = require('path');
 
+// ── 本地时区日期格式化 ────────────────────────────────
+function formatLocalDate(d) {
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+}
+
+function formatLocalDateTime(d) {
+    return `${formatLocalDate(d)} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
+}
+
 // ── CLI 参数解析 ─────────────────────────────────────
 function parseArgs(argv) {
     const args = {
@@ -93,7 +105,7 @@ try {
 const meta = data.meta;
 const sessions = Array.isArray(data.sessions) ? data.sessions : [];
 const agg = data.aggregated;
-const now = new Date().toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
+const now = formatLocalDateTime(new Date());
 
 // ── 加载分面数据 ──────────────────────────────────────
 const facetsData = [];
@@ -194,7 +206,7 @@ if (sessions.length > 0) {
         .filter(d => d && !isNaN(d.getTime()));
     if (startTimes.length > 0) {
         startTimes.sort((a, b) => a - b);
-        const fmt = d => d.toISOString().slice(0, 10);
+        const fmt = d => formatLocalDate(d);
         const earliest = fmt(startTimes[0]);
         const latest = fmt(startTimes[startTimes.length - 1]);
         timeSpan = `${earliest} ~ ${latest}`;

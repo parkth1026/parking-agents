@@ -68,6 +68,17 @@ function formatNumber(n) {
     return String(n);
 }
 
+function formatLocalDate(d) {
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+}
+
+function formatLocalDateTime(d) {
+    return `${formatLocalDate(d)} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
+}
+
 function barPct(value, max) {
     if (max <= 0) return 0;
     return Math.min(100, Math.round((value / max) * 100));
@@ -109,7 +120,7 @@ function main() {
     const meta = data.meta;
     const sessions = Array.isArray(data.sessions) ? data.sessions : [];
     const agg = data.aggregated;
-    const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
+    const now = formatLocalDateTime(new Date());
 
     // ── 加载分面数据 ──────────────────────────────────
     let facetsData = [];
@@ -225,8 +236,8 @@ function main() {
             .filter(d => d && !isNaN(d.getTime()));
         if (startTimes.length > 0) {
             startTimes.sort((a, b) => a - b);
-            const earliest = startTimes[0].toISOString().slice(0, 10);
-            const latest = startTimes[startTimes.length - 1].toISOString().slice(0, 10);
+            const earliest = formatLocalDate(startTimes[0]);
+            const latest = formatLocalDate(startTimes[startTimes.length - 1]);
             timeSpan = `${earliest} ~ ${latest}`;
         }
     }
@@ -1070,7 +1081,7 @@ td.heat-1, td.heat-2, td.heat-3, td.heat-4, td.heat-5 { text-align: center; }
     for (const s of sessions) {
         if (!s.startTime) continue;
         try {
-            const day = new Date(s.startTime).toISOString().slice(0, 10);
+            const day = formatLocalDate(new Date(s.startTime));
             dayMap[day] = (dayMap[day] || 0) + (s.userMessageCount || 0);
         } catch (_) { /* ignore */ }
     }
