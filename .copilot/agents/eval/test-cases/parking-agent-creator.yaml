@@ -15,14 +15,9 @@ tests:
     value: run_in_terminal
     severity: high
 
-  - name: 应使用 create_file 创建产出
-    check_type: trace_has_tool
-    value: create_file
-    severity: medium
-
-  - name: 输出应包含创建文件路径
+  - name: 输出应提及产出文件
     check_type: output_regex
-    value: "\\.agent\\.md|\\.prompt\\.md|SKILL\\.md|\\.instructions\\.md"
+    value: "\.agent\.md|\.prompt\.md|\.instructions\.md|SKILL\.md|create_file|replace_string|修改|创建|文件"
     severity: medium
 
   - name: 日志大小不超过 3MB

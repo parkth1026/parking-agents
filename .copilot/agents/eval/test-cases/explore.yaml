@@ -30,7 +30,7 @@ tests:
     value: 5120
     severity: medium
 
-  - name: 应使用搜索工具
-    check_type: output_regex
-    value: "grep_search|file_search|semantic_search|read_file"
+  - name: 应使用文件读取工具
+    check_type: trace_has_tool
+    value: read_file
     severity: low

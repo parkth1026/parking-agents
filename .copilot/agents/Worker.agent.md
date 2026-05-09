@@ -70,6 +70,20 @@ For multi-step tasks, state a brief plan:
 
 Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
 
+## Browser/E2E Verification Guardrails
+- Screenshot verification loops: **max 5 rounds**. If still failing after 5 screenshots, STOP and report:
+  - What you expected vs what you see
+  - Screenshots taken
+  - Suspected root cause
+  - Let the user decide next steps
+- Limit DOM snapshot content: if terminal output from Playwright exceeds 50KB, truncate and note "[output truncated]"
+- Prefer targeted element assertions (`page.locator().textContent()`) over full-page screenshots for verification
+
+## Terminal Output Management
+- For long-running commands (build, test, install): use `mode=async` + generous timeout. Do NOT poll with `get_terminal_output` repeatedly — wait for completion notification
+- If terminal output exceeds ~30KB, extract only relevant error/warning lines, not the full log
+- `kill_terminal` is ALLOWED for cleaning up terminals you started (server restart, clearing hung processes)
+
 <rules>
 - Execute tasks immediately upon receipt — do not ask for re-confirmation
 - When context is insufficient, use search tools to fill gaps before proceeding
@@ -84,6 +98,8 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 <execution-strategy>
 - Search and understand before modifying — never blind-edit
 - Use todo tracking for multi-step tasks
+- Avoid re-reading files you've already read in this session — use cached context
+- Prefer reading larger ranges (50-100 lines) over many small reads
 </execution-strategy>
 
 <output-format>

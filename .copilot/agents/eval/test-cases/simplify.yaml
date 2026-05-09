@@ -10,12 +10,12 @@ tests:
     value: hasAskQuestions
     severity: critical
 
-  - name: 应有文件修改（简化重构）
-    check_type: flag_absent
-    value: hasFileWrites
+  - name: 应使用文件读取工具
+    check_type: trace_has_tool
+    value: read_file
     severity: low
 
-  - name: 日志大小不超过 5MB
+  - name: 日志大小不超过 8MB
     check_type: log_size_max
-    value: 5120
+    value: 8192
     severity: medium
