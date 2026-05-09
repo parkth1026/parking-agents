@@ -1,3 +1,4 @@
+# DEPRECATED: This script has been replaced by the Node.js version (.js). Use the .js version instead.
 #Requires -Version 5.1
 <#
 .SYNOPSIS
@@ -246,6 +247,38 @@ function Test-Invocation {
             if (-not $value) { return $true }
             $flagVal = $Invocation.$value
             return -not [bool]$flagVal
+        }
+        'tool_error_absent' {
+            # 断言指定类别的工具错误不应出现
+            if (-not $value) { return $true }
+            $errCats = $Invocation.toolErrorCategories
+            if (-not $errCats) { return $true }
+            if ($errCats -is [hashtable]) {
+                return -not $errCats.ContainsKey($value)
+            }
+            # PSCustomObject
+            $members = @($errCats.PSObject.Properties | ForEach-Object { $_.Name })
+            return $members -notcontains $value
+        }
+        'tool_success_rate_min' {
+            # 断言工具调用成功率不低于某值（百分比）
+            $minRate = [double]$value
+            $rate = $Invocation.toolSuccessRate
+            if ($null -eq $rate) {
+                # 没有工具调用时视为通过
+                return ($Invocation.totalToolCalls -eq 0)
+            }
+            return [double]$rate -ge $minRate
+        }
+        'code_changes_max' {
+            # 断言代码变更不超过某数量（文件创建 + 文件修改）
+            $maxChanges = [int]$value
+            $changes = $Invocation.codeChanges
+            if (-not $changes) { return $true }
+            $total = 0
+            if ($changes.filesCreated)  { $total += [int]$changes.filesCreated }
+            if ($changes.filesModified) { $total += [int]$changes.filesModified }
+            return $total -le $maxChanges
         }
         default {
             Write-Warning "未知的 check_type: $checkType"

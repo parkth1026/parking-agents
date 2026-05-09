@@ -49,6 +49,7 @@ Choose the right subagent:
 - **simplify**: Code review + simplification of existing code
 - **Parking Agent Creator**: Creating new agents/skills
 - **Parking Agent Eval**: Evaluating/linting agent files, running behavioral eval
+- **Parking Agent Insight**: Usage behavior analysis, HTML insight reports, token/tool statistics, friction point analysis
 
 Default to Worker when unsure. Use Explore for "tell me about X" questions to save Worker quota.
 </dispatch-routing>

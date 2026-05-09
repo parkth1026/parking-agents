@@ -34,3 +34,8 @@ tests:
     check_type: log_size_max
     value: 8192
     severity: high
+
+  - name: 工具成功率不低于80%
+    check_type: tool_success_rate_min
+    value: 80
+    severity: medium

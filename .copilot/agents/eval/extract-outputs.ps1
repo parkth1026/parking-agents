@@ -1,3 +1,4 @@
+# DEPRECATED: This script has been replaced by the Node.js version (.js). Use the .js version instead.
 #Requires -Version 5.1
 <#
 .SYNOPSIS
@@ -42,6 +43,29 @@ $TAIL_LINES         = 1000
 
 $FILE_WRITE_TOOLS = @('create_file', 'replace_string_in_file', 'multi_replace_string_in_file')
 $FLAGGED_TOOL_SET = @('kill_terminal', 'vscode_askQuestions', 'manage_todo_list', 'runSubagent')
+
+# ── 工具错误分类模式（参考 Claude Code insights 7 种分类） ──
+$ERROR_PATTERNS = @{
+    'CommandFailed' = @('exited with code', 'exit code', 'command failed', 'non-zero exit')
+    'EditFailed'    = @('string to replace', 'not found in file', 'oldString', 'does not match', 'multiple locations')
+    'FileNotFound'  = @('file not found', 'does not exist', 'ENOENT', 'no such file', 'not found:', 'path not found')
+    'FileChanged'   = @('modified since', 'changed since', 'has been modified', 'file has changed')
+    'FileTooLarge'  = @('exceeds maximum', 'too large', 'file size exceeds', 'too big')
+    'UserRejected'  = @('rejected', 'cancelled', 'canceled', 'user declined', 'denied')
+}
+
+function Classify-ToolError {
+    <# 根据错误文本模式分类工具错误 #>
+    param([string]$ErrorText)
+    if (-not $ErrorText) { return 'Other' }
+    $lower = $ErrorText.ToLower()
+    foreach ($category in $ERROR_PATTERNS.Keys) {
+        foreach ($pattern in $ERROR_PATTERNS[$category]) {
+            if ($lower.Contains($pattern)) { return $category }
+        }
+    }
+    return 'Other'
+}
 
 # ── 辅助函数 ──────────────────────────────────────────
 
@@ -196,6 +220,16 @@ foreach ($entry in $allJsonlFiles) {
     $firstTs         = $null
     $lastTs          = $null
     $totalDurMs      = 0
+    # 新增：工具错误分类
+    $toolErrorCats   = @{}
+    $totalToolErrors = 0
+    # 新增：代码变更统计
+    $filesCreated    = 0
+    $filesModified   = 0
+    $replacements    = 0
+    $changedFilePaths = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    # 记录上一个 tool_call 名称（用于在 tool_result 中关联）
+    $lastToolCallName = ''
 
     foreach ($line in $lines) {
         if ([string]::IsNullOrWhiteSpace($line)) { continue }
@@ -228,9 +262,44 @@ foreach ($entry in $allJsonlFiles) {
                 } else {
                     $toolCounts[$toolName] = 1
                 }
+                $lastToolCallName = $toolName
                 # 文件写入检测
                 if ($toolName -in $FILE_WRITE_TOOLS) {
                     $hasFileWrites = $true
+                }
+                # 代码变更统计
+                if ($toolName -eq 'create_file') {
+                    $filesCreated++
+                    if ($evt.attrs -and $evt.attrs.args) {
+                        try {
+                            $argsObj = [string]$evt.attrs.args | ConvertFrom-Json -ErrorAction SilentlyContinue
+                            if ($argsObj -and $argsObj.filePath) { [void]$changedFilePaths.Add([string]$argsObj.filePath) }
+                        } catch {}
+                    }
+                }
+                if ($toolName -eq 'replace_string_in_file') {
+                    $filesModified++
+                    $replacements++
+                    if ($evt.attrs -and $evt.attrs.args) {
+                        try {
+                            $argsObj = [string]$evt.attrs.args | ConvertFrom-Json -ErrorAction SilentlyContinue
+                            if ($argsObj -and $argsObj.filePath) { [void]$changedFilePaths.Add([string]$argsObj.filePath) }
+                        } catch {}
+                    }
+                }
+                if ($toolName -eq 'multi_replace_string_in_file') {
+                    $filesModified++
+                    if ($evt.attrs -and $evt.attrs.args) {
+                        try {
+                            $argsObj = [string]$evt.attrs.args | ConvertFrom-Json -ErrorAction SilentlyContinue
+                            if ($argsObj -and $argsObj.replacements) {
+                                $replacements += @($argsObj.replacements).Count
+                                foreach ($rep in $argsObj.replacements) {
+                                    if ($rep.filePath) { [void]$changedFilePaths.Add([string]$rep.filePath) }
+                                }
+                            }
+                        } catch {}
+                    }
                 }
                 # 嵌套调度检测
                 if ($toolName -eq 'runSubagent') {
@@ -252,10 +321,29 @@ foreach ($entry in $allJsonlFiles) {
                     $hasTodoList = $true
                     if ('manage_todo_list' -notin $flaggedTools) { $flaggedTools.Add('manage_todo_list') }
                 }
-            }
-            'tool_result' {
+                # 工具持续时间
                 if ($evt.dur) {
                     $totalDurMs += [int]$evt.dur
+                }
+                # 工具错误检测与分类（JSONL 中错误在 tool_call 事件的 status 字段）
+                $isError = $false
+                $errText = ''
+                if ($evt.status -eq 'error') {
+                    $isError = $true
+                    if ($evt.attrs -and $evt.attrs.result) {
+                        $errText = [string]$evt.attrs.result
+                    } elseif ($evt.attrs -and $evt.attrs.error) {
+                        $errText = [string]$evt.attrs.error
+                    }
+                }
+                if ($isError) {
+                    $totalToolErrors++
+                    $cat = Classify-ToolError -ErrorText $errText
+                    if ($toolErrorCats.ContainsKey($cat)) {
+                        $toolErrorCats[$cat]++
+                    } else {
+                        $toolErrorCats[$cat] = 1
+                    }
                 }
             }
         }
@@ -281,6 +369,12 @@ foreach ($entry in $allJsonlFiles) {
     $totalCalls = 0
     foreach ($v in $toolCounts.Values) { $totalCalls += $v }
 
+    # 计算工具成功率
+    $toolSuccessRate = 100.0
+    if ($totalCalls -gt 0) {
+        $toolSuccessRate = [math]::Round((($totalCalls - $totalToolErrors) / $totalCalls) * 100, 1)
+    }
+
     $invocations.Add([PSCustomObject]@{
         logFile            = $jsonlFile.FullName
         agentName          = $agentName
@@ -291,6 +385,15 @@ foreach ($entry in $allJsonlFiles) {
         output             = Truncate-String -Text $outputText -Max $OUTPUT_MAX_CHARS
         toolCalls          = $toolCounts
         totalToolCalls     = $totalCalls
+        totalToolErrors    = $totalToolErrors
+        toolSuccessRate    = $toolSuccessRate
+        toolErrorCategories = $toolErrorCats
+        codeChanges        = [PSCustomObject]@{
+            filesCreated   = $filesCreated
+            filesModified  = $filesModified
+            replacements   = $replacements
+            uniqueFilePaths = @($changedFilePaths)
+        }
         hasFileWrites      = $hasFileWrites
         hasNestedDispatch  = $hasNestedDispatch
         hasKillTerminal    = $hasKillTerminal
@@ -383,6 +486,14 @@ $agentSizes  = @{}
 $byWorkspace = @{}
 $flagCounts  = @{ nestedDispatch = 0; askQuestions = 0; killTerminal = 0; todoList = 0 }
 $timestamps  = [System.Collections.Generic.List[string]]::new()
+# 聚合：工具错误分类
+$aggToolErrorCats = @{}
+# 聚合：代码变更
+$aggFilesCreated  = 0
+$aggFilesModified = 0
+$aggReplacements  = 0
+# 聚合：成功率
+$successRates = [System.Collections.Generic.List[double]]::new()
 
 foreach ($inv in $invocations) {
     $an = $inv.agentName
@@ -401,6 +512,27 @@ foreach ($inv in $invocations) {
     if ($inv.hasTodoList)       { $flagCounts['todoList']++ }
 
     if ($inv.timestamp) { $timestamps.Add($inv.timestamp) }
+
+    # 聚合工具错误分类
+    if ($inv.toolErrorCategories) {
+        $catObj = $inv.toolErrorCategories
+        if ($catObj -is [hashtable]) {
+            foreach ($k in $catObj.Keys) {
+                if ($aggToolErrorCats.ContainsKey($k)) { $aggToolErrorCats[$k] += $catObj[$k] }
+                else { $aggToolErrorCats[$k] = $catObj[$k] }
+            }
+        }
+    }
+    # 聚合代码变更
+    if ($inv.codeChanges) {
+        $aggFilesCreated  += $inv.codeChanges.filesCreated
+        $aggFilesModified += $inv.codeChanges.filesModified
+        $aggReplacements  += $inv.codeChanges.replacements
+    }
+    # 聚合成功率
+    if ($inv.totalToolCalls -gt 0) {
+        $successRates.Add($inv.toolSuccessRate)
+    }
 }
 
 # 按 agent 构建 byAgent 详情
@@ -438,6 +570,15 @@ $summary = [PSCustomObject]@{
         killTerminal   = $flagCounts['killTerminal']
         todoList       = $flagCounts['todoList']
     }
+    toolErrorCategories = $aggToolErrorCats
+    codeChanges        = [PSCustomObject]@{
+        filesCreated   = $aggFilesCreated
+        filesModified  = $aggFilesModified
+        replacements   = $aggReplacements
+    }
+    avgToolSuccessRate = if ($successRates.Count -gt 0) {
+        [math]::Round(($successRates | Measure-Object -Average).Average, 1)
+    } else { 100.0 }
 }
 
 # ── 输出 ──────────────────────────────────────────────

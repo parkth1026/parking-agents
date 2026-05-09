@@ -1,0 +1,103 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SessionFacets",
+  "description": "Per-session semantic facets extracted by LLM analysis. Cached at facets-cache/{session_id}.json",
+  "type": "object",
+  "required": ["sessionId", "extractedAt", "modelUsed", "facets"],
+  "properties": {
+    "sessionId": { "type": "string" },
+    "extractedAt": { "type": "string", "format": "date-time" },
+    "modelUsed": { "type": "string", "description": "e.g. gpt-4o, claude-3.5-sonnet" },
+    "transcriptHash": { "type": "string", "description": "MD5 hash of source transcript for cache invalidation" },
+    "facets": {
+      "type": "object",
+      "required": ["briefSummary", "goalCategories", "outcome"],
+      "properties": {
+        "briefSummary": { "type": "string", "maxLength": 200 },
+        "underlyingGoal": { "type": "string", "maxLength": 300 },
+        "goalCategories": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "feature_work",
+              "bug_fix",
+              "refactoring",
+              "testing",
+              "documentation",
+              "devops_infra",
+              "code_review",
+              "learning_exploration",
+              "data_analysis",
+              "design_architecture",
+              "migration_upgrade",
+              "performance_optimization",
+              "security"
+            ]
+          }
+        },
+        "outcome": {
+          "enum": ["fully_achieved", "mostly_achieved", "partially_achieved", "barely_started", "abandoned"]
+        },
+        "sessionType": {
+          "enum": ["focused_coding", "exploration", "debugging", "planning", "review", "mixed"]
+        },
+        "userSatisfaction": {
+          "type": "object",
+          "properties": {
+            "counts": {
+              "type": "object",
+              "properties": {
+                "highly_satisfied": { "type": "integer" },
+                "satisfied": { "type": "integer" },
+                "neutral": { "type": "integer" },
+                "slightly_frustrated": { "type": "integer" },
+                "frustrated": { "type": "integer" },
+                "very_frustrated": { "type": "integer" },
+                "confused": { "type": "integer" },
+                "impressed": { "type": "integer" }
+              }
+            },
+            "overall": {
+              "enum": ["highly_satisfied", "satisfied", "neutral", "slightly_frustrated", "frustrated", "very_frustrated"]
+            }
+          }
+        },
+        "claudeHelpfulness": {
+          "enum": ["extremely_helpful", "very_helpful", "moderately_helpful", "slightly_helpful", "not_helpful"]
+        },
+        "frictionCounts": {
+          "type": "object",
+          "properties": {
+            "wrong_approach": { "type": "integer" },
+            "hallucination": { "type": "integer" },
+            "ignored_instruction": { "type": "integer" },
+            "repetitive_error": { "type": "integer" },
+            "context_lost": { "type": "integer" },
+            "slow_response": { "type": "integer" },
+            "tool_failure": { "type": "integer" },
+            "incomplete_solution": { "type": "integer" },
+            "wrong_file_edit": { "type": "integer" },
+            "unnecessary_changes": { "type": "integer" },
+            "poor_code_quality": { "type": "integer" },
+            "misunderstood_request": { "type": "integer" }
+          }
+        },
+        "frictionDetail": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "Brief narrative of friction points encountered"
+        },
+        "primarySuccess": {
+          "type": "string",
+          "maxLength": 300,
+          "description": "What went well in this session"
+        },
+        "userInstructionsToClaude": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Explicit preferences or rules the user stated during the session"
+        }
+      }
+    }
+  }
+}

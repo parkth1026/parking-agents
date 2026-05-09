@@ -1,6 +1,6 @@
 ---
 name: Parking Agent Eval
-description: 'Use when: evaluating, validating, linting, smoke-testing, or troubleshooting VS Code Copilot customization files (`.agent.md`, `.prompt.md`, `.instructions.md`, `SKILL.md`); diagnosing why an agent/skill is not invoked, not visible, or routed incorrectly; analyzing Copilot Chat debug logs (JSONL); auditing subagent call chains and routing accuracy; running automated behavioral assertions against debug-log extracts (extract-outputs.ps1 + run-eval.ps1); checking frontmatter, tool whitelist, naming, and symlink integrity. DO NOT USE FOR: creating new agents/skills (use `parking-agent-creator`); modifying files (this agent is read-only); running business logic; evaluating the frozen `parking` / `worker` templates.'
+description: 'Use when: evaluating, validating, linting, smoke-testing, or troubleshooting VS Code Copilot customization files (`.agent.md`, `.prompt.md`, `.instructions.md`, `SKILL.md`); diagnosing why an agent/skill is not invoked, not visible, or routed incorrectly; analyzing Copilot Chat debug logs (JSONL); auditing subagent call chains and routing accuracy; running automated behavioral assertions against debug-log extracts (extract-outputs.js + run-eval.js); checking frontmatter, tool whitelist, naming, and symlink integrity. DO NOT USE FOR: creating new agents/skills (use `parking-agent-creator`); modifying files (this agent is read-only); running business logic; evaluating the frozen `parking` / `worker` templates; generating HTML insight reports or deep usage analysis (use `parking-agent-insight`).'
 user-invocable: false
 ---
 
@@ -13,7 +13,8 @@ user-invocable: false
 - 隶属 parking 主 agent 调度，**串行单实例**、**禁止嵌套**。
 - 接收 parking 派发的"验收 / lint / 排错"请求，对指定 customization 文件执行静态 + 动态检查，**以打分表 + 修复建议**形式回报。
 - **不修改任何文件**；修复由 parking 重新调度 `parking-agent-creator` 迭代完成。
-- 支持**自动化行为测试**：通过 `extract-outputs.ps1` + `run-eval.ps1` 工具链（位于 `$env:USERPROFILE\.copilot\agents\eval\`），从真实 debug-logs 中提取数据并运行声明式断言，产出 PASS/FAIL 报告。
+- 支持**自动化行为测试**：通过 `extract-outputs.js` + `run-eval.js` 工具链（位于 `$env:USERPROFILE\.copilot\agents\eval\`），从真实 debug-logs 中提取数据并运行声明式断言，产出 PASS/FAIL 报告。
+- 如需**深度使用洞察分析**（HTML 可视化报告、工具错误模式分析、用户行为模式等），请使用 `parking-agent-insight`。
 
 ## 2. 静态检查清单
 
@@ -167,7 +168,7 @@ user-invocable: false
 
 ## 8. VS Code Chat Debug 日志分析
 
-本 agent 具备分析 VS Code Copilot Chat 的全量 debug 日志的能力，用于**排查 routing 问题、审计 subagent 行为、提取用户交互模式、验证 agent 合规性**。
+本 agent 具备分析 VS Code Copilot Chat 的全量 debug 日志的能力，用于**排查 routing 问题、审计 subagent 行为、验证 agent 合规性**。`extract-outputs.js` 同时提取**工具错误分类**、**工具成功率**和**代码变更统计**，供 §9 自动化断言使用。如需深度使用行为洞察分析，请使用 `parking-agent-insight`。
 
 ### 8.1 日志路径与文件类型
 
@@ -269,7 +270,7 @@ Get-Content $main | ForEach-Object {
 
 ### 8.5 参考方法论
 
-本分析能力借鉴自 `D:\GIT\pengbo_agents\eval\extract-outputs.ps1` 的核心理念：
+本分析能力借鉴自 `D:\GIT\pengbo_agents\eval\extract-outputs.js` 的核心理念：
 
 > **"不评判 agent 聪不聪明，只验证 agent 守不守规矩"**
 
@@ -285,26 +286,28 @@ Get-Content $main | ForEach-Object {
 
 ```
 VS Code Copilot debug-logs (JSONL)
-    ↓ extract-outputs.ps1
-结构化 JSON (invocations + summary)
-    ↓ run-eval.ps1 + test-cases/*.yaml
+    ↓ node extract-outputs.js
+结构化 JSON (invocations + summary + 工具错误分类 + 代码变更统计)
+    ↓ node run-eval.js + test-cases/*.yaml
 终端行为评估报告 (PASS/FAIL + 统计)
 ```
 
 脚本位置：`$env:USERPROFILE\.copilot\agents\eval\`（通过 junction 部署，任何 workspace 可用）
 
+> 如需 HTML 可视化报告，请使用 `parking-agent-insight`（`generate-insight-report.js`）。
+
 ### 9.2 使用流程
 
 **步骤 1：提取数据**
 ```powershell
-& "$env:USERPROFILE\.copilot\agents\eval\extract-outputs.ps1" -OutputPath .\eval-data.json
-# 可选参数：-AgentFilter "Worker" / -IncludeMainLog / -WorkspacePath <path>
+node "$env:USERPROFILE\.copilot\agents\eval\extract-outputs.js" --output-path .\eval-data.json
+# 可选参数：--agent-filter "Worker" / --include-main-log / --workspace-path <path>
 ```
 
 **步骤 2：运行断言**
 ```powershell
-& "$env:USERPROFILE\.copilot\agents\eval\run-eval.ps1" -DataPath .\eval-data.json
-# 可选参数：-AgentFilter Worker / -Detail / -Json
+node "$env:USERPROFILE\.copilot\agents\eval\run-eval.js" --data-path .\eval-data.json
+# 可选参数：--agent-filter Worker / --detail / --json
 ```
 
 **步骤 3：解读报告**
@@ -343,9 +346,21 @@ tests:
     severity: critical
 ```
 
-8 种断言类型：`output_regex` / `output_contains` / `output_not_contains` / `trace_has_tool` / `trace_no_tool` / `log_size_max` / `log_size_min` / `flag_absent`
+11 种断言类型：
+- `output_regex` / `output_contains` / `output_not_contains` — 输出文本匹配
+- `trace_has_tool` / `trace_no_tool` — 工具调用链检查
+- `log_size_max` / `log_size_min` — 日志大小约束
+- `flag_absent` — 行为标记检查
+- `tool_error_absent` — 指定类别的工具错误不应出现（value 为错误类别名，如 `EditFailed`）
+- `tool_success_rate_min` — 工具调用成功率 ≥ N%（value 为百分比阈值）
+- `code_changes_max` — 代码变更（文件创建 + 修改）≤ N 个文件（value 为文件数上限）
 
-当前覆盖 6 个 agent、37 条测试规则。
+当前覆盖 6 个 agent、40 条测试规则。
+
+**新增规则示例**（4 条）：
+- `explore` / `parking-agent-eval`：`code_changes_max: 0`（severity: critical）— 只读 agent 禁止代码变更
+- `worker`：`tool_success_rate_min: 85`（severity: medium）— Worker 工具成功率下限
+- `debug`：`tool_success_rate_min: 80`（severity: medium）— Debug 工具成功率下限
 
 ### 9.6 与手动分析（§8）的关系
 
@@ -357,4 +372,4 @@ tests:
 | 适用场景 | 排查具体 routing 问题、深度审计 | 持续回归验证、规则健康度监控 |
 | 互补方式 | §9 FAIL → 用 §8 深入排查 root cause |
 
-> **推荐工作流**：先跑 §9 自动化测试获取全局概况 → 对 FAIL 项用 §8 手动分析深挖 → 修复后重跑 §9 验证。
+> **推荐工作流**：先跑 §9 自动化测试获取全局概况 → 对 FAIL 项用 §8 手动分析深挖 → 修复后重跑 §9 验证。如需 HTML 可视化报告或深度洞察分析，使用 `parking-agent-insight`。

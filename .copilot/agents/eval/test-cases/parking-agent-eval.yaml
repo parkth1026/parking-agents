@@ -34,3 +34,8 @@ tests:
     check_type: log_size_max
     value: 5120
     severity: medium
+
+  - name: 不应有代码变更
+    check_type: code_changes_max
+    value: 0
+    severity: critical

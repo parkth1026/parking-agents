@@ -29,3 +29,8 @@ tests:
     check_type: output_regex
     value: "\\*\\*|##|\\|.*\\|"
     severity: medium
+
+  - name: 工具成功率不低于85%
+    check_type: tool_success_rate_min
+    value: 85
+    severity: medium

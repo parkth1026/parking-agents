@@ -1,3 +1,4 @@
+# DEPRECATED: This script has been replaced by the Node.js version (.js). Use the .js version instead.
 # analyze-interactions.ps1
 # Full-precision JSONL analysis of all VS Code Copilot debug-logs
 # Uses StreamReader for memory efficiency on ~2GB data

@@ -1,0 +1,578 @@
+# ⚠️ DEPRECATED: 此脚本已迁移到 parking-agent-insight 的 generate-insight-report.ps1
+# 路径：.copilot\agents\insight\generate-insight-report.ps1
+# 请勿再使用此文件。
+
+#Requires -Version 5.1
+<#
+.SYNOPSIS
+    生成交互式 HTML 可视化报告（参考 Claude Code insights 报告设计）。
+
+.DESCRIPTION
+    读取 extract-outputs.ps1 输出的结构化 JSON 数据，
+    可选地读取 run-eval.ps1 -Json 的评估结果，
+    生成单文件暗色主题 HTML 报告。
+
+    特性：
+    - 零外部依赖（CSS + JS 全内联）
+    - 纯 CSS bar chart（无 CDN 图表库）
+    - 响应式布局（移动端可读）
+    - VS Code 风格暗色主题
+    - 点击折叠/展开详情
+
+.EXAMPLE
+    # 基本用法
+    .\generate-html-report.ps1 -DataPath .\eval-data.json
+
+    # 含评估结果
+    .\generate-html-report.ps1 -DataPath .\eval-data.json -EvalResultPath .\eval-result.json
+
+    # 自定义输出
+    .\generate-html-report.ps1 -DataPath .\eval-data.json -OutputPath .\report.html -Title "Weekly Report"
+#>
+param(
+    [Parameter(Mandatory)]
+    [string]$DataPath,          # extract-outputs.ps1 输出的 JSON 路径
+    [string]$EvalResultPath,    # run-eval.ps1 -Json 输出的路径（可选）
+    [string]$OutputPath,        # 输出 HTML 路径（默认 eval-report.html）
+    [string]$Title              # 报告标题
+)
+
+$ErrorActionPreference = 'Stop'
+
+if (-not $OutputPath) { $OutputPath = 'eval-report.html' }
+if (-not $Title)      { $Title = 'Parking Agents — Eval Report' }
+
+# ── 加载数据 ──────────────────────────────────────────
+if (-not (Test-Path $DataPath)) {
+    Write-Error "数据文件不存在: $DataPath"
+    return
+}
+try {
+    $rawJson = [System.IO.File]::ReadAllText((Resolve-Path $DataPath).Path, [System.Text.Encoding]::UTF8)
+    $data = $rawJson | ConvertFrom-Json -ErrorAction Stop
+} catch {
+    Write-Error "无法解析数据文件: $_"
+    return
+}
+
+$evalResult = $null
+if ($EvalResultPath -and (Test-Path $EvalResultPath)) {
+    try {
+        $evalRaw = [System.IO.File]::ReadAllText((Resolve-Path $EvalResultPath).Path, [System.Text.Encoding]::UTF8)
+        $evalResult = $evalRaw | ConvertFrom-Json -ErrorAction Stop
+    } catch {
+        Write-Warning "无法解析评估结果文件: $_"
+    }
+}
+
+# ── 数据聚合 ──────────────────────────────────────────
+$invocations = @($data.invocations)
+$summary     = $data.summary
+$totalInv    = $invocations.Count
+$now         = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
+
+# Agent 分布
+$agentDist = @{}
+foreach ($inv in $invocations) {
+    $an = $inv.agentName
+    if ($agentDist.ContainsKey($an)) { $agentDist[$an]++ } else { $agentDist[$an] = 1 }
+}
+
+# 工具调用统计（跨所有 invocation 聚合）
+$toolTotals = @{}
+foreach ($inv in $invocations) {
+    $tc = $inv.toolCalls
+    if (-not $tc) { continue }
+    if ($tc -is [hashtable]) {
+        foreach ($k in $tc.Keys) {
+            if ($toolTotals.ContainsKey($k)) { $toolTotals[$k] += $tc[$k] }
+            else { $toolTotals[$k] = $tc[$k] }
+        }
+    } else {
+        foreach ($p in $tc.PSObject.Properties) {
+            if ($toolTotals.ContainsKey($p.Name)) { $toolTotals[$p.Name] += [int]$p.Value }
+            else { $toolTotals[$p.Name] = [int]$p.Value }
+        }
+    }
+}
+
+# 工具调用热力图：agent × tool
+$agentToolMatrix = @{}
+$allToolNames = [System.Collections.Generic.HashSet[string]]::new()
+foreach ($inv in $invocations) {
+    $an = $inv.agentName
+    if (-not $agentToolMatrix.ContainsKey($an)) { $agentToolMatrix[$an] = @{} }
+    $tc = $inv.toolCalls
+    if (-not $tc) { continue }
+    $props = if ($tc -is [hashtable]) {
+        $tc.GetEnumerator() | ForEach-Object { [PSCustomObject]@{ Name = $_.Key; Value = $_.Value } }
+    } else {
+        $tc.PSObject.Properties
+    }
+    foreach ($p in $props) {
+        [void]$allToolNames.Add($p.Name)
+        if ($agentToolMatrix[$an].ContainsKey($p.Name)) {
+            $agentToolMatrix[$an][$p.Name] += [int]$p.Value
+        } else {
+            $agentToolMatrix[$an][$p.Name] = [int]$p.Value
+        }
+    }
+}
+$sortedToolNames = @($allToolNames | Sort-Object)
+$sortedAgents    = @($agentDist.Keys | Sort-Object)
+
+# 总工具调用
+$totalToolCalls = 0
+foreach ($v in $toolTotals.Values) { $totalToolCalls += $v }
+
+# 平均日志大小
+$avgLogKB = 0
+if ($totalInv -gt 0) {
+    $avgLogKB = [math]::Round(($invocations | ForEach-Object { $_.logSizeKB } | Measure-Object -Average).Average, 1)
+}
+
+# 日志大小分布
+$sizeBuckets = @{ 'lt1MB' = 0; '1to5MB' = 0; '5to10MB' = 0; 'gt10MB' = 0 }
+foreach ($inv in $invocations) {
+    $kb = $inv.logSizeKB
+    if     ($kb -lt 1024)  { $sizeBuckets['lt1MB']++ }
+    elseif ($kb -lt 5120)  { $sizeBuckets['1to5MB']++ }
+    elseif ($kb -lt 10240) { $sizeBuckets['5to10MB']++ }
+    else                   { $sizeBuckets['gt10MB']++ }
+}
+
+# 工具错误聚合
+$errCatsAgg = @{}
+foreach ($inv in $invocations) {
+    $cats = $inv.toolErrorCategories
+    if (-not $cats) { continue }
+    $props = if ($cats -is [hashtable]) {
+        $cats.GetEnumerator() | ForEach-Object { [PSCustomObject]@{ Name = $_.Key; Value = $_.Value } }
+    } else {
+        $cats.PSObject.Properties
+    }
+    foreach ($p in $props) {
+        if ($errCatsAgg.ContainsKey($p.Name)) { $errCatsAgg[$p.Name] += [int]$p.Value }
+        else { $errCatsAgg[$p.Name] = [int]$p.Value }
+    }
+}
+
+# Agent 成功率
+$agentSuccessRates = @{}
+foreach ($an in $sortedAgents) {
+    $agentInvs = @($invocations | Where-Object { $_.agentName -eq $an -and $_.totalToolCalls -gt 0 })
+    if ($agentInvs.Count -gt 0) {
+        $avg = [math]::Round(($agentInvs | ForEach-Object { $_.toolSuccessRate } | Measure-Object -Average).Average, 1)
+        $agentSuccessRates[$an] = $avg
+    } else {
+        $agentSuccessRates[$an] = 100.0
+    }
+}
+
+# 代码变更聚合
+$totalFilesCreated  = 0
+$totalFilesModified = 0
+$totalReplacements  = 0
+foreach ($inv in $invocations) {
+    if ($inv.codeChanges) {
+        $totalFilesCreated  += [int]$inv.codeChanges.filesCreated
+        $totalFilesModified += [int]$inv.codeChanges.filesModified
+        $totalReplacements  += [int]$inv.codeChanges.replacements
+    }
+}
+
+# 异常检测
+$oversizedLogs   = @($invocations | Where-Object { $_.logSizeKB -gt 10240 } | ForEach-Object {
+    [PSCustomObject]@{ agent = $_.agentName; sizeKB = $_.logSizeKB; logFile = $_.logFile }
+})
+$zeroToolInvs    = @($invocations | Where-Object { $_.totalToolCalls -eq 0 } | ForEach-Object {
+    [PSCustomObject]@{ agent = $_.agentName; logFile = $_.logFile; prompt = $_.prompt }
+})
+$highErrorAgents = @($sortedAgents | Where-Object { $agentSuccessRates[$_] -lt 80 } | ForEach-Object {
+    [PSCustomObject]@{ agent = $_; successRate = $agentSuccessRates[$_] }
+})
+
+# 时间范围
+$timeEarliest = ''
+$timeLatest   = ''
+if ($summary -and $summary.timeRange) {
+    $timeEarliest = if ($summary.timeRange.earliest) { [string]$summary.timeRange.earliest } else { '' }
+    $timeLatest   = if ($summary.timeRange.latest)   { [string]$summary.timeRange.latest   } else { '' }
+}
+
+# ── HTML 辅助函数 ─────────────────────────────────────
+function HtmlEncode {
+    param([string]$Text)
+    if (-not $Text) { return '' }
+    return $Text.Replace('&','&amp;').Replace('<','&lt;').Replace('>','&gt;').Replace('"','&quot;')
+}
+
+function BarCellColor {
+    param([double]$Value, [double]$Max)
+    if ($Max -le 0) { return 0 }
+    return [math]::Min(100, [math]::Round(($Value / $Max) * 100))
+}
+
+# ── 构建 HTML ─────────────────────────────────────────
+$sb = [System.Text.StringBuilder]::new(50000)
+
+[void]$sb.AppendLine(@"
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>$(HtmlEncode $Title)</title>
+<style>
+:root {
+  --bg: #1e1e1e; --bg2: #252526; --bg3: #2d2d30; --bg4: #3e3e42;
+  --fg: #d4d4d4; --fg2: #969696; --accent: #569cd6; --accent2: #4ec9b0;
+  --green: #4caf50; --yellow: #ff9800; --red: #f44336; --orange: #e67e22;
+  --border: #404040; --radius: 6px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--fg); font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; line-height: 1.6; padding: 20px; max-width: 1400px; margin: 0 auto; }
+a { color: var(--accent); text-decoration: none; }
+h1 { color: var(--accent); font-size: 1.6em; margin-bottom: 4px; }
+h2 { color: var(--accent2); font-size: 1.2em; margin: 24px 0 12px; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+h3 { color: var(--fg); font-size: 1em; margin: 16px 0 8px; }
+.header { border-bottom: 2px solid var(--accent); padding-bottom: 12px; margin-bottom: 20px; }
+.meta { color: var(--fg2); font-size: 0.85em; }
+/* Stats row */
+.stats-row { display: flex; flex-wrap: wrap; gap: 12px; margin: 16px 0; }
+.stat-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 16px; flex: 1; min-width: 140px; }
+.stat-card .label { color: var(--fg2); font-size: 0.8em; text-transform: uppercase; }
+.stat-card .value { font-size: 1.5em; font-weight: bold; color: var(--accent); }
+/* Bar chart */
+.bar-chart { margin: 8px 0; }
+.bar-row { display: flex; align-items: center; margin: 4px 0; }
+.bar-label { width: 180px; min-width: 120px; font-size: 0.85em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar-container { flex: 1; background: var(--bg3); border-radius: 3px; height: 22px; position: relative; margin: 0 8px; }
+.bar-fill { height: 100%; border-radius: 3px; transition: width 0.3s; min-width: 2px; }
+.bar-value { font-size: 0.8em; color: var(--fg2); min-width: 50px; text-align: right; }
+/* Table */
+table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 0.85em; }
+th, td { padding: 6px 10px; border: 1px solid var(--border); text-align: left; }
+th { background: var(--bg3); color: var(--accent2); font-weight: 600; position: sticky; top: 0; }
+td { background: var(--bg2); }
+/* Heatmap cell */
+.heat-0 { background: var(--bg2); }
+.heat-1 { background: #1a3a2a; }
+.heat-2 { background: #2a4a3a; }
+.heat-3 { background: #3a6a4a; }
+.heat-4 { background: #4a8a5a; }
+.heat-5 { background: #5aaa6a; }
+/* Collapsible */
+.collapse-toggle { cursor: pointer; user-select: none; background: var(--bg3); padding: 8px 12px; border-radius: var(--radius); margin: 4px 0; border: 1px solid var(--border); display: flex; justify-content: space-between; }
+.collapse-toggle:hover { background: var(--bg4); }
+.collapse-content { display: none; padding: 8px 12px; border: 1px solid var(--border); border-top: none; border-radius: 0 0 var(--radius) var(--radius); background: var(--bg2); }
+.collapse-content.open { display: block; }
+/* Rule health */
+.rule-row { display: flex; align-items: center; padding: 4px 0; border-bottom: 1px solid var(--border); }
+.rule-name { flex: 1; font-size: 0.85em; }
+.rule-bar { width: 120px; margin: 0 8px; }
+.rule-status { width: 24px; text-align: center; }
+.pass-bar { height: 14px; border-radius: 2px; }
+/* Anomaly */
+.anomaly-item { background: var(--bg3); padding: 6px 10px; margin: 4px 0; border-radius: 3px; border-left: 3px solid var(--red); font-size: 0.85em; }
+.anomaly-warn { border-left-color: var(--yellow); }
+/* Footer */
+.footer { margin-top: 32px; padding-top: 12px; border-top: 1px solid var(--border); color: var(--fg2); font-size: 0.75em; }
+/* Responsive */
+@media (max-width: 768px) {
+  .bar-label { width: 100px; min-width: 80px; font-size: 0.75em; }
+  .stats-row { flex-direction: column; }
+  table { font-size: 0.75em; }
+  th, td { padding: 3px 5px; }
+}
+</style>
+</head>
+<body>
+"@)
+
+# ── Header ────────────────────────────────────────────
+[void]$sb.AppendLine(@"
+<div class="header">
+  <h1>$(HtmlEncode $Title)</h1>
+  <div class="meta">
+    生成时间: $now &nbsp;|&nbsp;
+    Sessions: $(@($invocations | ForEach-Object { $_.sessionId } | Sort-Object -Unique).Count) &nbsp;|&nbsp;
+    Agents: $($agentDist.Count) &nbsp;|&nbsp;
+    时间范围: $(HtmlEncode $timeEarliest) ~ $(HtmlEncode $timeLatest)
+  </div>
+</div>
+"@)
+
+# ── Stats Row ─────────────────────────────────────────
+$avgSuccRate = if ($summary -and $summary.avgToolSuccessRate) { $summary.avgToolSuccessRate } else { 100.0 }
+[void]$sb.AppendLine(@"
+<div class="stats-row">
+  <div class="stat-card"><div class="label">总调用次数</div><div class="value">$totalInv</div></div>
+  <div class="stat-card"><div class="label">总工具调用</div><div class="value">$totalToolCalls</div></div>
+  <div class="stat-card"><div class="label">平均日志大小</div><div class="value">${avgLogKB} KB</div></div>
+  <div class="stat-card"><div class="label">文件变更数</div><div class="value">$($totalFilesCreated + $totalFilesModified)</div></div>
+  <div class="stat-card"><div class="label">平均工具成功率</div><div class="value">${avgSuccRate}%</div></div>
+</div>
+"@)
+
+# ── Agent 分布 ────────────────────────────────────────
+$maxAgentCount = 1
+foreach ($v in $agentDist.Values) { if ($v -gt $maxAgentCount) { $maxAgentCount = $v } }
+
+[void]$sb.AppendLine('<h2>Agent 分布</h2><div class="bar-chart">')
+foreach ($an in ($agentDist.Keys | Sort-Object)) {
+    $count = $agentDist[$an]
+    $pct = BarCellColor -Value $count -Max $maxAgentCount
+    [void]$sb.AppendLine(@"
+<div class="bar-row">
+  <div class="bar-label">$(HtmlEncode $an)</div>
+  <div class="bar-container"><div class="bar-fill" style="width:${pct}%;background:var(--accent)"></div></div>
+  <div class="bar-value">$count</div>
+</div>
+"@)
+}
+[void]$sb.AppendLine('</div>')
+
+# ── Rule Health 看板 ──────────────────────────────────
+if ($evalResult -and $evalResult.agents) {
+    [void]$sb.AppendLine('<h2>Rule Health 看板</h2>')
+
+    $agentProps = $evalResult.agents.PSObject.Properties
+    foreach ($ap in $agentProps) {
+        $agName = $ap.Name
+        $agData = $ap.Value
+        $agInvCount = if ($agData.invocations) { $agData.invocations } else { 0 }
+        [void]$sb.AppendLine("<h3>$(HtmlEncode $agName) ($agInvCount invocations)</h3>")
+
+        $tests = @($agData.tests)
+        foreach ($t in $tests) {
+            $rate = [double]$t.rate * 100
+            $ratePct = [math]::Round($rate, 1)
+            $barColor = if ($rate -ge 80) { 'var(--green)' } elseif ($rate -ge 50) { 'var(--yellow)' } else { 'var(--red)' }
+            $statusIcon = if ($t.result -eq 'PASS') { '&#x2705;' } else { '&#x274C;' }
+            if ($t.result -ne 'PASS' -and $rate -ge 50) { $statusIcon = '&#x26A0;' }
+            $sevBadge = if ($t.severity) { "[$($t.severity)]" } else { '' }
+
+            [void]$sb.AppendLine(@"
+<div class="rule-row">
+  <div class="rule-name">$(HtmlEncode $t.name) <span style="color:var(--fg2);font-size:0.8em">$sevBadge</span></div>
+  <div class="rule-bar"><div class="bar-container" style="height:14px"><div class="pass-bar" style="width:${ratePct}%;background:$barColor"></div></div></div>
+  <div class="bar-value">${ratePct}% ($($t.passed)/$($t.total))</div>
+  <div class="rule-status">$statusIcon</div>
+</div>
+"@)
+        }
+    }
+}
+
+# ── 工具调用热力图 ────────────────────────────────────
+[void]$sb.AppendLine('<h2>工具调用热力图</h2>')
+
+# 找全局最大值用于颜色映射
+$heatMax = 1
+foreach ($an in $sortedAgents) {
+    if ($agentToolMatrix.ContainsKey($an)) {
+        foreach ($v in $agentToolMatrix[$an].Values) {
+            if ([int]$v -gt $heatMax) { $heatMax = [int]$v }
+        }
+    }
+}
+
+# 只显示前 20 个最常用工具
+$topTools = @($toolTotals.GetEnumerator() | Sort-Object Value -Descending | Select-Object -First 20 | ForEach-Object { $_.Key })
+
+[void]$sb.AppendLine('<div style="overflow-x:auto"><table>')
+[void]$sb.Append('<tr><th>Agent</th>')
+foreach ($tn in $topTools) {
+    $shortName = $tn
+    if ($shortName.Length -gt 18) { $shortName = $shortName.Substring(0, 16) + '..' }
+    [void]$sb.Append("<th title=`"$(HtmlEncode $tn)`">$(HtmlEncode $shortName)</th>")
+}
+[void]$sb.AppendLine('</tr>')
+
+foreach ($an in $sortedAgents) {
+    [void]$sb.Append("<tr><td><strong>$(HtmlEncode $an)</strong></td>")
+    $matrix = if ($agentToolMatrix.ContainsKey($an)) { $agentToolMatrix[$an] } else { @{} }
+    foreach ($tn in $topTools) {
+        $cnt = 0
+        if ($matrix.ContainsKey($tn)) { $cnt = [int]$matrix[$tn] }
+        $level = if ($cnt -eq 0) { 0 }
+                 elseif ($cnt -le ($heatMax * 0.1)) { 1 }
+                 elseif ($cnt -le ($heatMax * 0.3)) { 2 }
+                 elseif ($cnt -le ($heatMax * 0.5)) { 3 }
+                 elseif ($cnt -le ($heatMax * 0.8)) { 4 }
+                 else { 5 }
+        [void]$sb.Append("<td class=`"heat-$level`" title=`"$cnt`">$cnt</td>")
+    }
+    [void]$sb.AppendLine('</tr>')
+}
+[void]$sb.AppendLine('</table></div>')
+
+# ── 工具错误分析 ──────────────────────────────────────
+[void]$sb.AppendLine('<h2>工具错误分析</h2>')
+
+if ($errCatsAgg.Count -gt 0) {
+    $maxErr = 1
+    foreach ($v in $errCatsAgg.Values) { if ([int]$v -gt $maxErr) { $maxErr = [int]$v } }
+
+    [void]$sb.AppendLine('<h3>错误类别分布</h3><div class="bar-chart">')
+    foreach ($cat in ($errCatsAgg.Keys | Sort-Object)) {
+        $cnt = $errCatsAgg[$cat]
+        $pct = BarCellColor -Value $cnt -Max $maxErr
+        [void]$sb.AppendLine(@"
+<div class="bar-row">
+  <div class="bar-label">$(HtmlEncode $cat)</div>
+  <div class="bar-container"><div class="bar-fill" style="width:${pct}%;background:var(--orange)"></div></div>
+  <div class="bar-value">$cnt</div>
+</div>
+"@)
+    }
+    [void]$sb.AppendLine('</div>')
+} else {
+    [void]$sb.AppendLine('<p style="color:var(--fg2)">无工具错误记录</p>')
+}
+
+# Agent 成功率
+[void]$sb.AppendLine('<h3>Agent 工具成功率</h3><div class="bar-chart">')
+foreach ($an in $sortedAgents) {
+    $rate = $agentSuccessRates[$an]
+    $barColor = if ($rate -ge 90) { 'var(--green)' } elseif ($rate -ge 70) { 'var(--yellow)' } else { 'var(--red)' }
+    [void]$sb.AppendLine(@"
+<div class="bar-row">
+  <div class="bar-label">$(HtmlEncode $an)</div>
+  <div class="bar-container"><div class="bar-fill" style="width:${rate}%;background:$barColor"></div></div>
+  <div class="bar-value">${rate}%</div>
+</div>
+"@)
+}
+[void]$sb.AppendLine('</div>')
+
+# ── 日志大小分布 ──────────────────────────────────────
+[void]$sb.AppendLine('<h2>日志大小分布</h2><div class="bar-chart">')
+$maxBucket = 1
+foreach ($v in $sizeBuckets.Values) { if ($v -gt $maxBucket) { $maxBucket = $v } }
+$bucketLabels = @(
+    @{ key='lt1MB';   label='< 1 MB' },
+    @{ key='1to5MB';  label='1-5 MB' },
+    @{ key='5to10MB'; label='5-10 MB' },
+    @{ key='gt10MB';  label='> 10 MB' }
+)
+foreach ($b in $bucketLabels) {
+    $cnt = $sizeBuckets[$b.key]
+    $pct = BarCellColor -Value $cnt -Max $maxBucket
+    $barColor = if ($b.key -eq 'gt10MB') { 'var(--red)' } elseif ($b.key -eq '5to10MB') { 'var(--yellow)' } else { 'var(--accent)' }
+    [void]$sb.AppendLine(@"
+<div class="bar-row">
+  <div class="bar-label">$($b.label)</div>
+  <div class="bar-container"><div class="bar-fill" style="width:${pct}%;background:$barColor"></div></div>
+  <div class="bar-value">$cnt</div>
+</div>
+"@)
+}
+[void]$sb.AppendLine('</div>')
+
+# ── 代码变更统计 ──────────────────────────────────────
+[void]$sb.AppendLine(@"
+<h2>代码变更统计</h2>
+<div class="stats-row">
+  <div class="stat-card"><div class="label">文件创建</div><div class="value">$totalFilesCreated</div></div>
+  <div class="stat-card"><div class="label">文件修改</div><div class="value">$totalFilesModified</div></div>
+  <div class="stat-card"><div class="label">替换操作</div><div class="value">$totalReplacements</div></div>
+</div>
+"@)
+
+# ── 异常检测 ──────────────────────────────────────────
+[void]$sb.AppendLine('<h2>异常检测</h2>')
+
+# 超大日志
+[void]$sb.AppendLine(@"
+<div class="collapse-toggle" onclick="toggle(this)">
+  <span>&#x1F4E6; 超大日志 (&gt;10MB): $($oversizedLogs.Count) 条</span>
+  <span class="arrow">&#x25B6;</span>
+</div>
+<div class="collapse-content">
+"@)
+if ($oversizedLogs.Count -gt 0) {
+    foreach ($ol in $oversizedLogs) {
+        $sizeMB = [math]::Round($ol.sizeKB / 1024, 1)
+        $logName = Split-Path $ol.logFile -Leaf
+        [void]$sb.AppendLine("<div class=`"anomaly-item`">$(HtmlEncode $ol.agent) — ${sizeMB} MB — $(HtmlEncode $logName)</div>")
+    }
+} else {
+    [void]$sb.AppendLine('<p style="color:var(--green)">无超大日志</p>')
+}
+[void]$sb.AppendLine('</div>')
+
+# 零工具调用
+[void]$sb.AppendLine(@"
+<div class="collapse-toggle" onclick="toggle(this)">
+  <span>&#x26A0; 零工具调用: $($zeroToolInvs.Count) 条</span>
+  <span class="arrow">&#x25B6;</span>
+</div>
+<div class="collapse-content">
+"@)
+if ($zeroToolInvs.Count -gt 0) {
+    foreach ($zi in $zeroToolInvs) {
+        $logName = Split-Path $zi.logFile -Leaf
+        $promptSnip = if ($zi.prompt.Length -gt 80) { $zi.prompt.Substring(0, 80) + '...' } else { $zi.prompt }
+        [void]$sb.AppendLine("<div class=`"anomaly-item anomaly-warn`">$(HtmlEncode $zi.agent) — $(HtmlEncode $logName)<br><span style=`"color:var(--fg2)`">$(HtmlEncode $promptSnip)</span></div>")
+    }
+} else {
+    [void]$sb.AppendLine('<p style="color:var(--green)">所有 invocation 均有工具调用</p>')
+}
+[void]$sb.AppendLine('</div>')
+
+# 超高错误率 agent
+[void]$sb.AppendLine(@"
+<div class="collapse-toggle" onclick="toggle(this)">
+  <span>&#x274C; 高错误率 Agent (&lt;80% 成功率): $($highErrorAgents.Count) 个</span>
+  <span class="arrow">&#x25B6;</span>
+</div>
+<div class="collapse-content">
+"@)
+if ($highErrorAgents.Count -gt 0) {
+    foreach ($ha in $highErrorAgents) {
+        [void]$sb.AppendLine("<div class=`"anomaly-item`">$(HtmlEncode $ha.agent) — 成功率 $($ha.successRate)%</div>")
+    }
+} else {
+    [void]$sb.AppendLine('<p style="color:var(--green)">所有 Agent 工具成功率均 ≥ 80%</p>')
+}
+[void]$sb.AppendLine('</div>')
+
+# ── Footer ────────────────────────────────────────────
+$dataFileName = Split-Path $DataPath -Leaf
+$evalFileName = if ($EvalResultPath) { Split-Path $EvalResultPath -Leaf } else { '(未提供)' }
+
+[void]$sb.AppendLine(@"
+<div class="footer">
+  <p>数据来源: $(HtmlEncode $dataFileName) &nbsp;|&nbsp; 评估结果: $(HtmlEncode $evalFileName)</p>
+  <p>生成命令: generate-html-report.ps1 -DataPath $(HtmlEncode $dataFileName)</p>
+  <p>版本: 1.0.0 &nbsp;|&nbsp; Parking Agents Eval Toolkit</p>
+</div>
+
+<script>
+function toggle(el) {
+  var content = el.nextElementSibling;
+  var arrow = el.querySelector('.arrow');
+  if (content.classList.contains('open')) {
+    content.classList.remove('open');
+    arrow.innerHTML = '&#x25B6;';
+  } else {
+    content.classList.add('open');
+    arrow.innerHTML = '&#x25BC;';
+  }
+}
+</script>
+</body>
+</html>
+"@)
+
+# ── 写出 ──────────────────────────────────────────────
+$html = $sb.ToString()
+$parentDir = Split-Path $OutputPath -Parent
+if ($parentDir -and -not (Test-Path $parentDir)) {
+    New-Item -Path $parentDir -ItemType Directory -Force | Out-Null
+}
+[System.IO.File]::WriteAllText($OutputPath, $html, [System.Text.Encoding]::UTF8)
+
+Write-Host "[done] HTML 报告已生成: $OutputPath ($([math]::Round($html.Length/1024, 1)) KB)" -ForegroundColor Green

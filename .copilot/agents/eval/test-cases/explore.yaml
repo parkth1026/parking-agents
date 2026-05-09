@@ -34,3 +34,8 @@ tests:
     check_type: trace_has_tool
     value: read_file
     severity: low
+
+  - name: 不应有代码变更
+    check_type: code_changes_max
+    value: 0
+    severity: critical
