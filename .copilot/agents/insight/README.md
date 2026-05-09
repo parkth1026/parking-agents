@@ -11,14 +11,14 @@ Insight agent 从 VS Code Copilot debug-logs (JSONL) 中提取使用行为数据
 ```
 Phase 1: 定量提取（脚本，零 LLM 成本）
   node analyze-insight.js --extract-transcripts
-  → insight-data.json + session-transcripts/*.txt
+  → reports/insight-data.json + reports/session-transcripts/*.txt
 
 Phase 2: LLM Facets 提取（通过 Copilot 对话）
-  读取 session-transcripts/ → LLM 分析 → facets-cache/{sessionId}.json
+  读取 reports/session-transcripts/ → LLM 分析 → reports/facets-cache/{sessionId}.json
   已缓存的 session 自动跳过
 
 Phase 3: 叙事生成 + HTML 报告
-  node generate-insight-report.js --facets-path facets-cache --narratives-path insight-narratives.json
+  node generate-insight-report.js --facets-path reports/facets-cache --narratives-path reports/insight-narratives.json
   → 包含语义分析的完整 HTML 报告
 ```
 
@@ -38,10 +38,10 @@ Insight 工具链提供三种报告生成方式，适用于不同场景：
 
 ```powershell
 # 1. 提取定量数据
-node .\analyze-insight.js --output-path insight-data.json --days-back 30
+node .\analyze-insight.js --output-path reports/insight-data.json --days-back 30
 
 # 2. 生成客观数据 HTML 报告（不含语义分析）
-node .\generate-quant-report.js --data-path insight-data.json --output-path report.html
+node .\generate-quant-report.js --data-path reports/insight-data.json --output-path reports/report.html
 ```
 
 ## 完整模式（含语义分析）
@@ -50,12 +50,12 @@ node .\generate-quant-report.js --data-path insight-data.json --output-path repo
 
 ```powershell
 # Phase 1: 提取数据 + 转录
-node .\analyze-insight.js --output-path insight-data.json --extract-transcripts --transcript-output-path session-transcripts
+node .\analyze-insight.js --output-path reports/insight-data.json --extract-transcripts --transcript-output-path reports/session-transcripts
 
-# Phase 2: 在 Copilot 对话中调用 insight agent，自动批量提取 facets → facets-cache/
+# Phase 2: 在 Copilot 对话中调用 insight agent，自动批量提取 facets → reports/facets-cache/
 
 # Phase 3: 生成完整报告
-node .\generate-insight-report.js --data-path insight-data.json --facets-path facets-cache --narratives-path insight-narratives.json
+node .\generate-insight-report.js --data-path reports/insight-data.json --facets-path reports/facets-cache --narratives-path reports/insight-narratives.json
 ```
 
 ## 参数参考
@@ -70,16 +70,16 @@ node .\generate-insight-report.js --data-path insight-data.json --facets-path fa
 | `--days-back` | int | 分析最近 N 天（默认 30） |
 | `--max-files` | int | 限制处理文件数（0=不限） |
 | `--extract-transcripts` | flag | 提取压缩 session 转录 |
-| `--transcript-output-path` | string | 转录输出目录（默认 `session-transcripts`） |
+| `--transcript-output-path` | string | 转录输出目录（默认 `reports/session-transcripts`） |
 
 ### generate-insight-report.js
 
 | 参数 | 类型 | 说明 |
 |------|------|------|
 | `--data-path` | string (必填) | insight-data.json 路径 |
-| `--output-path` | string | 输出 HTML 路径（默认 `insight-report.html`） |
+| `--output-path` | string | 输出 HTML 路径（默认 `reports/insight-report.html`） |
 | `--title` | string | 报告标题 |
-| `--facets-path` | string | facets 缓存目录（默认 `facets-cache`） |
+| `--facets-path` | string | facets 缓存目录（默认 `reports/facets-cache`） |
 | `--narratives-path` | string | 叙事 JSON 路径 |
 
 ### generate-quant-report.js
@@ -87,7 +87,7 @@ node .\generate-insight-report.js --data-path insight-data.json --facets-path fa
 | 参数 | 类型 | 说明 |
 |------|------|------|
 | `--data-path` | string (必填) | insight-data.json 路径 |
-| `--output-path` | string | 输出 HTML 路径（默认 `insight-report.html`） |
+| `--output-path` | string | 输出 HTML 路径（默认 `reports/insight-quant-report.html`） |
 | `--title` | string | 报告标题 |
 
 ### generate-qual-report.js
@@ -95,14 +95,14 @@ node .\generate-insight-report.js --data-path insight-data.json --facets-path fa
 | 参数 | 类型 | 说明 |
 |------|------|------|
 | `--data-path` | string (必填) | insight-data.json 路径 |
-| `--output-path` | string | 输出 HTML 路径（默认 `insight-report.html`） |
+| `--output-path` | string | 输出 HTML 路径（默认 `reports/insight-qual-report.html`） |
 | `--title` | string | 报告标题 |
-| `--facets-path` | string | facets 缓存目录（默认 `facets-cache`） |
+| `--facets-path` | string | facets 缓存目录（默认 `reports/facets-cache`） |
 | `--narratives-path` | string | 叙事 JSON 路径 |
 
 ## 缓存管理
 
-`facets-cache/` 目录存放每个 session 的 LLM 分析结果：
+`reports/facets-cache/` 目录存放每个 session 的 LLM 分析结果：
 
 - 文件名格式：`{sessionId}.json`
 - Phase 2 执行时自动跳过已缓存的 session

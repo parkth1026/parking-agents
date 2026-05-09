@@ -22,7 +22,8 @@
 ## 🤖 现有 subagent
 
 - **parking-agent-creator** —— 创建 / 脚手架新的 agent / skill。开发新 agent 时主 agent 应**优先调用它**（规范已内置，无需注入 AGENT_DEVELOPMENT.md）。
-- **parking-agent-eval** —— 评估 / lint / 排错 customization 文件（read-only，输出打分表 + 修复建议）。
+- **parking-agent-eval** —— 评估 / lint / 排错 customization 文件（read-only，输出打分表 + 修复建议）；运行行为断言测试。
+- **parking-agent-insight** —— 使用行为洞察分析：从 debug-logs 生成 HTML 报告、工具错误模式分析、token 消耗统计、用户满意度推断等。
 
 ## 🎯 测试与运行 agent 时
 

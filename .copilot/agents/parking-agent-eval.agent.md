@@ -300,13 +300,13 @@ VS Code Copilot debug-logs (JSONL)
 
 **步骤 1：提取数据**
 ```powershell
-node "$env:USERPROFILE\.copilot\agents\eval\extract-outputs.js" --output-path .\eval-data.json
+node "$env:USERPROFILE\.copilot\agents\eval\extract-outputs.js" --output-path .\reports\eval-data.json
 # 可选参数：--agent-filter "Worker" / --include-main-log / --workspace-path <path>
 ```
 
 **步骤 2：运行断言**
 ```powershell
-node "$env:USERPROFILE\.copilot\agents\eval\run-eval.js" --data-path .\eval-data.json
+node "$env:USERPROFILE\.copilot\agents\eval\run-eval.js" --data-path .\reports\eval-data.json
 # 可选参数：--agent-filter Worker / --detail / --json
 ```
 

@@ -10,8 +10,8 @@
  * 零外部依赖，CSS + JS 全内联。
  *
  * Usage:
- *   node generate-insight-report.js --data-path ./insight-data.json
- *   node generate-insight-report.js --data-path ./insight-data.json --output-path ./report.html --title "Weekly Insight"
+ *   node generate-insight-report.js --data-path ./reports/insight-data.json
+ *   node generate-insight-report.js --data-path ./reports/insight-data.json --output-path ./reports/report.html --title "Weekly Insight"
  */
 
 const fs = require('fs');
@@ -23,7 +23,7 @@ function parseArgs(argv) {
         dataPath: null,
         outputPath: null,
         title: null,
-        facetsPath: 'facets-cache',
+        facetsPath: 'reports/facets-cache',
         narrativesPath: '',
     };
     for (let i = 2; i < argv.length; i++) {
@@ -100,7 +100,7 @@ function main() {
         process.exit(1);
     }
 
-    const outputPath = args.outputPath || 'insight-report.html';
+    const outputPath = args.outputPath || 'reports/insight-report.html';
     const title = args.title || 'VS Code Copilot Insight Report';
 
     // ── 加载数据 ──────────────────────────────────────

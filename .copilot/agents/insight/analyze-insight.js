@@ -9,9 +9,9 @@
  * 时间分布等定量指标。纯本地计算，不调用 LLM。
  *
  * Usage:
- *   node analyze-insight.js --output-path ./insight-data.json
- *   node analyze-insight.js --output-path ./insight-data.json --days-back 7
- *   node analyze-insight.js --output-path ./insight-data.json --workspace-path "D:\GIT\my-project"
+ *   node analyze-insight.js --output-path ./reports/insight-data.json
+ *   node analyze-insight.js --output-path ./reports/insight-data.json --days-back 7
+ *   node analyze-insight.js --output-path ./reports/insight-data.json --workspace-path "D:\GIT\my-project"
  */
 
 const fs = require('fs');
@@ -28,8 +28,8 @@ function parseArgs(argv) {
         maxFiles: 0,
         daysBack: 30,
         extractTranscripts: false,
-        transcriptOutput: 'session-transcripts',
-        cachePath: 'insight-cache',
+        transcriptOutput: 'reports/session-transcripts',
+        cachePath: 'reports/insight-cache',
     };
 
     for (let i = 2; i < argv.length; i++) {
@@ -742,8 +742,11 @@ for (let sessionIdx = 0; sessionIdx < sessionEntries.length; sessionIdx++) {
 
     // startTime ISO 8601
     let startTimeIso = '';
+    let startDateUtc = '';
     if (ctx.firstTs) {
         startTimeIso = tsToIso(ctx.firstTs);
+        const _d = new Date(Number(ctx.firstTs));
+        startDateUtc = `${_d.getUTCFullYear()}-${String(_d.getUTCMonth() + 1).padStart(2, '0')}-${String(_d.getUTCDate()).padStart(2, '0')}`;
     }
 
     // 构建 session 对象
@@ -752,6 +755,7 @@ for (let sessionIdx = 0; sessionIdx < sessionEntries.length; sessionIdx++) {
         workspacePath: se.workspacePath,
         workspaceName: se.workspaceName,
         startTime: startTimeIso,
+        startDate: startDateUtc,
         durationMinutes,
         userMessageCount: ctx.userMsgCount,
         assistantMessageCount: ctx.assistantMsgCount,
@@ -926,7 +930,7 @@ for (const s of sessions) {
     totalFilesModified += (s.codeChanges && s.codeChanges.filesModified) || 0;
     totalReplacements += (s.codeChanges && s.codeChanges.replacements) || 0;
 
-    if (s.durationMinutes > 0) allDurations.push(s.durationMinutes);
+    allDurations.push(s.durationMinutes || 0);
     if (s.userResponseTimes && Array.isArray(s.userResponseTimes)) {
         for (const rt of s.userResponseTimes) allResponseTimes.push(rt);
     }
@@ -934,13 +938,12 @@ for (const s of sessions) {
         successRates.push(s.toolSuccessRate);
     }
 
-    // 活跃天数
+    // 活跃天数 — 提取 startTime 日期部分（本地日历日）
     if (s.startTime) {
-        try {
-            const d = new Date(s.startTime);
-            const day = formatLocalDate(d);
+        const day = String(s.startTime).substring(0, 10);
+        if (/^\d{4}-\d{2}-\d{2}$/.test(day)) {
             activeDays.add(day);
-        } catch (_) { /* ignore */ }
+        }
     }
 
     // 工具聚合
@@ -1016,8 +1019,8 @@ if (allResponseTimes.length > 0) {
     avgResponseTime = Math.round((allResponseTimes.reduce((a, b) => a + b, 0) / allResponseTimes.length) * 10) / 10;
 }
 
-const avgToolSuccessRate = successRates.length > 0
-    ? Math.round((successRates.reduce((a, b) => a + b, 0) / successRates.length) * 10) / 10
+const avgToolSuccessRate = totalToolCalls > 0
+    ? Math.round(((totalToolCalls - totalToolErrors) / totalToolCalls * 100) * 10) / 10
     : 100.0;
 
 // 排序 byWorkspace keys

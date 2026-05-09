@@ -10,9 +10,9 @@
  * 输出结构化 JSON 供 run-eval 消费。
  *
  * Usage:
- *   node extract-outputs.js --output-path ./eval-data.json
+ *   node extract-outputs.js --output-path ./reports/eval-data.json
  *   node extract-outputs.js --agent-filter "Worker"
- *   node extract-outputs.js --output-path ./eval-data.json --include-main-log
+ *   node extract-outputs.js --output-path ./reports/eval-data.json --include-main-log
  *   node extract-outputs.js --workspace-path <path-or-hash-prefix>
  */
 

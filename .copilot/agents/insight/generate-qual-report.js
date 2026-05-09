@@ -10,8 +10,8 @@
  * 不包含量化指标（工具、Token、时间、代码变更等）。
  *
  * Usage:
- *   node generate-qual-report.js --data-path ./insight-data.json
- *   node generate-qual-report.js --data-path ./insight-data.json --facets-path ./facets-cache --narratives-path ./insight-narratives.json
+ *   node generate-qual-report.js --data-path ./reports/insight-data.json
+ *   node generate-qual-report.js --data-path ./reports/insight-data.json --facets-path ./reports/facets-cache --narratives-path ./reports/insight-narratives.json
  */
 
 const fs = require('fs');
@@ -33,9 +33,9 @@ function formatLocalDateTime(d) {
 function parseArgs(argv) {
     const args = {
         dataPath: null,
-        facetsPath: 'facets-cache',
+        facetsPath: 'reports/facets-cache',
         narrativesPath: '',
-        outputPath: 'insight-qual-report.html',
+        outputPath: 'reports/insight-qual-report.html',
         title: 'VS Code Copilot Insight Report — LLM 语义分析',
     };
 
@@ -581,7 +581,7 @@ parts.push(`<div class="header" id="sec-header">
 if (!hasFacets && !hasNarratives) {
     parts.push(`<div class="warning-box">
   &#x26A0; 未找到 facets 或 narratives 数据。<br>
-  请先运行 <code>analyze-facets.ps1</code> 生成 facets-cache，或提供 narratives JSON 文件。
+  请先运行 <code>analyze-facets.ps1</code> 生成 reports/facets-cache，或提供 narratives JSON 文件。
 </div>
 `);
 }

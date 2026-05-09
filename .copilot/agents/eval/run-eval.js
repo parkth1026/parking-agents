@@ -9,9 +9,9 @@
  * 加载 YAML 测试用例，逐条运行断言，输出带格式的评估报告。
  *
  * Usage:
- *   node run-eval.js --data-path ./eval-data.json
- *   node run-eval.js --data-path ./eval-data.json --agent-filter Worker --detail
- *   node run-eval.js --data-path ./eval-data.json --json
+ *   node run-eval.js --data-path ./reports/eval-data.json
+ *   node run-eval.js --data-path ./reports/eval-data.json --agent-filter Worker --detail
+ *   node run-eval.js --data-path ./reports/eval-data.json --json
  */
 
 const fs = require('fs');

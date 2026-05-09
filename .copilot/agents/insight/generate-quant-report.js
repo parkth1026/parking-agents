@@ -11,8 +11,8 @@
  * 零外部依赖，CSS + JS 全内联。
  *
  * Usage:
- *   node generate-quant-report.js --data-path ./insight-data.json
- *   node generate-quant-report.js --data-path ./insight-data.json --output-path ./quant.html --title "Weekly Quant"
+ *   node generate-quant-report.js --data-path ./reports/insight-data.json
+ *   node generate-quant-report.js --data-path ./reports/insight-data.json --output-path ./reports/quant.html --title "Weekly Quant"
  */
 
 const fs = require('fs');
@@ -34,7 +34,7 @@ function formatLocalDateTime(d) {
 function parseArgs(argv) {
     const args = {
         dataPath: null,
-        outputPath: 'insight-quant-report.html',
+        outputPath: 'reports/insight-quant-report.html',
         title: 'VS Code Copilot Insight Report — 客观数据',
     };
 

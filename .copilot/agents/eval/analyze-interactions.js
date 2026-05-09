@@ -5,11 +5,11 @@
  * analyze-interactions.js
  * Full-precision JSONL analysis of all VS Code Copilot debug-logs.
  * Extracts user messages, askQuestions interactions, subagent invocations,
- * and child_session_ref links. Outputs interaction-analysis.json.
+ * and child_session_ref links. Outputs reports/interaction-analysis.json.
  *
  * Usage:
  *   node analyze-interactions.js
- *   node analyze-interactions.js --output-path ./interaction-analysis.json
+ *   node analyze-interactions.js --output-path ./reports/interaction-analysis.json
  *   node analyze-interactions.js --base-path "C:\Users\...\workspaceStorage"
  */
 
@@ -20,7 +20,7 @@ const path = require('path');
 function parseArgs(argv) {
     const args = {
         basePath: path.join(process.env.APPDATA || '', 'Code', 'User', 'workspaceStorage'),
-        outputPath: path.join('D:\\GIT\\parking-agents', 'interaction-analysis.json'),
+        outputPath: path.join('D:\\GIT\\parking-agents', 'reports', 'interaction-analysis.json'),
         maxLineLen: 8000000,
         fileTimeout: 60,
     };

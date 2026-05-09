@@ -103,18 +103,18 @@ user-invocable: false
 ╔══════════════════════════════════════════════════════════════╗
 ║ Phase 1: 定量提取（脚本，零 LLM 成本）                      ║
 ║   node analyze-insight.js --extract-transcripts             ║
-║   → insight-data.json（定量统计）                           ║
-║   → session-transcripts/*.txt（压缩转录）                   ║
+║   → reports/insight-data.json（定量统计）                           ║
+║   → reports/session-transcripts/*.txt（压缩转录）                   ║
 ╠══════════════════════════════════════════════════════════════╣
 ║ Phase 2: LLM Facets 提取（本 agent 执行，每批 3-5 session） ║
-║   读取 session-transcripts/ → LLM 分析 → facets-cache/     ║
-║   每个 session 生成 facets-cache/{sessionId}.json           ║
+║   读取 reports/session-transcripts/ → LLM 分析 → reports/facets-cache/     ║
+║   每个 session 生成 reports/facets-cache/{sessionId}.json           ║
 ║   已缓存的 session 自动跳过                                 ║
 ╠══════════════════════════════════════════════════════════════╣
 ║ Phase 3: 叙事生成 + HTML 报告                               ║
-║   读取 facets-cache/*.json + insight-data.json              ║
-║   → 生成 7 段叙事 + atAGlance → insight-narratives.json    ║
-║   → node generate-insight-report.js → insight-report.html   ║
+║   读取 reports/facets-cache/*.json + reports/insight-data.json              ║
+║   → 生成 7 段叙事 + atAGlance → reports/insight-narratives.json    ║
+║   → node generate-insight-report.js → reports/insight-report.html   ║
 ╚══════════════════════════════════════════════════════════════╝
 ```
 
@@ -219,7 +219,7 @@ user-invocable: false
 ### 8.1 Facets Schema
 
 所有提取的 facets 必须符合 `facets-schema.json`（位于 `.copilot/agents/insight/facets-schema.json`）。
-每个 session 的提取结果写入 `facets-cache/{sessionId}.json`。
+每个 session 的提取结果写入 `reports/facets-cache/{sessionId}.json`。
 
 ### 8.2 Facets 提取 Prompt 模板
 
@@ -278,7 +278,7 @@ user-invocable: false
 - 若转录过短无法判断，outcome 设为 barely_started
 
 ## 转录内容
-<此处插入 session-transcripts/{sessionId}.txt 的内容>
+<此处插入 reports/session-transcripts/{sessionId}.txt 的内容>
 ```
 
 ### 8.3 批量处理工作流
@@ -286,22 +286,22 @@ user-invocable: false
 agent 执行 Phase 2 时，按以下步骤批量提取 facets：
 
 ```
-Step 1: 列出 session-transcripts/ 下所有 .txt 文件，提取 sessionId 列表
-Step 2: 列出 facets-cache/ 下已缓存的 .json 文件，得到已处理 sessionId 集合
+Step 1: 列出 reports/session-transcripts/ 下所有 .txt 文件，提取 sessionId 列表
+Step 2: 列出 reports/facets-cache/ 下已缓存的 .json 文件，得到已处理 sessionId 集合
 Step 3: 计算差集 = 未缓存的 sessionId 列表
 Step 4: 每批处理 3-5 个 session：
-  a. 读取 session-transcripts/{sessionId}.txt
+  a. 读取 reports/session-transcripts/{sessionId}.txt
   b. 若超过 30k 字符，按 25k 分块摘要后拼接
   c. 用 §8.2 prompt 模板分析，提取 facets JSON
   d. 验证 JSON 合法性（必须包含 sessionId / facets / outcome）
-  e. 写入 facets-cache/{sessionId}.json
+  e. 写入 reports/facets-cache/{sessionId}.json
 Step 5: 每批完成后报告进度（已处理 X / 总计 Y sessions）
 Step 6: 全部完成后输出汇总
 ```
 
 ### 8.4 叙事生成 Prompt 模板
 
-所有 facets 缓存完成后，进入 Phase 3。读取全部 `facets-cache/*.json` + `insight-data.json`，依次生成 7 段叙事：
+所有 facets 缓存完成后，进入 Phase 3。读取全部 `reports/facets-cache/*.json` + `reports/insight-data.json`，依次生成 7 段叙事：
 
 | # | 段落 | Prompt 要点 | 输出键名 |
 |---|---|---|---|
@@ -356,9 +356,9 @@ Step 6: 全部完成后输出汇总
 
 ```powershell
 node "$env:USERPROFILE\.copilot\agents\insight\generate-insight-report.js" `
-  --data-path insight-data.json `
-  --facets-path facets-cache/ `
-  --narratives-path insight-narratives.json
+  --data-path reports/insight-data.json `
+  --facets-path reports/facets-cache/ `
+  --narratives-path reports/insight-narratives.json
 ```
 
 若脚本不存在，agent 应直接生成 HTML 报告文件（使用 §5 的设计规范）。
@@ -367,12 +367,12 @@ node "$env:USERPROFILE\.copilot\agents\insight\generate-insight-report.js" `
 
 | 项目 | 说明 |
 |---|---|
-| **缓存目录** | workspace 根目录下的 `facets-cache/` |
+| **缓存目录** | workspace 根目录下的 `reports/facets-cache/` |
 | **文件命名** | `{sessionId}.json`，每个 session 一个文件 |
-| **缓存命中** | Phase 2 开始时，比对 `facets-cache/` 已有文件，跳过已缓存 session |
-| **缓存失效** | 比较缓存文件中的 `transcriptHash` 与当前 `session-transcripts/{id}.txt` 的 MD5；不一致则重新提取 |
-| **手动清除** | 删除整个 `facets-cache/` 目录即可重新提取全部 facets |
-| **部分清除** | 删除特定 `facets-cache/{sessionId}.json` 可重新提取单个 session |
+| **缓存命中** | Phase 2 开始时，比对 `reports/facets-cache/` 已有文件，跳过已缓存 session |
+| **缓存失效** | 比较缓存文件中的 `transcriptHash` 与当前 `reports/session-transcripts/{id}.txt` 的 MD5；不一致则重新提取 |
+| **手动清除** | 删除整个 `reports/facets-cache/` 目录即可重新提取全部 facets |
+| **部分清除** | 删除特定 `reports/facets-cache/{sessionId}.json` 可重新提取单个 session |
 
 ## 10. 脚本依赖说明
 
