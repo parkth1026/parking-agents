@@ -151,11 +151,20 @@ if (hasFacets) {
     for (const f of facetsData) {
         const fc = f.facets || f;
 
-        // goalCategories is an array of category strings
-        if (fc.goalCategories && Array.isArray(fc.goalCategories)) {
-            for (const cat of fc.goalCategories) {
-                const k = String(cat);
-                goalDistribution[k] = (goalDistribution[k] || 0) + 1;
+        // goalCategories: weighted object {category: count} or legacy array
+        if (fc.goalCategories) {
+            if (Array.isArray(fc.goalCategories)) {
+                // Legacy array format: each entry counts as 1
+                for (const cat of fc.goalCategories) {
+                    const k = String(cat);
+                    goalDistribution[k] = (goalDistribution[k] || 0) + 1;
+                }
+            } else if (typeof fc.goalCategories === 'object') {
+                // New weighted object format: {category: count}
+                for (const [cat, weight] of Object.entries(fc.goalCategories)) {
+                    const w = Number(weight) || 1;
+                    goalDistribution[cat] = (goalDistribution[cat] || 0) + w;
+                }
             }
         }
 

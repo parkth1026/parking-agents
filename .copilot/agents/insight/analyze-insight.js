@@ -30,6 +30,8 @@ function parseArgs(argv) {
         extractTranscripts: false,
         transcriptOutput: 'reports/session-transcripts',
         cachePath: 'reports/insight-cache',
+        extractTurns: false,
+        turnsOutput: 'reports/conversation-turns',
     };
 
     for (let i = 2; i < argv.length; i++) {
@@ -58,6 +60,12 @@ function parseArgs(argv) {
                 break;
             case '--cache-path':
                 args.cachePath = argv[++i];
+                break;
+            case '--extract-turns':
+                args.extractTurns = true;
+                break;
+            case '--turns-output':
+                args.turnsOutput = argv[++i];
                 break;
             default:
                 console.log(`[warn] 未知参数: ${arg}`);
@@ -237,6 +245,281 @@ function md5Hash(text) {
     return crypto.createHash('md5').update(text, 'utf8').digest('hex');
 }
 
+/**
+ * Parse agent_response.attrs.response JSON string into structured parts.
+ * Handles the 5011-char truncation gracefully.
+ */
+function parseParts(responseStr) {
+  if (!responseStr) return { textParts: [], toolCallParts: [], reasoning: null, isTruncated: false };
+
+  const isTruncated = responseStr.length >= 5010;
+  let parsed = null;
+
+  try {
+    parsed = JSON.parse(responseStr);
+  } catch (_) {
+    // 5011 truncation broke the JSON — extract text via regex
+    const textMatches = [];
+    const re = /"content"\s*:\s*"((?:[^"\\]|\\.)*)"/g;
+    let m;
+    while ((m = re.exec(responseStr)) !== null) {
+      try { textMatches.push(JSON.parse('"' + m[1] + '"')); } catch (_) { textMatches.push(m[1]); }
+    }
+    return { textParts: textMatches, toolCallParts: [], reasoning: null, isTruncated: true };
+  }
+
+  const textParts = [];
+  const toolCallParts = [];
+
+  if (Array.isArray(parsed)) {
+    for (const msg of parsed) {
+      if (msg && Array.isArray(msg.parts)) {
+        for (const part of msg.parts) {
+          if (part.type === 'text' && part.content) {
+            textParts.push(part.content);
+          } else if (part.type === 'tool_call') {
+            toolCallParts.push({ name: part.name, id: part.id, arguments: part.arguments });
+          }
+        }
+      }
+    }
+  }
+
+  return { textParts, toolCallParts, reasoning: null, isTruncated };
+}
+
+/**
+ * Builds conversation turns from JSONL events using native turn_start/turn_end boundaries.
+ */
+class TurnBuilder {
+  constructor() {
+    this.turns = [];
+    this.currentTurn = null;
+    this.orphanEvents = []; // events before first turn_start
+    this.pendingUserMessage = null; // buffered user_message before turn_start
+  }
+
+  onTurnStart(evt) {
+    if (this.currentTurn) {
+      // Previous turn wasn't closed — force close it
+      this.turns.push(this._finalize(this.currentTurn));
+    }
+    const turnId = (evt.attrs && evt.attrs.turnId) || String(this.turns.length);
+    this.currentTurn = {
+      turnId,
+      startTs: Number(evt.ts) || 0,
+      endTs: null,
+      durMs: null,
+      userMessage: null,
+      agentResponses: [],
+      toolCalls: [],
+      llmRequests: [],
+      subagentCalls: [],
+      askQuestions: [],
+    };
+    // Attach buffered user_message that arrived before this turn_start
+    if (this.pendingUserMessage) {
+      this.currentTurn.userMessage = this.pendingUserMessage;
+      this.pendingUserMessage = null;
+    }
+  }
+
+  onTurnEnd(evt) {
+    if (!this.currentTurn) return;
+    this.currentTurn.endTs = Number(evt.ts) || 0;
+    this.currentTurn.durMs = this.currentTurn.endTs - this.currentTurn.startTs;
+    this.turns.push(this._finalize(this.currentTurn));
+    this.currentTurn = null;
+  }
+
+  onUserMessage(evt) {
+    const msg = {
+      content: (evt.attrs && evt.attrs.content) || '',
+      ts: Number(evt.ts) || 0,
+    };
+    if (this.currentTurn) {
+      this.currentTurn.userMessage = msg;
+    } else {
+      // Buffer — will be attached to next turn_start
+      this.pendingUserMessage = msg;
+    }
+  }
+
+  onAgentResponse(evt) {
+    if (!this.currentTurn) return;
+    const responseStr = evt.attrs && (evt.attrs.response || evt.attrs.content);
+    const parts = parseParts(typeof responseStr === 'string' ? responseStr : null);
+    parts.reasoning = (evt.attrs && evt.attrs.reasoning) || null;
+    parts.ts = Number(evt.ts) || 0;
+    this.currentTurn.agentResponses.push(parts);
+  }
+
+  onToolCall(evt) {
+    if (!this.currentTurn) return;
+    const toolName = evt.name || '';
+    let argsParsed = null;
+    let resultParsed = null;
+
+    if (evt.attrs && evt.attrs.args) {
+      try { argsParsed = typeof evt.attrs.args === 'string' ? JSON.parse(evt.attrs.args) : evt.attrs.args; } catch (_) { argsParsed = evt.attrs.args; }
+    }
+    if (evt.attrs && evt.attrs.result) {
+      const raw = evt.attrs.result;
+      const resultTruncated = typeof raw === 'string' && raw.length >= 5010;
+      try { resultParsed = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch (_) { resultParsed = raw; }
+
+      // askQuestions exchange
+      if (toolName === 'vscode_askQuestions' || toolName === 'askQuestions') {
+        const aq = {
+          questions: [],
+          answers: {},
+        };
+        if (argsParsed && argsParsed.questions) {
+          aq.questions = argsParsed.questions.map(q => ({
+            header: q.header || '',
+            question: q.question || '',
+            options: q.options || [],
+          }));
+        }
+        if (resultParsed && resultParsed.answers) {
+          aq.answers = resultParsed.answers;
+        }
+        this.currentTurn.askQuestions.push(aq);
+      }
+
+      // runSubagent exchange
+      if (toolName === 'runSubagent') {
+        this.currentTurn.subagentCalls.push({
+          agentName: (argsParsed && argsParsed.agentName) || 'unknown',
+          description: (argsParsed && argsParsed.description) || '',
+          prompt: (argsParsed && argsParsed.prompt) || '',
+          result: typeof resultParsed === 'string' ? resultParsed : JSON.stringify(resultParsed || ''),
+          resultTruncated: typeof raw === 'string' && raw.length >= 5010,
+          childLogFile: null, // linked later
+        });
+      }
+    }
+
+    this.currentTurn.toolCalls.push({
+      name: toolName,
+      status: evt.status || 'ok',
+      dur: Number(evt.dur) || 0,
+      ts: Number(evt.ts) || 0,
+      resultTruncated: evt.attrs && typeof evt.attrs.result === 'string' && evt.attrs.result.length >= 5010,
+    });
+  }
+
+  onLlmRequest(evt) {
+    if (!this.currentTurn) return;
+    this.currentTurn.llmRequests.push({
+      model: (evt.attrs && evt.attrs.model) || (evt.name || '').replace('chat:', ''),
+      inputTokens: Number((evt.attrs && evt.attrs.inputTokens) || 0),
+      outputTokens: Number((evt.attrs && evt.attrs.outputTokens) || 0),
+      ttft: Number((evt.attrs && evt.attrs.ttft) || 0),
+      dur: Number(evt.dur) || 0,
+    });
+  }
+
+  onChildSessionRef(evt) {
+    if (!this.currentTurn) return;
+    const childLogFile = evt.attrs && evt.attrs.childLogFile;
+    const label = evt.attrs && evt.attrs.label;
+    if (childLogFile) {
+      // Try to link to the most recent unlinked subagent call
+      for (let i = this.currentTurn.subagentCalls.length - 1; i >= 0; i--) {
+        if (!this.currentTurn.subagentCalls[i].childLogFile) {
+          this.currentTurn.subagentCalls[i].childLogFile = childLogFile;
+          break;
+        }
+      }
+    }
+  }
+
+  _finalize(turn) {
+    const totalToolCalls = turn.toolCalls.length;
+    const totalLlmCalls = turn.llmRequests.length;
+    let totalInput = 0, totalOutput = 0;
+    for (const lr of turn.llmRequests) { totalInput += lr.inputTokens; totalOutput += lr.outputTokens; }
+
+    turn.summary = {
+      totalToolCalls,
+      totalLlmCalls,
+      totalTokens: { input: totalInput, output: totalOutput },
+      hasUserMessage: !!turn.userMessage,
+      hasTextResponse: turn.agentResponses.some(r => r.textParts.length > 0),
+      hasAskQuestions: turn.askQuestions.length > 0,
+      hasSubagent: turn.subagentCalls.length > 0,
+    };
+    return turn;
+  }
+
+  build() {
+    if (this.currentTurn) {
+      this.turns.push(this._finalize(this.currentTurn));
+      this.currentTurn = null;
+    }
+    return this.turns;
+  }
+}
+
+/**
+ * Create a compact turn summary for LLM facets analysis.
+ * Strips large content, keeps structure and key signals.
+ */
+function buildTurnSummaryForLLM(turns) {
+  if (!turns || turns.length === 0) return null;
+
+  const significantTurns = turns.filter(t =>
+    t.userMessage || t.askQuestions.length > 0 || t.subagentCalls.length > 0
+  );
+
+  return {
+    totalTurns: turns.length,
+    significantTurns: significantTurns.length,
+    turnSummaries: significantTurns.map(t => {
+      const s = {
+        turnId: t.turnId,
+        durSec: Math.round((t.durMs || 0) / 1000),
+      };
+      if (t.userMessage) {
+        s.userMessage = t.userMessage.content.length > 500
+          ? t.userMessage.content.substring(0, 500) + '...'
+          : t.userMessage.content;
+      }
+      if (t.agentResponses.length > 0) {
+        const allText = t.agentResponses.flatMap(r => r.textParts).join('\n');
+        s.aiResponse = allText.length > 500 ? allText.substring(0, 500) + '...' : allText;
+        s.aiResponseTruncatedInLog = t.agentResponses.some(r => r.isTruncated);
+      }
+      if (t.askQuestions.length > 0) {
+        s.askQuestions = t.askQuestions.map(aq => ({
+          questions: aq.questions.map(q => q.question),
+          answers: aq.answers,
+        }));
+      }
+      if (t.subagentCalls.length > 0) {
+        s.subagents = t.subagentCalls.map(sc => ({
+          agent: sc.agentName,
+          desc: sc.description,
+          resultTruncated: sc.resultTruncated,
+        }));
+      }
+      if (t.summary) {
+        s.toolCalls = t.summary.totalToolCalls;
+        s.tokens = t.summary.totalTokens;
+      }
+      return s;
+    }),
+    stats: {
+      turnsWithUserMsg: turns.filter(t => t.userMessage).length,
+      turnsWithAskQ: turns.filter(t => t.askQuestions.length > 0).length,
+      turnsWithSubagent: turns.filter(t => t.subagentCalls.length > 0).length,
+      truncatedResponses: turns.reduce((c, t) => c + t.agentResponses.filter(r => r.isTruncated).length, 0),
+      totalResponses: turns.reduce((c, t) => c + t.agentResponses.length, 0),
+    }
+  };
+}
+
 // ── 定位 workspace 目录 ──────────────────────────────
 const debugLogsRoot = path.join(process.env.APPDATA || '', 'Code', 'User', 'workspaceStorage');
 if (!fs.existsSync(debugLogsRoot)) {
@@ -358,10 +641,7 @@ console.log(`[info] 待处理 ${sessionEntries.length} 个 session，${totalFile
 // ── 缓存目录 ─────────────────────────────────────────
 let cachePath = args.cachePath;
 if (!path.isAbsolute(cachePath)) {
-    const resolvedParent = path.dirname(path.resolve(args.outputPath));
-    if (resolvedParent) {
-        cachePath = path.join(resolvedParent, cachePath);
-    }
+    cachePath = path.resolve(cachePath);
 }
 fs.mkdirSync(cachePath, { recursive: true });
 
@@ -472,6 +752,26 @@ function processToolCall(evt, ctx) {
         } catch (_) {
             ctx.transcriptAskQs.push(`[${timeTag}] askQuestions: [parse error]`);
         }
+    }
+
+    // Extract askQuestions answers
+    if ((toolName === 'vscode_askQuestions' || toolName === 'askQuestions') && evt.attrs && evt.attrs.result) {
+        try {
+            const resultObj = typeof evt.attrs.result === 'string' ? JSON.parse(evt.attrs.result) : evt.attrs.result;
+            if (resultObj && resultObj.answers) {
+                const answerParts = [];
+                for (const [header, ans] of Object.entries(resultObj.answers)) {
+                    const parts = [];
+                    if (ans.selected && ans.selected.length) parts.push(`选: ${ans.selected.join(', ')}`);
+                    if (ans.freeText) parts.push(`自由: ${ans.freeText}`);
+                    if (ans.skipped) parts.push('(已跳过)');
+                    if (parts.length) answerParts.push(`${header}: ${parts.join(' | ')}`);
+                }
+                if (answerParts.length) {
+                    ctx.transcriptAskQs.push(`  → 回答: ${answerParts.join('; ')}`);
+                }
+            }
+        } catch (_) {}
     }
 
     // 语言检测
@@ -593,6 +893,7 @@ for (let sessionIdx = 0; sessionIdx < sessionEntries.length; sessionIdx++) {
         transcriptAskQs: [],
         transcriptAssistMsgs: [],
         extractTranscripts: args.extractTranscripts,
+        turnBuilder: new TurnBuilder(),
     };
 
     // === 解析 main.jsonl ===
@@ -622,12 +923,12 @@ for (let sessionIdx = 0; sessionIdx < sessionEntries.length; sessionIdx++) {
                     }
                     if (!ctx.firstPrompt && evt.attrs && evt.attrs.content) {
                         const content = String(evt.attrs.content);
-                        ctx.firstPrompt = content.length > 200 ? content.substring(0, 200) + '...' : content;
+                        ctx.firstPrompt = content.length > 500 ? content.substring(0, 500) + '...' : content;
                     }
                     // 中断检测
                     if (evt.attrs && evt.attrs.content) {
                         const c = String(evt.attrs.content);
-                        if (/\[Request interrupted/.test(c) || /cancelled/.test(c)) {
+                        if (/\[Request interrupted by user/.test(c)) {
                             ctx.userInterruptions++;
                         }
                     }
@@ -638,6 +939,7 @@ for (let sessionIdx = 0; sessionIdx < sessionEntries.length; sessionIdx++) {
                         if (txt.length > 500) txt = txt.substring(0, 500) + '...';
                         ctx.transcriptUserMsgs.push(`[${timeTag}] ${txt}`);
                     }
+                    ctx.turnBuilder.onUserMessage(evt);
                     break;
                 }
                 case 'agent_response': {
@@ -654,14 +956,17 @@ for (let sessionIdx = 0; sessionIdx < sessionEntries.length; sessionIdx++) {
                         if (txt.length > 200) txt = txt.substring(0, 200) + '...';
                         ctx.transcriptAssistMsgs.push(`[${timeTag}] ${txt}`);
                     }
+                    ctx.turnBuilder.onAgentResponse(evt);
                     break;
                 }
                 case 'llm_request': {
                     processLlmRequest(evt, ctx);
+                    if (ctx.turnBuilder.currentTurn) ctx.turnBuilder.onLlmRequest(evt);
                     break;
                 }
                 case 'tool_call': {
                     processToolCall(evt, ctx);
+                    if (ctx.turnBuilder.currentTurn) ctx.turnBuilder.onToolCall(evt);
                     break;
                 }
                 case 'child_session_ref': {
@@ -671,6 +976,15 @@ for (let sessionIdx = 0; sessionIdx < sessionEntries.length; sessionIdx++) {
                             ctx.subagentNames[saName] = 0;
                         }
                     }
+                    ctx.turnBuilder.onChildSessionRef(evt);
+                    break;
+                }
+                case 'turn_start': {
+                    ctx.turnBuilder.onTurnStart(evt);
+                    break;
+                }
+                case 'turn_end': {
+                    ctx.turnBuilder.onTurnEnd(evt);
                     break;
                 }
             }
@@ -789,6 +1103,7 @@ for (let sessionIdx = 0; sessionIdx < sessionEntries.length; sessionIdx++) {
         },
         isSubstantive: (ctx.userMsgCount >= 2 || durationMinutes >= 1),
         multiClauding: false,
+        turnCount: ctx.turnBuilder.turns.length + (ctx.turnBuilder.currentTurn ? 1 : 0),
     };
 
     // ── 输出 session 文稿 ──
@@ -829,8 +1144,7 @@ for (let sessionIdx = 0; sessionIdx < sessionEntries.length; sessionIdx++) {
 
         let txDir = args.transcriptOutput;
         if (!path.isAbsolute(txDir)) {
-            const parentDir = path.dirname(path.resolve(args.outputPath));
-            if (parentDir) txDir = path.join(parentDir, txDir);
+            txDir = path.resolve(txDir);
         }
         fs.mkdirSync(txDir, { recursive: true });
 
@@ -851,10 +1165,38 @@ for (let sessionIdx = 0; sessionIdx < sessionEntries.length; sessionIdx++) {
     }
     newCount++;
 
+    // Attach turnBuilder for turn extraction (excluded from JSON serialization)
+    sessionObj._turnBuilder = ctx.turnBuilder;
+
     sessions.push(sessionObj);
 }
 
 console.log(`[info] 解析完成，共 ${sessions.length} 个 session (Cached: ${cachedCount}, New: ${newCount}, Total: ${sessions.length})`);
+
+// ── Turn 提取输出 ────────────────────────────────────
+if (args.extractTurns) {
+    let turnsOutputPath = args.turnsOutput;
+    if (!path.isAbsolute(turnsOutputPath)) {
+        turnsOutputPath = path.resolve(turnsOutputPath);
+    }
+    fs.mkdirSync(turnsOutputPath, { recursive: true });
+    let turnFilesWritten = 0;
+    for (const sess of sessions) {
+        if (sess._turnBuilder) {
+            const turns = sess._turnBuilder.build();
+            const turnFile = path.join(turnsOutputPath, `${sess.sessionId}.json`);
+            fs.writeFileSync(turnFile, JSON.stringify({ sessionId: sess.sessionId, turnCount: turns.length, turns }, null, 2));
+            turnFilesWritten++;
+
+            const turnSummary = buildTurnSummaryForLLM(turns);
+            if (turnSummary) {
+                const summaryFile = path.join(turnsOutputPath, `${sess.sessionId}.summary.json`);
+                fs.writeFileSync(summaryFile, JSON.stringify(turnSummary, null, 2));
+            }
+        }
+    }
+    console.log(`[turn-extract] Wrote ${turnFilesWritten} turn files to ${turnsOutputPath}`);
+}
 
 // ── Multi-clauding 检测 ──────────────────────────────
 const sortedByTime = sessions
@@ -906,6 +1248,7 @@ let totalSubagentCalls = 0;
 let totalFilesCreated = 0;
 let totalFilesModified = 0;
 let totalReplacements = 0;
+let totalInterruptions = 0;
 const toolCountsAgg = {};
 const toolErrorCatsAgg = {};
 const subagentDistAgg = {};
@@ -929,6 +1272,7 @@ for (const s of sessions) {
     totalFilesCreated += (s.codeChanges && s.codeChanges.filesCreated) || 0;
     totalFilesModified += (s.codeChanges && s.codeChanges.filesModified) || 0;
     totalReplacements += (s.codeChanges && s.codeChanges.replacements) || 0;
+    totalInterruptions += s.userInterruptions || 0;
 
     allDurations.push(s.durationMinutes || 0);
     if (s.userResponseTimes && Array.isArray(s.userResponseTimes)) {
@@ -1072,11 +1416,13 @@ const output = {
         hourlyDistribution: hourlyDist,
         byWorkspace: byWorkspaceOut,
         multiClaudingSessions: multiClaudingCount,
+        totalInterruptions,
+        avgInterruptionsPerSession: sessions.length > 0 ? Math.round((totalInterruptions / sessions.length) * 100) / 100 : 0,
     },
 };
 
 // ── 输出 ─────────────────────────────────────────────
-const json = JSON.stringify(output, null, 2);
+const json = JSON.stringify(output, (key, value) => key === '_turnBuilder' ? undefined : value, 2);
 const parentDir = path.dirname(path.resolve(args.outputPath));
 if (parentDir) {
     fs.mkdirSync(parentDir, { recursive: true });

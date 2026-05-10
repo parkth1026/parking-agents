@@ -16,24 +16,9 @@
         "briefSummary": { "type": "string", "maxLength": 200 },
         "underlyingGoal": { "type": "string", "maxLength": 300 },
         "goalCategories": {
-          "type": "array",
-          "items": {
-            "enum": [
-              "feature_work",
-              "bug_fix",
-              "refactoring",
-              "testing",
-              "documentation",
-              "devops_infra",
-              "code_review",
-              "learning_exploration",
-              "data_analysis",
-              "design_architecture",
-              "migration_upgrade",
-              "performance_optimization",
-              "security"
-            ]
-          }
+          "type": "object",
+          "description": "Goal category → occurrence count. Higher count = more dominant goal. Keys from: feature_work, bug_fix, refactoring, testing, documentation, devops_infra, code_review, learning_exploration, data_analysis, design_architecture, migration_upgrade, performance_optimization, security",
+          "additionalProperties": { "type": "integer", "minimum": 0 }
         },
         "outcome": {
           "enum": ["fully_achieved", "mostly_achieved", "partially_achieved", "barely_started", "abandoned"]
@@ -96,6 +81,135 @@
           "type": "array",
           "items": { "type": "string" },
           "description": "Explicit preferences or rules the user stated during the session"
+        },
+        "userInterruptions": {
+          "type": "integer",
+          "description": "Count of times user interrupted/cancelled the assistant mid-response"
+        },
+        "firstPrompt": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "The first user message in the session, for quick categorization"
+        },
+        "correctionEvents": {
+          "type": "object",
+          "properties": {
+            "business_misunderstanding": { "type": "integer", "description": "Agent misunderstood domain/business requirements" },
+            "test_quality_complaint": { "type": "integer", "description": "User complained about test quality/coverage" },
+            "execution_deviation": { "type": "integer", "description": "Agent deviated from user's explicit instructions" },
+            "overengineering": { "type": "integer", "description": "Agent over-complicated the solution" }
+          },
+          "description": "Counts of user correction/push-back events by category"
+        },
+        "emotionEscalation": {
+          "type": "array",
+          "items": { "type": "string", "maxLength": 200 },
+          "description": "Direct user quotes showing significant frustration or emotion (verbatim, up to 5 quotes)"
+        },
+        "frictionDensity": {
+          "type": "number",
+          "description": "Total friction events divided by session message count — higher = more friction-dense"
+        },
+        "turnAnalysis": {
+          "type": "object",
+          "description": "Turn-level analysis of the conversation",
+          "properties": {
+            "turnCount": { "type": "integer", "description": "Total number of conversation turns" },
+            "avgTurnDurationSec": { "type": "number", "description": "Average turn duration in seconds" },
+            "longestTurn": {
+              "type": "object",
+              "properties": {
+                "turnId": { "type": "string" },
+                "durSec": { "type": "number" },
+                "reason": { "type": "string" }
+              }
+            },
+            "turnEfficiency": { "type": "string", "enum": ["high", "medium", "low"], "description": "Overall efficiency of turns" },
+            "turnBreakdown": {
+              "type": "array",
+              "description": "Per-turn purpose and effectiveness analysis (for significant turns only)",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "turnId": { "type": "string" },
+                  "purpose": { "type": "string", "description": "What this turn was about" },
+                  "userIntent": { "type": "string", "description": "What the user wanted" },
+                  "aiAction": { "type": "string", "description": "What AI did in response" },
+                  "wasEffective": { "type": "boolean" },
+                  "userReaction": { "type": "string", "enum": ["accepted", "modified", "ignored", "rejected", "clarified", "escalated", "topic_switched"] }
+                }
+              }
+            }
+          }
+        },
+        "conversationDynamics": {
+          "type": "object",
+          "description": "How the conversation flowed between user and AI",
+          "properties": {
+            "interactionPattern": {
+              "type": "string",
+              "enum": ["structured_delegation", "exploratory", "correction_heavy", "autonomous", "collaborative", "question_driven"],
+              "description": "Dominant interaction pattern"
+            },
+            "askQuestionsUsage": {
+              "type": "object",
+              "properties": {
+                "totalAsks": { "type": "integer" },
+                "userEngagement": { "type": "string", "enum": ["fully_responsive", "partial", "dismissive"] },
+                "answersInfluencedPlan": { "type": "boolean" }
+              }
+            },
+            "subagentOrchestration": {
+              "type": "object",
+              "properties": {
+                "totalDelegations": { "type": "integer" },
+                "agentsUsed": { "type": "array", "items": { "type": "string" } },
+                "delegationQuality": { "type": "string", "enum": ["appropriate", "over_delegated", "under_delegated"] },
+                "resultUtilization": { "type": "string", "enum": ["high", "partial", "ignored"] }
+              }
+            },
+            "conversationFlow": {
+              "type": "string",
+              "enum": ["linear", "branching", "iterative", "stuck_loop"],
+              "description": "How conversation progressed"
+            }
+          }
+        },
+        "aiFeedbackUtilization": {
+          "type": "object",
+          "description": "How well AI feedback was utilized by the user",
+          "properties": {
+            "responseQuality": {
+              "type": "object",
+              "properties": {
+                "truncatedResponses": { "type": "integer" },
+                "totalResponses": { "type": "integer" },
+                "truncationRate": { "type": "number" }
+              }
+            },
+            "promptResponseAlignment": {
+              "type": "string",
+              "enum": ["high", "medium", "low", "misaligned"],
+              "description": "How well user prompts and AI responses aligned"
+            },
+            "suggestionAdoptionRate": {
+              "type": "string",
+              "enum": ["high", "medium", "low"],
+              "description": "How often user accepted AI suggestions"
+            },
+            "ignoredAdvicePatterns": {
+              "type": "array",
+              "description": "Notable instances where AI advice was ignored",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "turnId": { "type": "string" },
+                  "advice": { "type": "string" },
+                  "userDid": { "type": "string" }
+                }
+              }
+            }
+          }
         }
       }
     }

@@ -23,7 +23,8 @@
 
 - **parking-agent-creator** —— 创建 / 脚手架新的 agent / skill。开发新 agent 时主 agent 应**优先调用它**（规范已内置，无需注入 AGENT_DEVELOPMENT.md）。
 - **parking-agent-eval** —— 评估 / lint / 排错 customization 文件（read-only，输出打分表 + 修复建议）；运行行为断言测试。
-- **parking-agent-insight** —— 使用行为洞察分析：从 debug-logs 生成 HTML 报告、工具错误模式分析、token 消耗统计、用户满意度推断等。
+- **parking-agent-insight** —— Insight 分析编排器：编排完整 3-phase 管线，直接执行脚本（Phase 1 数据提取、Phase 3b HTML 报告）和 LLM 语义分析（Phase 2 facets 提取、Phase 3a 叙事生成）。
+- **parking-agent-analytics** —— 脚本执行 + 定量分析：运行 insight/eval 工具链脚本、生成 HTML 报告、工具错误诊断、token 消耗统计。
 
 ## 🎯 测试与运行 agent 时
 
