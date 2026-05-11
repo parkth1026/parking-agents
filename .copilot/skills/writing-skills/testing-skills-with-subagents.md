@@ -10,9 +10,9 @@ You run scenarios without the skill (RED - watch agent fail), write skill addres
 
 **Core principle:** If you didn't watch an agent fail without the skill, you don't know if the skill prevents the right failures.
 
-**REQUIRED BACKGROUND:** You MUST understand superpowers:test-driven-development before using this skill. That skill defines the fundamental RED-GREEN-REFACTOR cycle. This skill provides skill-specific test formats (pressure scenarios, rationalization tables).
+**必需背景：** 你必须先理解 test-driven-development skill（读取 `.copilot/skills/test-driven-development/SKILL.md`）才能使用本 skill。该 skill 定义了基本的 RED-GREEN-REFACTOR 循环。本 skill 提供 skill 特定的测试格式（压力场景、合理化表）。
 
-**Complete worked example:** See examples/CLAUDE_MD_TESTING.md for a full test campaign testing CLAUDE.md documentation variants.
+**完整示例：** 参见 examples/CLAUDE_MD_TESTING.md 获取完整的测试活动示例，测试用户指令文件的文档变体。
 
 ## When to Use
 
