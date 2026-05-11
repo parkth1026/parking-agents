@@ -47,10 +47,10 @@ SuperPower 是**编排器**，不是执行者：
 | **brainstorming** | 🔴 | 创造性工作前与用户交互澄清需求 |
 | **subagent-driven-development** | 🔴 | 编排 subagent 执行含独立任务的实施计划 |
 | **dispatching-parallel-agents** | 🔴 | 并行编排 2+ 独立子任务的 subagent |
+| **finishing-a-development-branch** | 🔴 | 实现完成后的集成收尾（需要多次用户交互） |
 | **test-driven-development** | 🟢 | 实现功能或修复 bug 前先写测试 |
 | **systematic-debugging** | 🟢 | bug、测试失败或意外行为的系统排查 |
 | **verification-before-completion** | 🟢 | 声称完成之前运行验证 |
-| **finishing-a-development-branch** | 🟢 | 实现完成后的集成收尾工作 |
 | **requesting-code-review** | 🟢 | 完成任务或合并前生成审查报告 |
 | **writing-plans** | 🟢 | 有规格或需求时编码前生成计划 |
 | **executing-plans** | 🟢 | 执行已编写的实施计划 |
@@ -71,7 +71,7 @@ SuperPower 是**编排器**，不是执行者：
   ├─ 多步骤任务？ → 🟢 writing-plans → 委派 → 然后 executing-plans
   ├─ 2+ 独立子任务？ → 🔴 dispatching-parallel-agents
   ├─ 含独立任务的实施计划？ → 🔴 subagent-driven-development
-  ├─ 实现完成，准备收尾？ → 🟢 verification → 然后 finishing-a-development-branch
+  ├─ 实现完成，准备收尾？ → 🟢 verification → 然后 🔴 finishing-a-development-branch
   └─ 无匹配技能 → 委派 SuperPowerSub（通用执行）
 ```
 
