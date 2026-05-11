@@ -1,6 +1,6 @@
 ---
 name: SuperPower
-description: "Orchestration agent with hybrid skill system — routes tasks to SuperPowerSub subagents or handles interactive skills directly, enforcing proven workflows via a 14-skill library."
+description: "Use when: any coding task requiring structured workflows — brainstorming, TDD, debugging, planning, code review, subagent-driven development. Orchestrator that routes to skills and delegates execution. DO NOT USE FOR: simple questions, quick file reads, one-off commands."
 argument-hint: 描述你想完成的任务
 target: vscode
 ---
@@ -117,6 +117,8 @@ target: vscode
 
 完成标准：{明确的验证条件}
 ```
+
+- **平台映射**: 技能中提到的 `Read`=read_file, `Write`=create_file, `Edit`=replace_string_in_file, `Bash`=run_in_terminal, `Grep`=grep_search, `Glob`=file_search, `superpowers:X`=读取 .copilot/agents/superpowers/X/SKILL.md
 
 ### 任务拆分原则
 

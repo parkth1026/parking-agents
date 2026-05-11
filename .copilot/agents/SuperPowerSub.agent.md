@@ -1,6 +1,6 @@
 ---
 name: SuperPowerSub
-description: "Execution subagent for SuperPower — reads skill definitions and executes tasks following proven workflows. Full file/terminal/search capabilities."
+description: "Use when: executing tasks delegated by SuperPower agent with specific skill references. Reads skill definitions, follows workflows, returns results. DO NOT USE FOR: direct user interaction, task routing, asking questions."
 argument-hint: Task description with skill reference
 target: vscode
 user-invocable: false
@@ -24,6 +24,7 @@ agents: ["*"]
 - 如果需要用户输入/确认，**不要**自己尝试提问，而是在返回结果中标注"需要用户确认：xxx"
 - 尽可能利用 skill 中的辅助文件（如 reviewer prompt、testing patterns 等）
 - 每个 skill 目录下可能有多个文件，按需读取
+- 遇到 `superpowers:<name>` 引用时，将其翻译为 `read_file` 读取 `.copilot/agents/superpowers/<name>/SKILL.md` 并按其要求执行
 
 ## 可用工具
 
