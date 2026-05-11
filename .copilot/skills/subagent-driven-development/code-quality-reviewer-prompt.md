@@ -1,25 +1,25 @@
-# 代码质量审查者 Prompt 模板
+# Code Quality Reviewer Prompt Template
 
-派遣代码质量审查者 subagent 时使用此模板。通过 `runSubagent` 调用。
+Use this template when dispatching a code quality reviewer subagent.
 
-**目的：** 验证实现是否构建良好（整洁、测试充分、可维护）
+**Purpose:** Verify implementation is well-built (clean, tested, maintainable)
 
-**仅在规格合规审查通过后才派遣。**
+**Only dispatch after spec compliance review passes.**
 
 ```
-runSubagent prompt:
-  使用 requesting-code-review/code-reviewer.md 中的模板
+runSubagent:
+  Use template at requesting-code-review/code-reviewer.md
 
-  DESCRIPTION: [任务摘要，来自实现者报告]
-  PLAN_OR_REQUIREMENTS: 计划文件中的任务 N
-  BASE_SHA: [任务前的 commit]
-  HEAD_SHA: [当前 commit]
+  DESCRIPTION: [task summary, from implementer's report]
+  PLAN_OR_REQUIREMENTS: Task N from [plan-file]
+  BASE_SHA: [commit before task]
+  HEAD_SHA: [current commit]
 ```
 
-**除了标准代码质量关注点，审查者还应检查：**
-- 每个文件是否有一个清晰的职责和明确的接口？
-- 单元是否被分解为可以独立理解和测试的部分？
-- 实现是否遵循了计划中的文件结构？
-- 此实现是否创建了已经很大的新文件，或显著增大了现有文件？（不要标记预先存在的文件大小——关注此次变更的贡献。）
+**In addition to standard code quality concerns, the reviewer should check:**
+- Does each file have one clear responsibility with a well-defined interface?
+- Are units decomposed so they can be understood and tested independently?
+- Is the implementation following the file structure from the plan?
+- Did this implementation create new files that are already large, or significantly grow existing files? (Don't flag pre-existing file sizes — focus on what this change contributed.)
 
-**代码审查者返回：** 优点、问题（严重/重要/轻微）、评估
+**Code reviewer returns:** Strengths, Issues (Critical/Important/Minor), Assessment

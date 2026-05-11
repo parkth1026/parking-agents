@@ -4,104 +4,96 @@ description: Use when starting any conversation - establishes how to find and us
 ---
 
 <SUBAGENT-STOP>
-如果你是作为 subagent 被派遣执行特定任务的，跳过此 skill。
+If you were dispatched as a subagent to execute a specific task, skip this skill.
 </SUBAGENT-STOP>
 
 <EXTREMELY-IMPORTANT>
-如果你认为哪怕有 1% 的可能某个 skill 适用于你正在做的事，你**必须**调用该 skill。
+If you think there is even a 1% chance a skill might apply to what you are doing, you ABSOLUTELY MUST invoke the skill.
 
-如果 SKILL 适用于你的任务，你别无选择。必须使用它。
+IF A SKILL APPLIES TO YOUR TASK, YOU DO NOT HAVE A CHOICE. YOU MUST USE IT.
 
-这不可协商。这不是可选项。你不能合理化地绕过它。
+This is not negotiable. This is not optional. You cannot rationalize your way out of this.
 </EXTREMELY-IMPORTANT>
 
-## 指令优先级
+## Instruction Priority
 
-Superpowers skills 覆盖默认系统提示行为，但**用户指令始终优先**：
+Superpowers skills override default system prompt behavior, but **user instructions always take precedence**:
 
-1. **用户的明确指令**（copilot-instructions.md、AGENTS.md、直接请求）— 最高优先级
-2. **Superpowers skills** — 在冲突处覆盖默认系统行为
-3. **默认系统提示** — 最低优先级
+1. **User's explicit instructions** (CLAUDE.md, GEMINI.md, AGENTS.md, direct requests) — highest priority
+2. **Superpowers skills** — override default system behavior where they conflict
+3. **Default system prompt** — lowest priority
 
-如果用户指令说“不要使用 TDD”而某个 skill 说“始终使用 TDD”，遵循用户指令。用户掌控一切。
+If CLAUDE.md, GEMINI.md, or AGENTS.md says "don't use TDD" and a skill says "always use TDD," follow the user's instructions. The user is in control.
 
-## 如何访问 Skills
+## How to Access Skills
 
-使用 `read_file` 工具读取对应 skill 的 `SKILL.md` 文件。skill 文件位于 `.copilot/skills/<skill-name>/SKILL.md`。读取后，按照其中的指引执行。
+Use the `read_file` tool to read skill files from `.copilot/skills/<skill-name>/SKILL.md`. When a skill applies, read its SKILL.md and follow the instructions directly.
 
-# 使用 Skills
+# Using Skills
 
-## 规则
+## The Rule
 
-**在任何回应或行动之前，先读取相关的 skill。** 即使只有 1% 的可能性某个 skill 适用，也应该读取它来检查。如果读取后发现不适用，可以不使用它。
+**Invoke relevant or requested skills BEFORE any response or action.** Even a 1% chance a skill might apply means that you should invoke the skill to check. If an invoked skill turns out to be wrong for the situation, you don't need to use it.
 
 ```dot
 digraph skill_flow {
-    "收到用户消息" [shape=doublecircle];
-    "需要制定计划?" [shape=doublecircle];
-    "已完成头脑风暴?" [shape=diamond];
-    "读取 brainstorming skill" [shape=box];
-    "可能有 skill 适用?" [shape=diamond];
-    "用 read_file 读取 SKILL.md" [shape=box];
-    "宣布: '使用 [skill] 来 [目的]'" [shape=box];
-    "有检查清单?" [shape=diamond];
-    "用 manage_todo_list 创建待办项" [shape=box];
-    "严格按 skill 执行" [shape=box];
-    "回复（包括澄清问题）" [shape=doublecircle];
+    "User message received" [shape=doublecircle];
+    "Might any skill apply?" [shape=diamond];
+    "Read SKILL.md via read_file" [shape=box];
+    "Announce: 'Using [skill] to [purpose]'" [shape=box];
+    "Has checklist?" [shape=diamond];
+    "Create manage_todo_list todo per item" [shape=box];
+    "Follow skill exactly" [shape=box];
+    "Respond (including clarifications)" [shape=doublecircle];
 
-    "需要制定计划?" -> "已完成头脑风暴?";
-    "已完成头脑风暴?" -> "读取 brainstorming skill" [label="否"];
-    "已完成头脑风暴?" -> "可能有 skill 适用?" [label="是"];
-    "读取 brainstorming skill" -> "可能有 skill 适用?";
-
-    "收到用户消息" -> "可能有 skill 适用?";
-    "可能有 skill 适用?" -> "用 read_file 读取 SKILL.md" [label="是，哪怕 1%"];
-    "可能有 skill 适用?" -> "回复（包括澄清问题）" [label="确定不适用"];
-    "用 read_file 读取 SKILL.md" -> "宣布: '使用 [skill] 来 [目的]'";
-    "宣布: '使用 [skill] 来 [目的]'" -> "有检查清单?";
-    "有检查清单?" -> "用 manage_todo_list 创建待办项" [label="是"];
-    "有检查清单?" -> "严格按 skill 执行" [label="否"];
-    "用 manage_todo_list 创建待办项" -> "严格按 skill 执行";
+    "User message received" -> "Might any skill apply?";
+    "Might any skill apply?" -> "Read SKILL.md via read_file" [label="yes, even 1%"];
+    "Might any skill apply?" -> "Respond (including clarifications)" [label="definitely not"];
+    "Read SKILL.md via read_file" -> "Announce: 'Using [skill] to [purpose]'";
+    "Announce: 'Using [skill] to [purpose]'" -> "Has checklist?";
+    "Has checklist?" -> "Create manage_todo_list todo per item" [label="yes"];
+    "Has checklist?" -> "Follow skill exactly" [label="no"];
+    "Create manage_todo_list todo per item" -> "Follow skill exactly";
 }
 ```
 
-## 危险信号
+## Red Flags
 
-以下想法意味着“停下”——你在合理化逃避：
+These thoughts mean STOP—you're rationalizing:
 
-| 想法 | 现实 |
-|------|------|
-| “这只是个简单问题” | 问题也是任务。检查 skills。 |
-| “我需要先了解更多上下文” | Skill 检查在澄清问题**之前**。 |
-| “让我先探索代码库” | Skills 告诉你**怎么**探索。先检查。 |
-| “我可以快速看看 git/文件” | 文件缺少对话上下文。检查 skills。 |
-| “让我先收集信息” | Skills 告诉你**怎么**收集信息。 |
-| “这不需要正式的 skill” | 如果 skill 存在，就使用它。 |
-| “我记得这个 skill” | Skills 会更新。读取当前版本。 |
-| “这不算任务” | 行动 = 任务。检查 skills。 |
-| “这个 skill 太重了” | 简单的事会变复杂。使用它。 |
-| “我先做完这一件事” | 做任何事**之前**先检查。 |
-| “这感觉很有效率” | 无纪律的行动浪费时间。Skills 防止这一点。 |
-| “我知道那是什么意思” | 知道概念 ≠ 使用 skill。读取它。 |
+| Thought | Reality |
+|---------|---------|
+| "This is just a simple question" | Questions are tasks. Check for skills. |
+| "I need more context first" | Skill check comes BEFORE clarifying questions. |
+| "Let me explore the codebase first" | Skills tell you HOW to explore. Check first. |
+| "I can check git/files quickly" | Files lack conversation context. Check for skills. |
+| "Let me gather information first" | Skills tell you HOW to gather information. |
+| "This doesn't need a formal skill" | If a skill exists, use it. |
+| "I remember this skill" | Skills evolve. Read current version. |
+| "This doesn't count as a task" | Action = task. Check for skills. |
+| "The skill is overkill" | Simple things become complex. Use it. |
+| "I'll just do this one thing first" | Check BEFORE doing anything. |
+| "This feels productive" | Undisciplined action wastes time. Skills prevent this. |
+| "I know what that means" | Knowing the concept ≠ using the skill. Invoke it. |
 
-## Skill 优先级
+## Skill Priority
 
-当多个 skills 可能适用时，使用此顺序：
+When multiple skills could apply, use this order:
 
-1. **先用流程类 skills**（brainstorming、debugging）— 它们决定**如何**处理任务
-2. **再用实现类 skills**（frontend-design、mcp-builder）— 它们指导执行
+1. **Process skills first** (brainstorming, debugging) - these determine HOW to approach the task
+2. **Implementation skills second** (frontend-design, mcp-builder) - these guide execution
 
-“我们来做 X” → 先 brainstorming，再用实现类 skills。
-“修复这个 bug” → 先 debugging，再用领域特定 skills。
+"Let's build X" → brainstorming first, then implementation skills.
+"Fix this bug" → debugging first, then domain-specific skills.
 
-## Skill 类型
+## Skill Types
 
-**严格型**（TDD、debugging）：严格遵循。不要减弱纪律。
+**Rigid** (TDD, debugging): Follow exactly. Don't adapt away discipline.
 
-**灵活型**（patterns）：根据上下文调整原则。
+**Flexible** (patterns): Adapt principles to context.
 
-Skill 本身会告诉你它属于哪种。
+The skill itself tells you which.
 
-## 用户指令
+## User Instructions
 
-指令说的是**做什么**，不是**怎么做**。“添加 X” 或 “修复 Y” 不代表跳过工作流程。
+Instructions say WHAT, not HOW. "Add X" or "Fix Y" doesn't mean skip workflows.
