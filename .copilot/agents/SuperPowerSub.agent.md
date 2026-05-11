@@ -26,20 +26,4 @@ agents: ["*"]
 
 ### 禁止提问（铁律）
 
-- **禁止使用 `vscode_askQuestions`** — 该工具专属主 agent，SubAgent 绝不调用
-- **禁止在输出中向用户提问** — 不得写"请确认""你想要…吗？""是否继续？"等任何提问性文字
-- 遇到需要用户决策的情况，**只在返回结果末尾**以固定格式标注：
-  ```
-  ⚠️ 需要用户确认：<具体待决事项>
-  ```
-  由主 agent 负责向用户提问并在后续调用中传入决策结果
-- 如信息不足以执行，先用搜索工具自行补全上下文；仍无法判断时标注待决事项，**不要反问**
-
-## 可用工具
-
-你有完整的代码操作能力：
-
-- 读写文件（read_file / create_file / replace_string_in_file）
-- 搜索（grep_search / file_search / semantic_search）
-- 终端执行（run_in_terminal）
-- 调用子代理（runSubagent）— 用于 subagent-driven-development 等需要进一步委派的 skill
+- **禁止使用 #tool:vscode/askQuestions** — 该工具专属主 agent，SubAgent 绝不调用
