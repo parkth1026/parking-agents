@@ -1,20 +1,19 @@
 # Gemini CLI Tool Mapping
 
-Skills use Claude Code tool names. When you encounter these in a skill, use your platform equivalent:
+Skills use VS Code Copilot tool names. When you encounter these in a skill, use your Gemini CLI equivalent:
 
 | Skill references | Gemini CLI equivalent |
 |-----------------|----------------------|
-| `Read` (file reading) | `read_file` |
-| `Write` (file creation) | `write_file` |
-| `Edit` (file editing) | `replace` |
-| `Bash` (run commands) | `run_shell_command` |
-| `Grep` (search file content) | `grep_search` |
-| `Glob` (search files by name) | `glob` |
-| `TodoWrite` (task tracking) | `write_todos` |
-| `Skill` tool (invoke a skill) | `activate_skill` |
-| `WebSearch` | `google_web_search` |
-| `WebFetch` | `web_fetch` |
-| `Task` tool (dispatch subagent) | `@agent-name` (see [Subagent support](#subagent-support)) |
+| `read_file` (file reading) | `read_file` |
+| `create_file` (file creation) | `write_file` |
+| `replace_string_in_file` (file editing) | `replace` |
+| `run_in_terminal` (run commands) | `run_shell_command` |
+| `grep_search` (search file content) | `grep_search` |
+| `file_search` (search files by name) | `glob` |
+| `manage_todo_list` (task tracking) | `write_todos` |
+| `read_file` (invoke a skill) | `activate_skill` |
+| `fetch_webpage` (web search/fetch) | `google_web_search` / `web_fetch` |
+| `runSubagent` (dispatch subagent) | `@agent-name` (see [Subagent support](#subagent-support)) |
 
 ## Subagent support
 
@@ -24,11 +23,11 @@ When a skill says to dispatch a named agent type, use `@generalist` with the ful
 
 | Skill instruction | Gemini CLI equivalent |
 |-------------------|----------------------|
-| `Task tool (superpowers:implementer)` | `@generalist` with the filled `implementer-prompt.md` template |
-| `Task tool (superpowers:spec-reviewer)` | `@generalist` with the filled `spec-reviewer-prompt.md` template |
-| `Task tool (superpowers:code-reviewer)` | `@code-reviewer` (bundled agent) or `@generalist` with the filled review prompt |
-| `Task tool (superpowers:code-quality-reviewer)` | `@generalist` with the filled `code-quality-reviewer-prompt.md` template |
-| `Task tool (general-purpose)` with inline prompt | `@generalist` with your inline prompt |
+| `runSubagent (superpowers:implementer)` | `@generalist` with the filled `implementer-prompt.md` template |
+| `runSubagent (superpowers:spec-reviewer)` | `@generalist` with the filled `spec-reviewer-prompt.md` template |
+| `runSubagent (superpowers:code-reviewer)` | `@code-reviewer` (bundled agent) or `@generalist` with the filled review prompt |
+| `runSubagent (superpowers:code-quality-reviewer)` | `@generalist` with the filled `code-quality-reviewer-prompt.md` template |
+| `runSubagent (general-purpose)` with inline prompt | `@generalist` with your inline prompt |
 
 ### Prompt filling
 

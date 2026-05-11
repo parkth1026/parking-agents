@@ -1,23 +1,8 @@
-# VS Code Copilot Tool Mapping
+# VS Code Copilot Tool Reference
 
-Skills use Claude Code tool names. When you encounter these in a skill, use the VS Code Copilot equivalent:
+Skills now use VS Code Copilot tool names natively. This file serves as the authoritative tool reference.
 
-| Skill references | VS Code Copilot equivalent |
-|-----------------|---------------------------|
-| `Read` (file reading) | `read_file` |
-| `Write` (file creation) | `create_file` |
-| `Edit` (file editing) | `replace_string_in_file` |
-| `Bash` (run commands) | `run_in_terminal` |
-| `Grep` (search file content) | `grep_search` |
-| `Glob` (search files by name) | `file_search` |
-| `Skill` tool (invoke a skill) | No equivalent — skills are auto-injected via YAML `applyTo` or manually via `read_file` |
-| `WebFetch` | `fetch_webpage` |
-| `Task` tool (dispatch subagent) | `runSubagent` |
-| Multiple `Task` calls (parallel) | Multiple `runSubagent` calls |
-| Task status/output | No equivalent — subagent results are returned inline |
-| `TodoWrite` (task tracking) | `manage_todo_list` |
-| `WebSearch` | No equivalent — use `fetch_webpage` with a search engine URL |
-| `EnterPlanMode` / `ExitPlanMode` | No equivalent — stay in the main session |
+**No mapping needed** — skill tool names match VS Code Copilot tools directly.
 
 ## File operations
 

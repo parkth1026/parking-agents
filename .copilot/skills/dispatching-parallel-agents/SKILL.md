@@ -66,7 +66,7 @@ Each agent gets:
 ### 3. Dispatch in Parallel
 
 ```typescript
-// In VS Code Copilot environment
+// In Claude Code / AI environment
 runSubagent("Fix agent-tool-abort.test.ts failures")
 runSubagent("Fix batch-completion-behavior.test.ts failures")
 runSubagent("Fix tool-approval-race-conditions.test.ts failures")

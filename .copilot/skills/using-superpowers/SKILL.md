@@ -27,7 +27,7 @@ If CLAUDE.md, GEMINI.md, or AGENTS.md says "don't use TDD" and a skill says "alw
 
 ## How to Access Skills
 
-**In VS Code Copilot:** Skills are loaded via `read_file` on skill files. When you invoke a skill, its content is loaded and presented to you—follow it directly.
+**In Claude Code:** Use the `Skill` tool. When you invoke a skill, its content is loaded and presented to you—follow it directly. Never use the Read tool on skill files.
 
 **In Copilot CLI:** Use the `skill` tool. Skills are auto-discovered from installed plugins. The `skill` tool works the same as Claude Code's `Skill` tool.
 
@@ -37,7 +37,7 @@ If CLAUDE.md, GEMINI.md, or AGENTS.md says "don't use TDD" and a skill says "alw
 
 ## Platform Adaptation
 
-Skills use VS Code Copilot tool names. See [copilot-tools.md](./references/copilot-tools.md) for tool reference.
+Skills use VS Code Copilot tool names as default. Other platforms: see [copilot-tools.md](./references/copilot-tools.md) (Claude Code / Copilot CLI), [codex-tools.md](./references/codex-tools.md) (Codex), [gemini-tools.md](./references/gemini-tools.md) (Gemini CLI) for tool equivalents.
 
 # Using Skills
 
