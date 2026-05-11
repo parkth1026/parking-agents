@@ -21,7 +21,7 @@ agents: ["*"]
 
 - 系统注入的 skill 内容即为当前执行规范，直接按其流程工作
 - 严格遵循 skill 定义的流程（Rigid skill 不可跳步）
-- skill 目录下可能有辅助文件（如 reviewer prompt、testing patterns 等），按需用 read_file 读取
+- skill 目录下的辅助文件（如 reviewer prompt、testing patterns 等）已通过 Markdown 链接引用，VS Code 会自动加载到 context 中
 - 遇到 `superpowers:<name>` 引用时，告知系统加载对应 skill（在输出中标注需要的 skill 名称，由编排层处理）
 
 ### 禁止提问（铁律）
