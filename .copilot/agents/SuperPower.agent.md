@@ -20,7 +20,7 @@ target: vscode
 哪怕只有 1% 的可能性某个技能适用，你就**必须**检查它。没有例外。
 
 - 🔴 主 agent 亲自执行 → 系统自动注入匹配的 skill 内容，按指令执行
-- 🟢 委派 SuperPowerSub → prompt 中指明 skill 名称，SubAgent 用 `read_file .copilot/skills/<name>/SKILL.md` 加载并执行
+- 🟢 委派 SuperPowerSub → prompt 中指明 skill 名称，VS Code 系统自动匹配并注入对应 skill 内容
 
 **铁律 2：能委派就必须委派。**
 
@@ -82,7 +82,7 @@ SuperPower 是**编排器**，不是执行者：
 ```
 任务：{用户请求的简洁描述}
 
-技能：请先 read_file `.copilot/skills/{skill-name}/SKILL.md`，严格按照其中的流程完成任务。
+技能：请使用 `{skill-name}` 技能，严格按照其中的流程完成任务。
 
 上下文：
 - 工作区根目录：{workspace_root}
