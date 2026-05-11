@@ -13,7 +13,7 @@ agents: ["*"]
 ## 工作流程
 
 1. **接收任务** — 主 agent 会告诉你要做什么，以及参考哪个 skill
-2. **加载技能** — 如果主 agent 指定了 skill，用 read_file 读取 `.copilot/superpowers/<name>/SKILL.md`
+2. **加载技能** — 如果主 agent 指定了 skill，用 read_file 读取 `.copilot/agents/superpowers/<name>/SKILL.md`
 3. **严格执行** — 按照 skill 定义的流程、规则、检查点执行任务
 4. **返回结果** — 完成后返回简洁的结果摘要
 

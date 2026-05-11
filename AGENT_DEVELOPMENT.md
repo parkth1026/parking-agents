@@ -74,7 +74,7 @@ subagent 回报 → 主 agent 总结
 
 ## 工作目录与目录 junction 约定
 
-- 当前仓库的 `.copilot/agents/` 与 `.copilot/superpowers/` 已通过**目录级 junction**（`mklink /J`）挂载到用户目录 `~/.copilot/` 下。**不是文件级 symlink**——是整目录挂载。
+- 当前仓库的 `.copilot/agents/`（含 `superpowers/` 子目录）已通过**目录级 junction**（`mklink /J`）挂载到用户目录 `~/.copilot/` 下。**不是文件级 symlink**——是整目录挂载。
 - **所有 agent / skill 的改动一律在本仓库内直接进行**，VS Code Copilot 会通过目录 junction 自动识别。
 - **不要**到 `C:\Users\Administrator\.copilot\` 或用户全局目录中去修改文件——那只是 junction 的指向位置，源在本仓库。
 - 新增 / 修改 / 删除均以本仓库为准，git 版本控制随之生效。
@@ -181,7 +181,7 @@ C:\Users\Administrator\AppData\Roaming\Code\User\globalStorage\github.copilot-ch
 
 ## 目录约定（建议）
 - `.copilot/agents/` — VS Code Copilot 自定义 agents
-- `.copilot/superpowers/` — SuperPower 技能库（不被 VS Code 自动扫描）
+- `.copilot/agents/superpowers/` — SuperPower 技能库（不被 VS Code 自动扫描）
 - `.copilot/prompts/` — 可复用 prompt 文件
 - `.copilot/instructions/` — 作用域化的 instructions 文件
 
@@ -192,7 +192,7 @@ C:\Users\Administrator\AppData\Roaming\Code\User\globalStorage\github.copilot-ch
 | 类型 | 命名规则 | 放置位置 | 触发方式 |
 |---|---|---|---|
 | Agent | `<Name>.agent.md`（PascalCase 或 kebab-case 均可，文件名即 agent 显示名） | `.copilot/agents/` | 用户在 chat 中显式选择 / 主 agent dispatch |
-| Skill | 目录 `<skill-name>/SKILL.md`（kebab-case 目录名） | `.copilot/skills/<skill-name>/SKILL.md` 或 `.copilot/superpowers/<skill-name>/SKILL.md` | 由 description 语义匹配触发 |
+| Skill | 目录 `<skill-name>/SKILL.md`（kebab-case 目录名） | `.copilot/skills/<skill-name>/SKILL.md` 或 `.copilot/agents/superpowers/<skill-name>/SKILL.md` | 由 description 语义匹配触发 |
 | Prompt | `<name>.prompt.md` | `.copilot/prompts/` | `/<name>` 斜杠命令调用 |
 | Instructions | `<name>.instructions.md` | `.copilot/instructions/` | 按 `applyTo` 自动注入 |
 | 仓库根级 | `AGENTS.md` / `copilot-instructions.md` / `CLAUDE.md` | 仓库根 | 自动加载 |

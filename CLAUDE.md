@@ -43,7 +43,7 @@
 - 避免一个 subagent prompt 超过 500 字
 
 ### Skill 同步规范
-- `.copilot/superpowers/` 下的文件来源于 [superpowers](https://github.com/…/superpowers) 仓库
+- `.copilot/agents/superpowers/` 下的文件来源于 [superpowers](https://github.com/…/superpowers) 仓库
 - **保持英文原文**，方便未来同步更新
 - 仅做最小兼容性修复（TodoWrite→manage_todo_list, Task→runSubagent 等）
 - 不翻译、不重组、不改变原文格式

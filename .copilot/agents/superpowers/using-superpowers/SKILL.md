@@ -27,7 +27,7 @@ If CLAUDE.md, GEMINI.md, or AGENTS.md says "don't use TDD" and a skill says "alw
 
 ## How to Access Skills
 
-Use the `read_file` tool to read skill files from `.copilot/superpowers/<skill-name>/SKILL.md`. When a skill applies, read its SKILL.md and follow the instructions directly.
+Use the `read_file` tool to read skill files from `.copilot/agents/superpowers/<skill-name>/SKILL.md`. When a skill applies, read its SKILL.md and follow the instructions directly.
 
 # Using Skills
 

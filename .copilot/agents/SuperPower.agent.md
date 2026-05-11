@@ -32,24 +32,24 @@ target: vscode
 
 ## 技能库索引
 
-所有技能位于 `.copilot/superpowers/` 目录下，每个含 `SKILL.md` 完整指令。
+所有技能位于 `.copilot/agents/superpowers/` 目录下，每个含 `SKILL.md` 完整指令。
 
 | 技能 | 位置 | 使用场景 | 类型 |
 |------|------|----------|------|
-| **brainstorming** | `.copilot/superpowers/brainstorming/` | 任何创造性工作之前 — 创建功能、构建组件、修改行为 | 🔵 交互型 |
-| **using-superpowers** | `.copilot/superpowers/using-superpowers/` | 元技能 — 已嵌入主 agent，指导技能发现与调用 | 🔵 交互型 |
-| **test-driven-development** | `.copilot/superpowers/test-driven-development/` | 实现功能或修复 bug 前，先写测试 | 🟢 执行型 |
-| **systematic-debugging** | `.copilot/superpowers/systematic-debugging/` | 遇到 bug、测试失败或意外行为时 | 🟢 执行型 |
-| **verification-before-completion** | `.copilot/superpowers/verification-before-completion/` | 声称工作完成之前，运行验证 | 🟢 执行型 |
-| **finishing-a-development-branch** | `.copilot/superpowers/finishing-a-development-branch/` | 实现完成、测试通过，需要集成工作 | 🟢 执行型 |
-| **using-git-worktrees** | `.copilot/superpowers/using-git-worktrees/` | 需要隔离工作区或执行计划前 | 🟢 执行型 |
-| **requesting-code-review** | `.copilot/superpowers/requesting-code-review/` | 完成任务或合并前，生成审查报告 | 🟢 执行型 |
-| **receiving-code-review** | `.copilot/superpowers/receiving-code-review/` | 收到审查反馈后，应用建议 | 🟢 执行型 |
-| **writing-plans** | `.copilot/superpowers/writing-plans/` | 有规格或需求时，编码前生成计划 | 🟢 执行型 |
-| **executing-plans** | `.copilot/superpowers/executing-plans/` | 有已编写的实施计划需要执行 | 🟢 执行型 |
-| **writing-skills** | `.copilot/superpowers/writing-skills/` | 创建或编辑 skill 文件 | 🟢 执行型 |
-| **dispatching-parallel-agents** | `.copilot/superpowers/dispatching-parallel-agents/` | 2+ 独立任务可并行执行 | 🟢 执行型 |
-| **subagent-driven-development** | `.copilot/superpowers/subagent-driven-development/` | 在当前会话中执行含独立任务的实施计划 | 🟢 执行型 |
+| **brainstorming** | `.copilot/agents/superpowers/brainstorming/` | 任何创造性工作之前 — 创建功能、构建组件、修改行为 | 🔵 交互型 |
+| **using-superpowers** | `.copilot/agents/superpowers/using-superpowers/` | 元技能 — 已嵌入主 agent，指导技能发现与调用 | 🔵 交互型 |
+| **test-driven-development** | `.copilot/agents/superpowers/test-driven-development/` | 实现功能或修复 bug 前，先写测试 | 🟢 执行型 |
+| **systematic-debugging** | `.copilot/agents/superpowers/systematic-debugging/` | 遇到 bug、测试失败或意外行为时 | 🟢 执行型 |
+| **verification-before-completion** | `.copilot/agents/superpowers/verification-before-completion/` | 声称工作完成之前，运行验证 | 🟢 执行型 |
+| **finishing-a-development-branch** | `.copilot/agents/superpowers/finishing-a-development-branch/` | 实现完成、测试通过，需要集成工作 | 🟢 执行型 |
+| **using-git-worktrees** | `.copilot/agents/superpowers/using-git-worktrees/` | 需要隔离工作区或执行计划前 | 🟢 执行型 |
+| **requesting-code-review** | `.copilot/agents/superpowers/requesting-code-review/` | 完成任务或合并前，生成审查报告 | 🟢 执行型 |
+| **receiving-code-review** | `.copilot/agents/superpowers/receiving-code-review/` | 收到审查反馈后，应用建议 | 🟢 执行型 |
+| **writing-plans** | `.copilot/agents/superpowers/writing-plans/` | 有规格或需求时，编码前生成计划 | 🟢 执行型 |
+| **executing-plans** | `.copilot/agents/superpowers/executing-plans/` | 有已编写的实施计划需要执行 | 🟢 执行型 |
+| **writing-skills** | `.copilot/agents/superpowers/writing-skills/` | 创建或编辑 skill 文件 | 🟢 执行型 |
+| **dispatching-parallel-agents** | `.copilot/agents/superpowers/dispatching-parallel-agents/` | 2+ 独立任务可并行执行 | 🟢 执行型 |
+| **subagent-driven-development** | `.copilot/agents/superpowers/subagent-driven-development/` | 在当前会话中执行含独立任务的实施计划 | 🟢 执行型 |
 
 ---
 
@@ -108,7 +108,7 @@ target: vscode
 ```
 任务：{用户请求的简洁描述}
 
-技能：请先 read_file `.copilot/superpowers/{skill-name}/SKILL.md`，严格按照其中的流程完成任务。
+技能：请先 read_file `.copilot/agents/superpowers/{skill-name}/SKILL.md`，严格按照其中的流程完成任务。
 
 上下文：
 - 工作区根目录：{workspace_root}
@@ -160,7 +160,7 @@ target: vscode
 | `Task` 工具 | 委派给 SuperPowerSub subagent |
 | `TodoWrite` | 对话内跟踪或 markdown 检查列表 |
 
-完整映射见 `.copilot/superpowers/using-superpowers/references/copilot-tools.md`。
+完整映射见 `.copilot/agents/superpowers/using-superpowers/references/copilot-tools.md`。
 
 ---
 
