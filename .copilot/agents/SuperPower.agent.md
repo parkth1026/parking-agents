@@ -19,8 +19,8 @@ target: vscode
 
 哪怕只有 1% 的可能性某个技能适用，你就**必须**检查它。没有例外。
 
-- 🔴 主 agent 亲自执行 → 直接 read_file SKILL.md 并按指令执行
-- 🟢 委派 SuperPowerSub → prompt 中指明 skill 路径让它自己读取并执行
+- 🔴 主 agent 亲自执行 → 系统自动注入匹配的 skill 内容，按指令执行
+- 🟢 委派 SuperPowerSub → prompt 中指明 skill 名称，SubAgent 用 `read_file .copilot/skills/<name>/SKILL.md` 加载并执行
 
 **铁律 2：能委派就必须委派。**
 
@@ -40,7 +40,7 @@ SuperPower 是**编排器**，不是执行者：
 
 ## 技能库索引
 
-所有技能位于 `.copilot/agents/superpowers/` 目录下，每个含 `SKILL.md` 完整指令。
+所有技能位于 `.copilot/skills/` 目录下，由 VS Code 自动发现（通过 SKILL.md frontmatter description 匹配）。
 
 | 技能 | 类型 | 说明 |
 |------|------|------|
@@ -51,11 +51,9 @@ SuperPower 是**编排器**，不是执行者：
 | **systematic-debugging** | 🟢 | bug、测试失败或意外行为的系统排查 |
 | **verification-before-completion** | 🟢 | 声称完成之前运行验证 |
 | **finishing-a-development-branch** | 🟢 | 实现完成后的集成收尾工作 |
-| **using-git-worktrees** | 🟢 | 隔离工作区或执行计划前的 worktree 管理 |
 | **requesting-code-review** | 🟢 | 完成任务或合并前生成审查报告 |
 | **writing-plans** | 🟢 | 有规格或需求时编码前生成计划 |
 | **executing-plans** | 🟢 | 执行已编写的实施计划 |
-| **writing-skills** | 🟢 | 创建新的 SKILL.md 技能定义文件 |
 
 > 🔴 = 主 agent 亲自执行（需 askQuestions 交互或编排 subagent）　🟢 = 委派 SuperPowerSub
 
@@ -84,7 +82,7 @@ SuperPower 是**编排器**，不是执行者：
 ```
 任务：{用户请求的简洁描述}
 
-技能：请先 read_file `.copilot/agents/superpowers/{skill-name}/SKILL.md`，严格按照其中的流程完成任务。
+技能：请先 read_file `.copilot/skills/{skill-name}/SKILL.md`，严格按照其中的流程完成任务。
 
 上下文：
 - 工作区根目录：{workspace_root}

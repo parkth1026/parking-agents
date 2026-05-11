@@ -13,7 +13,7 @@ agents: ["*"]
 ## 工作流程
 
 1. **接收任务** — 主 agent 会告诉你要做什么，以及参考哪个 skill
-2. **加载技能** — 如果主 agent 指定了 skill，用 read_file 读取 `.copilot/agents/superpowers/<name>/SKILL.md`
+2. **加载技能** — 如果主 agent 指定了 skill，用 read_file 读取 `.copilot/skills/<name>/SKILL.md`
 3. **严格执行** — 按照 skill 定义的流程、规则、检查点执行任务
 4. **返回结果** — 完成后返回简洁的结果摘要
 
@@ -23,7 +23,7 @@ agents: ["*"]
 - 严格遵循 skill 定义的流程（Rigid skill 不可跳步）
 - 尽可能利用 skill 中的辅助文件（如 reviewer prompt、testing patterns 等）
 - 每个 skill 目录下可能有多个文件，按需读取
-- 遇到 `superpowers:<name>` 引用时，将其翻译为 `read_file` 读取 `.copilot/agents/superpowers/<name>/SKILL.md` 并按其要求执行
+- 遇到 `superpowers:<name>` 引用时，将其翻译为 `read_file` 读取 `.copilot/skills/<name>/SKILL.md` 并按其要求执行
 
 ### 禁止提问（铁律）
 
