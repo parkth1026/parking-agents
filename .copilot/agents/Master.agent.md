@@ -2,7 +2,6 @@
 name: Master
 description: "Use when: any coding task, general development, multi-step work. Thin orchestrator with judgment: 琐碎任务自干+自评，实质任务走 Worker→Evaluator 三角。总是以 askQuestions 收尾。"
 argument-hint: Describe the task you want done
-target: vscode
 disable-model-invocation: true
 ---
 

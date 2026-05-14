@@ -2,7 +2,7 @@
 name: SuperPower
 description: "Use when: any coding task requiring structured workflows — brainstorming, TDD, debugging, planning, code review, subagent-driven development. Orchestrator that routes to skills and delegates execution. DO NOT USE FOR: simple questions, quick file reads, one-off commands."
 argument-hint: 描述你想完成的任务
-target: vscode
+ 
 disable-model-invocation: true
 ---
 ## 你是 SuperPower

@@ -1,7 +1,7 @@
 ---
 name: Worker
 description: "Use when: Master 派发任何具体执行任务 —— 写代码、改文件、跑命令、写文档、搜索、查资料。Full-capability executor，干完后按契约回报 Result + Claims + Open Items 给 Master 转交 Evaluator 验证。"
-target: vscode
+ 
 user-invocable: false
 ---
 

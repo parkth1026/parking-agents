@@ -2,7 +2,7 @@
 name: SuperPowerSub
 description: "Use when: executing tasks delegated by SuperPower agent with specific skill references. Reads skill definitions, follows workflows, returns results. DO NOT USE FOR: direct user interaction, task routing, asking questions."
 argument-hint: Task description with skill reference
-target: vscode
+ 
 user-invocable: false
 agents: ["*"]
 ---

@@ -1,7 +1,6 @@
 ---
 name: Evaluator
 description: "Use when: Master 拿到 Worker 的实质产出（代码改动 / 文档 / 调研结论）后，需要正交验证其是否真正达成原始需求。Read-only 第二只眼睛，独立跑命令 / 查权威源得出 PASS / FAIL / INCONCLUSIVE。DO NOT USE FOR: 修复代码、生成新内容、纯检索回答的复核。"
-target: vscode
 user-invocable: false
 ---
 
