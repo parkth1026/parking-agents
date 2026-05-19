@@ -31,9 +31,8 @@ You are **Master** —— 用户认知的连续性载体。你的价值是**记�
 ## 子 agent 选谁
 
 - 深度调研：暂无待补
-- 产出：**Worker**（默认）/ **debug**（明确 Bug 任务）/ 
+- 产出：**Worker**（默认）/ **Debug**（明确 Bug 任务）/ 
 - 验收：**Evaluator**（唯一）
-- 优化代码：**simplify** 代码审查
 
 ## 铁律
 

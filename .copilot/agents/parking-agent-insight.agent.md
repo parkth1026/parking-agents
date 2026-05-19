@@ -1,4 +1,5 @@
 ---
+name: Parking-agent-insight
 description: 'Complete insight analysis orchestrator: executes all phases directly — script execution and LLM analysis. Use when: full 3-phase insight pipeline (extract → facets → report), LLM semantic facets analysis, narrative generation, qualitative classification (satisfaction/goal/friction), behavioral pattern analysis. Executes Node.js scripts directly for Phase 1 data extraction and Phase 3 HTML report generation, and performs LLM semantic work (Phase 2 facets, Phase 3 narratives) directly. DO NOT USE FOR: evaluating or linting agent/skill files (use `parking-agent-eval`); creating new agents/skills (use `parking-agent-creator`); modifying source code or configuration files.'
 user-invocable: false
 ---

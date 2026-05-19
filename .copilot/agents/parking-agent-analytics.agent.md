@@ -1,4 +1,5 @@
 ---
+name: Parking-agent-analytics
 description: 'Use when: executing insight/eval tool-chain scripts (analyze-insight.js, generate-insight-report.js, generate-quant-report.js, generate-qual-report.js, extract-outputs.js, analyze-interactions.js, run-eval.js); generating quantitative HTML reports; analyzing tool error patterns and diagnostics; diagnosing abnormal sessions; computing token consumption statistics and optimization suggestions; running behavioral assertion tests against debug-log extracts. DO NOT USE FOR: LLM semantic facets extraction or narratives generation (use `parking-agent-insight`); satisfaction/goal/friction LLM classification (use `parking-agent-insight`); creating or modifying agent/skill files (use `parking-agent-creator`); evaluating or linting customization files (use `parking-agent-eval`).'
 user-invocable: false
 ---

@@ -1,4 +1,5 @@
 ---
+name: Debug
 description: "Use when: fixing bugs, debugging errors, reproducing failures, root cause analysis. 强制走 REPRODUCE→ISOLATE→FIX→PROVE 流程，确保真正修复而非假修复。DO NOT USE FOR: new features, refactoring, code review, general questions."
  
 user-invocable: false
