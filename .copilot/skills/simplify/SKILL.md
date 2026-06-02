@@ -12,9 +12,9 @@
   Run `git diff` (or `git diff HEAD` if there are staged changes) to see what changed. If there are no git changes, review the most recently modified files that the user mentioned or that you edited earlier in
    this conversation.
 
-  ## Phase 2: Launch three review agents sequentially — one at a time.
+  ## Phase 2: Launch three review subagents one by one.
 
-  Use `runSubagent` to launch the three agents **one by one in serial order**. Wait for each agent to return its findings before launching the next. Pass each agent the full diff so it has the complete context.
+  Use the Agent tool to launch all three agents concurrently in a single message. Pass each agent the full diff so it has the complete context.
 
   ### Agent 1: Code Reuse Review
 
