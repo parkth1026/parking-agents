@@ -11,11 +11,16 @@
 
 | 参数 | 当前值 | 建议值 | 作用 |
 |------|--------|--------|------|
-| `js-flags` | ❌ 未设置 | `"--max-old-space-size=8192"` | Extension Host 堆内存从 ~1.5GB → 8GB，长对话不 OOM |
+| `js-flags` | ❌ 未设置 | `"--max-old-space-size=8192"` | Extension Host 堆内存上限 8GB，长对话不 OOM |
 | `disable-features` | ❌ 未设置 | `"CalculateNativeWinOcclusion"` | 阻止 Windows 遮挡检测降级 WebView 渲染 |
 | `disable-hardware-acceleration` | 注释状态（= 未启用） | 保持注释（不动） | GPU 加速应保持开启 |
 | `locale` | `"zh-cn"` | ✅ 保持不变 | — |
 | `enable-crash-reporter` | `true` | `false`（可选） | 关闭崩溃上报减少后台 IO |
+
+> ⚠️ **风险提示**：
+> - `max-old-space-size=8192`：**16GB 内存机器建议设 4096**，32GB+ 才用 8192。因为 VS Code 多进程（主进程 + Extension Host + LSP servers）各自独立占内存，8GB 上限可能导致系统 swap。
+> - `CalculateNativeWinOcclusion`：Chromium 内部 feature flag，未来版本可能重命名或移除。
+> - Node 18+ (VS Code 1.80+) 默认堆约 4GB（非旧版的 1.5GB），所以 8192 是在默认值上翻倍。
 
 ### 建议最终内容
 
@@ -54,7 +59,7 @@
 | `editor.largeFileOptimizations` | 未设置（默认 `true`） | `true` | 确保大文件优化开启 |
 | `workbench.list.smoothScrolling` | 未设置（默认 `false`） | `false` | 确保关闭 |
 | `workbench.editor.limit.enabled` | 未设置（默认 `false`） | `true` | 限制打开的 tab 数量 |
-| `workbench.editor.limit.value` | 未设置 | `8` | 超过时自动关闭最早的 tab |
+| `workbench.editor.limit.value` | 未设置 | `12` | 超过时自动关闭最早的 tab |
 | `workbench.tips.enabled` | 未设置（默认 `true`） | `false` | 关闭提示减少干扰 |
 | `files.watcherExclude` | 未设置 | 见下方 | **UE5 大项目必须配置** |
 | `search.exclude` | 未设置 | 见下方 | 搜索排除无关目录 |
@@ -64,6 +69,13 @@
 | `git.decorations.enabled` | 未设置（默认 `true`） | `false` | 关闭 git 文件颜色标记 |
 | `telemetry.telemetryLevel` | 未设置（默认 `"all"`） | `"off"` | 关闭遥测减少后台网络 |
 | `extensions.autoUpdate` | 未设置（默认 `true`） | `false` | 手动更新，避免后台下载 |
+
+> ⚠️ **风险提示**：
+> - `files.watcherExclude: **/Content/**`：**仅适用于 UE5 项目**（Content 下是二进制 .uasset）。前端项目如有 src/Content/ 目录包含源文件，排除后热重载失效。建议放 workspace settings 而非 user settings。
+> - `git.autorefresh: false`：Git 用户提交后侧边栏不自动更新，需手动点刷新。P4 用户无影响。
+> - `extensions.autoUpdate: false`：可能错过安全修复，建议每周手动检查一次更新。
+> - `workbench.editor.limit = 12`：P4/Git 解冲突时可能需要更多 tab，可按需调高。
+> - Copilot `anthropic.thinking.*` 设置属于实验性 API，无稳定性保证，可能随版本更新失效或重命名。
 
 ### 🟡 你已有的设置 — 建议修改
 
@@ -97,12 +109,19 @@
     "editor.renderWhitespace": "none",
     "editor.hover.delay": 500,
     "editor.suggest.preview": false,
+    "editor.codeLens": false,
+    "editor.inlayHints.enabled": "off",
+    "editor.stickyScroll.enabled": false,
+    "editor.guides.indentation": false,
+    "editor.renderLineHighlight": "none",
+    "editor.matchBrackets": "never",
 
     // ===== 工作台 =====
     "workbench.list.smoothScrolling": false,
     "workbench.editor.limit.enabled": true,
-    "workbench.editor.limit.value": 8,
+    "workbench.editor.limit.value": 12,
     "workbench.tips.enabled": false,
+    "workbench.reduceMotion": "on",
 
     // ===== 文件监视排除（大项目关键）=====
     "files.watcherExclude": {
@@ -133,6 +152,7 @@
     // ===== 遥测 & 更新 =====
     "telemetry.telemetryLevel": "off",
     "extensions.autoUpdate": false,
+    "extensions.autoCheckUpdates": false,
 
     // ===== Copilot 性能 =====
     "github.copilot.nextEditSuggestions.enabled": false
@@ -202,26 +222,31 @@
 
 | 优先级 | 操作 | 预期效果 |
 |--------|------|----------|
-| **P0** | argv.json 加 `max-old-space-size=8192` | 卡顿阈值从 ~20 轮推到 ~60+ 轮 |
+| **P0** | argv.json 加 `max-old-space-size=8192` | Extension Host/renderer 堆上限增大，推迟 OOM |
 | **P0** | 关闭 `nextEditSuggestions` | Extension Host CPU 降 30%+ |
 | **P1** | 加 `files.watcherExclude` | 主进程 CPU/IO 大幅降低 |
 | **P1** | 关闭 minimap + bracketPairColorization | 编辑器渲染帧率提升 |
+| **P1** | `workbench.reduceMotion: "on"` | 减少 CSS 动画合成开销 |
 | **P2** | 感觉卡时 `Ctrl+Shift+P` → Reload Window | WebView DOM 重置，历史保留 |
 | **P2** | argv.json 加 `disable-features` | WebView 不被降级渲染 |
 | **P3** | Windows Defender 排除 | IO 延迟降低 |
 
 ### 对话中的自救操作
 
-1. **感觉开始变卡**：`Ctrl+Shift+P` → `Developer: Reload Window` — 重载但保留 Chat 历史
-2. **Process Explorer 监控**：`Ctrl+Shift+P` → `Process Explorer` — Extension Host > 1.5GB 就该 Reload
-3. **避免超长输出**：指示 AI "简洁回答" / "只输出改动部分" 可减少 DOM 节点增长
-4. **终极手段**：如果 Reload 都救不回来，新开对话是唯一解
+1. **轻量释放**：`Ctrl+Shift+P` → 搜索 `compact` → 执行 **"Compact Conversation"** — 尝试压缩 DOM（比 Reload 更轻）
+2. **感觉开始变卡**：`Ctrl+Shift+P` → `Developer: Reload Window` — 重载但保留 Chat 历史
+3. **Process Explorer 监控**：`Ctrl+Shift+P` → `Process Explorer` — renderer > 2GB 就该 Reload
+4. **避免超长输出**：指示 AI "简洁回答" / "只输出改动部分" 可减少 DOM 节点增长
+5. **终极手段**：如果 Reload 都救不回来，新开对话是唯一解
 
 ### 本质原因
 
 > Copilot Chat 使用 WebView（Chromium 嵌入）渲染对话。每条消息都是 DOM 节点，  
 > 长对话 = DOM 树无限增长 = 重排/重绘越来越慢。这是架构性限制，无法完全消除，  
 > 只能通过增加资源 + 减少竞争来推迟阈值。
+>
+> **官方状态**：GitHub Issue [#316407](https://github.com/microsoft/vscode/issues/316407) 已报告此问题（2026-05-13），  
+> 建议的修复方向为 virtualized message rendering（仅渲染可见消息），但尚未实现。
 
 ---
 
