@@ -93,6 +93,7 @@ playwright-cli mousewheel 0 100
 playwright-cli screenshot
 playwright-cli screenshot e5
 playwright-cli screenshot --filename=page.png
+playwright-cli screenshot --hires
 playwright-cli pdf --filename=page.pdf
 ```
 
@@ -163,7 +164,11 @@ playwright-cli video-start video.webm
 playwright-cli video-chapter "Chapter Title" --description="Details" --duration=2000
 playwright-cli video-stop
 
-# launch the dashboard with annotation prompt to ask the user for input
+# annotate each subsequent action (click, type, ...) with a callout naming the action and highlighting the target
+playwright-cli video-show-actions --duration=600 --position=top-right
+playwright-cli video-hide-actions
+
+# launch the dashboard for UI review / design feedback — user annotates the page, you receive the annotated screenshot, snapshot, and notes
 playwright-cli show --annotate
 
 # generate a Playwright locator for an element from its ref or selector
@@ -229,6 +234,18 @@ playwright-cli close
 playwright-cli -s=msedge detach
 # Delete user data for the default session
 playwright-cli delete-data
+```
+
+## URLs with `&` on Windows
+
+On Windows, `cmd.exe` and PowerShell treat `&` as a command separator, so URLs with multiple query parameters get truncated before `playwright-cli` runs. Escape `&` with `^&` in `cmd.exe`, or use `--%` in PowerShell:
+
+```batch
+playwright-cli goto "https://example.com/?a=1^&b=2"
+```
+
+```powershell
+playwright-cli --% goto "https://example.com/?a=1&b=2"
 ```
 
 ## Snapshots
@@ -367,7 +384,7 @@ playwright-cli close
 
 ## Example: Interactive session
 
-Ask the user to annotate the UI. User can provide contextual tasks or ask contextual questions using annotations:
+Ask the user for UI review or design feedback. The user draws boxes on the live page and types comments; you receive the annotated screenshot, the snapshot of the marked region, and the user's notes. Use this whenever the user asks for "UI review", "design feedback", or to "ask the user what they think / want / mean":
 
 ```bash
 playwright-cli open https://example.com
