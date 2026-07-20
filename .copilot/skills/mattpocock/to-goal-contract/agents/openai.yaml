@@ -1,0 +1,6 @@
+interface:
+  display_name: "To Goal Contract"
+  short_description: "Persist shared understanding as a verifiable goal contract"
+  default_prompt: "Use $to-goal-contract to persist the confirmed shared understanding as a verifiable repository Goal Contract."
+policy:
+  allow_implicit_invocation: true
