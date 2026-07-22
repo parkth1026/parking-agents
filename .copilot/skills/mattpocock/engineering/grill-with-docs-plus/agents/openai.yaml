@@ -1,6 +1,6 @@
 interface:
-  display_name: "grill-with-docs-plus"
-  short_description: "科学消歧，并按任务规模提醒 implement 或 to-spec"
+  display_name: "Grill with Docs Plus"
+  short_description: "Evidence-gated docs-backed design interview"
   default_prompt: "使用 $grill-with-docs-plus 按设计歧义指数消除未知项，确认共享理解后提醒我应该进入 $implement 还是 $to-spec。"
 policy:
   allow_implicit_invocation: false

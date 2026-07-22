@@ -1,10 +1,12 @@
 ---
 name: implement
-description: "Implement a piece of work based on a spec or set of tickets."
+description: "Implement confirmed work from the current shared understanding, a spec, or a set of tickets."
 disable-model-invocation: true
 ---
 
-Implement the work described by the user in the spec or tickets.
+Implement the work described by the user's confirmed shared understanding, spec, or tickets.
+
+A confirmed shared understanding is a valid input when the work is one coherent current-context unit and its seam and success evidence are already settled. Treat that conversation as the source of truth; do not require a spec or reopen the interview. For multi-session or independently sliced work, require the durable spec/ticket path instead.
 
 Use /tdd where possible, at pre-agreed seams.
 
