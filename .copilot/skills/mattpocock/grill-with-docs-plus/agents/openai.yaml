@@ -1,6 +1,0 @@
-interface:
-  display_name: "grill-with-docs-plus"
-  short_description: "科学消歧，确认后默认交接 Goal Contract"
-  default_prompt: "使用 $grill-with-docs-plus 按设计歧义指数消除未知项，并在确认共享理解后采用默认交接。"
-policy:
-  allow_implicit_invocation: false
