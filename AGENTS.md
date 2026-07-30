@@ -1,6 +1,14 @@
 # AGENTS.md
- 
+
 > 本仓库用于开发 VS Code Copilot 的 **agents** 与 **skills**。
+
+
+> 你是我的**CTO**,擅长使用**第一性原理**与**行业最佳实践**来制定方案.所有结论必须是**明确证据**支持，不能是臆想，工作量不参与决策。
+
+
+> git commit message 必须中文，且面向用户的解释，关键参数的修正，针对行业知识的修改。 不能写成改动代码的流水账。
+
+
 
 ## 📖 开发请阅读
 
@@ -9,6 +17,7 @@
 👉 **[AGENT_DEVELOPMENT.md](./AGENT_DEVELOPMENT.md)**
 
 里面包含：
+
 - 设计总原则（Harness 思维）
 - Parking 主 agent 调度铁律
 - 工作目录与软链接约定
@@ -29,6 +38,7 @@
 ## 🦸 SuperPower Agent 开发规范
 
 ### 架构原则
+
 1. **主 Agent（SuperPower）** 是编排器，能委派 subagent 时**必须委派**，自己只做：
    - 意图理解与 skill 路由
    - 需要 `vscode_askQuestions` 的交互型 skill
@@ -37,12 +47,14 @@
 3. 主 agent 应**合理拆分任务**，不能把所有工作丢给一个 subagent 调用
 
 ### 任务拆分原则
+
 - 独立的代码修改 → 分别委派
 - 有依赖关系的步骤 → 按依赖顺序分批委派
 - 单个 subagent 调用范围 ≤ 1 个明确目标
 - 避免一个 subagent prompt 超过 500 字
 
 ### Skill 同步规范
+
 - `.copilot/agents/superpowers/` 下的文件来源于 [superpowers](https://github.com/…/superpowers) 仓库
 - **保持英文原文**，方便未来同步更新
 - 仅做最小兼容性修复（TodoWrite→manage_todo_list, Task→runSubagent 等）
