@@ -28,13 +28,23 @@ user-invocable: false
 | 类型         | 命名规则                                                        | 放置位置                                  | 触发方式                            |
 | ------------ | --------------------------------------------------------------- | ----------------------------------------- | ----------------------------------- |
 | Agent        | `<Name>.agent.md`（PascalCase 或 kebab-case，文件名即显示名） | `.copilot/agents/`                      | 用户 chat 显式选择 / 主 agent dispatch |
-| Skill        | 目录 `<skill-name>/SKILL.md`（kebab-case）                    | `.copilot/skills/<skill-name>/SKILL.md` | description 语义匹配触发            |
+| Skill        | 目录 `<skill-name>/SKILL.md`（kebab-case，**必须与 frontmatter `name:` 一致**） | **`skills/<skill-name>/SKILL.md`**（仓库根，一层扁平） | description 语义匹配触发            |
 | Prompt       | `<name>.prompt.md`                                            | `.copilot/prompts/`                     | `/<name>` 斜杠命令调用            |
 | Instructions | `<name>.instructions.md`                                      | `.copilot/instructions/`                | 按 `applyTo` 自动注入             |
 | 仓库根级     | `AGENTS.md` / `copilot-instructions.md` / `CLAUDE.md`     | 仓库根                                    | 自动加载                            |
 
 - 扩展名**严格小写**：`.agent.md` / `.prompt.md` / `.instructions.md`。
 - skill **必须**是"目录 + SKILL.md"，不是单文件。
+
+### ⚠️ Skill 是跨平台的，与 agent 规则不同
+
+`skills/` 是 Claude Code / Codex / Pi 共享的真源，**不在 `.copilot/` 下**。建 skill 时额外遵守：
+
+- **一层扁平，禁止更深嵌套**。平台只扫 `skills/` 的直接子目录，嵌套会让技能在所有平台**静默消失**（无报错、无警告）。
+- **目录名必须与 frontmatter `name:` 完全一致**。
+- 正文里的 `read_file` / `run_in_terminal` / `runSubagent` 等 VS Code 工具名被当作**动作别名**，由 `skills/using-parking-skills/references/<harness>-tools.md` 翻译成各平台真实工具名。新建 skill 沿用这套命名即可，**不要**改写成某个平台的专有工具名。
+- 建完跑 `npm test` 验证结构（`tests/skills/test-skill-discovery.mjs` 会断言以上全部）。
+- 完整规范见 `docs/porting-to-a-new-harness.md`。
 
 ## 4. YAML Frontmatter 速查
 
@@ -72,12 +82,13 @@ argumentHint: '描述参数用法'           # agent/prompt 提示用户输入
 ## 7. 创建工作流（每次任务必走）
 
 1. **确认类型与命名**：是 agent / skill / prompt / instructions？文件名是否符合 §3。
-2. **去重检查**：用 `list_dir` / `file_search` 检查 `.copilot/agents/` 或 `.copilot/skills/` 下是否已存在同名文件，**避免覆盖现役**。
+2. **去重检查**：用 `list_dir` / `file_search` 检查 `.copilot/agents/`（agent）或 `skills/`（skill）下是否已存在同名文件，**避免覆盖现役**。
 3. **冻结模板保护**：若目标涉及 `parking` 或 `worker`，立即停止并报告——这两个是冻结模板。
 4. **写 frontmatter**：按 §4 / §5 / §6 落字段；省略 `tools`（推荐默认，继承父权限），仅在确有隔离需求时再显式白名单；description 必须精准（参考 §6）。
 5. **写正文**：结构化中文（角色定位 / 输入 / 输出契约 / 禁区），必要时把跨多文件复用的硬规范**直接内联**进正文，避免运行时再加载。
-6. **目录预创建**：若 `.copilot/skills/<name>/` 不存在，先 `create_directory` 再 `create_file SKILL.md`。
-7. **回报**（见 §8）并建议下一步（通常是调用 `parking-agent-eval` 验收）。
+6. **目录预创建**：若 `skills/<name>/` 不存在，先 `create_directory` 再 `create_file SKILL.md`。**注意是仓库根的 `skills/`，不是 `.copilot/skills/`**。
+7. **结构验证**（仅 skill）：跑 `npm test`，确认 `test-skill-discovery.mjs` 通过。
+8. **回报**（见 §8）并建议下一步（通常是调用 `parking-agent-eval` 验收）。
 
 ## 8. 输出契约
 

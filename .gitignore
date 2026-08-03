@@ -1,4 +1,6 @@
 /docs/_PROMPT.txt
 docs/*
+!docs/porting-to-a-new-harness.md
 reports/*
 *reports/*
+node_modules/

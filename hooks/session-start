@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# SessionStart hook for the parking-skills plugin
+
+set -euo pipefail
+
+# Determine plugin root directory
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PLUGIN_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+BOOTSTRAP_SKILL="${PLUGIN_ROOT}/skills/using-parking-skills/SKILL.md"
+TOOL_MAPPING="${PLUGIN_ROOT}/skills/using-parking-skills/references/claude-code-tools.md"
+
+bootstrap_content=$(cat "${BOOTSTRAP_SKILL}" 2>&1 || echo "Error reading using-parking-skills skill")
+
+# Unlike upstream superpowers, the skill bodies here name VS Code Copilot tools,
+# so the mapping table is NOT optional on Claude Code -- append it to the
+# injection rather than making the model go read it.
+mapping_content=$(cat "${TOOL_MAPPING}" 2>&1 || echo "")
+
+# Escape string for JSON embedding using bash parameter substitution.
+# Each ${s//old/new} is a single C-level pass - orders of magnitude
+# faster than a character-by-character loop.
+escape_for_json() {
+    local s="$1"
+    s="${s//\\/\\\\}"
+    s="${s//\"/\\\"}"
+    s="${s//$'\n'/\\n}"
+    s="${s//$'\r'/\\r}"
+    s="${s//$'\t'/\\t}"
+    printf '%s' "$s"
+}
+
+bootstrap_escaped=$(escape_for_json "$bootstrap_content")
+mapping_escaped=$(escape_for_json "$mapping_content")
+
+session_context="<EXTREMELY_IMPORTANT>\nYou have the parking skills.\n\n**Below is the full content of your 'parking-skills:using-parking-skills' skill - your introduction to using these skills. For all other skills, use the 'Skill' tool:**\n\n${bootstrap_escaped}\n\n---\n\n${mapping_escaped}\n</EXTREMELY_IMPORTANT>"
+
+# Output context injection as JSON.
+# Cursor hooks expect additional_context (snake_case).
+# Claude Code hooks expect hookSpecificOutput.additionalContext (nested).
+# Copilot CLI (v1.0.11+) and others expect additionalContext (top-level, SDK standard).
+# Claude Code reads BOTH additional_context and hookSpecificOutput without
+# deduplication, so we must emit only the field the current platform consumes.
+#
+# Only Claude Code is a supported target today; the other branches are kept so
+# adding Cursor / Copilot CLI later is a README change, not a rewrite.
+#
+# Uses printf instead of heredoc to work around bash 5.3+ heredoc hang.
+# See: https://github.com/obra/superpowers/issues/571
+if [ -n "${CURSOR_PLUGIN_ROOT:-}" ]; then
+  # Cursor sets CURSOR_PLUGIN_ROOT (may also set CLAUDE_PLUGIN_ROOT)
+  printf '{\n  "additional_context": "%s"\n}\n' "$session_context" | cat
+elif [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] && [ -z "${COPILOT_CLI:-}" ]; then
+  # Claude Code sets CLAUDE_PLUGIN_ROOT without COPILOT_CLI
+  printf '{\n  "hookSpecificOutput": {\n    "hookEventName": "SessionStart",\n    "additionalContext": "%s"\n  }\n}\n' "$session_context" | cat
+else
+  # Copilot CLI (sets COPILOT_CLI=1) or unknown platform — SDK standard format
+  printf '{\n  "additionalContext": "%s"\n}\n' "$session_context" | cat
+fi
+
+exit 0

@@ -1,4 +1,5 @@
 ---
+name: claude-to-vscode-skill-converter
 description: "Use when: converting Claude Code skills/prompts to VS Code Copilot format. Handles tool name mapping, syntax conversion, and platform-specific adaptations."
 ---
 

@@ -1,0 +1,15 @@
+{
+  "name": "parking-skills-dev",
+  "owner": {
+    "name": "piaotonghu",
+    "email": "pb763396199@gmail.com"
+  },
+  "plugins": [
+    {
+      "name": "parking-skills",
+      "source": "./",
+      "version": "0.1.0",
+      "description": "A cross-platform skill library: PowerShell scripting, Windows CPU diagnostics, dev-environment setup, plus Matt Pocock's engineering and productivity workflows."
+    }
+  ]
+}

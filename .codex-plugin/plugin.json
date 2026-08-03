@@ -1,0 +1,42 @@
+{
+  "name": "parking-skills",
+  "version": "0.1.0",
+  "description": "A cross-platform skill library: PowerShell scripting, Windows CPU diagnostics, dev-environment setup, plus Matt Pocock's engineering and productivity workflows.",
+  "author": {
+    "name": "piaotonghu",
+    "email": "pb763396199@gmail.com",
+    "url": "https://github.com/parkth1026"
+  },
+  "homepage": "https://github.com/parkth1026/parking-agents",
+  "repository": "https://github.com/parkth1026/parking-agents",
+  "license": "MIT",
+  "keywords": [
+    "skills",
+    "powershell",
+    "windows",
+    "code-review",
+    "debugging",
+    "domain-modeling",
+    "workflows"
+  ],
+  "skills": "./skills/",
+  "hooks": {},
+  "interface": {
+    "displayName": "Parking Skills",
+    "shortDescription": "PowerShell, Windows diagnostics, and engineering workflow skills",
+    "longDescription": "A skill library covering PowerShell script authoring, Windows CPU and process diagnostics, local dev-environment setup, and a full set of engineering workflows: spec writing, ticket breakdown, domain modeling, code review, bug diagnosis, and design grilling.",
+    "developerName": "piaotonghu",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Help me write a PowerShell script.",
+      "Break this plan into tickets."
+    ],
+    "websiteURL": "https://github.com/parkth1026/parking-agents",
+    "screenshots": []
+  }
+}

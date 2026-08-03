@@ -72,9 +72,22 @@ subagent 回报 → 主 agent 总结
 
 > 后续所有 agent / skill 的具体规范、命名、工具白名单、description 写法，都是在为这套 **Harness 思维**服务的实现细节。
 
+## ⚠️ Skills 已迁出 `.copilot/`（2026-08）
+
+**本文档的 skill 相关内容仅适用于 VS Code Copilot agent 侧。跨平台技能库的规范另见 [docs/porting-to-a-new-harness.md](./docs/porting-to-a-new-harness.md)。**
+
+技能真源已迁到仓库根的 **`skills/`**，一层扁平，同时服务 Claude Code / Codex / Pi：
+
+- `skills/<name>/SKILL.md` —— **禁止更深嵌套**。平台只扫一层，嵌套会让技能**静默消失**（无报错、无警告）
+- 目录名必须与 frontmatter 的 `name:` 完全一致
+- 改完跑 `npm test`（`tests/skills/test-skill-discovery.mjs` 会断言以上全部）
+- 技能正文里的 `read_file` / `runSubagent` 等 VS Code 工具名被当作**动作别名**，由各平台映射表翻译 —— 新写技能沿用这套命名即可
+
+下文 P0-1 表格中「Skill 放置于 `.copilot/skills/`」的说法已过时。
+
 ## 工作目录与目录 junction 约定
 
-- 当前仓库的 `.copilot/agents/`（含 `superpowers/` 子目录）已通过**目录级 junction**（`mklink /J`）挂载到用户目录 `~/.copilot/` 下。**不是文件级 symlink**——是整目录挂载。
+- 当前仓库的 `.copilot/agents/` 已通过**目录级 junction**（`mklink /J`）挂载到用户目录 `~/.copilot/` 下。**不是文件级 symlink**——是整目录挂载。
 - **所有 agent / skill 的改动一律在本仓库内直接进行**，VS Code Copilot 会通过目录 junction 自动识别。
 - **不要**到 `C:\Users\Administrator\.copilot\` 或用户全局目录中去修改文件——那只是 junction 的指向位置，源在本仓库。
 - 新增 / 修改 / 删除均以本仓库为准，git 版本控制随之生效。
@@ -83,7 +96,7 @@ subagent 回报 → 主 agent 总结
   Get-Item "$env:USERPROFILE\.copilot\agents" | Select-Object Name, LinkType, Target
   fsutil reparsepoint query "$env:USERPROFILE\.copilot\agents"
   ```
-  `LinkType` 应为 `Junction`，`Target` 应指向本仓库 `D:\GIT\parking-agents\.copilot\agents`。
+  `LinkType` 应为 `Junction`，`Target` 应指向本仓库 `G:\GIT\AI_WorkFlow\parking-agents-dev\.copilot\agents`。
 
 ## Parking 主 Agent 设计原则
 
@@ -192,7 +205,7 @@ C:\Users\Administrator\AppData\Roaming\Code\User\globalStorage\github.copilot-ch
 | 类型 | 命名规则 | 放置位置 | 触发方式 |
 |---|---|---|---|
 | Agent | `<Name>.agent.md`（PascalCase 或 kebab-case 均可，文件名即 agent 显示名） | `.copilot/agents/` | 用户在 chat 中显式选择 / 主 agent dispatch |
-| Skill | 目录 `<skill-name>/SKILL.md`（kebab-case 目录名） | `.copilot/skills/<skill-name>/SKILL.md` 或 `.copilot/agents/superpowers/<skill-name>/SKILL.md` | 由 description 语义匹配触发 |
+| Skill | 目录 `<skill-name>/SKILL.md`（kebab-case，**必须与 frontmatter `name:` 一致**） | **`skills/<skill-name>/SKILL.md`**（仓库根，一层扁平，禁止更深嵌套） | 由 description 语义匹配触发 |
 | Prompt | `<name>.prompt.md` | `.copilot/prompts/` | `/<name>` 斜杠命令调用 |
 | Instructions | `<name>.instructions.md` | `.copilot/instructions/` | 按 `applyTo` 自动注入 |
 | 仓库根级 | `AGENTS.md` / `copilot-instructions.md` / `CLAUDE.md` | 仓库根 | 自动加载 |

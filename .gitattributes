@@ -1,0 +1,26 @@
+# Shell scripts must have LF. A CRLF in `hooks/session-start` breaks the
+# shebang (`#!/usr/bin/env bash\r`), the hook silently fails to run, and no
+# bootstrap is ever injected — on every non-Windows machine.
+*.sh text eol=lf
+hooks/session-start text eol=lf
+
+# The polyglot wrapper is parsed by BOTH cmd.exe and bash — it must keep LF.
+*.cmd text eol=lf
+
+# Common text files
+*.md text eol=lf
+*.json text eol=lf
+*.mjs text eol=lf
+*.js text eol=lf
+*.ts text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+
+# PowerShell scripts are Windows-only; keep CRLF so they open cleanly in
+# Windows editors.
+*.ps1 text eol=crlf
+
+# Explicitly mark binary files
+*.png binary
+*.jpg binary
+*.gif binary

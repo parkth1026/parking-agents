@@ -40,7 +40,9 @@ SuperPower 是**编排器**，优先委派执行：
 
 ## 技能库索引
 
-所有技能位于 `.copilot/skills/` 目录下，由 VS Code 自动发现（通过 SKILL.md frontmatter description 匹配）。
+所有技能位于仓库根的 `skills/` 目录下（一层扁平），由 description 语义匹配自动发现。
+
+> ⚠️ **下表的 10 个技能当前均不存在于 `skills/` 中** —— 它们是 [superpowers](https://github.com/obra/superpowers) 上游的技能名，从未移植进本仓库。此索引在移植完成前不可用。仓库实际拥有的 33 个技能见 [README.md](../../README.md) 的 Skills 章节。
 
 | 技能                                     | 类型 | 说明                                     |
 | ---------------------------------------- | ---- | ---------------------------------------- |

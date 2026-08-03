@@ -1,7 +1,7 @@
 ---
-  name: simplify
-  description: Review changed code for reuse, quality, and efficiency, then fix any issues found.
-  ---
+name: simplify
+description: Review changed code for reuse, quality, and efficiency, then fix any issues found.
+---
 
   # Simplify: Code Review and Cleanup
 

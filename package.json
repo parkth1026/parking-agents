@@ -1,0 +1,31 @@
+{
+  "name": "parking-skills",
+  "version": "0.1.0",
+  "description": "A cross-platform skill library: PowerShell scripting, Windows CPU diagnostics, dev-environment setup, plus Matt Pocock's engineering and productivity workflows.",
+  "type": "module",
+  "scripts": {
+    "test": "node tests/skills/test-skill-discovery.mjs && node tests/hooks/test-session-start.mjs && node --test tests/pi/test-pi-extension.mjs && node scripts/bump-version.mjs --check && node scripts/bump-version.mjs --audit"
+  },
+  "license": "MIT",
+  "author": "piaotonghu <pb763396199@gmail.com>",
+  "homepage": "https://github.com/parkth1026/parking-agents",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/parkth1026/parking-agents.git"
+  },
+  "keywords": [
+    "pi-package",
+    "skills",
+    "powershell",
+    "windows",
+    "workflows"
+  ],
+  "pi": {
+    "extensions": [
+      "./.pi/extensions/parking-skills.ts"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  }
+}

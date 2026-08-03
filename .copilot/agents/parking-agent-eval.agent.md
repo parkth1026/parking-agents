@@ -41,7 +41,7 @@ user-invocable: false
    Get-Item "$env:USERPROFILE\.copilot\agents" | Select-Object Name, LinkType, Target
    fsutil reparsepoint query "$env:USERPROFILE\.copilot\agents"
    ```
-   `LinkType` 应为 `Junction`，`Target` 应指向本仓库 `D:\GIT\parking-agents\.copilot\agents`；若为空或指向别处，junction 失效。
+   `LinkType` 应为 `Junction`，`Target` 应指向本仓库 `G:\GIT\AI_WorkFlow\parking-agents-dev\.copilot\agents`；若为空或指向别处，junction 失效。
 4. **重载窗口**：建议用户 `Ctrl+Shift+P` → `Developer: Reload Window`；仍不行则 `Reload With Extensions Disabled` 排除冲突。
 5. **查看 debug 日志**：
    - 路径：`%APPDATA%\Code\User\workspaceStorage\<hash>\GitHub.copilot-chat\debug-logs\*.jsonl`

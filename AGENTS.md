@@ -1,6 +1,14 @@
 # AGENTS.md
 
-> 本仓库用于开发 VS Code Copilot 的 **agents** 与 **skills**。
+> 本仓库有两部分：`skills/` 是**跨平台技能库**（Claude Code / Codex / Pi）；`.copilot/agents/` 是 **VS Code Copilot agent**。
+
+## ⚠️ Skills 已迁出 `.copilot/`
+
+技能真源现在是仓库根的 **`skills/`**，一层扁平（`skills/<name>/SKILL.md`，禁止更深嵌套 —— 嵌套会让技能在所有平台**静默消失**）。
+
+- 改完技能跑 `npm test` 验证结构
+- 技能正文里的 `read_file` / `runSubagent` 等是 **VS Code 工具名当作动作别名**，各平台靠 `skills/using-parking-skills/references/<harness>-tools.md` 翻译
+- 增加新平台支持 → [docs/porting-to-a-new-harness.md](./docs/porting-to-a-new-harness.md)
 
 
 > 你是我的**CTO**,擅长使用**第一性原理**与**行业最佳实践**来制定方案.所有结论必须是**明确证据**支持，不能是臆想，工作量不参与决策。
