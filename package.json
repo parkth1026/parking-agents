@@ -3,8 +3,9 @@
   "version": "0.1.0",
   "description": "A cross-platform skill library: PowerShell scripting, Windows CPU diagnostics, dev-environment setup, plus Matt Pocock's engineering and productivity workflows.",
   "type": "module",
+  "main": ".opencode/plugins/parking-skills.js",
   "scripts": {
-    "test": "node tests/skills/test-skill-discovery.mjs && node tests/hooks/test-session-start.mjs && node --test tests/pi/test-pi-extension.mjs && node scripts/bump-version.mjs --check && node scripts/bump-version.mjs --audit"
+    "test": "node tests/skills/test-skill-discovery.mjs && node tests/skills/test-no-tool-names.mjs && node tests/hooks/test-session-start.mjs && node --test tests/pi/test-pi-extension.mjs && node --test tests/harnesses/test-harness-manifests.mjs && node scripts/bump-version.mjs --check && node scripts/bump-version.mjs --audit"
   },
   "license": "MIT",
   "author": "piaotonghu <pb763396199@gmail.com>",

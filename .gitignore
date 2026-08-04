@@ -1,6 +1,9 @@
+# Scratch inputs, never committed
 /docs/_PROMPT.txt
-docs/*
-!docs/porting-to-a-new-harness.md
+
+# Generated reports (HTML/quant/qual output from the insight + eval toolchains)
+/docs/reports/
 reports/*
 *reports/*
+
 node_modules/

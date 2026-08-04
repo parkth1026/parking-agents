@@ -1,0 +1,6 @@
+{
+  "name": "parking-skills",
+  "description": "A cross-platform skill library: PowerShell scripting, Windows CPU diagnostics, dev-environment setup, plus engineering and productivity workflows.",
+  "version": "0.1.0",
+  "contextFileName": "GEMINI.md"
+}

@@ -119,10 +119,34 @@ for (const name of skillDirs) {
 	}
 }
 
+// --- 4b. Codex interface metadata is named consistently -----------------------
+// agents/ is optional, but when present Codex only reads `openai.yaml`. An
+// `openai.yml` is not an error anywhere -- it is simply never read.
+
+for (const name of skillDirs) {
+	const agentsDir = join(skillsDir, name, "agents");
+	if (!existsSync(agentsDir)) continue;
+
+	for (const f of readdirSync(agentsDir, { withFileTypes: true })) {
+		if (f.isFile() && /^openai\.(yml|yaml)$/.test(f.name) && f.name !== "openai.yaml") {
+			fail(`skills/${name}/agents/${f.name} must be named 'openai.yaml' — Codex ignores .yml`);
+		}
+	}
+}
+
 // --- 5. The bootstrap skill and its reference files exist ---------------------
 
+// Claude Code / Cursor / Copilot CLI deliberately have NO reference file: skill
+// bodies name actions, and those harnesses expose a tool for every action, so
+// there is nothing to translate. OpenCode and Kimi carry their mapping inline at
+// their integration point instead (see tests/harnesses/).
 const BOOTSTRAP = "using-parking-skills";
-const REQUIRED_REFERENCES = ["claude-code-tools.md", "codex-tools.md", "pi-tools.md"];
+const REQUIRED_REFERENCES = [
+	"codex-tools.md",
+	"pi-tools.md",
+	"gemini-tools.md",
+	"antigravity-tools.md",
+];
 
 if (!skillDirs.includes(BOOTSTRAP)) {
 	fail(`skills/${BOOTSTRAP}/ missing — without it no platform gets a bootstrap`);

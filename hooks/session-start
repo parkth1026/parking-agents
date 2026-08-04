@@ -8,14 +8,13 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 BOOTSTRAP_SKILL="${PLUGIN_ROOT}/skills/using-parking-skills/SKILL.md"
-TOOL_MAPPING="${PLUGIN_ROOT}/skills/using-parking-skills/references/claude-code-tools.md"
 
 bootstrap_content=$(cat "${BOOTSTRAP_SKILL}" 2>&1 || echo "Error reading using-parking-skills skill")
 
-# Unlike upstream superpowers, the skill bodies here name VS Code Copilot tools,
-# so the mapping table is NOT optional on Claude Code -- append it to the
-# injection rather than making the model go read it.
-mapping_content=$(cat "${TOOL_MAPPING}" 2>&1 || echo "")
+# Only SKILL.md is injected. Skill bodies name actions, not tools, and the
+# harnesses on this code path (Claude Code / Cursor / Copilot CLI) already
+# expose a tool for every action -- so there is no mapping file to append.
+# Harnesses that DO need one reach it via SKILL.md's Platform Adaptation links.
 
 # Escape string for JSON embedding using bash parameter substitution.
 # Each ${s//old/new} is a single C-level pass - orders of magnitude
@@ -31,9 +30,8 @@ escape_for_json() {
 }
 
 bootstrap_escaped=$(escape_for_json "$bootstrap_content")
-mapping_escaped=$(escape_for_json "$mapping_content")
 
-session_context="<EXTREMELY_IMPORTANT>\nYou have the parking skills.\n\n**Below is the full content of your 'parking-skills:using-parking-skills' skill - your introduction to using these skills. For all other skills, use the 'Skill' tool:**\n\n${bootstrap_escaped}\n\n---\n\n${mapping_escaped}\n</EXTREMELY_IMPORTANT>"
+session_context="<EXTREMELY_IMPORTANT>\nYou have the parking skills.\n\n**Below is the full content of your 'parking-skills:using-parking-skills' skill - your introduction to using these skills. Load any other skill through your platform's own skill mechanism:**\n\n${bootstrap_escaped}\n</EXTREMELY_IMPORTANT>"
 
 # Output context injection as JSON.
 # Cursor hooks expect additional_context (snake_case).

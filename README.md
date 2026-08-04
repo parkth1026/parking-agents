@@ -2,42 +2,58 @@
 
 > 个人跨平台 skill 库 + VS Code Copilot agent 工具箱。攒一点记一点，**体系未完成，随用随加**。
 
-`skills/` 下的 33 个技能可通过各平台**原生的插件机制**安装到 **Claude Code / Codex / Pi**。
-`.copilot/agents/` 下的 agent 仍是 VS Code Copilot 专用。
+## 这个仓库有两半
+
+它们**互不依赖**，规则也不同：
+
+| | `skills/` | `.copilot/agents/` |
+|---|---|---|
+| 是什么 | 跨平台技能库，9 个 harness 共享 | VS Code Copilot 专用 agent |
+| 交付方式 | 各平台原生插件机制 | 目录 junction 挂到 `~/.copilot/` |
+| 正文能否写工具名 | **不能**（`npm test` 会拦） | 能，本来就只跑在 Copilot 上 |
+| 开发文档 | [docs/porting-to-a-new-harness.md](./docs/porting-to-a-new-harness.md) | [AGENT_DEVELOPMENT.md](./AGENT_DEVELOPMENT.md) |
+
+下面的「安装」「跨平台是怎么做到的」「Skills」三节只讲左边那半。
 
 ## 目录结构
 
 ```
 skills/                  # ★ 跨平台技能真源（一层扁平，33 个）
-├── using-parking-skills/    # bootstrap 技能 + 三份平台工具映射表
+├── using-parking-skills/    # bootstrap 技能 + references/ 平台工具映射表
 └── <name>/SKILL.md          # 其余 32 个
 
-.claude-plugin/          # Claude Code 插件清单
+.claude-plugin/          # Claude Code 插件清单 + dev marketplace
+.cursor-plugin/          # Cursor 插件清单
 .codex-plugin/           # Codex 插件清单
+.kimi-plugin/            # Kimi Code 插件清单（映射内联在 skillInstructions）
 .pi/extensions/          # Pi 进程内扩展
-hooks/                   # Claude Code 的 SessionStart 注入器
-tests/                   # 结构断言 + 各平台集成测试
+.opencode/plugins/       # OpenCode 进程内插件（映射内联在 .js）
+.agents/plugins/         # 跨运行时 marketplace 入口
+gemini-extension.json    # Gemini CLI 扩展清单
+GEMINI.md                # Gemini 的指令文件（两行 @-include）
+hooks/                   # SessionStart 注入器（Claude Code / Cursor / Copilot CLI 共用）
+tests/                   # 结构断言 + 工具名 lint + 各平台契约测试
 scripts/bump-version.mjs # 跨 manifest 版本锁步
-docs/                    # 移植文档
+docs/                    # 移植文档 + 测试文档
 
-.copilot/agents/         # VS Code Copilot agent（未跨平台）
+.copilot/agents/         # 另一半：VS Code Copilot agent
 ├── eval/                # 行为评估脚本
 └── insight/             # 使用行为洞察分析
 ```
 
 ## 安装
 
-### Claude Code
+支持 9 个 harness。**✅ 表示跑过验收测试**（干净会话里技能能自动触发）；⚠️ 表示集成已写好、契约测试覆盖，但没做端到端验证 —— 装了之后请自己冒烟确认一次。
+
+### ✅ Claude Code
 
 ```bash
 claude --plugin-dir /path/to/parking-agents
 ```
 
-或加进 marketplace 后 `/plugin install parking-skills`。
+或加进 marketplace 后 `/plugin install parking-skills`。会话开始时 `hooks/session-start` 自动注入 bootstrap。
 
-会话开始时 `hooks/session-start` 会自动注入 bootstrap，无需手动开启。
-
-### Codex
+### ✅ Codex
 
 把仓库作为插件加载，Codex 会原生发现 `skills/`。需要 subagent 类技能的话，在 `~/.codex/config.toml` 里开启：
 
@@ -46,7 +62,7 @@ claude --plugin-dir /path/to/parking-agents
 multi_agent = true
 ```
 
-### Pi
+### ✅ Pi
 
 ```bash
 pi install git:https://github.com/parkth1026/parking-agents
@@ -54,26 +70,57 @@ pi install git:https://github.com/parkth1026/parking-agents
 
 `package.json` 的 `pi` 字段声明了扩展与技能目录。
 
-### VS Code Copilot（未适配，见下文）
+### ⚠️ Cursor
 
-第一版**不为 VS Code Copilot 做适配**。若仍想使用，把 junction 指向新的 `skills/` 目录：
+作为插件加载仓库。`.cursor-plugin/plugin.json` 指向 `hooks/hooks-cursor.json`（Cursor 的 hook schema 与 Claude Code 不同，是另一份文件）。
+
+### ⚠️ Gemini CLI
+
+```bash
+gemini extensions install https://github.com/parkth1026/parking-agents
+```
+
+`gemini-extension.json` 声明 `GEMINI.md` 为上下文文件，后者 `@`-include bootstrap 与工具映射。
+
+### ⚠️ OpenCode
+
+在 `opencode.json` 里加：
+
+```json
+{ "plugin": ["https://github.com/parkth1026/parking-agents"] }
+```
+
+详见 [.opencode/INSTALL.md](./.opencode/INSTALL.md)。
+
+### ⚠️ Kimi Code
+
+marketplace 安装，或 `/plugins install` 加 GitHub URL。bootstrap 与工具映射都由 `.kimi-plugin/plugin.json` 声明。
+
+### ⚠️ Copilot CLI / Antigravity
+
+两者都复用 Claude Code 的插件路径。Copilot CLI 靠 `COPILOT_CLI` 环境变量走 hook 的第三个分支；Antigravity 的工具差异见 `references/antigravity-tools.md`。
+
+### ❌ VS Code Copilot（不适配）
+
+它没有 session-start hook，无法满足自动注入的硬性要求。若仍想用技能，挂 junction：
 
 ```powershell
 New-Item -ItemType Junction -Path "$env:USERPROFILE\.copilot\skills" -Target "G:\GIT\AI_WorkFlow\parking-agents-dev\skills"
-New-Item -ItemType Junction -Path "$env:USERPROFILE\.copilot\agents" -Target "G:\GIT\AI_WorkFlow\parking-agents-dev\.copilot\agents"
 ```
 
 技能能被发现（扁平结构是所有平台的最小公倍数），但**没有 bootstrap 注入**，`using-parking-skills` 不会自动生效。原因见 [docs/porting-to-a-new-harness.md](./docs/porting-to-a-new-harness.md) 附录 B。
 
 ## 跨平台是怎么做到的
 
-三层结构，零构建：
+三层结构，零构建、零依赖：
 
-1. **`skills/` 是唯一真源** —— 所有平台逐字共享
-2. **每平台一份工具映射表** —— `skills/using-parking-skills/references/<harness>-tools.md`
-3. **每平台一个 bootstrap 注入器** —— 会话开始把 `using-parking-skills/SKILL.md` 注入上下文
+1. **`skills/` 是唯一真源** —— 所有平台逐字共享。技能正文只写**动作**（"读一个文件"、"派发一个子代理"），从不指名具体工具。这就是同一份正文能在 9 个平台上原封不动运行的原因。
+2. **每平台一份工具映射表，只写差异** —— `references/<harness>-tools.md` 做「动作 → 该平台工具」的两列翻译。**工具面已覆盖全部动作的平台不需要映射表**（Claude Code / Cursor / Copilot CLI 都没有）。
+3. **每平台一个 bootstrap 注入器** —— 会话开始把 `using-parking-skills/SKILL.md` 注入上下文。
 
-⚠️ **技能正文里的工具名是别名，不是真实工具。** 这些技能源自 VS Code Copilot，正文里写的是 `read_file`、`run_in_terminal`、`runSubagent` 等。它们被当作**动作代号**，由各平台的映射表翻译成真实工具名。详见 [docs/porting-to-a-new-harness.md](./docs/porting-to-a-new-harness.md) 的 Part 1.5。
+> **Bootstrap 就是集成本身。** 没有它，技能文件只是躺在磁盘上的死文本 —— 存在，但永远不会被调用。
+
+⚠️ **技能正文里不允许出现任何 harness 的工具名。** 一句 "use the Agent tool" 在一个平台上正确，在另外八个平台上静默出错。`npm test` 里的 `tests/skills/test-no-tool-names.mjs` 会拦下来。缺能力的修法永远是**改映射表**，不是改技能正文。
 
 ## Skills
 
@@ -81,7 +128,8 @@ New-Item -ItemType Junction -Path "$env:USERPROFILE\.copilot\agents" -Target "G:
 
 | Skill | 说明 | 来源 |
 |---|---|---|
-| using-parking-skills | bootstrap：技能使用规则 + 平台工具映射 | 本仓库 |
+| using-parking-skills | bootstrap：技能使用规则 + 各平台工具映射（`references/`） | 本仓库 |
+| making-skills-cross-platform | 把任意技能仓库改造成多 harness 插件，含可移植结构检查器 | 本仓库 |
 | cpu-monitor | Windows CPU 进程/线程采样 + WMI 诊断 | 本仓库 |
 | ps1-creator | PowerShell 脚本创建规范（契约头 + 强制测试） | 本仓库 |
 | dev-environment | .NET + 前端本地开发环境一键启动 | 本仓库 |
@@ -138,7 +186,7 @@ New-Item -ItemType Junction -Path "$env:USERPROFILE\.copilot\agents" -Target "G:
 | SuperPowerSub | SuperPower 的执行子代理 |
 | Karpathy | 遵循 Karpathy 准则的代码 agent |
 | Debug | REPRODUCE→ISOLATE→FIX→PROVE 系统化除虫 |
-| Simplify | 代码审查：复用 / 质量 / 效率三维审查 |
+| Simplify | 薄入口，转发到 `skills/simplify`（避免同一套流程维护两份） |
 
 **工具链 subagent**（`parking-agent-*`）
 
@@ -161,14 +209,15 @@ New-Item -ItemType Junction -Path "$env:USERPROFILE\.copilot\agents" -Target "G:
 npm test
 ```
 
-跑全部断言：技能结构（扁平 + frontmatter 合法 + 目录名与 `name` 一致）、hook 的三种 JSON 形状、Pi 扩展注入与去重、跨 manifest 版本一致性。
+零依赖纯 Node。跑：技能结构断言、**工具名 lint**、hook 的三种 JSON 形状、Pi 扩展注入与去重、9 个平台的契约测试、跨 manifest 版本一致性。
 
-**技能结构测试是最重要的一条** —— 技能加载失败在所有平台上都是**静默**的，没有报错也没有警告，技能只是不出现。
+**这些测试的价值在于把静默失败变成响亮失败** —— 技能加载在所有平台上都无报错、无警告，出错时技能只是不出现。详见 [docs/testing.md](./docs/testing.md)。
 
 - 增加新平台支持 → [docs/porting-to-a-new-harness.md](./docs/porting-to-a-new-harness.md)
+- 测试分层与验收标准 → [docs/testing.md](./docs/testing.md)
 - 开发 VS Code Copilot agent → [AGENT_DEVELOPMENT.md](./AGENT_DEVELOPMENT.md)
 
-版本升级（四份 manifest 锁步）：
+版本升级（七份 manifest 锁步）：
 
 ```bash
 node scripts/bump-version.mjs 0.2.0

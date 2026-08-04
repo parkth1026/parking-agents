@@ -46,16 +46,22 @@ function assertBootstrapContent(ctx, label) {
 	check(ctx.includes("<EXTREMELY_IMPORTANT>"), `${label}: missing <EXTREMELY_IMPORTANT> wrapper`);
 	check(ctx.includes("You have the parking skills."), `${label}: missing bootstrap preamble`);
 	check(
-		ctx.includes("ALIASES, not real tools"),
-		`${label}: missing the tool-alias declaration — the model would call VS Code tool names verbatim`
+		ctx.includes("Skills speak in actions, not tool names"),
+		`${label}: missing the action-vocabulary declaration — the model would expect literal tool names`
 	);
 	check(
-		ctx.includes("# Claude Code tool mapping"),
-		`${label}: missing the appended Claude Code mapping table`
+		ctx.includes("Subagent (general-purpose):"),
+		`${label}: missing the subagent dispatch template — skills that fan out would have nothing to translate`
 	);
 	check(
-		ctx.includes("`read_file` | read a file | `Read`"),
-		`${label}: mapping table lost its rows`
+		ctx.includes("Platform Adaptation"),
+		`${label}: missing the Platform Adaptation pointer list`
+	);
+	// No mapping file is appended on this code path: these harnesses expose a
+	// tool for every action skills describe.
+	check(
+		!ctx.includes("# Codex tool mapping") && !ctx.includes("# Pi tool mapping"),
+		`${label}: another harness's mapping table leaked into the injection`
 	);
 }
 
@@ -84,8 +90,8 @@ function assertBootstrapContent(ctx, label) {
 }
 
 // --- Cursor: top-level additional_context (snake_case) -----------------------
-// Not a supported target yet, but the branch exists so adding Cursor later is a
-// README change rather than a rewrite. Pin it now so it cannot silently rot.
+// Cursor sets CURSOR_PLUGIN_ROOT and may ALSO set CLAUDE_PLUGIN_ROOT, so the
+// Cursor branch must be tested first in the hook. This case pins that order.
 
 {
 	const j = runHook({ CURSOR_PLUGIN_ROOT: repoRoot, CLAUDE_PLUGIN_ROOT: repoRoot });

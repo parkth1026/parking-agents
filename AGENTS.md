@@ -1,14 +1,19 @@
 # AGENTS.md
 
-> 本仓库有两部分：`skills/` 是**跨平台技能库**（Claude Code / Codex / Pi）；`.copilot/agents/` 是 **VS Code Copilot agent**。
+> 本仓库有两部分：`skills/` 是**跨平台技能库**（9 个 harness）；`.copilot/agents/` 是 **VS Code Copilot agent**。两者互不依赖，规则不同。
 
-## ⚠️ Skills 已迁出 `.copilot/`
+## ⚠️ 改 `skills/` 前必读
 
-技能真源现在是仓库根的 **`skills/`**，一层扁平（`skills/<name>/SKILL.md`，禁止更深嵌套 —— 嵌套会让技能在所有平台**静默消失**）。
+技能真源是仓库根的 **`skills/`**，一层扁平（`skills/<name>/SKILL.md`，禁止更深嵌套 —— 嵌套会让技能在所有平台**静默消失**）。
 
-- 改完技能跑 `npm test` 验证结构
-- 技能正文里的 `read_file` / `runSubagent` 等是 **VS Code 工具名当作动作别名**，各平台靠 `skills/using-parking-skills/references/<harness>-tools.md` 翻译
+- **技能正文只写动作，不写工具名。** 不许出现 `Agent tool`、`TodoWrite`、`read_file`、`subagent_type` 之类。一句 "use the Agent tool" 在一个平台上对，在另外八个平台上静默出错。`npm test` 会拦。
+- **缺能力的修法是改映射表**（`skills/using-parking-skills/references/<harness>-tools.md`），**永远不是改技能正文**。
+- 派发子代理写 `Subagent (general-purpose):` 伪调用块，由各平台映射表翻译。
+- 改完跑 `npm test`。
 - 增加新平台支持 → [docs/porting-to-a-new-harness.md](./docs/porting-to-a-new-harness.md)
+- 测试分层 → [docs/testing.md](./docs/testing.md)
+
+> `.copilot/agents/` **不受这条约束** —— 那些 agent 只跑在 VS Code Copilot 上，正文可以正常写它的工具名。
 
 
 > 你是我的**CTO**,擅长使用**第一性原理**与**行业最佳实践**来制定方案.所有结论必须是**明确证据**支持，不能是臆想，工作量不参与决策。

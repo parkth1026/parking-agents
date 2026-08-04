@@ -57,7 +57,19 @@ Each smell reads *what it is* → *how to fix*; match it against the diff:
 
 ### 4. Spawn both sub-agents in parallel
 
-Send a single message with two `Agent` tool calls. Use the `general-purpose` subagent for both.
+Dispatch both subagents in a single message so they run concurrently:
+
+```
+Subagent (general-purpose):
+  description: "Standards review"
+  prompt: |
+    <the Standards prompt below>
+
+Subagent (general-purpose):
+  description: "Spec review"
+  prompt: |
+    <the Spec prompt below>
+```
 
 **Standards sub-agent prompt** — include:
 

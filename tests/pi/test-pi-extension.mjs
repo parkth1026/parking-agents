@@ -92,9 +92,10 @@ test("startup context injects the bootstrap as one user message until agent_end"
 	assert.match(textOf(result.messages[0]), /Pi tool mapping/);
 	assert.equal(result.messages[1], originalMessages[0]);
 
-	// The alias declaration is the whole point on this platform — without it the
-	// model calls the VS Code tool names written in the skill bodies verbatim.
-	assert.match(textOf(result.messages[0]), /ALIASES, not real tools/);
+	// Pi has neither a subagent nor a todo tool, so the mapping's degradation
+	// guidance is what stops the model inventing calls for actions it can't do.
+	assert.match(textOf(result.messages[0]), /Skills speak in actions, not tool names/);
+	assert.match(textOf(result.messages[0]), /never invent a subagent call/);
 
 	const alreadyInjected = await context({ type: "context", messages: result.messages }, {});
 	assert.equal(alreadyInjected, undefined, "bootstrap must not duplicate when already present");
@@ -142,18 +143,33 @@ test("pi-tools.md and the inlined piToolMapping() stay in sync", async () => {
 	const rows = doc.split("\n").filter((line) => line.startsWith("|"));
 	assert.ok(rows.length > 5, "pi-tools.md should still contain a mapping table");
 
-	for (const [alias, piTool] of [
-		["read_file", "read"],
-		["run_in_terminal", "bash"],
-		["grep_search", "grep"],
+	for (const [action, piTool] of [
+		["Read a file", "read"],
+		["Run a shell command", "bash"],
+		["Search file contents", "grep"],
 	]) {
 		assert.ok(
-			rows.some((row) => row.includes(alias) && row.includes(`\`${piTool}\``)),
-			`pi-tools.md table should map ${alias} → ${piTool}`
+			rows.some((row) => row.includes(action) && row.includes(`\`${piTool}\``)),
+			`pi-tools.md table should map "${action}" → ${piTool}`
 		);
 		assert.ok(
-			injected.includes(alias) && injected.includes(`\`${piTool}\``),
-			`injected mapping should cover ${alias} → ${piTool}`
+			injected.includes(action) && injected.includes(`\`${piTool}\``),
+			`injected mapping should cover "${action}" → ${piTool}`
+		);
+	}
+
+	// Both copies must speak the action vocabulary, not any harness's tool names.
+	for (const copy of [
+		[doc, "pi-tools.md"],
+		[injected, "injected mapping"],
+	]) {
+		assert.ok(
+			copy[0].includes("Skills speak in actions"),
+			`${copy[1]} should open with the action-vocabulary statement`
+		);
+		assert.ok(
+			copy[0].includes("Subagent (general-purpose):"),
+			`${copy[1]} should name the subagent dispatch template it translates`
 		);
 	}
 

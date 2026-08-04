@@ -106,7 +106,7 @@ Expected Behavior 验证：
 
 ## 8. 修改工作流
 
-1. `read_file` 读取现有 `.ps1` 的 Header
+1. 读取现有 `.ps1` 的 Header
 2. 确认改动是否影响已声明行为
 3. 影响 → 停止征求同意；不影响 → 继续
 4. 新增行为 → 先更新 Header

@@ -1,0 +1,3 @@
+interface:
+  display_name: "Making Skills Cross-Platform"
+  short_description: "Port a skills repo to many harnesses via native plugin mechanisms"

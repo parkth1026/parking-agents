@@ -97,23 +97,23 @@ function stripFrontmatter(content: string): string {
 function piToolMapping(): string {
 	return `## Pi tool mapping
 
-The skill bodies in this repository name VS Code Copilot tools. Those names are aliases for actions, not tools you can call. Pi's built-in coding tools are lowercase — substitute them:
+Skills speak in actions ("dispatch a subagent", "create a todo", "read a file"). On Pi these resolve to the lowercase built-in tools:
 
-- \`read_file\` → \`read\`
-- \`create_file\` → \`write\`
-- \`replace_string_in_file\`, \`multi_replace_string_in_file\` → \`edit\`
-- \`run_in_terminal\` → \`bash\`
-- \`grep_search\` → \`grep\`
-- \`file_search\` → \`find\`
-- \`list_dir\` → \`ls\`
+- Read a file → \`read\`
+- Create a file → \`write\`
+- Edit a file → \`edit\`
+- Run a shell command → \`bash\`
+- Search file contents → \`grep\`
+- Find files by name → \`find\`
+- List a directory → \`ls\`
 
-Pi has native skills but does not expose Claude Code's \`Skill\` tool. When a skill body says to invoke another skill, load the relevant \`SKILL.md\` with \`read\`, or let a human invoke \`/skill:name\` explicitly.
+Pi has native skill discovery but no dedicated skill-invocation tool. When a skill body says to invoke another skill, load the relevant \`SKILL.md\` with \`read\`, or let your human partner invoke \`/skill:name\` explicitly. Reading it that way IS Pi's skill-loading mechanism, so it does not bypass anything.
 
-Pi does not ship a standard subagent tool. \`runSubagent\` is the most common tool name in this library. If a subagent tool such as \`subagent\` from \`pi-subagents\` is available, use it. If no subagent tool is available, do the work in this session or explain the missing capability instead of inventing \`runSubagent\` or \`Task\` calls.
+Pi does not ship a standard subagent tool. When a skill emits a \`Subagent (general-purpose):\` block, use \`subagent\` from \`pi-subagents\` if it is installed. If no subagent tool is available, do the work in this session or explain the missing capability — never invent a subagent call.
 
-Pi does not ship a standard task-list tool. If an installed todo/task tool is available, use it. Otherwise track work in plan files or a repo-local \`TODO.md\`. Treat \`manage_todo_list\` references as this task-tracking action.
+Pi does not ship a standard task-list tool. If an installed todo/task tool is available, use it. Otherwise track work in plan files or a repo-local \`TODO.md\`.
 
-Pi has no \`vscode_askQuestions\` equivalent. When a skill says to ask the user, put the question in your reply and stop — do not guess and continue.
+Pi has no interactive question tool. When a skill says to ask your human partner, put the question in your reply and stop — do not guess and continue.
 
 Pi has no standard web fetch or search tool. If a skill's core purpose needs the web, say the capability is missing rather than answering from memory.
 
