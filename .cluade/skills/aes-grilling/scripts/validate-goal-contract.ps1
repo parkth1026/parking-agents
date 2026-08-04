@@ -1,0 +1,299 @@
+<#
+.SYNOPSIS
+  Validates a lightweight AES Goal Contract for direct agent execution.
+
+.EXPECTED BEHAVIOR
+  1. A valid Ready or Blocked Contract exits 0.
+  2. Missing Goal, Scope, AC, mandate, completion, or blocker boundaries exit 1.
+  3. One Contract has 1-7 ACs so it does not grow into a specification.
+  4. Hashes, approval receipts, validation matrices, and handoff files are not required.
+  5. PowerShell 7 and Windows PowerShell 5.1 use the same rules.
+#>
+[CmdletBinding()]
+param(
+    [Parameter(Mandatory = $true)]
+    [string]$Path
+)
+
+$ErrorActionPreference = 'Stop'
+$resolvedPath = (Resolve-Path -LiteralPath $Path).Path
+$content = Get-Content -LiteralPath $resolvedPath -Raw -Encoding UTF8
+$errors = New-Object System.Collections.Generic.List[string]
+$warnings = New-Object System.Collections.Generic.List[string]
+
+function Get-SectionBody {
+    param([string]$Heading)
+    $match = [regex]::Match(
+        $content,
+        "(?ms)^## $([regex]::Escape($Heading))\s*\r?\n(?<body>.*?)(?=^## |\z)"
+    )
+    if (-not $match.Success) {
+        return $null
+    }
+    return $match.Groups['body'].Value.Trim()
+}
+
+function Get-ListValue {
+    param(
+        [string]$Text,
+        [string]$Key
+    )
+    if ([string]::IsNullOrWhiteSpace($Text)) {
+        return $null
+    }
+    $match = [regex]::Match($Text, "(?m)^- $([regex]::Escape($Key)):\s*(\S.*)$")
+    if (-not $match.Success) {
+        return $null
+    }
+    return $match.Groups[1].Value.Trim()
+}
+
+function Test-MeaningfulValue {
+    param([string]$Value)
+    if ([string]::IsNullOrWhiteSpace($Value)) {
+        return $false
+    }
+    return $Value -notmatch '(?i)^(none|n/?a|unknown|pending|later|-)$'
+}
+
+function Get-BulletLines {
+    param([string]$Section)
+    if ([string]::IsNullOrWhiteSpace($Section)) {
+        return @()
+    }
+    return @(
+        $Section -split '\r?\n' |
+            Where-Object { $_ -match '^-\s+\S.*$' }
+    )
+}
+
+$titleMatches = [regex]::Matches($content, '(?m)^# Goal Contract:\s*(?<title>\S.*)$')
+if ($titleMatches.Count -ne 1) {
+    $errors.Add('Contract requires exactly one non-empty "# Goal Contract:" title.')
+}
+
+$goalHeadingIndex = $content.IndexOf('## Goal', [System.StringComparison]::Ordinal)
+$preamble = if ($goalHeadingIndex -ge 0) {
+    $content.Substring(0, $goalHeadingIndex)
+}
+else {
+    $content
+}
+
+$statusMatches = [regex]::Matches($preamble, '(?m)^- Status:\s*(Ready|Blocked)\s*$')
+if ($statusMatches.Count -ne 1) {
+    $errors.Add('Preamble requires exactly one Status: Ready or Blocked.')
+}
+$statusMatch = if ($statusMatches.Count -gt 0) { $statusMatches[0] } else { $null }
+$status = if ($null -ne $statusMatch) { $statusMatch.Groups[1].Value } else { '' }
+
+$targetMatches = [regex]::Matches($preamble, '(?m)^- Target:\s*(\S.*)$')
+$target = Get-ListValue -Text $preamble -Key 'Target'
+if ($targetMatches.Count -ne 1 -or -not (Test-MeaningfulValue -Value $target)) {
+    $errors.Add('Preamble requires exactly one meaningful Target.')
+}
+$updatedMatches = [regex]::Matches($preamble, '(?m)^- Updated:\s*(\S.*)$')
+$updated = Get-ListValue -Text $preamble -Key 'Updated'
+if ($updatedMatches.Count -ne 1 -or $updated -notmatch '^\d{4}-\d{2}-\d{2}$') {
+    $errors.Add('Preamble requires exactly one Updated value using YYYY-MM-DD.')
+}
+
+# 占位符判据只认模板那种 <letter...> 的形式。放宽到任意 <...> 会把
+# "响应时间 < 200ms 且 QPS > 100" 这类数值阈值 AC 当成占位符拒掉，而阈值恰恰是好 AC 该写的。
+if ($content -match '(?i)\b(TODO|TBD|FIXME|XXX)\b|<[A-Za-z][A-Za-z0-9 ,._/|-]{1,80}>') {
+    $errors.Add('Contract contains a placeholder.')
+}
+
+$requiredHeadings = @(
+    'Goal',
+    'Why',
+    'Scope',
+    'Success Criteria',
+    'Constraints',
+    'Agent Mandate',
+    'Completion',
+    'Blockers'
+)
+$sections = @{}
+$lastHeadingIndex = -1
+foreach ($heading in $requiredHeadings) {
+    $headingMatches = [regex]::Matches(
+        $content,
+        "(?m)^## $([regex]::Escape($heading))\s*$"
+    )
+    $body = Get-SectionBody -Heading $heading
+    $sections[$heading] = $body
+    if ($headingMatches.Count -eq 0) {
+        $errors.Add("Missing heading: $heading")
+    }
+    elseif ($headingMatches.Count -gt 1) {
+        $errors.Add("Heading must appear exactly once: $heading")
+    }
+    elseif ($headingMatches[0].Index -lt $lastHeadingIndex) {
+        $errors.Add("Heading is out of order: $heading")
+    }
+    else {
+        $lastHeadingIndex = $headingMatches[0].Index
+    }
+}
+
+foreach ($legacyHeading in @(
+    'Contract Metadata',
+    'Validation Matrix',
+    'Approval Binding',
+    'Independent Handoff',
+    'Delivery Standard',
+    'Authority and Escalation'
+)) {
+    if ($content -match "(?m)^## $([regex]::Escape($legacyHeading))\s*$") {
+        $errors.Add("Legacy heavy-contract heading is not allowed: $legacyHeading")
+    }
+}
+
+$goal = $sections['Goal']
+if (-not (Test-MeaningfulValue -Value $goal)) {
+    $errors.Add('Goal must contain one meaningful observable end state.')
+}
+elseif ($goal -match '(?m)^-\s+' -or $goal -match '(?m)^\d+[.)]\s+') {
+    $errors.Add('Goal must be one end-state statement, not a list of goals or tasks.')
+}
+elseif ($goal.Length -gt 600) {
+    $errors.Add('Goal is too long; move detail to Scope, Success Criteria, or repository references.')
+}
+
+$whyBullets = @(Get-BulletLines -Section $sections['Why'])
+if ($whyBullets.Count -lt 1) {
+    $errors.Add('Why requires at least one concrete problem or value bullet.')
+}
+if ($whyBullets.Count -gt 3) {
+    $errors.Add('Why must stay concise: use no more than three bullets.')
+}
+
+$inScope = Get-ListValue -Text $sections['Scope'] -Key 'In'
+$outOfScope = Get-ListValue -Text $sections['Scope'] -Key 'Out'
+if (-not (Test-MeaningfulValue -Value $inScope)) {
+    $errors.Add('Scope requires a meaningful In value.')
+}
+if (-not (Test-MeaningfulValue -Value $outOfScope)) {
+    $errors.Add('Scope requires a meaningful Out value.')
+}
+
+$acMatches = [regex]::Matches(
+    $sections['Success Criteria'],
+    '(?m)^-\s+(AC-\d{2}):\s*(\S.*)$'
+)
+$successCriterionBullets = @(Get-BulletLines -Section $sections['Success Criteria'])
+if ($successCriterionBullets.Count -ne $acMatches.Count) {
+    $errors.Add('Every Success Criteria bullet must use "- AC-01: <decidable result>" format.')
+}
+foreach ($line in @($sections['Success Criteria'] -split '\r?\n')) {
+    if ($line -match 'AC-\d' -and $line -notmatch '^-\s+AC-\d{2}:\s*\S.*$') {
+        $errors.Add("Malformed acceptance criterion line: $line")
+    }
+}
+$acceptanceIds = @($acMatches | ForEach-Object { $_.Groups[1].Value })
+$uniqueAcceptanceIds = @($acceptanceIds | Sort-Object -Unique)
+if ($acceptanceIds.Count -lt 1) {
+    $errors.Add('Success Criteria requires at least one AC.')
+}
+if ($acceptanceIds.Count -gt 7) {
+    $errors.Add('A Goal Contract may contain at most seven ACs; split independent Goals instead of writing a Spec.')
+}
+if ($uniqueAcceptanceIds.Count -ne $acceptanceIds.Count) {
+    $errors.Add('Acceptance criterion identifiers must be unique.')
+}
+for ($index = 0; $index -lt $acceptanceIds.Count; $index++) {
+    $expectedId = 'AC-{0:D2}' -f ($index + 1)
+    if ($acceptanceIds[$index] -ne $expectedId) {
+        $errors.Add("Acceptance criteria must be sequential; expected $expectedId.")
+        break
+    }
+}
+foreach ($match in $acMatches) {
+    $criterion = $match.Groups[2].Value.Trim()
+    if ($criterion.Length -lt 8) {
+        $errors.Add("Acceptance criterion $($match.Groups[1].Value) is too short to define a decidable result.")
+    }
+    if ($criterion -match '(?i)^(works?|working correctly|done|complete|tests? pass)[.!]?$') {
+        $errors.Add("Acceptance criterion $($match.Groups[1].Value) is not independently decidable.")
+    }
+}
+
+if (@(Get-BulletLines -Section $sections['Constraints']).Count -lt 1) {
+    $errors.Add('Constraints requires at least one concrete bullet or an explicit repository-rules-only boundary.')
+}
+
+$mandate = $sections['Agent Mandate']
+foreach ($key in @('May decide', 'Must ask', 'Must not')) {
+    if (-not (Test-MeaningfulValue -Value (Get-ListValue -Text $mandate -Key $key))) {
+        $errors.Add("Agent Mandate requires a meaningful '$key' boundary.")
+    }
+}
+
+foreach ($key in @('Evidence', 'Quality', 'Final report')) {
+    if (-not (Test-MeaningfulValue -Value (
+        Get-ListValue -Text $sections['Completion'] -Key $key
+    ))) {
+        $errors.Add("Completion requires a meaningful '$key' value.")
+    }
+}
+
+$blockers = $sections['Blockers']
+$blockerBullets = @(Get-BulletLines -Section $blockers)
+$noneBlocker = $blockers -match '(?im)^-\s*None\.?\s*$'
+if ($blockerBullets.Count -lt 1) {
+    $errors.Add('Blockers requires an explicit None or an objective blocker.')
+}
+elseif ($status -eq 'Ready') {
+    if (-not $noneBlocker -or $blockerBullets.Count -ne 1 -or
+        $blockers.Trim() -notmatch '^- None\.?$') {
+        $errors.Add('Ready requires Blockers to contain only "- None.".')
+    }
+}
+elseif ($status -eq 'Blocked') {
+    if ($noneBlocker) {
+        $errors.Add('Blocked cannot declare that no blocker exists.')
+    }
+    $blockerType = Get-ListValue -Text $blockers -Key 'Blocker Type'
+    if ($blockerType -notmatch '^(User decision|Permission|Credential|External prerequisite)$') {
+        $errors.Add('Blocked requires an allowed Blocker Type.')
+    }
+    if (-not (Test-MeaningfulValue -Value (Get-ListValue -Text $blockers -Key 'Blocker'))) {
+        $errors.Add('Blocked requires "- Blocker: <objective obstacle>".')
+    }
+    if (-not (Test-MeaningfulValue -Value (Get-ListValue -Text $blockers -Key 'Unblock when'))) {
+        $errors.Add('Blocked requires "- Unblock when: <exact condition>".')
+    }
+}
+
+$lineCount = @($content -split '\r?\n').Count
+if ($lineCount -gt 180) {
+    $errors.Add('Contract exceeds 180 lines and has become a Spec; split the Goal or move implementation detail out.')
+}
+elseif ($lineCount -gt 120) {
+    $warnings.Add('Contract exceeds 120 lines; review whether implementation detail can be removed.')
+}
+if ($content.Length -gt 12000) {
+    $warnings.Add('Contract exceeds 12,000 characters; prefer links to stable repository context over copied detail.')
+}
+
+if ($errors.Count -gt 0) {
+    Write-Output "INVALID: $resolvedPath"
+    foreach ($item in $errors) {
+        Write-Output "ERROR: $item"
+    }
+    foreach ($item in $warnings) {
+        Write-Output "WARNING: $item"
+    }
+    exit 1
+}
+
+Write-Output "VALID: $resolvedPath"
+Write-Output 'FORMAT: AES Goal Contract B'
+Write-Output "STATUS: $status"
+Write-Output "AC_COUNT: $($acceptanceIds.Count)"
+Write-Output "LINE_COUNT: $lineCount"
+foreach ($item in $warnings) {
+    Write-Output "WARNING: $item"
+}
+exit 0
