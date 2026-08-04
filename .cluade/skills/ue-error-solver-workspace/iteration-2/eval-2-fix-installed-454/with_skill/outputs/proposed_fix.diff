@@ -1,0 +1,14 @@
+diff --git a/Source/EarthPrefab/Private/Output/EarthRenderTarget2DFragment.cpp b/Source/EarthPrefab/Private/Output/EarthRenderTarget2DFragment.cpp
+--- a/Source/EarthPrefab/Private/Output/EarthRenderTarget2DFragment.cpp
++++ b/Source/EarthPrefab/Private/Output/EarthRenderTarget2DFragment.cpp
+@@ -10,8 +10,10 @@
+ #include "TextureResource.h"
+ #include "Engine/TextureRenderTarget2D.h"
+ #include "Kismet/KismetRenderingLibrary.h"
++#include "Materials/Material.h"
+ #include "Materials/MaterialInstance.h"
+ #include "Materials/MaterialLayersFunctions.h"
++#include "UObject/Package.h"
+
+ void FEarthRenderTarget2DFragment::CreateRenderTarget2D()
+ {

@@ -1,0 +1,19 @@
+               Total    Copied   Skipped  Mismatch    FAILED    Extras
+               Total    Copied   Skipped  Mismatch    FAILED    Extras
+Took 168.48s to run dotnet.exe, ExitCode=0
+AutomationTool exiting with ExitCode=0 (Success)
+Took 165.54s to run dotnet.exe, ExitCode=0
+LogLinker: Warning: [AssetLog] D:\ws_twe_ue5.5_ci\Project\Plugins\G\EarthArtAsset\Content\TWE2025\Office_01\modules\Parapet\parapet\parapet.uasset: VerifyImport: Failed to find script package for import object 'Package /Script/DatasmithGLTFTranslator'
+LogMaterial: Warning: [AssetLog] D:\ws_twe_ue5.5_ci\Project\Plugins\G\AesArtAsset\Content\AssetRepository\default_mat_stuff\mi_type\simple_mask.uasset: Failed to compile Material Instance with Base root_simple for platform PCD3D_SM6, Default Material will be used in game.
+LogMaterial: Warning: [AssetLog] D:\ws_twe_ue5.5_ci\Project\Plugins\G\EarthArtAsset\Content\TWE2025\Terrain\M_ShowDOM_Splatmap.uasset: Failed to compile Material for platform PCD3D_SM6, Default Material will be used in game.
+LogMaterial: Warning: [AssetLog] D:\ws_twe_ue5.5_ci\Project\Plugins\G\AesArtAsset\Content\WaterConservancy\Martial\MI_Riverbank.uasset: Failed to compile Material Instance with Base M_Riverbank_Base for platform PCD3D_SM6, Default Material will be used in game.
+LogMaterial: Warning: [AssetLog] D:\ws_twe_ue5.5_ci\Project\Plugins\G\EarthArtAsset\Content\TWE2025\Terrain\MI_ShowDOM_Splatmap.uasset: Failed to compile Material Instance with Base M_ShowDOM_SplatMap for platform PCD3D_SM6, Default Material will be used in game.
+LogInit: Display: LogLinker: Warning: [AssetLog] D:\ws_twe_ue5.5_ci\Project\Plugins\G\EarthArtAsset\Content\TWE2025\Office_01\modules\Parapet\parapet\parapet.uasset: VerifyImport: Failed to find script package for import object 'Package /Script/DatasmithGLTFTranslator'
+Took 540.73s to run UnrealEditor-Cmd.exe, ExitCode=0
+Took 40.02s to run UnrealPak.exe, ExitCode=0
+AutomationTool exiting with ExitCode=0 (Success)
+                            $rawExit = $LASTEXITCODE
+                            $statusZh = switch ([int]$cmp.ExitCode) { 0 {'闁俺绻?} 1 {'鐠€锕€鎲?} 2 {'婢惰精瑙?} default {'閺堫亞鐓?} }
+                                if($LASTEXITCODE -le 3) {
+                                    Write-Host "[Archive] WARN robocopy exit=$LASTEXITCODE"
+ERROR: AesWorldInsights-Analyze failed with exit code: 99

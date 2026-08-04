@@ -1,0 +1,23 @@
+--- a/Source/AesWorldProfiling/Public/AesWorldProfilingTrace.h
++++ b/Source/AesWorldProfiling/Public/AesWorldProfilingTrace.h
+@@ (in the #else branch, after the macro definitions, before #endif)
+
+ #define AESWORLD_TRACE_SCOPE(Name)
+ #define AESWORLD_TRACE_SCOPE_STR(Str)
+ #define AESWORLD_TRACE_CACHE(EventType, ProducerId, MarkerInfo, InCacheName)
+
++// Complete-type stubs so TUniquePtr<T> compiles without -Wdelete-incomplete
++struct FAesTraceScope {};
++struct FAesTracePayloadScope {};
++struct FAesTraceProducerScope {};
++
+ #endif // WITH_EARTH_DEBUGGER
+
+--- a/Source/AesWorldProfiling/Private/AesWorldProfilingTrace.cpp
++++ b/Source/AesWorldProfiling/Private/AesWorldProfilingTrace.cpp
+@@ (inside the #if WITH_EARTH_DEBUGGER block, at the top of includes)
+
+ #if WITH_EARTH_DEBUGGER
+
++#include "AesProducerGraphStore.h"
+ #include "AesWorldProfilingModule.h"

@@ -1,0 +1,82 @@
+[
+  {
+    "query": "I just finished reading Karpathy's 'Intro to Large Language Models' YouTube lecture and I want to build a knowledge base from it. He covers pretraining, fine-tuning, RLHF, scaling laws, and the LLM OS concept. Can you help me organize all this into a wiki?",
+    "should_trigger": true
+  },
+  {
+    "query": "我在读这篇 Flash Attention 的论文 (https://arxiv.org/abs/2205.14135)，里面讲了 IO-aware attention 算法。帮我把核心思想整理到 wiki 里，跟之前的 attention mechanism 页面关联起来",
+    "should_trigger": true
+  },
+  {
+    "query": "hey can you check if my LLM wiki has any broken links or missing pages? I've been adding stuff manually and I think some wikilinks might be pointing to pages that don't exist yet",
+    "should_trigger": true
+  },
+  {
+    "query": "I want to compare GPT-4 vs Claude 3.5 vs Llama 3 in terms of architecture, training data, and benchmark performance. Add a comparison page to the knowledge base.",
+    "should_trigger": true
+  },
+  {
+    "query": "what's the difference between LoRA and QLoRA? I know we have pages about fine-tuning in the wiki, can you pull up what we have and fill in any gaps?",
+    "should_trigger": true
+  },
+  {
+    "query": "Here's a blog post about mixture of experts from Switch Transformer to Mixtral. I want this captured in the wiki with proper cross-references to our existing transformer and scaling pages:\n\nMoE routes each token to a subset of 'expert' FFN layers. Switch Transformer (2021) used top-1 routing. Mixtral 8x7B (2024) uses top-2 with 8 experts, achieving performance close to Llama 2 70B with only 13B active params per token.",
+    "should_trigger": true
+  },
+  {
+    "query": "run a full lint on the wiki — I want scores on link integrity, frontmatter compliance, orphan pages, everything. Fix what you can automatically and tell me what needs manual attention.",
+    "should_trigger": true
+  },
+  {
+    "query": "start a new knowledge base about deep learning. I want to organize what I'm learning about transformers, CNNs, RNNs, attention mechanisms, and training techniques into something I can reference later",
+    "should_trigger": true
+  },
+  {
+    "query": "I've got notes from 3 different ML papers scattered across my desktop. Can you help me ingest them into a structured wiki format? The papers are about RLHF (Anthropic's), DPO (Stanford's), and KTO (the contextual AI one)",
+    "should_trigger": true
+  },
+  {
+    "query": "查一下我们wiki里有没有关于 tokenization 和 BPE 的内容？如果没有的话帮我创建一个概念页面，连接到我们已有的 GPT 和 LLM training 页面",
+    "should_trigger": true
+  },
+  {
+    "query": "My Jenkins build linux-ci #912 failed with error C2061 in FZoneGraphBuildData. Can you diagnose what happened and suggest a fix?",
+    "should_trigger": false
+  },
+  {
+    "query": "I need to set up a Confluence wiki for our team's sprint documentation. Can you help me create the page templates and space structure?",
+    "should_trigger": false
+  },
+  {
+    "query": "help me write a Python script that uses the Wikipedia API to download articles about machine learning topics and save them as markdown files",
+    "should_trigger": false
+  },
+  {
+    "query": "我想在 Obsidian 里建一个个人日记系统，有每日笔记模板、标签分类、和周回顾。这跟 LLM 无关，就是普通的笔记管理",
+    "should_trigger": false
+  },
+  {
+    "query": "Can you explain how attention mechanisms work in transformers? I'm studying for an ML interview and need a clear explanation, not a wiki page — just explain it to me directly.",
+    "should_trigger": false
+  },
+  {
+    "query": "I'm building a RAG system with LangChain and Pinecone. I need help writing the retrieval pipeline code — vector store setup, embedding model selection, and chunking strategy.",
+    "should_trigger": false
+  },
+  {
+    "query": "run the Jenkins auto-learning skill to analyze recent build failures and update the knowledge base with any new error patterns",
+    "should_trigger": false
+  },
+  {
+    "query": "I need to create API documentation for our REST endpoints. Can you help me set up a docs site with Swagger/OpenAPI specs?",
+    "should_trigger": false
+  },
+  {
+    "query": "帮我把这个 markdown 文件转成 PDF，需要保留标题层级和代码块格式",
+    "should_trigger": false
+  },
+  {
+    "query": "I want to fine-tune Llama 3 on my custom dataset. Can you help me write the training script with LoRA? I need the actual code, not a wiki page about fine-tuning.",
+    "should_trigger": false
+  }
+]

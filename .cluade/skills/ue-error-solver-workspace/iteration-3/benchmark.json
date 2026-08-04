@@ -1,0 +1,178 @@
+{
+  "metadata": {
+    "skill_name": "ue-error-solver",
+    "skill_path": "D:\\Claude_skills\\.claude\\skills\\ue-error-solver",
+    "executor_model": "claude-opus-4-6",
+    "analyzer_model": "claude-opus-4-6",
+    "timestamp": "2026-04-11T12:00:00Z",
+    "evals_run": [1, 2, 3],
+    "runs_per_configuration": 1
+  },
+
+  "runs": [
+    {
+      "eval_id": 1,
+      "eval_name": "diagnose-autoci-3939-full-url",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 5,
+        "failed": 0,
+        "total": 5,
+        "time_seconds": 577.4,
+        "tokens": 0,
+        "tool_calls": 38,
+        "errors": 0
+      },
+      "expectations": [
+        {"text": "成功下载并解析 Jenkins build log", "passed": true, "evidence": "Build API queried, console log downloaded (1758 lines)"},
+        {"text": "提取出所有编译错误，包含完整错误上下文", "passed": true, "evidence": "UBT error fully captured with dependency chain"},
+        {"text": "使用了至少2个诊断源", "passed": true, "evidence": "Used source code, knowledge base, and Epic UE Assistant"},
+        {"text": "诊断报告包含根因分析、置信度和修复建议", "passed": true, "evidence": "Root cause with High confidence, fix referencing commit 8894ec3"},
+        {"text": "没有尝试修改代码", "passed": true, "evidence": "Phases 4-6 explicitly skipped"}
+      ]
+    },
+    {
+      "eval_id": 1,
+      "eval_name": "diagnose-autoci-3939-full-url",
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.6,
+        "passed": 3,
+        "failed": 2,
+        "total": 5,
+        "time_seconds": 125.7,
+        "tokens": 0,
+        "tool_calls": 18,
+        "errors": 0
+      },
+      "expectations": [
+        {"text": "成功下载并解析 Jenkins build log", "passed": true, "evidence": "94KB console.log fetched and analyzed"},
+        {"text": "提取出所有编译错误，包含完整错误上下文", "passed": true, "evidence": "UBT error captured with dependency chain"},
+        {"text": "使用了至少2个诊断源", "passed": false, "evidence": "Only used Jenkins console log, no KB/Epic/web search"},
+        {"text": "诊断报告包含根因分析、置信度和修复建议", "passed": false, "evidence": "Has root cause and fix but missing confidence level"},
+        {"text": "没有尝试修改代码", "passed": true, "evidence": "No code modifications performed"}
+      ]
+    },
+    {
+      "eval_id": 2,
+      "eval_name": "diagnose-autoci-3913-short-name",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 4,
+        "failed": 0,
+        "total": 4,
+        "time_seconds": 484.0,
+        "tokens": 0,
+        "tool_calls": 33,
+        "errors": 0
+      },
+      "expectations": [
+        {"text": "正确解析短名 'autoci #3913' 并匹配到 aes6-ue-runtime-ci job", "passed": true, "evidence": "Matched config: name='autoci' -> path='wdp-ue/job/Earth/job/aes6-ue-runtime-ci'"},
+        {"text": "成功下载并解析 Jenkins build log", "passed": true, "evidence": "Console log downloaded (43KB), parsed for errors"},
+        {"text": "提取出所有编译错误", "passed": true, "evidence": "C1083 fatal error correctly identified"},
+        {"text": "给出了包含根因和修复建议的诊断报告", "passed": true, "evidence": "Root cause: IWYU refactoring, fix with concrete diff, KB match (10/10 score)"}
+      ]
+    },
+    {
+      "eval_id": 2,
+      "eval_name": "diagnose-autoci-3913-short-name",
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 4,
+        "failed": 0,
+        "total": 4,
+        "time_seconds": 73.7,
+        "tokens": 0,
+        "tool_calls": 8,
+        "errors": 0
+      },
+      "expectations": [
+        {"text": "正确解析短名 'autoci #3913' 并匹配到 aes6-ue-runtime-ci job", "passed": true, "evidence": "Full URL provided directly to baseline (soft pass)"},
+        {"text": "成功下载并解析 Jenkins build log", "passed": true, "evidence": "1137-line log downloaded"},
+        {"text": "提取出所有编译错误", "passed": true, "evidence": "C1083 fatal error correctly identified"},
+        {"text": "给出了包含根因和修复建议的诊断报告", "passed": true, "evidence": "Root cause identified, replacement header suggestions given"}
+      ]
+    },
+    {
+      "eval_id": 3,
+      "eval_name": "diagnose-autoci-3908-full-url",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 5,
+        "failed": 0,
+        "total": 5,
+        "time_seconds": 493.9,
+        "tokens": 0,
+        "tool_calls": 51,
+        "errors": 0
+      },
+      "expectations": [
+        {"text": "正确解析完整 Jenkins URL", "passed": true, "evidence": "URL decomposed into baseUrl, jobPath, buildNumber, matched config"},
+        {"text": "成功下载并解析 Jenkins build log", "passed": true, "evidence": "1114-line log downloaded, FAILURE confirmed via API"},
+        {"text": "提取出所有编译错误", "passed": true, "evidence": "2 LNK2019 + 1 LNK1120, correctly classified as linker errors"},
+        {"text": "使用了多个诊断源进行分析", "passed": true, "evidence": "Source code, KB (4 matches), Epic assistant, build log analysis"},
+        {"text": "诊断报告结构化，包含根因、置信度、修复建议", "passed": true, "evidence": "Root cause: missing Material.h include, Confidence: High, fix verified in commit 767c64d"}
+      ]
+    },
+    {
+      "eval_id": 3,
+      "eval_name": "diagnose-autoci-3908-full-url",
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.6,
+        "passed": 3,
+        "failed": 2,
+        "total": 5,
+        "time_seconds": 130.4,
+        "tokens": 0,
+        "tool_calls": 15,
+        "errors": 0
+      },
+      "expectations": [
+        {"text": "正确解析完整 Jenkins URL", "passed": true, "evidence": "Correctly extracted job path and build number"},
+        {"text": "成功下载并解析 Jenkins build log", "passed": true, "evidence": "1114-line log downloaded (45774 bytes)"},
+        {"text": "提取出所有编译错误", "passed": true, "evidence": "All 3 errors found (2 LNK2019 + 1 LNK1120)"},
+        {"text": "使用了多个诊断源进行分析", "passed": false, "evidence": "Only used Jenkins-native data, no KB/Epic/web search"},
+        {"text": "诊断报告结构化，包含根因、置信度、修复建议", "passed": false, "evidence": "Has root cause and fix but missing confidence level"}
+      ]
+    }
+  ],
+
+  "run_summary": {
+    "with_skill": {
+      "pass_rate": {"mean": 1.0, "stddev": 0.0, "min": 1.0, "max": 1.0},
+      "time_seconds": {"mean": 518.4, "stddev": 41.2, "min": 484.0, "max": 577.4},
+      "tokens": {"mean": 0, "stddev": 0, "min": 0, "max": 0}
+    },
+    "without_skill": {
+      "pass_rate": {"mean": 0.73, "stddev": 0.19, "min": 0.6, "max": 1.0},
+      "time_seconds": {"mean": 109.9, "stddev": 25.5, "min": 73.7, "max": 130.4},
+      "tokens": {"mean": 0, "stddev": 0, "min": 0, "max": 0}
+    },
+    "delta": {
+      "pass_rate": "+0.27",
+      "time_seconds": "+408.5",
+      "tokens": "+0"
+    }
+  },
+
+  "notes": [
+    "With-skill achieves 100% pass rate across all 3 evals vs 73% baseline average",
+    "Baseline consistently fails on 'multi-source diagnosis' and 'confidence level' assertions - these are the key differentiators of the skill",
+    "With-skill takes ~4.7x longer (518s vs 110s average) due to multi-source querying (KB, Epic assistant, source code)",
+    "Eval 2 (Build #3913) shows 100% pass for both configurations - the single-error, well-documented C1083 case is too easy for discrimination",
+    "The biggest quality gap is in root cause depth: baseline stops at surface-level analysis while skill reaches true root causes (e.g., IWYU violation vs 'missing implementation')",
+    "Knowledge base hits significantly boost skill performance - builds #3939 and #3913 both had exact KB matches",
+    "All with-skill runs correctly identified that fixes were already applied in subsequent builds - baseline did not check this"
+  ]
+}

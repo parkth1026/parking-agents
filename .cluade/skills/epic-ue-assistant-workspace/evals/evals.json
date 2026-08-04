@@ -1,0 +1,89 @@
+{
+  "skill_name": "epic-ue-assistant",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "我的 UE5.3 插件编译报错 error C2061: syntax error: identifier FZoneGraphBuildData, 怎么修复这个错误?",
+      "expected_output": "A detailed answer explaining the missing include/module dependency causing C2061, with specific fix steps (add include or module to Build.cs), and at least one reference to official UE docs.",
+      "files": [],
+      "assertions": [
+        {
+          "name": "returns_answer",
+          "description": "The query returns a non-empty answer (AgentAnswer or HtmlAnswer)",
+          "type": "non_empty_output"
+        },
+        {
+          "name": "has_references",
+          "description": "At least one official Epic reference URL is returned",
+          "type": "reference_count_gte_1"
+        },
+        {
+          "name": "mentions_build_cs",
+          "description": "Answer mentions .Build.cs or module dependencies as part of the fix",
+          "type": "content_contains"
+        },
+        {
+          "name": "mentions_include",
+          "description": "Answer mentions #include or header file as a potential fix",
+          "type": "content_contains"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "How does UE5 World Partition work? How do I enable it for an existing level?",
+      "expected_output": "An explanation of World Partition with steps to enable it, mentioning streaming, data layers, or level conversion. Should have references to official docs.",
+      "files": [],
+      "assertions": [
+        {
+          "name": "returns_answer",
+          "description": "The query returns a non-empty answer",
+          "type": "non_empty_output"
+        },
+        {
+          "name": "has_references",
+          "description": "At least one official Epic reference URL is returned",
+          "type": "reference_count_gte_1"
+        },
+        {
+          "name": "explains_concept",
+          "description": "Answer explains what World Partition is (streaming, cells, grids, or data layers)",
+          "type": "content_contains"
+        },
+        {
+          "name": "has_enable_steps",
+          "description": "Answer includes steps or instructions for enabling World Partition",
+          "type": "content_contains"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "UE5 build error LNK2001: unresolved external symbol UE::MovieScene::FEntityManager::FindOrAddTypelessComponent - What module dependency is likely missing in the .Build.cs file?",
+      "expected_output": "Answer identifies the missing module (likely MovieScene or MovieSceneCore) and shows how to add it to Build.cs. Should mention the specific module name.",
+      "files": [],
+      "assertions": [
+        {
+          "name": "returns_answer",
+          "description": "The query returns a non-empty answer",
+          "type": "non_empty_output"
+        },
+        {
+          "name": "has_references",
+          "description": "At least one official Epic reference URL is returned",
+          "type": "reference_count_gte_1"
+        },
+        {
+          "name": "identifies_module",
+          "description": "Answer mentions MovieScene or a specific module name as the missing dependency",
+          "type": "content_contains"
+        },
+        {
+          "name": "shows_build_cs_fix",
+          "description": "Answer shows the Build.cs code change needed (PublicDependencyModuleNames or PrivateDependencyModuleNames)",
+          "type": "content_contains"
+        }
+      ]
+    }
+  ]
+}

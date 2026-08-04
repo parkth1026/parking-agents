@@ -1,0 +1,1277 @@
+Started by GitLab push by luwei
+Obtained Groovy/TWE_UE_Runtime.groovy from git http://10.100.10.55/neon/AesBuilderJenkins.git
+[Pipeline] Start of Pipeline
+[Pipeline] node
+Running on twe_autoci in D:/Jenkins/workspace/wdp-ue/Earth/aes6-ue-runtime-ci
+[Pipeline] {
+[Pipeline] stage
+[Pipeline] { (Prepare)
+[Pipeline] script
+[Pipeline] {
+[Pipeline] fileExists
+[Pipeline] readJSON
+[Pipeline] echo
+Pull Tools
+[Pipeline] echo
+robocopy //10.66.12.53/PaaS/AESBuilder/Jenkins/_SlaveSetup/Extra/Bandizip D:/Jenkins/Extra/Bandizip /DCOPY:DAT /E /NP /NFL /NDL /MT:128 /MIR 
+[Pipeline] powershell
+
+-------------------------------------------------------------------------------
+   ROBOCOPY     ::     Robust File Copy for Windows                              
+-------------------------------------------------------------------------------
+
+  Started : Wednesday, April 29, 2026 3:44:39 PM
+   Source : \\10.66.12.53\PaaS\AESBuilder\Jenkins\_SlaveSetup\Extra\Bandizip\
+     Dest : D:\Jenkins\Extra\Bandizip\
+
+    Files : *.*
+	    
+  Options : *.* /NDL /NFL /S /E /DCOPY:DAT /COPY:DAT /PURGE /MIR /NP /MT:128 /R:1000000 /W:30 
+
+------------------------------------------------------------------------------
+
+
+------------------------------------------------------------------------------
+
+               Total    Copied   Skipped  Mismatch    FAILED    Extras
+    Dirs :         6         6         6         0         0         0
+   Files :        89         0        89         0         0         0
+   Bytes :   16.41 m         0   16.41 m         0         0         0
+   Times :   0:00:00   0:00:00                       0:00:00   0:00:00
+   Ended : Wednesday, April 29, 2026 3:44:39 PM
+
+[Pipeline] echo
+robocopy //10.66.12.53/PaaS/AESBuilder/Jenkins/_SlaveSetup/Extra/Python39 D:/Jenkins/Extra/Python39 /DCOPY:DAT /E /NP /NFL /NDL /MT:128  
+[Pipeline] powershell
+
+-------------------------------------------------------------------------------
+   ROBOCOPY     ::     Robust File Copy for Windows                              
+-------------------------------------------------------------------------------
+
+  Started : Wednesday, April 29, 2026 3:44:40 PM
+   Source : \\10.66.12.53\PaaS\AESBuilder\Jenkins\_SlaveSetup\Extra\Python39\
+     Dest : D:\Jenkins\Extra\Python39\
+
+    Files : *.*
+	    
+  Options : *.* /NDL /NFL /S /E /DCOPY:DAT /COPY:DAT /NP /MT:128 /R:1000000 /W:30 
+
+------------------------------------------------------------------------------
+
+
+------------------------------------------------------------------------------
+
+               Total    Copied   Skipped  Mismatch    FAILED    Extras
+    Dirs :       687       687       686         0         0        17
+   Files :     12126         0     12125         0         0         2
+   Bytes :  293.57 m         0  293.61 m         0         0   207.7 k
+   Times :   0:00:10   0:00:00                       0:00:00   0:00:10
+   Ended : Wednesday, April 29, 2026 3:44:50 PM
+
+[Pipeline] dir
+Running in D:/ws_twe_ue5.5_ci/AesBuilderJenkins
+[Pipeline] {
+[Pipeline] echo
+Before: No Plugin: D:/ws_twe_ue5.5_ci//AesBuilderJenkins/.git/index
+[Pipeline] checkout
+The recommended git tool is: NONE
+using credential devopsjenkins
+Fetching changes from the remote Git repository
+Using shallow fetch with depth 1
+Pruning obsolete local branches
+ > git rev-parse --resolve-git-dir D:\ws_twe_ue5.5_ci\AesBuilderJenkins\.git # timeout=10
+ > git config remote.origin.url http://10.100.10.55/neon/AesBuilderJenkins.git # timeout=10
+Fetching upstream changes from http://10.100.10.55/neon/AesBuilderJenkins.git
+ > git --version # timeout=10
+ > git --version # 'git version 2.48.1.windows.1'
+using GIT_ASKPASS to set credentials jenkins-devops
+ > git fetch --tags --force --progress --prune --depth=1 -- http://10.100.10.55/neon/AesBuilderJenkins.git +refs/heads/release:refs/remotes/origin/release # timeout=60
+skipping resolution of commit remotes/origin/dev, since it originates from another repository
+Checking out Revision dfb3c0f4eb225aeffc0d92365e085017a4ae0970 (refs/remotes/origin/release)
+Enabling Git LFS pull
+ > git rev-parse "refs/remotes/origin/release^{commit}" # timeout=10
+ > git config core.sparsecheckout # timeout=10
+ > git checkout -f dfb3c0f4eb225aeffc0d92365e085017a4ae0970 # timeout=60
+ > git config --get remote.origin.url # timeout=10
+using GIT_ASKPASS to set credentials jenkins-devops
+ > git lfs pull origin # timeout=60
+Commit message: "娣诲姞 Skip_RecalculateUproject 鏀剧疆 uproject 琚慨鏀?
+ > git rev-list --no-walk dfb3c0f4eb225aeffc0d92365e085017a4ae0970 # timeout=10
+[Pipeline] }
+[Pipeline] // dir
+[Pipeline] echo
+if (Get-Process -Name "UnrealEditor-Cmd" -EA 0) { wmic process where "name='UnrealEditor-Cmd.exe'"  delete; Write-Host "!!!PROCESS DELETE!!!" } else { Write-Host "!!!PROCESS DOES NOT EXIST!!!" }
+[Pipeline] powershell
+!!!PROCESS DOES NOT EXIST!!!
+[Pipeline] }
+[Pipeline] // script
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (Pull Plugins)
+[Pipeline] script
+[Pipeline] {
+[Pipeline] dir
+Running in D:/ws_twe_ue5.5_ci
+[Pipeline] {
+[Pipeline] dir
+Running in D:/ws_twe_ue5.5_ci/Project/Plugins/G/AesArtAsset
+[Pipeline] {
+[Pipeline] echo
+Before: No Plugin: D:/ws_twe_ue5.5_ci/Project/Plugins/G/AesArtAsset/.git/index
+[Pipeline] checkout
+The recommended git tool is: NONE
+using credential devopsjenkins
+Fetching changes from the remote Git repository
+Using shallow fetch with depth 1
+Pruning obsolete local branches
+ > git rev-parse --resolve-git-dir D:\ws_twe_ue5.5_ci\Project\Plugins\G\AesArtAsset\.git # timeout=10
+ > git config remote.origin.url http://10.100.10.55/neon/AesArtAsset.git # timeout=10
+Fetching upstream changes from http://10.100.10.55/neon/AesArtAsset.git
+ > git --version # timeout=10
+ > git --version # 'git version 2.48.1.windows.1'
+using GIT_ASKPASS to set credentials jenkins-devops
+ > git fetch --tags --force --progress --prune --depth=1 -- http://10.100.10.55/neon/AesArtAsset.git +refs/heads/dev:refs/remotes/origin/dev # timeout=60
+skipping resolution of commit remotes/origin/dev, since it originates from another repository
+Checking out Revision d63c006a30592db61a3025fecaad747cdf2c75e7 (refs/remotes/origin/dev)
+Enabling Git LFS pull
+ > git rev-parse "refs/remotes/origin/dev^{commit}" # timeout=10
+ > git config core.sparsecheckout # timeout=10
+ > git checkout -f d63c006a30592db61a3025fecaad747cdf2c75e7 # timeout=60
+ > git config --get remote.origin.url # timeout=10
+using GIT_ASKPASS to set credentials jenkins-devops
+ > git lfs pull origin # timeout=60
+Commit message: "灏哹ool鍊兼敼鎴恠calar  0=false 1=true"
+ > git rev-list --no-walk d63c006a30592db61a3025fecaad747cdf2c75e7 # timeout=10
+[Pipeline] bat
+[Pipeline] echo
+After: d63c006 灏哹ool鍊兼敼鎴恠calar  0=false 1=true
+[Pipeline] echo
+Get-ChildItem D:/ws_twe_ue5.5_ci/Project/Plugins/G/AesArtAsset -FILE -NAME -RECURSE -FILTER *.uplugin
+[Pipeline] powershell
+[Pipeline] dir
+Running in D:/ws_twe_ue5.5_ci/Project/Plugins/G/AesArtAsset
+[Pipeline] {
+[Pipeline] bat
+[Pipeline] }
+[Pipeline] // dir
+[Pipeline] echo
+D:/ws_twe_ue5.5_ci/Project/Plugins/G/AesArtAsset
+[Pipeline] }
+[Pipeline] // dir
+[Pipeline] dir
+Running in D:/ws_twe_ue5.5_ci/Project/Plugins/G/ArtCommon
+[Pipeline] {
+[Pipeline] fileExists
+[Pipeline] echo
+Get-ChildItem D:/ws_twe_ue5.5_ci/Project/Plugins/G/ArtCommon -FILE -NAME -RECURSE -FILTER *.uplugin
+[Pipeline] powershell
+[Pipeline] dir
+Running in D:/ws_twe_ue5.5_ci/Project/Plugins/G/ArtCommon
+[Pipeline] {
+[Pipeline] fileExists
+[Pipeline] echo
+OldCommit: 
+[Pipeline] }
+[Pipeline] // dir
+[Pipeline] bat
+[Pipeline] echo
+Before: a15b4bf UTF-8
+[Pipeline] checkout
+The recommended git tool is: NONE
+using credential devopsjenkins
+Fetching changes from the remote Git repository
+Using shallow fetch with depth 1
+Pruning obsolete local branches
+ > git rev-parse --resolve-git-dir D:\ws_twe_ue5.5_ci\Project\Plugins\G\ArtCommon\.git # timeout=10
+ > git config remote.origin.url http://10.100.10.55/neon/ArtCommon.git # timeout=10
+Fetching upstream changes from http://10.100.10.55/neon/ArtCommon.git
+ > git --version # timeout=10
+ > git --version # 'git version 2.48.1.windows.1'
+using GIT_ASKPASS to set credentials jenkins-devops
+ > git fetch --tags --force --progress --prune --depth=1 -- http://10.100.10.55/neon/ArtCommon.git +refs/heads/dev:refs/remotes/origin/dev # timeout=60
+skipping resolution of commit remotes/origin/dev, since it originates from another repository
+Checking out Revision a15b4bf5178157bbe4cd5aae8c3bcf7f4d414145 (refs/remotes/origin/dev)
+Enabling Git LFS pull
+ > git rev-parse "refs/remotes/origin/dev^{commit}" # timeout=10
+ > git config core.sparsecheckout # timeout=10
+ > git checkout -f a15b4bf5178157bbe4cd5aae8c3bcf7f4d414145 # timeout=60
+ > git config --get remote.origin.url # timeout=10
+using GIT_ASKPASS to set credentials jenkins-devops
+ > git lfs pull origin # timeout=60
+Commit message: "UTF-8"
+ > git rev-list --no-walk a15b4bf5178157bbe4cd5aae8c3bcf7f4d414145 # timeout=10
+[Pipeline] bat
+[Pipeline] echo
+After: a15b4bf UTF-8
+[Pipeline] echo
+Get-ChildItem D:/ws_twe_ue5.5_ci/Project/Plugins/G/ArtCommon -FILE -NAME -RECURSE -FILTER *.uplugin
+[Pipeline] powershell
+[Pipeline] dir
+Running in D:/ws_twe_ue5.5_ci/Project/Plugins/G/ArtCommon
+[Pipeline] {
+[Pipeline] bat
+[Pipeline] }
+[Pipeline] // dir
+[Pipeline] echo
+D:/ws_twe_ue5.5_ci/Project/Plugins/G/ArtCommon
+[Pipeline] }
+[Pipeline] // dir
+[Pipeline] dir
+Running in D:/ws_twe_ue5.5_ci/Project/Plugins/G/EarthArtAsset
+[Pipeline] {
+[Pipeline] fileExists
+[Pipeline] echo
+Get-ChildItem D:/ws_twe_ue5.5_ci/Project/Plugins/G/EarthArtAsset -FILE -NAME -RECURSE -FILTER *.uplugin
+[Pipeline] powershell
+[Pipeline] dir
+Running in D:/ws_twe_ue5.5_ci/Project/Plugins/G/EarthArtAsset
+[Pipeline] {
+[Pipeline] fileExists
+[Pipeline] echo
+OldCommit: 
+[Pipeline] }
+[Pipeline] // dir
+[Pipeline] bat
+[Pipeline] echo
+Before: c730f3d 鍩庡競妞嶈姣嶆潗璐ㄥ姞鍏ヨ窛绂诲墧闄ゆ潗璐ㄥ嚱鏁?
+[Pipeline] checkout
+The recommended git tool is: NONE
+using credential devopsjenkins
+Fetching changes from the remote Git repository
+Using shallow fetch with depth 1
+Pruning obsolete local branches
+ > git rev-parse --resolve-git-dir D:\ws_twe_ue5.5_ci\Project\Plugins\G\EarthArtAsset\.git # timeout=10
+ > git config remote.origin.url http://10.100.10.55/neon/EarthArtAsset.git # timeout=10
+Fetching upstream changes from http://10.100.10.55/neon/EarthArtAsset.git
+ > git --version # timeout=10
+ > git --version # 'git version 2.48.1.windows.1'
+using GIT_ASKPASS to set credentials jenkins-devops
+ > git fetch --tags --force --progress --prune --depth=1 -- http://10.100.10.55/neon/EarthArtAsset.git +refs/heads/dev:refs/remotes/origin/dev # timeout=60
+skipping resolution of commit remotes/origin/dev, since it originates from another repository
+Checking out Revision c730f3de99329dd452192b23520731d98c376128 (refs/remotes/origin/dev)
+Enabling Git LFS pull
+Commit message: "鍩庡競妞嶈姣嶆潗璐ㄥ姞鍏ヨ窛绂诲墧闄ゆ潗璐ㄥ嚱鏁?
+ > git rev-parse "refs/remotes/origin/dev^{commit}" # timeout=10
+ > git config core.sparsecheckout # timeout=10
+ > git checkout -f c730f3de99329dd452192b23520731d98c376128 # timeout=60
+ > git config --get remote.origin.url # timeout=10
+using GIT_ASKPASS to set credentials jenkins-devops
+ > git lfs pull origin # timeout=60
+ > git rev-list --no-walk c730f3de99329dd452192b23520731d98c376128 # timeout=10
+[Pipeline] bat
+[Pipeline] echo
+After: c730f3d 鍩庡競妞嶈姣嶆潗璐ㄥ姞鍏ヨ窛绂诲墧闄ゆ潗璐ㄥ嚱鏁?
+[Pipeline] echo
+Get-ChildItem D:/ws_twe_ue5.5_ci/Project/Plugins/G/EarthArtAsset -FILE -NAME -RECURSE -FILTER *.uplugin
+[Pipeline] powershell
+[Pipeline] dir
+Running in D:/ws_twe_ue5.5_ci/Project/Plugins/G/EarthArtAsset
+[Pipeline] {
+[Pipeline] bat
+[Pipeline] }
+[Pipeline] // dir
+[Pipeline] echo
+D:/ws_twe_ue5.5_ci/Project/Plugins/G/EarthArtAsset
+[Pipeline] }
+[Pipeline] // dir
+[Pipeline] dir
+Running in D:/ws_twe_ue5.5_ci/Project/Plugins/G/WdpCamera
+[Pipeline] {
+[Pipeline] fileExists
+[Pipeline] echo
+Get-ChildItem D:/ws_twe_ue5.5_ci/Project/Plugins/G/WdpCamera -FILE -NAME -RECURSE -FILTER *.uplugin
+[Pipeline] powershell
+[Pipeline] dir
+Running in D:/ws_twe_ue5.5_ci/Project/Plugins/G/WdpCamera
+[Pipeline] {
+[Pipeline] fileExists
+[Pipeline] echo
+OldCommit: 
+[Pipeline] }
+[Pipeline] // dir
+[Pipeline] bat
+[Pipeline] echo
+Before: 8932bd1 Merge branch 'feature/camera_refactor_wxy' into dev
+[Pipeline] checkout
+The recommended git tool is: NONE
+using credential devopsjenkins
+Fetching changes from the remote Git repository
+Using shallow fetch with depth 1
+Pruning obsolete local branches
+ > git rev-parse --resolve-git-dir D:\ws_twe_ue5.5_ci\Project\Plugins\G\WdpCamera\.git # timeout=10
+ > git config remote.origin.url http://10.100.10.55/neon/WdpCamera.git # timeout=10
+Fetching upstream changes from http://10.100.10.55/neon/WdpCamera.git
+ > git --version # timeout=10
+ > git --version # 'git version 2.48.1.windows.1'
+using GIT_ASKPASS to set credentials jenkins-devops
+ > git fetch --tags --force --progress --prune --depth=1 -- http://10.100.10.55/neon/WdpCamera.git +refs/heads/release:refs/remotes/origin/release # timeout=60
+skipping resolution of commit remotes/origin/dev, since it originates from another repository
+Checking out Revision 8932bd17d223dbc15e27106f6caaad465099e535 (refs/remotes/origin/release)
+Enabling Git LFS pull
+Commit message: "Merge branch 'feature/camera_refactor_wxy' into dev"
+ > git rev-parse "refs/remotes/origin/release^{commit}" # timeout=10
+ > git config core.sparsecheckout # timeout=10
+ > git checkout -f 8932bd17d223dbc15e27106f6caaad465099e535 # timeout=60
+ > git config --get remote.origin.url # timeout=10
+using GIT_ASKPASS to set credentials jenkins-devops
+ > git lfs pull origin # timeout=60
+ > git rev-list --no-walk 8932bd17d223dbc15e27106f6caaad465099e535 # timeout=10
+[Pipeline] bat
+[Pipeline] echo
+After: 8932bd1 Merge branch 'feature/camera_refactor_wxy' into dev
+[Pipeline] echo
+Get-ChildItem D:/ws_twe_ue5.5_ci/Project/Plugins/G/WdpCamera -FILE -NAME -RECURSE -FILTER *.uplugin
+[Pipeline] powershell
+[Pipeline] dir
+Running in D:/ws_twe_ue5.5_ci/Project/Plugins/G/WdpCamera
+[Pipeline] {
+[Pipeline] bat
+[Pipeline] }
+[Pipeline] // dir
+[Pipeline] echo
+D:/ws_twe_ue5.5_ci/Project/Plugins/G/WdpCamera
+[Pipeline] }
+[Pipeline] // dir
+[Pipeline] dir
+Running in D:/ws_twe_ue5.5_ci/Project/Plugins/G/AesWorld
+[Pipeline] {
+[Pipeline] fileExists
+[Pipeline] echo
+Get-ChildItem D:/ws_twe_ue5.5_ci/Project/Plugins/G/AesWorld -FILE -NAME -RECURSE -FILTER *.uplugin
+[Pipeline] powershell
+[Pipeline] dir
+Running in D:/ws_twe_ue5.5_ci/Project/Plugins/G/AesWorld
+[Pipeline] {
+[Pipeline] fileExists
+[Pipeline] echo
+OldCommit: 
+[Pipeline] }
+[Pipeline] // dir
+[Pipeline] bat
+[Pipeline] echo
+Before: 2d3d7fa 鑰佺増鏈殑杞欢闇€瑕佽兘璇诲彇鏂扮殑鏁版嵁鏍煎紡锛堟彁渚涙柊鐨勬暟鎹殑灞炴€х粨鏋勶級
+[Pipeline] checkout
+The recommended git tool is: NONE
+using credential devopsjenkins
+Fetching changes from the remote Git repository
+Using shallow fetch with depth 1
+Pruning obsolete local branches
+ > git rev-parse --resolve-git-dir D:\ws_twe_ue5.5_ci\Project\Plugins\G\AesWorld\.git # timeout=10
+ > git config remote.origin.url http://10.100.10.55/neon/AesWorld.git # timeout=10
+Fetching upstream changes from http://10.100.10.55/neon/AesWorld.git
+ > git --version # timeout=10
+ > git --version # 'git version 2.48.1.windows.1'
+using GIT_ASKPASS to set credentials jenkins-devops
+ > git fetch --tags --force --progress --prune --depth=1 -- http://10.100.10.55/neon/AesWorld.git +refs/heads/dev:refs/remotes/origin/dev # timeout=60
+skipping resolution of commit remotes/origin/dev, since it originates from another repository
+Checking out Revision 316d0a17d2250faf3939a268fc012f565af29f3a (refs/remotes/origin/dev)
+Enabling Git LFS pull
+ > git rev-parse "refs/remotes/origin/dev^{commit}" # timeout=10
+ > git config core.sparsecheckout # timeout=10
+ > git checkout -f 316d0a17d2250faf3939a268fc012f565af29f3a # timeout=60
+ > git config --get remote.origin.url # timeout=10
+using GIT_ASKPASS to set credentials jenkins-devops
+ > git lfs pull origin # timeout=60
+Commit message: "淇敼PrefabAssetLibrary鍜孯egionalPrefabAssetLibrary闇€瑕侀噸鏂癈acheData"
+ > git rev-list --no-walk 2d3d7fa56f27cfa0ccdbd6aa709323339baf8aca # timeout=10
+[Pipeline] bat
+[Pipeline] echo
+After: 316d0a1 淇敼PrefabAssetLibrary鍜孯egionalPrefabAssetLibrary闇€瑕侀噸鏂癈acheData
+[Pipeline] echo
+Get-ChildItem D:/ws_twe_ue5.5_ci/Project/Plugins/G/AesWorld -FILE -NAME -RECURSE -FILTER *.uplugin
+[Pipeline] powershell
+[Pipeline] dir
+Running in D:/ws_twe_ue5.5_ci/Project/Plugins/G/AesWorld
+[Pipeline] {
+[Pipeline] bat
+[Pipeline] }
+[Pipeline] // dir
+[Pipeline] echo
+D:/ws_twe_ue5.5_ci/Project/Plugins/G/AesWorld
+[Pipeline] }
+[Pipeline] // dir
+[Pipeline] dir
+Running in D:/ws_twe_ue5.5_ci/Project/Plugins/G/AesRuntime
+[Pipeline] {
+[Pipeline] fileExists
+[Pipeline] echo
+Get-ChildItem D:/ws_twe_ue5.5_ci/Project/Plugins/G/AesRuntime -FILE -NAME -RECURSE -FILTER *.uplugin
+[Pipeline] powershell
+[Pipeline] dir
+Running in D:/ws_twe_ue5.5_ci/Project/Plugins/G/AesRuntime
+[Pipeline] {
+[Pipeline] fileExists
+[Pipeline] echo
+OldCommit: 
+[Pipeline] }
+[Pipeline] // dir
+[Pipeline] bat
+[Pipeline] echo
+Before: fafed1e 绂佹灏哃evel鍐欏叆鎼厤CustomDepthStencilValue涓?
+[Pipeline] checkout
+The recommended git tool is: NONE
+using credential devopsjenkins
+Fetching changes from the remote Git repository
+Using shallow fetch with depth 1
+Pruning obsolete local branches
+ > git rev-parse --resolve-git-dir D:\ws_twe_ue5.5_ci\Project\Plugins\G\AesRuntime\.git # timeout=10
+ > git config remote.origin.url http://10.100.10.55/neon/AesRuntime.git # timeout=10
+Fetching upstream changes from http://10.100.10.55/neon/AesRuntime.git
+ > git --version # timeout=10
+ > git --version # 'git version 2.48.1.windows.1'
+using GIT_ASKPASS to set credentials jenkins-devops
+ > git fetch --tags --force --progress --prune --depth=1 -- http://10.100.10.55/neon/AesRuntime.git +refs/heads/dev:refs/remotes/origin/dev # timeout=60
+skipping resolution of commit remotes/origin/dev, since it originates from another repository
+Checking out Revision fafed1e0a1fbc2bd1b2d03e7a0b6a1dca4066bdb (refs/remotes/origin/dev)
+Enabling Git LFS pull
+ > git rev-parse "refs/remotes/origin/dev^{commit}" # timeout=10
+ > git config core.sparsecheckout # timeout=10
+ > git checkout -f fafed1e0a1fbc2bd1b2d03e7a0b6a1dca4066bdb # timeout=60
+ > git config --get remote.origin.url # timeout=10
+using GIT_ASKPASS to set credentials jenkins-devops
+ > git lfs pull origin # timeout=60
+Commit message: "绂佹灏哃evel鍐欏叆鎼厤CustomDepthStencilValue涓?
+ > git rev-list --no-walk fafed1e0a1fbc2bd1b2d03e7a0b6a1dca4066bdb # timeout=10
+[Pipeline] bat
+[Pipeline] echo
+After: fafed1e 绂佹灏哃evel鍐欏叆鎼厤CustomDepthStencilValue涓?
+[Pipeline] echo
+Get-ChildItem D:/ws_twe_ue5.5_ci/Project/Plugins/G/AesRuntime -FILE -NAME -RECURSE -FILTER *.uplugin
+[Pipeline] powershell
+[Pipeline] dir
+Running in D:/ws_twe_ue5.5_ci/Project/Plugins/G/AesRuntime
+[Pipeline] {
+[Pipeline] bat
+[Pipeline] }
+[Pipeline] // dir
+[Pipeline] echo
+D:/ws_twe_ue5.5_ci/Project/Plugins/G/AesRuntime
+[Pipeline] }
+[Pipeline] // dir
+[Pipeline] dir
+Running in D:/ws_twe_ue5.5_ci/Project/Plugins/G/AesTilesEditor
+[Pipeline] {
+[Pipeline] fileExists
+[Pipeline] echo
+Get-ChildItem D:/ws_twe_ue5.5_ci/Project/Plugins/G/AesTilesEditor -FILE -NAME -RECURSE -FILTER *.uplugin
+[Pipeline] powershell
+[Pipeline] dir
+Running in D:/ws_twe_ue5.5_ci/Project/Plugins/G/AesTilesEditor/AesBuilder
+[Pipeline] {
+[Pipeline] fileExists
+[Pipeline] echo
+OldCommit: 
+[Pipeline] }
+[Pipeline] // dir
+[Pipeline] dir
+Running in D:/ws_twe_ue5.5_ci/Project/Plugins/G/AesTilesEditor/AesBuilderAsset
+[Pipeline] {
+[Pipeline] fileExists
+[Pipeline] echo
+OldCommit: 
+[Pipeline] }
+[Pipeline] // dir
+[Pipeline] dir
+Running in D:/ws_twe_ue5.5_ci/Project/Plugins/G/AesTilesEditor/AesBuilderCommon
+[Pipeline] {
+[Pipeline] fileExists
+[Pipeline] echo
+OldCommit: 
+[Pipeline] }
+[Pipeline] // dir
+[Pipeline] dir
+Running in D:/ws_twe_ue5.5_ci/Project/Plugins/G/AesTilesEditor/AesEditor
+[Pipeline] {
+[Pipeline] fileExists
+[Pipeline] echo
+OldCommit: 
+[Pipeline] }
+[Pipeline] // dir
+[Pipeline] dir
+Running in D:/ws_twe_ue5.5_ci/Project/Plugins/G/AesTilesEditor/AesHoudini
+[Pipeline] {
+[Pipeline] fileExists
+[Pipeline] echo
+OldCommit: 
+[Pipeline] }
+[Pipeline] // dir
+[Pipeline] dir
+Running in D:/ws_twe_ue5.5_ci/Project/Plugins/G/AesTilesEditor/AesModeler
+[Pipeline] {
+[Pipeline] fileExists
+[Pipeline] echo
+OldCommit: 
+[Pipeline] }
+[Pipeline] // dir
+[Pipeline] bat
+[Pipeline] echo
+Before: 1f6ada4 浼樺寲 warning
+[Pipeline] checkout
+The recommended git tool is: NONE
+using credential devopsjenkins
+Fetching changes from the remote Git repository
+Using shallow fetch with depth 1
+Pruning obsolete local branches
+ > git rev-parse --resolve-git-dir D:\ws_twe_ue5.5_ci\Project\Plugins\G\AesTilesEditor\.git # timeout=10
+ > git config remote.origin.url http://10.100.10.55/neon/AesTilesEditor.git # timeout=10
+Fetching upstream changes from http://10.100.10.55/neon/AesTilesEditor.git
+ > git --version # timeout=10
+ > git --version # 'git version 2.48.1.windows.1'
+using GIT_ASKPASS to set credentials jenkins-devops
+ > git fetch --tags --force --progress --prune --depth=1 -- http://10.100.10.55/neon/AesTilesEditor.git +refs/heads/dev:refs/remotes/origin/dev # timeout=60
+skipping resolution of commit remotes/origin/dev, since it originates from another repository
+Checking out Revision 1f6ada4eb18a639a2ddeb8a7e39fc24e25b623a2 (refs/remotes/origin/dev)
+Enabling Git LFS pull
+Commit message: "浼樺寲 warning"
+ > git rev-parse "refs/remotes/origin/dev^{commit}" # timeout=10
+ > git config core.sparsecheckout # timeout=10
+ > git checkout -f 1f6ada4eb18a639a2ddeb8a7e39fc24e25b623a2 # timeout=60
+ > git config --get remote.origin.url # timeout=10
+using GIT_ASKPASS to set credentials jenkins-devops
+ > git lfs pull origin # timeout=60
+ > git rev-list --no-walk 1f6ada4eb18a639a2ddeb8a7e39fc24e25b623a2 # timeout=10
+ > git remote # timeout=10
+ > git submodule init # timeout=10
+ > git submodule sync # timeout=10
+ > git config --get remote.origin.url # timeout=10
+ > git submodule init # timeout=10
+ > git config -f .gitmodules --get-regexp ^submodule\.(.+)\.url # timeout=10
+ > git config --get submodule.AesBuilder.url # timeout=10
+ > git remote # timeout=10
+ > git config --get remote.origin.url # timeout=10
+ > git config -f .gitmodules --get submodule.AesBuilder.path # timeout=10
+ > git config --get submodule.AesBuilderAsset.url # timeout=10
+ > git remote # timeout=10
+ > git config --get remote.origin.url # timeout=10
+ > git config -f .gitmodules --get submodule.AesBuilderAsset.path # timeout=10
+ > git config --get submodule.AesBuilderCommon.url # timeout=10
+ > git remote # timeout=10
+ > git config --get remote.origin.url # timeout=10
+ > git config -f .gitmodules --get submodule.AesBuilderCommon.path # timeout=10
+ > git config --get submodule.AesEditor.url # timeout=10
+ > git remote # timeout=10
+ > git config --get remote.origin.url # timeout=10
+ > git config -f .gitmodules --get submodule.AesEditor.path # timeout=10
+ > git config --get submodule.AesHoudini.url # timeout=10
+ > git remote # timeout=10
+ > git config --get remote.origin.url # timeout=10
+ > git config -f .gitmodules --get submodule.AesHoudini.path # timeout=10
+ > git config --get submodule.AesModeler.url # timeout=10
+ > git remote # timeout=10
+ > git config --get remote.origin.url # timeout=10
+ > git config -f .gitmodules --get submodule.AesModeler.path # timeout=10
+using GIT_ASKPASS to set credentials jenkins-devops
+ > git submodule update --init --recursive AesBuilder # timeout=10
+using GIT_ASKPASS to set credentials jenkins-devops
+ > git submodule update --init --recursive AesBuilderAsset # timeout=10
+using GIT_ASKPASS to set credentials jenkins-devops
+ > git submodule update --init --recursive AesBuilderCommon # timeout=10
+using GIT_ASKPASS to set credentials jenkins-devops
+ > git submodule update --init --recursive AesEditor # timeout=10
+using GIT_ASKPASS to set credentials jenkins-devops
+ > git submodule update --init --recursive AesHoudini # timeout=10
+[Pipeline] bat
+[Pipeline] echo
+After: 1f6ada4 浼樺寲 warning
+[Pipeline] echo
+Get-ChildItem D:/ws_twe_ue5.5_ci/Project/Plugins/G/AesTilesEditor -FILE -NAME -RECURSE -FILTER *.uplugin
+[Pipeline] powershell
+using GIT_ASKPASS to set credentials jenkins-devops
+ > git submodule update --init --recursive AesModeler # timeout=10
+[Pipeline] dir
+Running in D:/ws_twe_ue5.5_ci/Project/Plugins/G/AesTilesEditor/AesBuilder
+[Pipeline] {
+[Pipeline] bat
+[Pipeline] }
+[Pipeline] // dir
+[Pipeline] echo
+D:/ws_twe_ue5.5_ci/Project/Plugins/G/AesTilesEditor/AesBuilder
+[Pipeline] dir
+Running in D:/ws_twe_ue5.5_ci/Project/Plugins/G/AesTilesEditor/AesBuilderAsset
+[Pipeline] {
+[Pipeline] bat
+[Pipeline] }
+[Pipeline] // dir
+[Pipeline] echo
+D:/ws_twe_ue5.5_ci/Project/Plugins/G/AesTilesEditor/AesBuilderAsset
+[Pipeline] dir
+Running in D:/ws_twe_ue5.5_ci/Project/Plugins/G/AesTilesEditor/AesBuilderCommon
+[Pipeline] {
+[Pipeline] bat
+[Pipeline] }
+[Pipeline] // dir
+[Pipeline] echo
+D:/ws_twe_ue5.5_ci/Project/Plugins/G/AesTilesEditor/AesBuilderCommon
+[Pipeline] dir
+Running in D:/ws_twe_ue5.5_ci/Project/Plugins/G/AesTilesEditor/AesEditor
+[Pipeline] {
+[Pipeline] bat
+[Pipeline] }
+[Pipeline] // dir
+[Pipeline] echo
+D:/ws_twe_ue5.5_ci/Project/Plugins/G/AesTilesEditor/AesEditor
+[Pipeline] dir
+Running in D:/ws_twe_ue5.5_ci/Project/Plugins/G/AesTilesEditor/AesHoudini
+[Pipeline] {
+[Pipeline] bat
+[Pipeline] }
+[Pipeline] // dir
+[Pipeline] echo
+D:/ws_twe_ue5.5_ci/Project/Plugins/G/AesTilesEditor/AesHoudini
+[Pipeline] dir
+Running in D:/ws_twe_ue5.5_ci/Project/Plugins/G/AesTilesEditor/AesModeler
+[Pipeline] {
+[Pipeline] bat
+[Pipeline] }
+[Pipeline] // dir
+[Pipeline] echo
+D:/ws_twe_ue5.5_ci/Project/Plugins/G/AesTilesEditor/AesModeler
+[Pipeline] }
+[Pipeline] // dir
+[Pipeline] dir
+Running in D:/ws_twe_ue5.5_ci/Project/Plugins/G/SkyCreatorPlugin
+[Pipeline] {
+[Pipeline] fileExists
+[Pipeline] echo
+Get-ChildItem D:/ws_twe_ue5.5_ci/Project/Plugins/G/SkyCreatorPlugin -FILE -NAME -RECURSE -FILTER *.uplugin
+[Pipeline] powershell
+[Pipeline] dir
+Running in D:/ws_twe_ue5.5_ci/Project/Plugins/G/SkyCreatorPlugin
+[Pipeline] {
+[Pipeline] fileExists
+[Pipeline] echo
+OldCommit: 
+[Pipeline] }
+[Pipeline] // dir
+[Pipeline] bat
+[Pipeline] echo
+Before: 82528d0 鏇存柊WDP涓缓娴峰垱涓撳睘01澶╂皵棰勮_闆炬晥
+[Pipeline] checkout
+The recommended git tool is: NONE
+using credential devopsjenkins
+Fetching changes from the remote Git repository
+Using shallow fetch with depth 1
+Pruning obsolete local branches
+ > git rev-parse --resolve-git-dir D:\ws_twe_ue5.5_ci\Project\Plugins\G\SkyCreatorPlugin\.git # timeout=10
+ > git config remote.origin.url http://10.100.10.55/MarketPlace/SkyCreatorPlugin.git # timeout=10
+Fetching upstream changes from http://10.100.10.55/MarketPlace/SkyCreatorPlugin.git
+ > git --version # timeout=10
+ > git --version # 'git version 2.48.1.windows.1'
+using GIT_ASKPASS to set credentials jenkins-devops
+ > git fetch --tags --force --progress --prune --depth=1 -- http://10.100.10.55/MarketPlace/SkyCreatorPlugin.git +refs/heads/dev:refs/remotes/origin/dev # timeout=60
+skipping resolution of commit remotes/origin/dev, since it originates from another repository
+Checking out Revision 82528d05cedc9c62b6c5237815d16287d7991908 (refs/remotes/origin/dev)
+Enabling Git LFS pull
+ > git rev-parse "refs/remotes/origin/dev^{commit}" # timeout=10
+ > git config core.sparsecheckout # timeout=10
+ > git checkout -f 82528d05cedc9c62b6c5237815d16287d7991908 # timeout=60
+ > git config --get remote.origin.url # timeout=10
+using GIT_ASKPASS to set credentials jenkins-devops
+ > git lfs pull origin # timeout=60
+Commit message: "鏇存柊WDP涓缓娴峰垱涓撳睘01澶╂皵棰勮_闆炬晥"
+ > git rev-list --no-walk 82528d05cedc9c62b6c5237815d16287d7991908 # timeout=10
+[Pipeline] bat
+[Pipeline] echo
+After: 82528d0 鏇存柊WDP涓缓娴峰垱涓撳睘01澶╂皵棰勮_闆炬晥
+[Pipeline] echo
+Get-ChildItem D:/ws_twe_ue5.5_ci/Project/Plugins/G/SkyCreatorPlugin -FILE -NAME -RECURSE -FILTER *.uplugin
+[Pipeline] powershell
+[Pipeline] dir
+Running in D:/ws_twe_ue5.5_ci/Project/Plugins/G/SkyCreatorPlugin
+[Pipeline] {
+[Pipeline] bat
+[Pipeline] }
+[Pipeline] // dir
+[Pipeline] echo
+D:/ws_twe_ue5.5_ci/Project/Plugins/G/SkyCreatorPlugin
+[Pipeline] }
+[Pipeline] // dir
+[Pipeline] dir
+Running in D:/ws_twe_ue5.5_ci/Project/Plugins/G/WdpEnvironment
+[Pipeline] {
+[Pipeline] fileExists
+[Pipeline] echo
+Get-ChildItem D:/ws_twe_ue5.5_ci/Project/Plugins/G/WdpEnvironment -FILE -NAME -RECURSE -FILTER *.uplugin
+[Pipeline] powershell
+[Pipeline] dir
+Running in D:/ws_twe_ue5.5_ci/Project/Plugins/G/WdpEnvironment
+[Pipeline] {
+[Pipeline] fileExists
+[Pipeline] echo
+OldCommit: 
+[Pipeline] }
+[Pipeline] // dir
+[Pipeline] bat
+[Pipeline] echo
+Before: a740f6c add wdp custom Weather Description
+[Pipeline] checkout
+The recommended git tool is: NONE
+using credential devopsjenkins
+Fetching changes from the remote Git repository
+Using shallow fetch with depth 1
+Pruning obsolete local branches
+ > git rev-parse --resolve-git-dir D:\ws_twe_ue5.5_ci\Project\Plugins\G\WdpEnvironment\.git # timeout=10
+ > git config remote.origin.url http://10.100.10.55/neon/WdpEnvironment.git # timeout=10
+Fetching upstream changes from http://10.100.10.55/neon/WdpEnvironment.git
+ > git --version # timeout=10
+ > git --version # 'git version 2.48.1.windows.1'
+using GIT_ASKPASS to set credentials jenkins-devops
+ > git fetch --tags --force --progress --prune --depth=1 -- http://10.100.10.55/neon/WdpEnvironment.git +refs/heads/dev:refs/remotes/origin/dev # timeout=60
+skipping resolution of commit remotes/origin/dev, since it originates from another repository
+Checking out Revision a740f6c429fee204c2ad7cf42de7ab7c914c8adc (refs/remotes/origin/dev)
+Enabling Git LFS pull
+ > git rev-parse "refs/remotes/origin/dev^{commit}" # timeout=10
+ > git config core.sparsecheckout # timeout=10
+ > git checkout -f a740f6c429fee204c2ad7cf42de7ab7c914c8adc # timeout=60
+ > git config --get remote.origin.url # timeout=10
+using GIT_ASKPASS to set credentials jenkins-devops
+ > git lfs pull origin # timeout=60
+Commit message: "add wdp custom Weather Description"
+ > git rev-list --no-walk a740f6c429fee204c2ad7cf42de7ab7c914c8adc # timeout=10
+[Pipeline] bat
+[Pipeline] echo
+After: a740f6c add wdp custom Weather Description
+[Pipeline] echo
+Get-ChildItem D:/ws_twe_ue5.5_ci/Project/Plugins/G/WdpEnvironment -FILE -NAME -RECURSE -FILTER *.uplugin
+[Pipeline] powershell
+[Pipeline] dir
+Running in D:/ws_twe_ue5.5_ci/Project/Plugins/G/WdpEnvironment
+[Pipeline] {
+[Pipeline] bat
+[Pipeline] }
+[Pipeline] // dir
+[Pipeline] echo
+D:/ws_twe_ue5.5_ci/Project/Plugins/G/WdpEnvironment
+[Pipeline] }
+[Pipeline] // dir
+[Pipeline] }
+[Pipeline] // dir
+[Pipeline] }
+[Pipeline] // script
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (Clean Build)
+[Pipeline] script
+[Pipeline] {
+[Pipeline] dir
+Running in D:/ws_twe_ue5.5_ci
+[Pipeline] {
+[Pipeline] echo
+(Test-Path -Path D:/ws_twe_ue5.5_ci/Package/Windows) -and (Remove-Item  -Path D:/ws_twe_ue5.5_ci/Package/Windows -Recurse -Force)
+[Pipeline] powershell
+False
+[Pipeline] echo
+Get-ChildItem D:/ws_twe_ue5.5_ci/Project/Plugins/G -DIRECTORY -NAME
+[Pipeline] powershell
+[Pipeline] echo
+(Test-Path -Path D:/ws_twe_ue5.5_ci/Project/Plugins/G/AesArtAsset@tmp) -and (Remove-Item  -Path D:/ws_twe_ue5.5_ci/Project/Plugins/G/AesArtAsset@tmp -Recurse -Force)
+[Pipeline] powershell
+False
+[Pipeline] echo
+(Test-Path -Path D:/ws_twe_ue5.5_ci/Project/Plugins/G/AesRuntime@tmp) -and (Remove-Item  -Path D:/ws_twe_ue5.5_ci/Project/Plugins/G/AesRuntime@tmp -Recurse -Force)
+[Pipeline] powershell
+False
+[Pipeline] echo
+(Test-Path -Path D:/ws_twe_ue5.5_ci/Project/Plugins/G/AesTilesEditor@tmp) -and (Remove-Item  -Path D:/ws_twe_ue5.5_ci/Project/Plugins/G/AesTilesEditor@tmp -Recurse -Force)
+[Pipeline] powershell
+False
+[Pipeline] echo
+(Test-Path -Path D:/ws_twe_ue5.5_ci/Project/Plugins/G/AesWorld@tmp) -and (Remove-Item  -Path D:/ws_twe_ue5.5_ci/Project/Plugins/G/AesWorld@tmp -Recurse -Force)
+[Pipeline] powershell
+False
+[Pipeline] echo
+(Test-Path -Path D:/ws_twe_ue5.5_ci/Project/Plugins/G/ArtCommon@tmp) -and (Remove-Item  -Path D:/ws_twe_ue5.5_ci/Project/Plugins/G/ArtCommon@tmp -Recurse -Force)
+[Pipeline] powershell
+False
+[Pipeline] echo
+(Test-Path -Path D:/ws_twe_ue5.5_ci/Project/Plugins/G/EarthArtAsset@tmp) -and (Remove-Item  -Path D:/ws_twe_ue5.5_ci/Project/Plugins/G/EarthArtAsset@tmp -Recurse -Force)
+[Pipeline] powershell
+False
+[Pipeline] echo
+(Test-Path -Path D:/ws_twe_ue5.5_ci/Project/Plugins/G/SkyCreatorPlugin@tmp) -and (Remove-Item  -Path D:/ws_twe_ue5.5_ci/Project/Plugins/G/SkyCreatorPlugin@tmp -Recurse -Force)
+[Pipeline] powershell
+False
+[Pipeline] echo
+(Test-Path -Path D:/ws_twe_ue5.5_ci/Project/Plugins/G/WdpCamera@tmp) -and (Remove-Item  -Path D:/ws_twe_ue5.5_ci/Project/Plugins/G/WdpCamera@tmp -Recurse -Force)
+[Pipeline] powershell
+False
+[Pipeline] echo
+(Test-Path -Path D:/ws_twe_ue5.5_ci/Project/Plugins/G/WdpEnvironment@tmp) -and (Remove-Item  -Path D:/ws_twe_ue5.5_ci/Project/Plugins/G/WdpEnvironment@tmp -Recurse -Force)
+[Pipeline] powershell
+False
+[Pipeline] }
+[Pipeline] // dir
+[Pipeline] }
+[Pipeline] // script
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (Pull Project)
+[Pipeline] script
+[Pipeline] {
+[Pipeline] dir
+Running in D:/ws_twe_ue5.5_ci
+[Pipeline] {
+[Pipeline] dir
+Running in D:/ws_twe_ue5.5_ci/Project
+[Pipeline] {
+[Pipeline] checkout
+Executor number at runtime: 0
+(p4):cmd:... p4 login
+p4 login
+
+User piaotonghu logged in.
+
+(p4):stop:4
+(p4):cmd:... p4 login -s
+p4 login -s
+
+User piaotonghu ticket expires in 102787 hours 19 minutes.
+
+(p4):stop:5
+(p4):cmd:... p4 client -o aes6-ue-runtime-ci-twe_autoci
+p4 client -o aes6-ue-runtime-ci-twe_autoci
+
+(p4):stop:6
+(p4):cmd:... p4 info
+p4 info
+
+(p4):stop:7
+(p4):cmd:... p4 info
+p4 info
+
+(p4):stop:8
+(p4):cmd:... p4 client -o aes6-ue-runtime-ci-twe_autoci
+p4 client -o aes6-ue-runtime-ci-twe_autoci
+
+(p4):stop:9
+(p4):cmd:... p4 counter change
+p4 counter change
+
+(p4):stop:10
+(p4):cmd:... p4 changes -m1 -ssubmitted //aes6-ue-runtime-ci-twe_autoci/...@217296
+p4 changes -m1 -ssubmitted //aes6-ue-runtime-ci-twe_autoci/...@217296
+
+Change 217208 on 2026/04/21 by piaotonghu@piaotonghu_6T '2026-04-21 00:53:49 copy
+'
+(p4):stop:11
+P4: found 217208 revision in //aes6-ue-runtime-ci-twe_autoci/...@217296
+(p4):cmd:... p4 changes -m1 -ssubmitted //aes6-ue-runtime-ci-twe_autoci/...@216208,217208
+p4 changes -m1 -ssubmitted //aes6-ue-runtime-ci-twe_autoci/...@216208,217208
+
+Change 217208 on 2026/04/21 by piaotonghu@piaotonghu_6T '2026-04-21 00:53:49 copy
+'
+(p4):stop:12
+P4: found 217208 revision in //aes6-ue-runtime-ci-twe_autoci/...@216208,217208
+(p4):cmd:... p4 repos -C
+p4 repos -C
+
+(p4):stop:13
+P4: builds: 217208 
+Building on Node: twe_autoci
+(p4):cmd:... p4 login
+p4 login
+
+User piaotonghu logged in.
+
+(p4):stop:4
+(p4):cmd:... p4 login -s
+p4 login -s
+
+User piaotonghu ticket expires in 102787 hours 19 minutes.
+
+(p4):stop:5
+(p4):cmd:... p4 client -o aes6-ue-runtime-ci-twe_autoci
+p4 client -o aes6-ue-runtime-ci-twe_autoci
+
+(p4):stop:6
+(p4):cmd:... p4 info
+p4 info
+
+(p4):stop:7
+(p4):cmd:... p4 info
+p4 info
+
+(p4):stop:8
+(p4):cmd:... p4 client -o aes6-ue-runtime-ci-twe_autoci
+p4 client -o aes6-ue-runtime-ci-twe_autoci
+
+(p4):stop:9
+
+P4 Task: establishing connection.
+... server: 10.100.20.20:1666
+... node: DESKTOP-B3QM4IH
+(p4):cmd:... p4 login
+p4 login
+
+User piaotonghu logged in.
+
+(p4):stop:4
+(p4):cmd:... p4 login -s
+p4 login -s
+
+User piaotonghu ticket expires in 102787 hours 19 minutes.
+
+(p4):stop:5
+(p4):cmd:... p4 client -o aes6-ue-runtime-ci-twe_autoci
+p4 client -o aes6-ue-runtime-ci-twe_autoci
+
+(p4):stop:6
+(p4):cmd:... p4 info
+p4 info
+
+(p4):stop:7
+(p4):cmd:... p4 info
+p4 info
+
+(p4):stop:8
+(p4):cmd:... p4 client -o aes6-ue-runtime-ci-twe_autoci
+p4 client -o aes6-ue-runtime-ci-twe_autoci
+
+(p4):stop:9
+
+P4 Task: establishing connection.
+... server: 10.100.20.20:1666
+... node: DESKTOP-B3QM4IH
+
+P4 Task: reverting all pending and shelved revisions.
+(p4):cmd:... p4 revert D:/ws_twe_ue5.5_ci/Project/...
+D:/ws_twe_ue5.5_ci/Project/... - file(s) not opened on this client.
+
+(p4):stop:10
+... rm [abandoned files]
+duration: (5ms)
+
+P4 Task: cleaning workspace to match have list.
+(p4):cmd:... p4 reconcile -e -f -d -w D:/ws_twe_ue5.5_ci/Project/...
+P4: saving built changes.
+Found last change 217208 on syncID aes6-ue-runtime-ci-twe_autoci
+(p4):cmd:... p4 login
+p4 login
+
+User piaotonghu logged in.
+
+(p4):stop:4
+(p4):cmd:... p4 login -s
+p4 login -s
+
+User piaotonghu ticket expires in 102787 hours 18 minutes.
+
+(p4):stop:5
+(p4):cmd:... p4 client -o aes6-ue-runtime-ci-twe_autoci
+p4 client -o aes6-ue-runtime-ci-twe_autoci
+
+(p4):stop:6
+(p4):cmd:... p4 info
+p4 info
+
+(p4):stop:7
+(p4):cmd:... p4 info
+p4 info
+
+(p4):stop:8
+(p4):cmd:... p4 client -o aes6-ue-runtime-ci-twe_autoci
+p4 client -o aes6-ue-runtime-ci-twe_autoci
+
+(p4):stop:9
+(p4):cmd:... p4 login
+p4 login
+
+User piaotonghu logged in.
+
+(p4):stop:4
+(p4):cmd:... p4 login -s
+p4 login -s
+
+User piaotonghu ticket expires in 102787 hours 18 minutes.
+
+(p4):stop:5
+(p4):cmd:... p4 client -o aes6-ue-runtime-ci-twe_autoci
+p4 client -o aes6-ue-runtime-ci-twe_autoci
+
+(p4):stop:6
+(p4):cmd:... p4 info
+p4 info
+
+(p4):stop:7
+(p4):cmd:... p4 info
+p4 info
+
+(p4):stop:8
+(p4):cmd:... p4 client -o aes6-ue-runtime-ci-twe_autoci
+p4 client -o aes6-ue-runtime-ci-twe_autoci
+
+(p4):stop:9
+... done
+
+[Pipeline] }
+[Pipeline] // dir
+[Pipeline] }
+[Pipeline] // dir
+[Pipeline] }
+[Pipeline] // script
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (Build Project)
+(p4):stop:11
+duration: 0m 13s
+
+P4 Task: syncing files at change: 217208
+(p4):cmd:... p4 sync -q D:/ws_twe_ue5.5_ci/Project/...@217208
+(p4):stop:12
+duration: (9ms)
+
+[Pipeline] script
+[Pipeline] {
+[Pipeline] dir
+Running in D:/ws_twe_ue5.5_ci
+[Pipeline] {
+[Pipeline] echo
+Prepare uproject...
+[Pipeline] readFile
+[Pipeline] echo
+"Plugins": [],
+    "TargetPlatforms": [
+        "Windows",
+        "Linux"
+    ] matched, will be replace
+[Pipeline] writeFile
+[Pipeline] echo
+Build project...
+[Pipeline] echo
+                        D:\UnrealEngine/Engine/Build/BatchFiles/RunUAT.bat BuildTarget                         -project="D:/ws_twe_ue5.5_ci/Project/TWE.uproject"                         -Target=Editor                         -Platform=Win64                         -Configuration=Development                         -NoTools                                                 
+[Pipeline] powershell
+Running AutomationTool...
+Using bundled DotNet SDK version: 8.0.300
+Starting AutomationTool...
+Parsing command line: BuildTarget -project=D:/ws_twe_ue5.5_ci/Project/TWE.uproject -Target=Editor -Platform=Win64 -Configuration=Development -NoTools
+Initializing script modules...
+Total script module initialization time: 0.45 s.
+Using C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\MSBuild\Current\Bin\MSBuild.exe
+Executing commands...
+Running: D:\UnrealEngine\Engine\Binaries\ThirdParty\DotNet\8.0.300\win-x64\dotnet.exe "D:\UnrealEngine\Engine\Binaries\DotNET\UnrealBuildTool\UnrealBuildTool.dll" TWEEditor Win64 Development -Project="D:\ws_twe_ue5.5_ci\Project\TWE.uproject"  -log="D:\UnrealEngine\Engine\Programs\AutomationTool\Saved\Logs\UBT-TWEEditor-Win64-Development.txt"
+Log file: D:\UnrealEngine\Engine\Programs\AutomationTool\Saved\Logs\UBT-TWEEditor-Win64-Development.txt
+Using 'git status' to determine working set for adaptive non-unity build (D:\UnrealEngine).
+Creating makefile for TWEEditor (.uproject file is newer)
+Plugin 'AesWorld' depends on plugin 'StructUtils' which was deprecated in 5.5 and will soon be removed. Please update your dependencies.
+Parsing headers for TWEEditor
+  Running Internal UnrealHeaderTool D:\ws_twe_ue5.5_ci\Project\TWE.uproject D:\ws_twe_ue5.5_ci\Project\Intermediate\Build\Win64\TWEEditor\Development\TWEEditor.uhtmanifest -WarningsAsErrors
+Total of 1 written
+Reflection code generated for TWEEditor in 2.1642566 seconds
+Building TWEEditor...
+Using Visual Studio 2022 14.38.33144 toolchain (D:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.38.33130) and Windows 10.0.22621.0 SDK (C:\Program Files (x86)\Windows Kits\10).
+Determining max actions to execute in parallel (8 physical cores, 16 logical cores)
+  Executing up to 8 processes, one per physical core
+Using Unreal Build Accelerator local executor to run 51 action(s)
+  Storage capacity 40Gb
+---- Starting trace: 260429_154626 ----
+UbaSessionServer - Disable remote execution (remote sessions will finish current processes)
+------ Building 51 action(s) started ------
+[1/51] Compile [x64] Module.EarthPrefab.10.cpp
+D:\UnrealEngine\Engine\Plugins\Runtime\ZoneGraph\Source\ZoneGraph\Public\BezierUtilities.h(9): warning C4996: BezierUtilities.h is deprecated; file moved to Curves/BezierUtilities.h. Please update your code to the new API before upgrading to the next release, otherwise your project will no longer compile.
+[2/51] Compile [x64] Module.EarthPrefab.3.cpp
+[3/51] Compile [x64] Module.EarthPrefab.4.cpp
+[4/51] Compile [x64] Module.EarthPrefab.5.cpp
+[5/51] Compile [x64] Module.EarthPrefab.2.cpp
+[6/51] Compile [x64] Module.EarthPrefab.1.cpp
+[7/51] Compile [x64] Module.EarthPrefab.6.cpp
+[8/51] Compile [x64] AesEmbankmentGeoSourceMarkerProducer.cpp
+[9/51] Compile [x64] AesJunctionGeoSourceMarkerProducer.cpp
+[10/51] Compile [x64] Module.EarthPrefab.7.cpp
+[11/51] Compile [x64] AesBuildingGeoSourceMarkerProducer.cpp
+[12/51] Compile [x64] CGLFileReader.cpp
+[13/51] Compile [x64] EarthTextureOverlayerFragment.cpp
+[14/51] Compile [x64] AesMarkerSystemProfiler.cpp
+[15/51] Compile [x64] Module.EarthPrefab.9.cpp
+[16/51] Compile [x64] Module.EarthAssetManager.cpp
+[17/51] Link [x64] UnrealEditor-EarthAssetManager.lib
+[18/51] Compile [x64] AesRoadGeoSourceMarkerProducer.cpp
+[19/51] Link [x64] UnrealEditor-EarthAssetManager.dll
+   Creating object D:\ws_twe_ue5.5_ci\Project\Plugins\G\AesWorld\Binaries\Win64\UnrealEditor-EarthAssetManager.exp
+[20/51] Compile [x64] GeoDataToLocalData.cpp
+[21/51] Compile [x64] Module.EarthPrefab.8.cpp
+[22/51] Compile [x64] Module.EarthPrefabEditor.cpp
+[23/51] Link [x64] UnrealEditor-EarthPrefab.lib
+[24/51] Link [x64] UnrealEditor-AesMarkerSystem.lib
+[25/51] Link [x64] UnrealEditor-EarthPrefabEditor.lib
+[26/51] Link [x64] UnrealEditor-EarthPrefab.dll
+   Creating object D:\ws_twe_ue5.5_ci\Project\Plugins\G\AesWorld\Binaries\Win64\UnrealEditor-EarthPrefab.exp
+[27/51] Link [x64] UnrealEditor-EarthPrefabEditor.dll
+   Creating object D:\ws_twe_ue5.5_ci\Project\Plugins\G\AesWorld\Binaries\Win64\UnrealEditor-EarthPrefabEditor.exp
+[28/51] Link [x64] UnrealEditor-AesMarkerSystem.dll
+   Creating object D:\ws_twe_ue5.5_ci\Project\Plugins\G\AesWorld\Binaries\Win64\UnrealEditor-AesMarkerSystem.exp
+[29/51] Compile [x64] Module.AesWorldBuilderEditor.cpp
+[30/51] Link [x64] UnrealEditor-AesWorldBuilderEditor.lib
+[31/51] Compile [x64] Module.EarthModeler.1.cpp
+[32/51] WriteMetadata UnrealEditor.version (TWEEditor) (UBA disabled)
+[33/51] Compile [x64] Module.AesEditingMode.cpp
+[34/51] Link [x64] UnrealEditor-AesEditingMode.lib
+[35/51] Link [x64] UnrealEditor-AesEditingMode.dll
+   Creating object D:\ws_twe_ue5.5_ci\Project\Plugins\G\AesWorld\Binaries\Win64\UnrealEditor-AesEditingMode.exp
+[36/51] Compile [x64] Module.AesEditorMode.5.cpp
+[37/51] Link [x64] UnrealEditor-AesEditorMode.lib
+[38/51] Compile [x64] Module.AesEditorUI.cpp
+[39/51] Link [x64] UnrealEditor-AesEditorUI.lib
+[40/51] Compile [x64] Module.AesEarth.2.cpp
+[41/51] Compile [x64] Module.AesEarth.4.cpp
+[42/51] Compile [x64] Module.EarthModeler.2.cpp
+D:\ws_twe_ue5.5_ci\Project\Plugins\G\AesWorld\Source\EarthModeler\Private\Utils\EarthModelerSelectionUtil.cpp(8): warning C4996: 'FSelectedOjectsChangeList': Use FSelectedObjectsChangeList instead Please update your code to the new API before upgrading to the next release, otherwise your project will no longer compile.
+D:\ws_twe_ue5.5_ci\Project\Plugins\G\AesWorld\Source\EarthModeler\Private\Utils\EarthModelerSelectionUtil.cpp(17): warning C4996: 'FSelectedOjectsChangeList': Use FSelectedObjectsChangeList instead Please update your code to the new API before upgrading to the next release, otherwise your project will no longer compile.
+D:\ws_twe_ue5.5_ci\Project\Plugins\G\AesWorld\Source\EarthModeler\Private\Utils\EarthModelerSelectionUtil.cpp(28): warning C4996: 'FSelectedOjectsChangeList': Use FSelectedObjectsChangeList instead Please update your code to the new API before upgrading to the next release, otherwise your project will no longer compile.
+[43/51] Link [x64] UnrealEditor-EarthModeler.lib
+[44/51] Compile [x64] Module.AesEarth.3.cpp
+[45/51] Link [x64] UnrealEditor-AesEarth.lib
+[46/51] Link [x64] UnrealEditor-AesWorldBuilderEditor.dll
+   Creating object D:\ws_twe_ue5.5_ci\Project\Plugins\G\AesWorld\Binaries\Win64\UnrealEditor-AesWorldBuilderEditor.exp
+[47/51] Link [x64] UnrealEditor-AesEarth.dll
+   Creating object D:\ws_twe_ue5.5_ci\Project\Plugins\G\AesWorld\Binaries\Win64\UnrealEditor-AesEarth.exp
+[48/51] Link [x64] UnrealEditor-AesEditorUI.dll
+   Creating object D:\ws_twe_ue5.5_ci\Project\Plugins\G\AesWorld\Binaries\Win64\UnrealEditor-AesEditorUI.exp
+[49/51] Link [x64] UnrealEditor-EarthModeler.dll
+   Creating object D:\ws_twe_ue5.5_ci\Project\Plugins\G\AesWorld\Binaries\Win64\UnrealEditor-EarthModeler.exp
+[50/51] Link [x64] UnrealEditor-AesEditorMode.dll
+   Creating object D:\ws_twe_ue5.5_ci\Project\Plugins\G\AesWorld\Binaries\Win64\UnrealEditor-AesEditorMode.exp
+[51/51] WriteMetadata TWEEditor.target (UBA disabled)
+Trace file written to D:/UnrealEngine/Engine/Programs/AutomationTool/Saved/Logs/UBT-TWEEditor-Win64-Development.uba with size 17.2kb
+Total time in Unreal Build Accelerator local executor: 72.53 seconds
+Total execution time: 80.91 seconds
+Took 81.04s to run dotnet.exe, ExitCode=0
+BUILD SUCCESSFUL
+AutomationTool executed for 0h 1m 22s
+AutomationTool exiting with ExitCode=0 (Success)
+[Pipeline] }
+[Pipeline] // dir
+[Pipeline] }
+[Pipeline] // script
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (Package Project)
+[Pipeline] script
+[Pipeline] {
+[Pipeline] dir
+Running in D:/ws_twe_ue5.5_ci
+[Pipeline] {
+[Pipeline] echo
+                        $env:LINUX_MULTIARCH_ROOT = ""
+                        Write-Host $env:LINUX_MULTIARCH_ROOT
+                        D:\UnrealEngine/Engine/Build/BatchFiles/RunUAT.bat BuildCookRun                         -project="D:/ws_twe_ue5.5_ci/Project/TWE.uproject"                         -archivedirectory=D:/ws_twe_ue5.5_ci/Package/Windows/ci-1.0.1023/Data/TWERuntime                         -targetplatform=Win64                          -clientconfig=Development -nocompileeditor -nop4  -pak -cook -stage -archive -package -compressed -prereqs -build -utf8output                                                 
+[Pipeline] powershell
+
+Running AutomationTool...
+Using bundled DotNet SDK version: 8.0.300
+Starting AutomationTool...
+Parsing command line: BuildCookRun -project=D:/ws_twe_ue5.5_ci/Project/TWE.uproject -archivedirectory=D:/ws_twe_ue5.5_ci/Package/Windows/ci-1.0.1023/Data/TWERuntime -targetplatform=Win64 -clientconfig=Development -nocompileeditor -nop4 -pak -cook -stage -archive -package -compressed -prereqs -build -utf8output
+Initializing script modules...
+Total script module initialization time: 0.27 s.
+Using C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\MSBuild\Current\Bin\MSBuild.exe
+Executing commands...
+Setting up ProjectParams for D:\ws_twe_ue5.5_ci\Project\TWE.uproject
+********** BUILD COMMAND STARTED **********
+Running: D:\UnrealEngine\Engine\Binaries\ThirdParty\DotNet\8.0.300\win-x64\dotnet.exe "D:\UnrealEngine\Engine\Binaries\DotNET\UnrealBuildTool\UnrealBuildTool.dll" -Target="UnrealPak Win64 Development -Project=D:\ws_twe_ue5.5_ci\Project\TWE.uproject -Manifest=D:\UnrealEngine\Engine\Intermediate\Build\Manifest-1-UnrealPak-Win64-Development.xml" -Target="TWE Win64 Development -Project=D:\ws_twe_ue5.5_ci\Project\TWE.uproject -Manifest=D:\UnrealEngine\Engine\Intermediate\Build\Manifest-2-TWE-Win64-Development.xml  -remoteini=\"D:\ws_twe_ue5.5_ci\Project\"  -skipdeploy " -log="D:\UnrealEngine\Engine\Programs\AutomationTool\Saved\Logs\UBT-.txt"
+Log file: D:\UnrealEngine\Engine\Programs\AutomationTool\Saved\Logs\UBT-.txt
+Using 'git status' to determine working set for adaptive non-unity build (D:\UnrealEngine).
+Creating makefile for UnrealPak (.uproject file is newer)
+Writing manifest to D:\UnrealEngine\Engine\Intermediate\Build\Manifest-1-UnrealPak-Win64-Development.xml
+Creating makefile for TWE (.uproject file is newer)
+Plugin 'AesWorld' depends on plugin 'StructUtils' which was deprecated in 5.5 and will soon be removed. Please update your dependencies.
+Parsing headers for TWE
+  Running Internal UnrealHeaderTool D:\ws_twe_ue5.5_ci\Project\TWE.uproject D:\ws_twe_ue5.5_ci\Project\Intermediate\Build\Win64\TWE\Development\TWE.uhtmanifest -WarningsAsErrors
+Total of 1 written
+Reflection code generated for TWE in 1.697496 seconds
+Writing manifest to D:\UnrealEngine\Engine\Intermediate\Build\Manifest-2-TWE-Win64-Development.xml
+Building UnrealPak and TWE...
+UnrealPak: Using Visual Studio 2022 14.38.33144 toolchain (D:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.38.33130) and Windows 10.0.22621.0 SDK (C:\Program Files (x86)\Windows Kits\10).
+TWE: Using Visual Studio 2022 14.38.33144 toolchain (D:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.38.33130) and Windows 10.0.22621.0 SDK (C:\Program Files (x86)\Windows Kits\10).
+Determining max actions to execute in parallel (8 physical cores, 16 logical cores)
+  Executing up to 8 processes, one per physical core
+Using Unreal Build Accelerator local executor to run 27 action(s)
+  Storage capacity 40Gb
+---- Starting trace: 260429_154746 ----
+UbaSessionServer - Disable remote execution (remote sessions will finish current processes)
+------ Building 27 action(s) started ------
+** For TWE-Win64-Development **
+[1/27] Compile [x64] AesEmbankmentGeoSourceMarkerProducer.cpp
+[2/27] Compile [x64] Module.AesEarth.3.cpp
+D:\ws_twe_ue5.5_ci\Project\Plugins\G\AesWorld\Source\AesEarth\Private\AesEarth.cpp(863): error C2039: 'Reset': is not a member of 'UEarthRegionalPrefabAssetLibrary'
+D:\ws_twe_ue5.5_ci\Project\Plugins\G\AesWorld\Source\EarthPrefab\Public\PrefabAsset\EarthPrefabAssetLibrary.h(145): note: see declaration of 'UEarthRegionalPrefabAssetLibrary'
+D:\ws_twe_ue5.5_ci\Project\Plugins\G\AesWorld\Source\AesEarth\Private\AesEarth.cpp(867): error C2039: 'Reset': is not a member of 'UEarthRegionalPrefabAssetLibrary'
+D:\ws_twe_ue5.5_ci\Project\Plugins\G\AesWorld\Source\EarthPrefab\Public\PrefabAsset\EarthPrefabAssetLibrary.h(145): note: see declaration of 'UEarthRegionalPrefabAssetLibrary'
+D:\ws_twe_ue5.5_ci\Project\Plugins\G\AesWorld\Source\AesEarth\Private\AesEarth.cpp(871): error C2039: 'Reset': is not a member of 'UEarthRegionalPrefabAssetLibrary'
+D:\ws_twe_ue5.5_ci\Project\Plugins\G\AesWorld\Source\EarthPrefab\Public\PrefabAsset\EarthPrefabAssetLibrary.h(145): note: see declaration of 'UEarthRegionalPrefabAssetLibrary'
+[3/27] Compile [x64] AesBuildingGeoSourceMarkerProducer.cpp
+[4/27] Compile [x64] AesJunctionGeoSourceMarkerProducer.cpp
+[5/27] Compile [x64] Module.AesEditingMode.cpp
+[6/27] Compile [x64] Module.AesEditorUI.cpp
+[7/27] Compile [x64] Module.AesEditorMode.5.cpp
+[8/27] Compile [x64] Module.EarthAssetManager.cpp
+[9/27] Compile [x64] CGLFileReader.cpp
+[10/27] Compile [x64] EarthTextureOverlayerFragment.cpp
+[11/27] Compile [x64] AesMarkerSystemProfiler.cpp
+[12/27] Compile [x64] AesRoadGeoSourceMarkerProducer.cpp
+[13/27] Compile [x64] Module.EarthPrefab.10.cpp
+D:\UnrealEngine\Engine\Plugins\Runtime\ZoneGraph\Source\ZoneGraph\Public\BezierUtilities.h(9): warning C4996: BezierUtilities.h is deprecated; file moved to Curves/BezierUtilities.h. Please update your code to the new API before upgrading to the next release, otherwise your project will no longer compile.
+[14/27] Compile [x64] Module.EarthPrefab.3.cpp
+[15/27] Compile [x64] Module.AesEarth.2.cpp
+[16/27] Compile [x64] Module.EarthPrefab.2.cpp
+[17/27] Compile [x64] GeoDataToLocalData.cpp
+[18/27] Compile [x64] Module.EarthPrefab.4.cpp
+[19/27] Compile [x64] Module.EarthPrefab.1.cpp
+[20/27] Compile [x64] Module.EarthPrefab.5.cpp
+[21/27] Compile [x64] Module.AesEarth.4.cpp
+[22/27] Compile [x64] Module.EarthPrefab.6.cpp
+[23/27] Compile [x64] Module.EarthPrefab.7.cpp
+[24/27] Compile [x64] Module.EarthPrefab.9.cpp
+[25/27] Compile [x64] Module.EarthPrefab.8.cpp
+Trace file written to D:/UnrealEngine/Engine/Programs/AutomationTool/Saved/Logs/UBT-.uba with size 10.8kb
+Total time in Unreal Build Accelerator local executor: 45.11 seconds
+Total execution time: 49.95 seconds
+Took 50.06s to run dotnet.exe, ExitCode=6
+UnrealBuildTool failed. See log for more details. (D:\UnrealEngine\Engine\Programs\AutomationTool\Saved\Logs\UBT-.txt)
+AutomationTool executed for 0h 0m 51s
+AutomationTool exiting with ExitCode=6 (6)
+BUILD FAILED
+[Pipeline] error
+[Pipeline] }
+[Pipeline] // dir
+[Pipeline] }
+[Pipeline] // script
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (Auto Test)
+Stage "Auto Test" skipped due to earlier failure(s)
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (Archive)
+Stage "Archive" skipped due to earlier failure(s)
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (Declarative: Post Actions)
+[Pipeline] script
+[Pipeline] {
+[Pipeline] echo
+post failure
+[Pipeline] echo
+{   "msgtype": "markdown",   "markdown": {       "content": "aes6-ue-runtime-ci#4016 Complete\n>StartByUser: <font color='warning'>null</font>\n>Platform: Windows\n>Result: <font color='warning'>Package Error</font>\n>Console: [ConsoleOutput](http://10.66.12.40/job/wdp-ue/job/Earth/job/aes6-ue-runtime-ci/4016/console)\n>Package: <font color='comment'>'\\\\\\\\10.66.12.53\\\\eci\\\\UE5\\\\TWEBuild\\\\twe-ue5.5-ci\\\\ci-1.0.1023-2604291544-4016\\\\ci-1.0.1023'</font>\n>Plugins: AesArtAsset: <font color='comment'>d63c006 灏哹ool鍊兼敼鎴恠calar  0=false 1=true</font>\nArtCommon: <font color='comment'>a15b4bf UTF-8</font>\nEarthArtAsset: <font color='comment'>c730f3d 鍩庡競妞嶈姣嶆潗璐ㄥ姞鍏ヨ窛绂诲墧闄ゆ潗璐ㄥ嚱鏁?/font>\nWdpCamera: <font color='comment'>8932bd1 Merge branch 'feature camera_refactor_wxy' into dev</font>\nAesWorld: <font color='comment'>316d0a1 淇敼PrefabAssetLibrary鍜孯egionalPrefabAssetLibrary闇€瑕侀噸鏂癈acheData</font>\nAesRuntime: <font color='comment'>fafed1e 绂佹灏哃evel鍐欏叆鎼厤CustomDepthStencilValue涓?/font>\n>RunTime: <font color='comment'>0sec</font>\n>Log: [Log](//10.66.12.53/eci/UE5/TWEBuild/twe-ue5.5-ci/ci-1.0.1023-2604291544-4016/ci-1.0.1023/Data/TWERuntime/TWE/Saved/Logs/TWE.log)\n>Crash: <font color='comment'>None</font>        "}}    
+[Pipeline] httpRequest
+HttpMethod: POST
+URL: https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=f999aae1-5519-4863-a083-425d6ff95bd2
+Content-Type: application/json; charset=UTF-8
+Sending request to url: https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=f999aae1-5519-4863-a083-425d6ff95bd2
+Response Code: HTTP/1.1 200 OK
+Success: Status code 200 is in the accepted range: 100:399
+[Pipeline] }
+[Pipeline] // script
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] }
+[Pipeline] // node
+[Pipeline] End of Pipeline
+ERROR: Package project failed.
+Finished: FAILURE

@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>scan-pairs.ps1 深度评估报告</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #1e1e2e;
+      --surface:   #27273a;
+      --surface2:  #313145;
+      --border:    #44445a;
+      --text:      #cdd6f4;
+      --text-dim:  #7f849c;
+      --accent:    #89b4fa;
+      --green:     #a6e3a1;
+      --yellow:    #f9e2af;
+      --red:       #f38ba8;
+      --orange:    #fab387;
+      --purple:    #cba6f7;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      font-size: 15px;
+      line-height: 1.7;
+    }
+
+    /* ── NAV ── */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(30,30,46,.92);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      min-height: 48px;
+    }
+    nav a {
+      color: var(--text-dim);
+      text-decoration: none;
+      font-size: 13px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      transition: background .15s, color .15s;
+      white-space: nowrap;
+    }
+    nav a:hover { background: var(--surface2); color: var(--text); }
+    nav .brand {
+      color: var(--accent);
+      font-weight: 700;
+      font-size: 14px;
+      margin-right: 8px;
+    }
+    nav .sep { color: var(--border); user-select: none; }
+
+    /* ── LAYOUT ── */
+    .wrapper {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 40px 24px 80px;
+    }
+
+    /* ── HEADER ── */
+    header {
+      margin-bottom: 40px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid var(--border);
+    }
+    header h1 {
+      font-size: 26px;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 8px;
+    }
+    header .meta {
+      color: var(--text-dim);
+      font-size: 13px;
+      display: flex;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+    header .meta span { display: flex; align-items: center; gap: 6px; }
+
+    /* ── SECTIONS ── */
+    section { margin-bottom: 48px; }
+    section:target { scroll-margin-top: 60px; }
+
+    h2 {
+      font-size: 19px;
+      font-weight: 700;
+      color: var(--purple);
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    h2 .num {
+      background: var(--purple);
+      color: var(--bg);
+      font-size: 12px;
+      font-weight: 800;
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+
+    h3 {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--yellow);
+      margin: 20px 0 10px;
+    }
+
+    p { margin-bottom: 10px; }
+
+    /* ── STAT CARDS ── */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      text-align: center;
+    }
+    .stat-card .val {
+      font-size: 28px;
+      font-weight: 800;
+      color: var(--accent);
+      display: block;
+    }
+    .stat-card .lbl {
+      font-size: 12px;
+      color: var(--text-dim);
+      margin-top: 4px;
+      display: block;
+    }
+
+    /* ── INFO BOX ── */
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .info-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+    }
+    .info-item .key {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--text-dim);
+      margin-bottom: 4px;
+    }
+    .info-item .val { color: var(--text); }
+    code {
+      font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-size: 13px;
+      color: var(--green);
+    }
+
+    /* ── PHASE BOXES ── */
+    .phase-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+    @media (max-width: 640px) { .phase-grid { grid-template-columns: 1fr; } }
+    .phase-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px;
+    }
+    .phase-box .phase-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .phase-box .phase-title .badge {
+      background: var(--accent);
+      color: var(--bg);
+      font-size: 11px;
+      padding: 1px 8px;
+      border-radius: 20px;
+    }
+    .phase-box ul { list-style: none; padding: 0; }
+    .phase-box ul li {
+      padding: 5px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 13.5px;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+    .phase-box ul li:last-child { border-bottom: none; }
+    .phase-box ul li::before { content: '▸'; color: var(--accent); flex-shrink: 0; margin-top: 2px; }
+
+    /* ── BUG CARDS ── */
+    .bug-card {
+      border-radius: 10px;
+      padding: 20px 22px;
+      margin-bottom: 18px;
+      position: relative;
+    }
+    .bug-card.sev-critical {
+      background: rgba(243,139,168,.07);
+      border: 2px solid var(--red);
+    }
+    .bug-card.sev-medium {
+      background: rgba(250,179,135,.07);
+      border: 2px solid var(--orange);
+    }
+    .bug-card.sev-low {
+      background: rgba(137,180,250,.07);
+      border: 2px solid var(--accent);
+    }
+    .bug-card .sev-badge {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 20px;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+    .sev-critical .sev-badge { background: var(--red); color: var(--bg); }
+    .sev-medium   .sev-badge { background: var(--orange); color: var(--bg); }
+    .sev-low      .sev-badge { background: var(--accent); color: var(--bg); }
+    .bug-card h3 { margin-top: 0; color: inherit; }
+    .sev-critical h3 { color: var(--red); }
+    .sev-medium   h3 { color: var(--orange); }
+    .sev-low      h3 { color: var(--accent); }
+    .bug-meta {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 6px 14px;
+      margin: 12px 0;
+      font-size: 13.5px;
+    }
+    .bug-meta dt { color: var(--text-dim); white-space: nowrap; }
+    .bug-meta dd { color: var(--text); }
+
+    /* ── TABLE ── */
+    .table-wrap { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border); margin: 16px 0; }
+    table { border-collapse: collapse; width: 100%; min-width: 480px; }
+    thead tr { background: var(--surface2); }
+    thead th {
+      padding: 10px 14px;
+      text-align: left;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      color: var(--text-dim);
+      white-space: nowrap;
+    }
+    tbody tr:nth-child(even) { background: var(--surface); }
+    tbody tr:nth-child(odd)  { background: var(--bg); }
+    tbody tr:hover { background: var(--surface2); }
+    tbody td { padding: 10px 14px; font-size: 13.5px; border-top: 1px solid var(--border); }
+
+    .tag {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 20px;
+      white-space: nowrap;
+    }
+    .tag-p0  { background: rgba(243,139,168,.2); color: var(--red); border: 1px solid var(--red); }
+    .tag-p1  { background: rgba(249,226,175,.2); color: var(--yellow); border: 1px solid var(--yellow); }
+    .tag-p2  { background: rgba(137,180,250,.2); color: var(--accent); border: 1px solid var(--accent); }
+
+    /* ── ACTION CARDS ── */
+    .action-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px;
+    }
+    .action-card {
+      background: linear-gradient(135deg, rgba(166,227,161,.12), rgba(166,227,161,.04));
+      border: 1px solid rgba(166,227,161,.35);
+      border-radius: 10px;
+      padding: 16px 18px;
+    }
+    .action-card .ac-pri {
+      font-size: 11px;
+      font-weight: 800;
+      color: var(--green);
+      letter-spacing: .1em;
+      margin-bottom: 6px;
+    }
+    .action-card h4 {
+      font-size: 14px;
+      color: var(--text);
+      margin-bottom: 8px;
+    }
+    .action-card .ac-meta {
+      font-size: 12px;
+      color: var(--text-dim);
+      display: flex;
+      gap: 12px;
+    }
+
+    /* ── COMPARISON TABLE ── */
+    .cmp-better { color: var(--green); font-weight: 600; }
+    .cmp-worse  { color: var(--red); }
+    .cmp-neutral{ color: var(--text-dim); }
+
+    /* ── FOOTER ── */
+    footer {
+      margin-top: 60px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+      color: var(--text-dim);
+      font-size: 12px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <span class="brand">&#128202; 评估报告</span>
+  <span class="sep">|</span>
+  <a href="#overview">概述</a>
+  <a href="#architecture">架构分析</a>
+  <a href="#bugs">发现问题</a>
+  <a href="#migration">迁移评估</a>
+  <a href="#actions">行动计划</a>
+  <a href="#pending">Pending 现状</a>
+</nav>
+
+<div class="wrapper">
+
+  <header>
+    <h1>Jenkins Log Auto-Learning<br>scan-pairs.ps1 深度评估报告</h1>
+    <div class="meta">
+      <span>&#128197; 2026-05-28</span>
+      <span>&#128196; <code>scripts/scan-pairs.ps1</code></span>
+      <span>&#128295; 版本 v1.0 (PS1)</span>
+    </div>
+  </header>
+
+  <!-- ===== 1. 概述 ===== -->
+  <section id="overview">
+    <h2><span class="num">1</span> 概述</h2>
+
+    <div class="stats">
+      <div class="stat-card">
+        <span class="val">2430</span>
+        <span class="lbl">已扫描构建</span>
+      </div>
+      <div class="stat-card">
+        <span class="val">84</span>
+        <span class="lbl">FAILURE→SUCCESS 对</span>
+      </div>
+      <div class="stat-card">
+        <span class="val">377</span>
+        <span class="lbl">失败构建</span>
+      </div>
+      <div class="stat-card">
+        <span class="val">7</span>
+        <span class="lbl">启用 CI 任务</span>
+      </div>
+      <div class="stat-card">
+        <span class="val">170</span>
+        <span class="lbl">脚本行数</span>
+      </div>
+      <div class="stat-card">
+        <span class="val">4</span>
+        <span class="lbl">辅助 .psm1 模块</span>
+      </div>
+    </div>
+
+    <div class="info-grid">
+      <div class="info-item">
+        <div class="key">技能用途</div>
+        <div class="val">批量扫描 Jenkins CI 任务的 FAILURE→SUCCESS 构建对，提取错误模式，生成知识文件</div>
+      </div>
+      <div class="info-item">
+        <div class="key">核心脚本</div>
+        <div class="val"><code>scripts/scan-pairs.ps1</code>（约 170 行）</div>
+      </div>
+      <div class="info-item">
+        <div class="key">辅助模块</div>
+        <div class="val">ErrorClassification · ErrorFingerprint · FixAnalysis · PreciseFix</div>
+      </div>
+      <div class="info-item">
+        <div class="key">配置文件</div>
+        <div class="val"><code>config.json</code>（7 个启用任务，含 aes6-ue-runtime-ci 主力 job）</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 2. 架构分析 ===== -->
+  <section id="architecture">
+    <h2><span class="num">2</span> scan-pairs.ps1 架构分析</h2>
+
+    <h3>双阶段设计</h3>
+    <div class="phase-grid">
+      <div class="phase-box">
+        <div class="phase-title">
+          <span class="badge">Phase 1</span>
+          快速分类（行 60–94）
+        </div>
+        <ul>
+          <li>遍历所有构建，逐一快速分类</li>
+          <li>SUCCESS → 直接写 track（<code>success:w=?</code>）</li>
+          <li>ABORTED / NOT_BUILT / BUILDING → 直接写 track（<code>skip:xxx</code>）</li>
+          <li>FAILURE → 仅计数，留给 Phase 2 配对</li>
+        </ul>
+      </div>
+      <div class="phase-box">
+        <div class="phase-title">
+          <span class="badge">Phase 2</span>
+          滑动窗口配对（行 97–152）
+        </div>
+        <ul>
+          <li>过滤出 FAILURE + SUCCESS 的有意义序列</li>
+          <li>连续 FAILURE 收集为 <code>failGroup</code></li>
+          <li>failGroup 后紧跟 SUCCESS → 记录 pair（<code>hasFix=true</code>）</li>
+          <li>failGroup 后无 SUCCESS → 标记 <code>failure:no-fix-found</code></li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>复杂度评估</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>维度</th>
+            <th>情况</th>
+            <th>备注</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>总行数</td>
+            <td>~170 行</td>
+            <td>整体可控</td>
+          </tr>
+          <tr>
+            <td>Phase 2 逻辑</td>
+            <td>双层 while 嵌套</td>
+            <td>O(n) 单次遍历，逻辑清晰</td>
+          </tr>
+          <tr>
+            <td>性能热点</td>
+            <td><code>PSObject.Properties.Name</code> 的 <code>-contains</code></td>
+            <td>O(n) per check → 大 track 文件下 O(n²)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ===== 3. 发现问题 ===== -->
+  <section id="bugs">
+    <h2><span class="num">3</span> 发现的问题</h2>
+
+    <!-- Bug 1 -->
+    <div class="bug-card sev-critical">
+      <span class="sev-badge">严重</span>
+      <h3>&#128308; Bug 1：Track Key 路径前缀不一致</h3>
+      <dl class="bug-meta">
+        <dt>问题描述</dt>
+        <dd><code>analyzed-builds.json</code> 中的 key 存在路径前缀不一致，同一构建可能被记录为两个不同的 key</dd>
+        <dt>示例（无前缀）</dt>
+        <dd><code>"wdp-ue/job/Earth/job/twe-ue5.5#890"</code></dd>
+        <dt>示例（有前缀）</dt>
+        <dd><code>"job/wdp-ue/job/Earth/job/twe-ue5.5#890"</code></dd>
+        <dt>影响</dt>
+        <dd>去重失效，同一个构建可能被重复处理，导致分析结果不准确</dd>
+        <dt>根因</dt>
+        <dd><code>config.json</code> 中的 <code>job.path</code> 以 <code>job/</code> 开头，但 scan-pairs.ps1 在某些代码路径中可能裁剪了前缀</dd>
+        <dt>修复建议</dt>
+        <dd>统一使用 <code>config.json</code> 中的 <code>job.path</code> 原值作为 key 前缀，确保所有代码路径一致</dd>
+      </dl>
+    </div>
+
+    <!-- Bug 2 -->
+    <div class="bug-card sev-medium">
+      <span class="sev-badge">中等</span>
+      <h3>&#128992; Bug 2：历史遗留 PSObject 序列化条目</h3>
+      <dl class="bug-meta">
+        <dt>问题描述</dt>
+        <dd><code>analyzed-builds.json</code> 中存在旧格式条目，无法被正确解析</dd>
+        <dt>示例</dt>
+        <dd><code>"@{errorPhase=Cook; fixResult=SUCCESS; ...}"</code></dd>
+        <dt>影响</dt>
+        <dd>这些条目等同于垃圾数据，破坏数据一致性，可能导致后续分析逻辑出错</dd>
+        <dt>根因</dt>
+        <dd>早期代码将 PowerShell 对象直接序列化为字符串，而非手动构造格式化字符串</dd>
+        <dt>修复建议</dt>
+        <dd>编写一次性清理脚本，将旧格式转换为标准 <code>"failure:score=N:ErrorCode:fix=#N"</code> 格式</dd>
+      </dl>
+    </div>
+
+    <!-- 性能 -->
+    <div class="bug-card sev-low">
+      <span class="sev-badge">低优先级</span>
+      <h3>&#128309; 性能问题：O(n²) 的 track 查找</h3>
+      <dl class="bug-meta">
+        <dt>问题描述</dt>
+        <dd><code>-contains</code> 在 <code>PSObject.Properties.Name</code> 上是线性查找，复杂度 O(n)</dd>
+        <dt>当前影响</dt>
+        <dd>track 文件约 60+ 条目时可忽略，但增长到数千条时会明显变慢</dd>
+        <dt>修复建议</dt>
+        <dd>PowerShell 中改用 Hashtable（将 <code>$track.PSObject.Properties.Name</code> 转为 HashSet），或迁移 JS 时自然解决</dd>
+      </dl>
+    </div>
+  </section>
+
+  <!-- ===== 4. 迁移评估 ===== -->
+  <section id="migration">
+    <h2><span class="num">4</span> PS1 vs JS 迁移评估</h2>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>维度</th>
+            <th>PS1（当前）</th>
+            <th>JS (Node.js)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>JSON 处理</td>
+            <td class="cmp-worse">痛点：PSObject 陷阱，序列化踩坑</td>
+            <td class="cmp-better">原生，零摩擦</td>
+          </tr>
+          <tr>
+            <td>性能（大 track）</td>
+            <td class="cmp-worse">O(n²) 的 -contains</td>
+            <td class="cmp-better">O(1) 的 Map/Set</td>
+          </tr>
+          <tr>
+            <td>测试能力</td>
+            <td class="cmp-worse">困难（Pester 较重）</td>
+            <td class="cmp-better">简单（vitest/jest）</td>
+          </tr>
+          <tr>
+            <td>git/curl 调用</td>
+            <td class="cmp-better">原生顺畅</td>
+            <td class="cmp-neutral">child_process 略啰嗦但完全可行</td>
+          </tr>
+          <tr>
+            <td>迁移成本</td>
+            <td class="cmp-better">0</td>
+            <td class="cmp-worse">中等（约 2–3 天）</td>
+          </tr>
+          <tr>
+            <td>当前可用性</td>
+            <td class="cmp-better">已在运行，84 对已扫描</td>
+            <td class="cmp-worse">需完全重写</td>
+          </tr>
+          <tr>
+            <td>错误处理</td>
+            <td class="cmp-worse">模式不够优雅</td>
+            <td class="cmp-better">try/catch/async 更自然</td>
+          </tr>
+          <tr>
+            <td>可维护性</td>
+            <td class="cmp-neutral">4 个 .psm1 模块，理解成本中等</td>
+            <td class="cmp-better">模块化更自然（import/export）</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>迁移建议</h3>
+    <div class="info-grid">
+      <div class="info-item">
+        <div class="key">&#9989; 短期</div>
+        <div class="val">继续使用 PS1，修复上述两个 bug</div>
+      </div>
+      <div class="info-item">
+        <div class="key">&#128336; 中期</div>
+        <div class="val">如需增加更多逻辑（增量 fetch、changeset 深度解析、评分自动化），考虑迁移到 JS</div>
+      </div>
+      <div class="info-item">
+        <div class="key">&#10060; 不建议立即迁移</div>
+        <div class="val">当前脚本可用，84 对已扫描，迁移会中断工作流</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 5. 行动计划 ===== -->
+  <section id="actions">
+    <h2><span class="num">5</span> 推荐行动计划</h2>
+
+    <div class="action-grid">
+      <div class="action-card">
+        <div class="ac-pri">P0 — 立即</div>
+        <h4>修复 Track Key 路径前缀不一致</h4>
+        <div class="ac-meta">
+          <span>&#9201; 30 分钟</span>
+          <span>&#127919; 消除重复分析</span>
+        </div>
+      </div>
+      <div class="action-card">
+        <div class="ac-pri">P0 — 立即</div>
+        <h4>清理 analyzed-builds.json 旧格式条目</h4>
+        <div class="ac-meta">
+          <span>&#9201; 30 分钟</span>
+          <span>&#127919; 数据一致性</span>
+        </div>
+      </div>
+      <div class="action-card">
+        <div class="ac-pri">P1 — 本周</div>
+        <h4>Phase 1 的 -contains 改用 HashSet</h4>
+        <div class="ac-meta">
+          <span>&#9201; 15 分钟</span>
+          <span>&#127919; 性能（预防性）</span>
+        </div>
+      </div>
+      <div class="action-card">
+        <div class="ac-pri">P2 — 评估</div>
+        <h4>评估 JS 迁移完整方案</h4>
+        <div class="ac-meta">
+          <span>&#9201; 2 小时</span>
+          <span>&#127919; 长期可维护性</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="table-wrap" style="margin-top:24px">
+      <table>
+        <thead>
+          <tr>
+            <th>优先级</th>
+            <th>行动</th>
+            <th>预计耗时</th>
+            <th>影响</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="tag tag-p0">P0</span></td>
+            <td>修复 track key 路径前缀不一致</td>
+            <td>30 分钟</td>
+            <td>消除重复分析</td>
+          </tr>
+          <tr>
+            <td><span class="tag tag-p0">P0</span></td>
+            <td>清理 analyzed-builds.json 旧格式条目</td>
+            <td>30 分钟</td>
+            <td>数据一致性</td>
+          </tr>
+          <tr>
+            <td><span class="tag tag-p1">P1</span></td>
+            <td>Phase 1 的 -contains 改用 HashSet</td>
+            <td>15 分钟</td>
+            <td>性能（预防性）</td>
+          </tr>
+          <tr>
+            <td><span class="tag tag-p2">P2</span></td>
+            <td>评估 JS 迁移完整方案</td>
+            <td>2 小时</td>
+            <td>长期可维护性</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ===== 6. Pending 现状 ===== -->
+  <section id="pending">
+    <h2><span class="num">6</span> pending-pairs.json 现状</h2>
+
+    <div class="stats">
+      <div class="stat-card">
+        <span class="val">84</span>
+        <span class="lbl">总构建对数</span>
+      </div>
+      <div class="stat-card">
+        <span class="val">377</span>
+        <span class="lbl">总失败构建</span>
+      </div>
+      <div class="stat-card">
+        <span class="val">2430</span>
+        <span class="lbl">总构建扫描</span>
+      </div>
+    </div>
+
+    <div class="info-grid">
+      <div class="info-item">
+        <div class="key">生成时间</div>
+        <div class="val">2026-05-23T12:40:10</div>
+      </div>
+      <div class="info-item">
+        <div class="key">主力 job</div>
+        <div class="val"><code>aes6-ue-runtime-ci</code>（构建号约 3546~4018）</div>
+      </div>
+      <div class="info-item">
+        <div class="key">数据状态</div>
+        <div class="val">84 对 FAILURE→SUCCESS 待 Phase 2 分析处理</div>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<footer>
+  Jenkins Log Auto-Learning &nbsp;·&nbsp; scan-pairs.ps1 深度评估 &nbsp;·&nbsp; 2026-05-28
+</footer>
+
+</body>
+</html>

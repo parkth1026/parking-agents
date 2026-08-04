@@ -1,0 +1,60 @@
+{
+  "eval_id": 1,
+  "eval_name": "v5-fresh-start-full-validation",
+  "assertions": [
+    {
+      "text": "tracking 文件从 knowledgeDir 读取和写入",
+      "passed": true,
+      "evidence": "写入路径 knowledge-bases/raw/jenkins-log-auto-learning/analyzed-builds.json，正确"
+    },
+    {
+      "text": "从 Jenkins API 返回的最低 build 编号开始扫",
+      "passed": true,
+      "evidence": "TWE 从 #842 扫起（选出 #898 等 FAILURE），AES 从 #3744 扫起（选出 #3746）"
+    },
+    {
+      "text": "10 个 slot 优先分配给 FAILURE builds",
+      "passed": true,
+      "evidence": "全部 10 个都是 FAILURE（TWE 9个 + AES 1个），跨 job 混合选取"
+    },
+    {
+      "text": "知识文件用 FAILURE build 编号命名，不是纯序号",
+      "passed": true,
+      "evidence": "twe-1034-C2061-FZoneGraphBuildData.md, twe-898-903-LNK1120-TiffJpegUnresolved.md, aes6-3746-CookFail-UassetVersionTooNew.md"
+    },
+    {
+      "text": "知识文件写入 knowledgeDir/details/ 或 scratch/",
+      "passed": true,
+      "evidence": "details/ 1个，scratch/ 2个，均在 knowledgeDir 下"
+    },
+    {
+      "text": "runHistory 条目包含固定字段",
+      "passed": true,
+      "evidence": "Missing fields: none, Extra fields: none — 完全匹配 6 个必填字段"
+    },
+    {
+      "text": "analyzed map value 使用统一格式",
+      "passed": true,
+      "evidence": "所有 FAILURE 均为 failure:score=N:CODE:fix=#M 格式，infra 为 failure:infra:reason"
+    },
+    {
+      "text": "Jenkins API URL 构造正确",
+      "passed": true,
+      "evidence": "使用 {baseUrl}/job/{job.path}/... 构造，无 404"
+    },
+    {
+      "text": "只运行了一个实例",
+      "passed": true,
+      "evidence": "单 subagent 执行，tracking 文件无竞争写入"
+    }
+  ],
+  "summary": "9/9 assertions passed",
+  "timing": {
+    "total_tokens": 87561,
+    "duration_ms": 475332,
+    "total_duration_seconds": 475.3
+  },
+  "issues_found": [
+    "ABORTED/NOT_BUILT builds 不被选入 10 个 slot（因为 FAILURE 优先 + SUCCESS 填充），会永远累积在 remaining 中。AES6 有约 51 个 NOT_BUILT 不会被处理。需要在 Phase 0 的选取逻辑中给 ABORTED/NOT_BUILT 分配少量 slot 或在扫描时直接跳过并记录。"
+  ]
+}

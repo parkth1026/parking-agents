@@ -1,0 +1,12 @@
+{
+  "summary": { "pass_rate": 0.43, "passed": 3, "failed": 4, "total": 7 },
+  "expectations": [
+    { "text": "Correctly matched 'linux-ci' to twe-ue5.5-linux-ci job path", "passed": true, "evidence": "Report shows 'twe-ue5.5-linux-ci #466'" },
+    { "text": "Successfully downloaded build log and saved with timestamped filename", "passed": false, "evidence": "Log saved to /tmp/linux-ci-466.log without timestamp" },
+    { "text": "Extracted the -Wdelete-incomplete error for FAesTracePayloadScope", "passed": true, "evidence": "Report identifies error correctly" },
+    { "text": "Captured complete error block including note: lines and instantiation chain", "passed": true, "evidence": "Full error chain captured" },
+    { "text": "Resolved ./wiki-raw/jenkins-learnings rawDir path correctly", "passed": false, "evidence": "No rawDir concept in baseline" },
+    { "text": "Produced structured diagnosis with root cause analysis", "passed": true, "evidence": "Good diagnosis with 3 fix options" },
+    { "text": "Diagnosis report is written in Chinese (not English)", "passed": false, "evidence": "Report entirely in English" }
+  ]
+}

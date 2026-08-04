@@ -1,0 +1,14 @@
+{
+  "eval_id": 1,
+  "eval_name": "diagnose-autoci-3913",
+  "prompt": "帮我看看这个 build 怎么挂的 http://10.66.12.40/job/wdp-ue/job/Earth/job/aes6-ue-runtime-ci/3913/",
+  "assertions": [
+    {"id": "parse_url", "text": "Correctly parses Jenkins URL to extract job path and build number 3913", "type": "boolean"},
+    {"id": "download_log", "text": "Downloads the build console log from Jenkins", "type": "boolean"},
+    {"id": "extract_full_error_block", "text": "Extracts the COMPLETE error block including note: lines, code pointers, and instantiation chain - not just the first error: line", "type": "boolean"},
+    {"id": "search_kb", "text": "Searches local knowledge base and finds existing entries", "type": "boolean"},
+    {"id": "query_epic_with_full_context", "text": "Queries Epic with the full error block and source context, not just a one-line summary", "type": "boolean"},
+    {"id": "diagnosis_report", "text": "Presents structured diagnosis with root cause, fix, and references", "type": "boolean"},
+    {"id": "no_code_modification", "text": "Does NOT modify code or commit (user only asked for diagnosis)", "type": "boolean"}
+  ]
+}

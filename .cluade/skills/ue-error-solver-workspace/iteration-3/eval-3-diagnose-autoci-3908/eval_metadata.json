@@ -1,0 +1,12 @@
+{
+  "eval_id": 3,
+  "eval_name": "diagnose-autoci-3908-full-url",
+  "prompt": "http://10.66.12.40/job/wdp-ue/job/Earth/job/aes6-ue-runtime-ci/3908/ 这个build失败了，看看什么问题",
+  "assertions": [
+    {"id": "a3-url-parse", "text": "正确解析完整 Jenkins URL", "type": "binary"},
+    {"id": "a3-log-download", "text": "成功下载并解析 Jenkins build log", "type": "binary"},
+    {"id": "a3-error-extract", "text": "提取出所有编译错误", "type": "binary"},
+    {"id": "a3-multi-source", "text": "使用了多个诊断源进行分析", "type": "binary"},
+    {"id": "a3-diagnosis-format", "text": "诊断报告结构化，包含根因、置信度、修复建议", "type": "binary"}
+  ]
+}

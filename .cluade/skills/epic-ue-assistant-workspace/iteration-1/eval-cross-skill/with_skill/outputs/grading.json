@@ -1,0 +1,26 @@
+{
+  "eval_name": "cross-skill-lnk2001-moviescene",
+  "expectations": [
+    {
+      "text": "returns_answer",
+      "evidence": "Answer length: 2827 chars",
+      "passed": true
+    },
+    {
+      "text": "has_references",
+      "evidence": "References: 2",
+      "passed": true
+    },
+    {
+      "text": "identifies_module",
+      "evidence": "Found 'MovieScene' module name",
+      "passed": true
+    },
+    {
+      "text": "shows_build_cs_fix",
+      "evidence": "Found Build.cs dependency code",
+      "passed": true
+    }
+  ],
+  "eval_id": 3
+}

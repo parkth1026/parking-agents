@@ -1,0 +1,63 @@
+{
+  "expectations": [
+    {
+      "text": "Correctly matched 'linux-ci' (new name) to twe-ue5.5-linux-ci job path",
+      "passed": true,
+      "evidence": "Diagnosis correctly identifies: 'Job | twe-ue5.5-linux-ci #466' and uses the correct Jenkins URL for the job"
+    },
+    {
+      "text": "Successfully downloaded build log and saved with timestamped filename",
+      "passed": false,
+      "evidence": "No mention of saving the log to a file with any naming convention. The baseline downloaded the log inline but did not persist it."
+    },
+    {
+      "text": "Extracted the -Wdelete-incomplete error for FAesTracePayloadScope",
+      "passed": true,
+      "evidence": "Error Details section contains: 'error: deleting pointer to incomplete type FAesTracePayloadScope may cause undefined behavior [-Werror,-Wdelete-incomplete]'"
+    },
+    {
+      "text": "Captured complete error block including note: lines and instantiation chain",
+      "passed": false,
+      "evidence": "The error block shown is abbreviated — it shows 'Note: in instantiation of member function TUniquePtr<FAesTracePayloadScope>::~TUniquePtr requested here at AesLodSystemLayeredQuadRequest.h(14)' but omits the TDefaultDelete note line and code pointer lines (| and ^ markers). The with_skill version captured the full block with all note: lines and code pointers."
+    },
+    {
+      "text": "Resolved ./wiki-raw/jenkins-learnings rawDir path correctly",
+      "passed": false,
+      "evidence": "No rawDir path resolution. The baseline has no concept of config paths."
+    },
+    {
+      "text": "Produced structured diagnosis with root cause analysis",
+      "passed": true,
+      "evidence": "Root cause analysis is thorough: explains incomplete type issue, why Linux fails but Win64 passes (MSVC vs Clang), identifies suspect commit 8894ec3, provides fix with code examples."
+    }
+  ],
+  "summary": {
+    "passed": 3,
+    "failed": 3,
+    "total": 6,
+    "pass_rate": 0.5
+  },
+  "claims": [
+    {
+      "claim": "Previous build #465 was SUCCESS",
+      "type": "factual",
+      "verified": true,
+      "evidence": "Consistent with Jenkins build history"
+    },
+    {
+      "claim": "MSVC is more lenient with delete-incomplete than Clang",
+      "type": "factual",
+      "verified": true,
+      "evidence": "This is a well-known compiler difference — MSVC does not enable -Wdelete-incomplete by default"
+    }
+  ],
+  "eval_feedback": {
+    "suggestions": [
+      {
+        "assertion": "Captured complete error block including note: lines and instantiation chain",
+        "reason": "The baseline captured a summarized error block, omitting the TDefaultDelete instantiation note and code pointer lines. This is a meaningful quality difference — the with_skill version's full block provides more diagnostic value."
+      }
+    ],
+    "overall": "Baseline gets 3/6 — correctly identifies the error and root cause but lacks structured workflow (no config paths, no timestamped log, abbreviated error block). The diagnosis quality is good but less comprehensive than with_skill."
+  }
+}

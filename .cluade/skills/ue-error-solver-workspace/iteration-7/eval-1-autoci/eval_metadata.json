@@ -1,0 +1,15 @@
+{
+  "eval_id": 1,
+  "eval_name": "autoci-config-validation",
+  "prompt": "autoci #3939 构建失败了，帮我看看什么问题",
+  "assertions": [
+    { "id": "a1-job-match", "text": "Correctly matched 'autoci' to aes6-ue-runtime-ci job path", "type": "binary" },
+    { "id": "a1-tmpdir-resolve", "text": "Used tmpDir and resolved ./tmp/ue-error to absolute path", "type": "binary" },
+    { "id": "a1-log-timestamp", "text": "Log filename includes timestamp (e.g., autoci-3939-YYYYMMDD-HHMMSS.log)", "type": "binary" },
+    { "id": "a1-wikidir-resolve", "text": "Resolved ~/memory/jenkins-learnings (tilde path) and successfully searched knowledge base", "type": "binary" },
+    { "id": "a1-kb-match", "text": "Found knowledge base match 085-precompiled-manifest with score >= 8/10", "type": "binary" },
+    { "id": "a1-epic-skip", "text": "Skipped Epic query due to high KB score (fast-path)", "type": "binary" },
+    { "id": "a1-diagnosis", "text": "Diagnosis includes root cause, confidence, and fix reference", "type": "binary" },
+    { "id": "a1-chinese-output", "text": "Diagnosis report is written in Chinese (not English)", "type": "binary" }
+  ]
+}

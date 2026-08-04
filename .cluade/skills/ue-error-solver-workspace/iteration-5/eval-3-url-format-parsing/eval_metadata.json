@@ -1,0 +1,32 @@
+{
+  "eval_id": 3,
+  "eval_name": "url-format-parsing",
+  "prompt": "http://10.66.12.40/job/wdp-ue/job/Earth/job/aes6-ue-runtime-ci/3939/ 这个build红了",
+  "assertions": [
+    {
+      "id": "a3-url-parse",
+      "text": "Correctly parsed URL to extract baseUrl, jobPath, and buildNumber",
+      "type": "binary"
+    },
+    {
+      "id": "a3-path-resolution",
+      "text": "All config paths resolved correctly (tmpDir, wikiDir, rawDir)",
+      "type": "binary"
+    },
+    {
+      "id": "a3-log-download",
+      "text": "Downloaded log and saved with timestamped filename to tmpDir",
+      "type": "binary"
+    },
+    {
+      "id": "a3-kb-search",
+      "text": "Searched knowledge base at resolved wikiDir path",
+      "type": "binary"
+    },
+    {
+      "id": "a3-diagnosis",
+      "text": "Produced complete diagnosis report",
+      "type": "binary"
+    }
+  ]
+}

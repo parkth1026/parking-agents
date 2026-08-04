@@ -1,0 +1,31 @@
+{
+  "eval_id": 1,
+  "eval_name": "full-scan-from-start-with-new-tracking-path",
+  "prompt": "执行 jenkins-log-auto-learning 技能一轮，从最早可见的 build 开始扫描，验证：1) tracking 文件写入 knowledgeDir，2) 从最小 build 编号往上扫，3) FAILURE→SUCCESS 对分析完整，4) 知识文件路径正确",
+  "assertions": [
+    {
+      "id": "tracking-path-correct",
+      "description": "analyzed-builds.json 写入了 knowledgeDir (knowledge-bases/raw/jenkins-log-auto-learning/)，而非旧的 outputDir"
+    },
+    {
+      "id": "scan-from-lowest-build",
+      "description": "Phase 0 从最小可见 build 编号开始扫描（不依赖 last_analyzed 过滤）"
+    },
+    {
+      "id": "failure-first-priority",
+      "description": "10 个分析 slot 优先分配给 FAILURE builds（按 build 编号升序）"
+    },
+    {
+      "id": "failure-success-pair-analysis",
+      "description": "至少找到 1 个 FAILURE→SUCCESS 对，并完整分析（错误码、根因、fix commit）"
+    },
+    {
+      "id": "knowledge-file-path",
+      "description": "知识文件写入 knowledgeDir/details/ 或 knowledgeDir/scratch/，而非 outputDir/details/"
+    },
+    {
+      "id": "incremental-tracking-update",
+      "description": "analyzed map 和 runHistory 在本轮结束后正确更新"
+    }
+  ]
+}

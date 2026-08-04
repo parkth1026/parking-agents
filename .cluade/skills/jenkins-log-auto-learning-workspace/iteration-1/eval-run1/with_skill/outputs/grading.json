@@ -1,0 +1,38 @@
+{
+  "eval_id": 1,
+  "eval_name": "full-scan-from-start-with-new-tracking-path",
+  "assertions": [
+    {
+      "text": "analyzed-builds.json 写入了 knowledgeDir，而非旧的 outputDir",
+      "passed": true,
+      "evidence": "trackFile 写入路径为 knowledge-bases/raw/jenkins-log-auto-learning/analyzed-builds.json，正确"
+    },
+    {
+      "text": "Phase 0 从最小可见 build 编号开始扫（不依赖 last_analyzed 过滤）",
+      "passed": true,
+      "evidence": "tracked 为空，从 twe #842、aes6 #3744 开始扫，选出了 #898-#903 等早期 FAILURE builds"
+    },
+    {
+      "text": "10 个分析 slot 优先分配给 FAILURE builds（按 build 编号升序）",
+      "passed": true,
+      "evidence": "全部 10 个 slot 均为 FAILURE，包含两个 job 的早期 FAILURE，顺序正确"
+    },
+    {
+      "text": "至少找到 1 个 FAILURE→SUCCESS 对，并完整分析（错误码、根因、fix commit）",
+      "passed": true,
+      "evidence": "找到 4 对：LNK2019×6, C2061×1, infra×2, CookFail×1；LNK2019 和 C2061 分析完整含 commit hash"
+    },
+    {
+      "text": "知识文件写入 knowledgeDir/details/ 或 knowledgeDir/scratch/，而非 outputDir/details/",
+      "passed": true,
+      "evidence": "details/001, details/002 写入 knowledgeDir；scratch/001 写入 knowledgeDir/scratch/"
+    },
+    {
+      "text": "analyzed map 和 runHistory 在本轮结束后正确更新",
+      "passed": true,
+      "evidence": "10 个 build key 写入 analyzed，runHistory 有 buildsAnalyzed=10 等字段"
+    }
+  ],
+  "summary": "6/6 assertions passed",
+  "notes": "config job.path 格式问题（需拼接 /job/ 前缀）属于已知行为，skill 已正确处理"
+}

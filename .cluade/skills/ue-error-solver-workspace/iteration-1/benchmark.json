@@ -1,0 +1,86 @@
+{
+  "skill_name": "ue-error-solver",
+  "timestamp": "2026-04-10T12:00:00Z",
+  "iteration": 1,
+  "summary": {
+    "total_evals": 3,
+    "configurations": ["with_skill", "without_skill"]
+  },
+  "configurations": {
+    "with_skill": {
+      "pass_rate": 1.0,
+      "pass_rate_detail": "21/21 assertions passed",
+      "mean_duration_seconds": 408.2,
+      "stddev_duration_seconds": 100.9,
+      "mean_tool_uses": 40.3
+    },
+    "without_skill": {
+      "pass_rate": 0.667,
+      "pass_rate_detail": "14/21 assertions passed",
+      "mean_duration_seconds": 256.2,
+      "stddev_duration_seconds": 60.6,
+      "mean_tool_uses": 22.0
+    }
+  },
+  "delta": {
+    "pass_rate": "+33.3pp (0.667 → 1.0)",
+    "duration": "+59.3% slower (408s vs 256s)",
+    "tool_uses": "+83.2% more tool calls (40.3 vs 22.0)"
+  },
+  "per_eval": [
+    {
+      "eval_name": "diagnose-autoci-3913",
+      "with_skill": {
+        "pass_rate": "7/7 (100%)",
+        "duration_seconds": 293.0,
+        "tool_uses": 33,
+        "highlights": "Found exact KB match, queried Epic successfully, verified fix in build #3914, identified correct replacement header via engine source analysis"
+      },
+      "without_skill": {
+        "pass_rate": "4/7 (57%)",
+        "duration_seconds": 194.3,
+        "tool_uses": 12,
+        "highlights": "Correct error identification but could not download log independently, no KB search, no Epic query, fix recommendation uncertain (4 possible headers)"
+      }
+    },
+    {
+      "eval_name": "fix-installed-454",
+      "with_skill": {
+        "pass_rate": "6/6 (100%)",
+        "duration_seconds": 467.2,
+        "tool_uses": 43,
+        "highlights": "Exact KB match (10/10 score), Epic confirmed IWYU fix, read actual source showing fix already applied, definitive single-line fix"
+      },
+      "without_skill": {
+        "pass_rate": "5/6 (83%)",
+        "duration_seconds": 259.4,
+        "tool_uses": 24,
+        "highlights": "Correct error ID, good log analysis, but only 1 source used (log + general knowledge). Proposed 2 possible fixes (one correct, one suboptimal)"
+      }
+    },
+    {
+      "eval_name": "fix-commit-linux-466",
+      "with_skill": {
+        "pass_rate": "8/8 (100%)",
+        "duration_seconds": 464.3,
+        "tool_uses": 45,
+        "highlights": "KB exact match + related pattern, Epic guidance, source context, full git workflow documented, knowledge entry prepared with duplicate check"
+      },
+      "without_skill": {
+        "pass_rate": "5/8 (63%)",
+        "duration_seconds": 315.0,
+        "tool_uses": 30,
+        "highlights": "Good error analysis and root cause, but uncertain fix path, no git workflow, no knowledge accumulation"
+      }
+    }
+  ],
+  "analyst_observations": [
+    "with_skill consistently achieves 100% assertion pass rate across all 3 evals",
+    "The KB search is the highest-value feature: in all 3 cases, exact matches existed and provided verified fixes with commit hashes",
+    "Epic query adds authoritative confirmation but rarely provides new information beyond what KB already contains",
+    "without_skill struggles most with fix precision — correct general direction but unable to confirm which specific fix is correct",
+    "Time/token tradeoff is significant: with_skill takes ~60% longer but eliminates diagnostic uncertainty",
+    "The download_log assertion failure in eval-1 baseline is an environment artifact (agent networking), not a skill quality difference",
+    "Non-discriminating assertions: parse_url and no_code_modification pass for both configurations — they test basic capability, not skill value"
+  ]
+}

@@ -1,0 +1,225 @@
+Started by GitLab push by piaotonghu
+Obtained Groovy/TWE_UE_Runtime.groovy from git http://10.100.10.55/neon/AesBuilderJenkins.git
+[Pipeline] Start of Pipeline
+[Pipeline] node
+Running on twe_autoci in D:/Jenkins/workspace/wdp-ue/Earth/aes6-ue-runtime-ci
+[Pipeline] {
+[Pipeline] stage
+[Pipeline] { (Prepare)
+[Pipeline] script
+[Pipeline] {
+[Pipeline] fileExists
+[Pipeline] readJSON
+[Pipeline] echo
+Pull Tools
+[Pipeline] echo
+robocopy //10.66.12.53/PaaS/AESBuilder/Jenkins/_SlaveSetup/Extra/Bandizip D:/Jenkins/Extra/Bandizip /DCOPY:DAT /E /NP /NFL /NDL /MT:128 /MIR
+[Pipeline] powershell
+
+-------------------------------------------------------------------------------
+   ROBOCOPY     ::     Robust File Copy for Windows
+-------------------------------------------------------------------------------
+
+  Started : Tuesday, March 31, 2026 3:01:45 AM
+   Source : \\10.66.12.53\PaaS\AESBuilder\Jenkins\_SlaveSetup\Extra\Bandizip\
+     Dest : D:\Jenkins\Extra\Bandizip\
+
+    Files : *.*
+
+  Options : *.* /NDL /NFL /S /E /DCOPY:DAT /COPY:DAT /PURGE /MIR /NP /MT:128 /R:1000000 /W:30
+
+------------------------------------------------------------------------------
+
+
+------------------------------------------------------------------------------
+
+               Total    Copied   Skipped  Mismatch    FAILED    Extras
+    Dirs :         6         6         6         0         0         0
+   Files :        89         0        89         0         0         0
+   Bytes :   16.41 m         0   16.41 m         0         0         0
+   Times :   0:00:00   0:00:00                       0:00:00   0:00:00
+   Ended : Tuesday, March 31, 2026 3:01:46 AM
+
+[Pipeline] echo
+robocopy //10.66.12.53/PaaS/AESBuilder/Jenkins/_SlaveSetup/Extra/Python39 D:/Jenkins/Extra/Python39 /DCOPY:DAT /E /NP /NFL /NDL /MT:128
+[Pipeline] powershell
+
+-------------------------------------------------------------------------------
+   ROBOCOPY     ::     Robust File Copy for Windows
+-------------------------------------------------------------------------------
+
+  Started : Tuesday, March 31, 2026 3:01:46 AM
+   Source : \\10.66.12.53\PaaS\AESBuilder\Jenkins\_SlaveSetup\Extra\Python39\
+     Dest : D:\Jenkins\Extra\Python39\
+
+    Files : *.*
+
+  Options : *.* /NDL /NFL /S /E /DCOPY:DAT /COPY:DAT /NP /MT:128 /R:1000000 /W:30
+
+------------------------------------------------------------------------------
+
+
+------------------------------------------------------------------------------
+
+               Total    Copied   Skipped  Mismatch    FAILED    Extras
+    Dirs :       687       687       687         0         0         0
+   Files :     12128         0     12128         0         0         0
+   Bytes :  293.70 m         0  293.70 m         0         0         0
+   Times :   0:00:00   0:00:00                       0:00:00   0:00:00
+   Ended : Tuesday, March 31, 2026 3:01:47 AM
+
+[Pipeline] dir
+Running in D:/ws_twe_ue5.5_ci/AesBuilderJenkins
+[Pipeline] {
+[Pipeline] echo
+Before: No Plugin: D:/ws_twe_ue5.5_ci//AesBuilderJenkins/.git/index
+[Pipeline] checkout
+The recommended git tool is: NONE
+using credential devopsjenkins
+Fetching changes from the remote Git repository
+Using shallow fetch with depth 1
+Pruning obsolete local branches
+ > git rev-parse --resolve-git-dir D:\ws_twe_ue5.5_ci\AesBuilderJenkins\.git # timeout=10
+ > git config remote.origin.url http://10.100.10.55/neon/AesBuilderJenkins.git # timeout=10
+Fetching upstream changes from http://10.100.10.55/neon/AesBuilderJenkins.git
+ > git --version # timeout=10
+ > git --version # 'git version 2.48.1.windows.1'
+using GIT_ASKPASS to set credentials jenkins-devops
+ > git fetch --tags --force --progress --prune --depth=1 -- http://10.100.10.55/neon/AesBuilderJenkins.git +refs/heads/release:refs/remotes/origin/release # timeout=60
+skipping resolution of commit remotes/origin/dev, since it originates from another repository
+Checking out Revision dfb3c0f4eb225aeffc0d92365e085017a4ae0970 (refs/remotes/origin/release)
+Enabling Git LFS pull
+Commit message: "添加 Skip_RecalculateUproject 放置 uproject 被修改"
+ > git rev-parse "refs/remotes/origin/release^{commit}" # timeout=10
+ > git config core.sparsecheckout # timeout=10
+ > git checkout -f dfb3c0f4eb225aeffc0d92365e085017a4ae0970 # timeout=60
+ > git config --get remote.origin.url # timeout=10
+using GIT_ASKPASS to set credentials jenkins-devops
+ > git lfs pull origin # timeout=60
+ > git rev-list --no-walk dfb3c0f4eb225aeffc0d92365e085017a4ae0970 # timeout=10
+[Pipeline] }
+[Pipeline] // dir
+[Pipeline] echo
+if (Get-Process -Name "UnrealEditor-Cmd" -EA 0) { wmic process where "name='UnrealEditor-Cmd.exe'"  delete; Write-Host "!!!PROCESS DELETE!!!" } else { Write-Host "!!!PROCESS DOES NOT EXIST!!!" }
+[Pipeline] powershell
+!!!PROCESS DOES NOT EXIST!!!
+[Pipeline] }
+[Pipeline] // script
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (Pull Plugins)
+[Pipeline] script
+[Pipeline] {
+[Pipeline] dir
+Running in D:/ws_twe_ue5.5_ci
+[Pipeline] {
+[Pipeline] dir
+Running in D:/ws_twe_ue5.5_ci/Project/Plugins/G/AesArtAsset
+[Pipeline] {
+[Pipeline] echo
+Before: No Plugin: D:/ws_twe_ue5.5_ci/Project/Plugins/G/AesArtAsset/.git/index
+[Pipeline] checkout
+The recommended git tool is: NONE
+using credential devopsjenkins
+Fetching changes from the remote Git repository
+Using shallow fetch with depth 1
+Pruning obsolete local branches
+ > git rev-parse --resolve-git-dir D:\ws_twe_ue5.5_ci\Project\Plugins\G\AesArtAsset\.git # timeout=10
+ > git config remote.origin.url http://10.100.10.55/neon/AesArtAsset.git # timeout=10
+Fetching upstream changes from http://10.100.10.55/neon/AesArtAsset.git
+ > git --version # timeout=10
+ > git --version # 'git version 2.48.1.windows.1'
+using GIT_ASKPASS to set credentials jenkins-devops
+ > git fetch --tags --force --progress --prune --depth=1 -- http://10.100.10.55/neon/AesArtAsset.git +refs/heads/dev:refs/remotes/origin/dev # timeout=60
+skipping resolution of commit remotes/origin/dev, since it originates from another repository
+Checking out Revision 132a639b80a5be4cd5ef62f9d71b582c6b22af7c (refs/remotes/origin/dev)
+Enabling Git LFS pull
+Commit message: "api v2.2.0"
+ > git rev-parse "refs/remotes/origin/dev^{commit}" # timeout=10
+ > git config core.sparsecheckout # timeout=10
+ > git checkout -f 132a639b80a5be4cd5ef62f9d71b582c6b22af7c # timeout=60
+ > git config --get remote.origin.url # timeout=10
+using GIT_ASKPASS to set credentials jenkins-devops
+ > git lfs pull origin # timeout=60
+ > git rev-list --no-walk 132a639b80a5be4cd5ef62f9d71b582c6b22af7c # timeout=10
+[Pipeline] bat
+[Pipeline] echo
+After: 132a639 api v2.2.0
+[Pipeline] echo
+Get-ChildItem D:/ws_twe_ue5.5_ci/Project/Plugins/G/AesArtAsset -FILE -NAME -RECURSE -FILTER *.uplugin
+[Pipeline] powershell
+[Pipeline] dir
+Running in D:/ws_twe_ue5.5_ci/Project/Plugins/G/AesArtAsset
+[Pipeline] {
+[Pipeline] bat
+[Pipeline] }
+[Pipeline] // dir
+[Pipeline] echo
+D:/ws_twe_ue5.5_ci/Project/Plugins/G/AesArtAsset
+[Pipeline] }
+[Pipeline] // dir
+Building TWEEditor...
+Using Visual Studio 2022 14.38.33144 toolchain (D:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.38.33130) and Windows 10.0.22621.0 SDK (C:\Program Files (x86)\Windows Kits\10).
+Determining max actions to execute in parallel (8 physical cores, 16 logical cores)
+  Executing up to 8 processes, one per physical core
+Using Unreal Build Accelerator local executor to run 4 action(s)
+  Storage capacity 40Gb
+---- Starting trace: 260331_030252 ----
+UbaSessionServer - Disable remote execution (remote sessions will finish current processes)
+------ Building 4 action(s) started ------
+[1/4] Compile [x64] Module.AesEarth.4.cpp
+D:\ws_twe_ue5.5_ci\Project\Plugins\G\AesWorld\Source\AesEarth\Private\AesTerrain\AesTerrainPayload\AesTerrainPayload_IdealCut.cpp(24): fatal error C1083: Cannot open include file: 'TextureRenderTargetResource.h': No such file or directory
+Trace file written to C:/Users/Administrator/AppData/Roaming/Unreal Engine/AutomationTool/Logs/D+Epic+UE_5.5_51/UBT-TWEEditor-Win64-Development.uba with size 2.6kb
+Total time in Unreal Build Accelerator local executor: 5.81 seconds
+Total execution time: 8.67 seconds
+Took 8.78s to run dotnet.exe, ExitCode=6
+UnrealBuildTool failed. See log for more details. (C:\Users\Administrator\AppData\Roaming\Unreal Engine\AutomationTool\Logs\D+Epic+UE_5.5_51\UBT-TWEEditor-Win64-Development.txt)
+AutomationTool executed for 0h 0m 10s
+AutomationTool exiting with ExitCode=6 (6)
+BUILD FAILED
+[Pipeline] error
+[Pipeline] }
+[Pipeline] // dir
+[Pipeline] }
+[Pipeline] // script
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (Package Project)
+Stage "Package Project" skipped due to earlier failure(s)
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (Auto Test)
+Stage "Auto Test" skipped due to earlier failure(s)
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (Archive)
+Stage "Archive" skipped due to earlier failure(s)
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (Declarative: Post Actions)
+[Pipeline] script
+[Pipeline] {
+[Pipeline] echo
+post failure
+[Pipeline] echo
+{   "msgtype": "markdown",   "markdown": {       "content": "aes6-ue-runtime-ci#3913 Complete\n>StartByUser: <font color='warning'>null</font>\n>Platform: Windows\n>Result: <font color='warning'>Build Error</font>\n>Console: [ConsoleOutput](http://10.66.12.40/job/wdp-ue/job/Earth/job/aes6-ue-runtime-ci/3913/console)\n>Package: <font color='comment'>'\\\\\\\\10.66.12.53\\\\eci\\\\UE5\\\\TWEBuild\\\\twe-ue5.5-ci\\\\ci-1.0.25-2603310301-3913\\\\ci-1.0.25'</font>\n>Plugins: AesArtAsset: <font color='comment'>132a639 api v2.2.0</font>\nArtCommon: <font color='comment'>a15b4bf UTF-8</font>\nEarthArtAsset: <font color='comment'>e552826 优化 show dom 显示原始卫星图</font>\nWdpCamera: <font color='comment'>8932bd1 Merge branch 'feature camera_refactor_wxy' into dev</font>\nAesWorld: <font color='comment'>656aef2 fix installed build</font>\nAesRuntime: <font color='comment'>fafed1e 禁止将Level写入搭配CustomDepthStencilValue中</font>\n>RunTime: <font color='comment'>0sec</font>\n>Log: [Log](//10.66.12.53/eci/UE5/TWEBuild/twe-ue5.5-ci/ci-1.0.25-2603310301-3913/ci-1.0.25/Data/TWERuntime/TWE/Saved/Logs/TWE.log)\n>Crash: <font color='comment'>None</font>        "}}
+[Pipeline] httpRequest
+HttpMethod: POST
+URL: https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=f999aae1-5519-4863-a083-425d6ff95bd2
+Sending request to url: https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=f999aae1-5519-4863-a083-425d6ff95bd2
+Response Code: HTTP/1.1 200 OK
+Success: Status code 200 is in the accepted range: 100:399
+[Pipeline] }
+[Pipeline] // script
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] }
+[Pipeline] // node
+[Pipeline] End of Pipeline
+ERROR: Build project failed.
+Finished: FAILURE

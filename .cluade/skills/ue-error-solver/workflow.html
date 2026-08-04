@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UE Error Solver — 工作流可视化</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#0a0e1a;--bg2:#111827;--bg3:#1e293b;
+    --card:#162033;--card-hover:#1c2a44;
+    --accent:#3b82f6;--accent2:#06b6d4;--accent3:#8b5cf6;
+    --green:#10b981;--amber:#f59e0b;--red:#ef4444;--pink:#ec4899;
+    --text:#e2e8f0;--text2:#94a3b8;--text3:#64748b;
+    --border:#1e3a5f;--glow:0 0 20px rgba(59,130,246,.15);
+    --radius:12px;
+  }
+  html{scroll-behavior:smooth}
+  body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);line-height:1.7;padding:0}
+
+  /* ---- NAV ---- */
+  .top-nav{position:sticky;top:0;z-index:100;background:rgba(10,14,26,.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:12px 32px;display:flex;align-items:center;gap:24px;flex-wrap:wrap}
+  .top-nav .logo{font-size:1.25rem;font-weight:700;color:var(--accent);letter-spacing:.5px}
+  .top-nav a{color:var(--text2);text-decoration:none;font-size:.85rem;transition:color .2s}
+  .top-nav a:hover{color:var(--accent)}
+
+  /* ---- HERO ---- */
+  .hero{text-align:center;padding:64px 24px 40px;background:linear-gradient(180deg,#0f172a 0%,var(--bg) 100%)}
+  .hero h1{font-size:2.4rem;font-weight:800;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:12px}
+  .hero p{color:var(--text2);font-size:1.05rem;max-width:640px;margin:0 auto}
+
+  /* ---- CONTAINER ---- */
+  .container{max-width:1200px;margin:0 auto;padding:0 24px 80px}
+
+  /* ---- SECTION ---- */
+  .section{margin-top:56px}
+  .section-title{font-size:1.5rem;font-weight:700;color:var(--accent);margin-bottom:24px;display:flex;align-items:center;gap:10px}
+  .section-title .dot{width:10px;height:10px;border-radius:50%;background:var(--accent);flex-shrink:0}
+
+  /* ---- FLOW CHART ---- */
+  .flow{display:flex;flex-direction:column;align-items:center;gap:0;position:relative;padding:24px 0}
+  .flow-node{position:relative;width:260px;padding:18px 22px;border-radius:var(--radius);text-align:center;font-weight:700;font-size:.95rem;cursor:default;transition:transform .2s,box-shadow .2s;z-index:2}
+  .flow-node:hover{transform:translateY(-2px);box-shadow:var(--glow)}
+  .flow-node.always{background:linear-gradient(135deg,#1e3a5f,#162a4a);border:2px solid var(--accent);color:var(--accent)}
+  .flow-node.optional{background:linear-gradient(135deg,#2d1f4e,#1e1640);border:2px dashed var(--accent3);color:var(--accent3)}
+  .flow-node.conditional{background:linear-gradient(135deg,#1f3d2d,#132a1e);border:2px dashed var(--green);color:var(--green)}
+  .flow-node .badge{position:absolute;top:-10px;right:-10px;font-size:.65rem;padding:2px 8px;border-radius:10px;font-weight:600;letter-spacing:.3px}
+  .badge-required{background:var(--accent);color:#fff}
+  .badge-optional{background:var(--accent3);color:#fff}
+  .badge-conditional{background:var(--green);color:#fff}
+
+  .flow-arrow{width:2px;height:36px;background:var(--border);position:relative;z-index:1}
+  .flow-arrow::after{content:'';position:absolute;bottom:-5px;left:50%;transform:translateX(-50%);border-left:6px solid transparent;border-right:6px solid transparent;border-top:7px solid var(--border)}
+  .flow-arrow.branch{background:none;height:24px;display:flex;align-items:center;justify-content:center}
+  .flow-arrow.branch::after{display:none}
+  .flow-label{font-size:.72rem;color:var(--text3);text-align:center;margin:2px 0}
+
+  /* ---- CARDS ---- */
+  .card-grid{display:grid;gap:24px;grid-template-columns:1fr}
+  @media(min-width:768px){.card-grid.two{grid-template-columns:1fr 1fr}}
+
+  .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:28px 28px 24px;position:relative;overflow:hidden;transition:border-color .25s,box-shadow .25s}
+  .card:hover{border-color:var(--accent);box-shadow:var(--glow)}
+  .card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+  .card.phase0::before{background:linear-gradient(90deg,var(--text3),var(--accent))}
+  .card.phase1::before{background:linear-gradient(90deg,var(--accent),var(--accent2))}
+  .card.phase2::before{background:linear-gradient(90deg,var(--accent2),var(--green))}
+  .card.phase3::before{background:linear-gradient(90deg,var(--green),var(--amber))}
+  .card.phase4::before{background:linear-gradient(90deg,var(--accent3),var(--pink))}
+  .card.phase5::before{background:linear-gradient(90deg,var(--pink),var(--red))}
+  .card.phase6::before{background:linear-gradient(90deg,var(--green),var(--accent2))}
+
+  .card-header{display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+  .card-num{font-size:.75rem;font-weight:700;padding:4px 10px;border-radius:6px;letter-spacing:.5px;flex-shrink:0}
+  .num-0{background:#334155;color:var(--text2)}
+  .num-1{background:#1e3a5f;color:var(--accent)}
+  .num-2{background:#164e63;color:var(--accent2)}
+  .num-3{background:#14532d;color:var(--green)}
+  .num-4{background:#2d1f4e;color:var(--accent3)}
+  .num-5{background:#4a1942;color:var(--pink)}
+  .num-6{background:#1a3a2a;color:var(--green)}
+  .card-name{font-size:1.15rem;font-weight:700;color:#fff}
+  .card-tag{font-size:.65rem;padding:2px 8px;border-radius:8px;font-weight:600}
+  .tag-always{background:var(--accent);color:#fff}
+  .tag-optional{background:var(--accent3);color:#fff}
+  .tag-conditional{background:var(--green);color:#fff}
+
+  .card h4{font-size:.9rem;color:var(--accent2);margin:16px 0 8px;font-weight:600}
+  .card ul{list-style:none;padding:0}
+  .card li{position:relative;padding-left:20px;margin-bottom:6px;font-size:.88rem;color:var(--text2)}
+  .card li::before{content:'›';position:absolute;left:4px;color:var(--accent);font-weight:700;font-size:1rem}
+
+  .io-box{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+  .io-item{background:var(--bg2);border-radius:8px;padding:12px 14px;border:1px solid var(--border)}
+  .io-item .label{font-size:.7rem;text-transform:uppercase;letter-spacing:1px;color:var(--accent);font-weight:700;margin-bottom:6px}
+  .io-item p{font-size:.82rem;color:var(--text2);margin:0}
+
+  /* ---- SOURCE RULES ---- */
+  .rules-table{width:100%;border-collapse:separate;border-spacing:0;border-radius:var(--radius);overflow:hidden;margin-top:16px;font-size:.85rem}
+  .rules-table th{background:var(--bg3);color:var(--accent);padding:12px 16px;text-align:left;font-weight:600;border-bottom:2px solid var(--border)}
+  .rules-table td{padding:10px 16px;border-bottom:1px solid var(--border);color:var(--text2);vertical-align:top}
+  .rules-table tr:last-child td{border-bottom:none}
+  .rules-table tr:hover td{background:rgba(59,130,246,.04)}
+  .pill{display:inline-block;font-size:.7rem;padding:2px 8px;border-radius:6px;font-weight:600;margin-right:4px}
+  .pill-yes{background:#065f46;color:var(--green)}
+  .pill-skip{background:#451a03;color:var(--amber)}
+  .pill-no{background:#450a0a;color:var(--red)}
+
+  /* ---- SCORE BAR ---- */
+  .score-bar{display:flex;border-radius:8px;overflow:hidden;height:32px;margin:12px 0;font-size:.72rem;font-weight:600}
+  .score-seg{display:flex;align-items:center;justify-content:center;color:#fff}
+  .seg-low{background:#991b1b;flex:4}
+  .seg-mid{background:#92400e;flex:3}
+  .seg-high{background:#065f46;flex:3}
+
+  /* ---- CONFIG ---- */
+  .config-grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+  .config-item{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px}
+  .config-item .key{font-family:'Cascadia Code','Fira Code',monospace;font-size:.85rem;color:var(--accent2);margin-bottom:6px}
+  .config-item .desc{font-size:.82rem;color:var(--text2)}
+
+  /* ---- CONSTRAINTS ---- */
+  .constraint-list{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+  .constraint{display:flex;align-items:flex-start;gap:10px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:14px 16px;transition:border-color .2s}
+  .constraint:hover{border-color:var(--accent)}
+  .constraint .idx{flex-shrink:0;width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:.72rem;font-weight:700;display:flex;align-items:center;justify-content:center}
+  .constraint .txt{font-size:.84rem;color:var(--text2)}
+  .constraint .txt strong{color:var(--text)}
+
+  /* ---- FOOTER ---- */
+  .footer{text-align:center;padding:32px;color:var(--text3);font-size:.78rem;border-top:1px solid var(--border);margin-top:64px}
+</style>
+</head>
+<body>
+
+<!-- ========== NAV ========== -->
+<nav class="top-nav">
+  <span class="logo">UE Error Solver</span>
+  <a href="#flow">流程图</a>
+  <a href="#phases">阶段详情</a>
+  <a href="#sources">来源规则</a>
+  <a href="#config">配置</a>
+  <a href="#constraints">约束</a>
+</nav>
+
+<!-- ========== HERO ========== -->
+<header class="hero">
+  <h1>UE Error Solver 工作流</h1>
+  <p>从 Jenkins CI 日志中诊断并修复 UE5 构建错误的自动化工作流。<br>多源诊断 · 知识库驱动 · 可选修复与提交</p>
+</header>
+
+<div class="container">
+
+<!-- ========== FLOW CHART ========== -->
+<section class="section" id="flow">
+  <div class="section-title"><span class="dot"></span>执行流程总览</div>
+  <div class="flow">
+    <!-- Phase 0 -->
+    <div class="flow-node always">
+      <span class="badge badge-required">必需</span>
+      Phase 0 · 配置加载 &amp; 输入解析
+    </div>
+    <div class="flow-arrow"></div>
+
+    <!-- Phase 1 -->
+    <div class="flow-node always">
+      <span class="badge badge-required">必需</span>
+      Phase 1 · 下载并解析构建日志
+    </div>
+    <div class="flow-arrow"></div>
+
+    <!-- Phase 2 -->
+    <div class="flow-node always">
+      <span class="badge badge-required">必需</span>
+      Phase 2 · 多源诊断
+    </div>
+    <div class="flow-arrow"></div>
+
+    <!-- Phase 3 -->
+    <div class="flow-node always">
+      <span class="badge badge-required">必需</span>
+      Phase 3 · 呈现诊断
+    </div>
+    <div class="flow-arrow"></div>
+    <div class="flow-label">用户要求"修复"？</div>
+    <div class="flow-arrow"></div>
+
+    <!-- Phase 4 -->
+    <div class="flow-node optional">
+      <span class="badge badge-optional">可选</span>
+      Phase 4 · 修复代码
+    </div>
+    <div class="flow-arrow"></div>
+    <div class="flow-label">用户要求"提交"？</div>
+    <div class="flow-arrow"></div>
+
+    <!-- Phase 5 -->
+    <div class="flow-node optional">
+      <span class="badge badge-optional">可选</span>
+      Phase 5 · 提交推送
+    </div>
+    <div class="flow-arrow"></div>
+    <div class="flow-label">Phase 4 编译成功？</div>
+    <div class="flow-arrow"></div>
+
+    <!-- Phase 6 -->
+    <div class="flow-node conditional">
+      <span class="badge badge-conditional">有条件</span>
+      Phase 6 · 知识积累
+    </div>
+  </div>
+</section>
+
+<!-- ========== PHASE CARDS ========== -->
+<section class="section" id="phases">
+  <div class="section-title"><span class="dot"></span>各阶段详细说明</div>
+  <div class="card-grid">
+
+    <!-- Phase 0 -->
+    <div class="card phase0">
+      <div class="card-header">
+        <span class="card-num num-0">PHASE 0</span>
+        <span class="card-name">配置加载 &amp; 输入解析</span>
+        <span class="card-tag tag-always">始终执行</span>
+      </div>
+      <h4>配置加载</h4>
+      <ul>
+        <li>从 skill 目录读取 <code>config.json</code></li>
+        <li>解析路径：<code>~/</code> → 展开为主目录；<code>./</code> → 相对于 skill 目录；绝对路径直接使用</li>
+        <li>用 <code>Test-Path</code> 验证所有路径，<code>rawDir</code> 不存在则自动创建</li>
+        <li>创建临时目录 <code>$env:TEMP/ue-error-solver</code></li>
+      </ul>
+      <h4>输入解析</h4>
+      <ul>
+        <li><strong>格式 1</strong>：完整 Jenkins URL → 直接提取 baseUrl / jobPath / buildNumber</li>
+        <li><strong>格式 2</strong>：任务名 + 编号 → 查询 Jenkins API 递归展平并模糊匹配</li>
+        <li>多个匹配时列出供用户选择；无匹配时要求完整 URL</li>
+      </ul>
+      <div class="io-box">
+        <div class="io-item"><div class="label">输入</div><p>config.json + 用户提供的 Jenkins 构建引用</p></div>
+        <div class="io-item"><div class="label">输出</div><p>解析后的 baseUrl、jobPath、buildNumber；验证后的路径配置</p></div>
+      </div>
+    </div>
+
+    <!-- Phase 1 -->
+    <div class="card phase1">
+      <div class="card-header">
+        <span class="card-num num-1">PHASE 1</span>
+        <span class="card-name">下载并解析构建日志</span>
+        <span class="card-tag tag-always">始终执行</span>
+      </div>
+      <h4>关键步骤</h4>
+      <ul>
+        <li>用 <code>curl.exe</code> 下载控制台日志，文件名含时间戳防冲突</li>
+        <li>大日志 (&gt;500KB) 内存保留全量，磁盘保存过滤版</li>
+        <li>通过 API 检查构建结果 (result / timestamp / duration)</li>
+        <li>提取所有错误类型：C/C++ 编译、Clang、链接器、UBT/UHT、Cook、Blueprint、基础设施</li>
+        <li><strong>捕获完整错误块</strong>（含 <code>note:</code> 行、实例化链、代码指示行）</li>
+        <li>分类分组：识别主要错误，标注级联错误</li>
+        <li>提取构建命令（UBT 调用 / RunUBT.bat / Build.bat）</li>
+      </ul>
+      <div class="io-box">
+        <div class="io-item"><div class="label">输入</div><p>Jenkins consoleText API 端点</p></div>
+        <div class="io-item"><div class="label">输出</div><p>分类后的错误列表、完整错误块、构建命令</p></div>
+      </div>
+    </div>
+
+    <!-- Phase 2 -->
+    <div class="card phase2">
+      <div class="card-header">
+        <span class="card-num num-2">PHASE 2</span>
+        <span class="card-name">多源诊断</span>
+        <span class="card-tag tag-always">始终执行</span>
+      </div>
+      <h4>诊断来源（顺序执行）</h4>
+      <ul>
+        <li><strong>2.1 源码上下文</strong> — 映射错误路径到本地 git 仓库，读取 ±15 行上下文，查看 <code>git log</code> 最近修改</li>
+        <li><strong>2.2 知识库搜索</strong> — 搜索 wiki concepts / entities + rawDir + jenkins-log-auto-learning 历史，按评分判定置信度</li>
+        <li><strong>2.3 Epic UE 助手</strong> — 使用 <code>Invoke-EpicAssistantQuery</code> 发送完整错误块 + 源码上下文（多个独立错误分别查询，新会话）</li>
+        <li><strong>2.4 网络搜索</strong> — 不常见错误码、第三方插件、引擎版本迁移问题的补充来源</li>
+      </ul>
+      <h4>强制检查清单</h4>
+      <ul>
+        <li>进入 Phase 3 前必须填写 4 步骤状态表（已完成 / 已跳过 + 原因）</li>
+        <li>不可仅凭模型直觉跳过有条件步骤</li>
+      </ul>
+      <div class="io-box">
+        <div class="io-item"><div class="label">输入</div><p>Phase 1 提取的错误块 + 分类结果</p></div>
+        <div class="io-item"><div class="label">输出</div><p>各来源诊断结果、KB 评分、检查清单</p></div>
+      </div>
+    </div>
+
+    <!-- Phase 3 -->
+    <div class="card phase3">
+      <div class="card-header">
+        <span class="card-num num-3">PHASE 3</span>
+        <span class="card-name">呈现诊断</span>
+        <span class="card-tag tag-always">始终执行</span>
+      </div>
+      <h4>输出模板（中文）</h4>
+      <ul>
+        <li><strong>诊断</strong>：ErrorCode — FileName</li>
+        <li><strong>错误信息</strong>：原始错误消息</li>
+        <li><strong>根因分析</strong>：综合所有来源的确定性分析</li>
+        <li><strong>置信度</strong>：高 / 中 / 低</li>
+        <li><strong>证据</strong>：知识库 / Epic 指引 / 源码上下文 / Web 搜索</li>
+        <li><strong>修复建议</strong>：具体步骤和代码改动</li>
+        <li><strong>参考资料</strong>：Epic 文档、KB 文件、Web 链接</li>
+      </ul>
+      <ul>
+        <li>证据部分必须与 Phase 2 检查清单一致</li>
+        <li>多个独立错误分别呈现</li>
+      </ul>
+      <div class="io-box">
+        <div class="io-item"><div class="label">输入</div><p>Phase 2 检查清单 + 所有来源结果</p></div>
+        <div class="io-item"><div class="label">输出</div><p>格式化的中文诊断报告</p></div>
+      </div>
+    </div>
+
+    <!-- Phase 4 -->
+    <div class="card phase4">
+      <div class="card-header">
+        <span class="card-num num-4">PHASE 4</span>
+        <span class="card-name">修复代码</span>
+        <span class="card-tag tag-optional">可选 — 仅用户要求</span>
+      </div>
+      <h4>触发条件</h4>
+      <ul>
+        <li>用户提示中包含 "fix" / "repair" / "修复" / "解决" / "solve" 等词</li>
+      </ul>
+      <h4>关键步骤</h4>
+      <ul>
+        <li>在 <code>gitRepos</code> 中定位错误文件并应用代码更改</li>
+        <li>回读修改后文件验证语法正确性</li>
+        <li>使用 Phase 1 提取的构建命令本地重新编译</li>
+        <li>编译失败时分析新错误类型，修订修复，<strong>最多重试 3 次</strong></li>
+      </ul>
+      <div class="io-box">
+        <div class="io-item"><div class="label">输入</div><p>Phase 3 的修复建议 + 本地源码</p></div>
+        <div class="io-item"><div class="label">输出</div><p>修改后的代码文件 + 编译结果</p></div>
+      </div>
+    </div>
+
+    <!-- Phase 5 -->
+    <div class="card phase5">
+      <div class="card-header">
+        <span class="card-num num-5">PHASE 5</span>
+        <span class="card-name">提交推送</span>
+        <span class="card-tag tag-optional">可选 — 仅用户要求</span>
+      </div>
+      <h4>触发条件</h4>
+      <ul>
+        <li>用户明确要求 "commit" / "push" / "提交" / "推送"</li>
+      </ul>
+      <h4>安全规则</h4>
+      <ul>
+        <li><strong>始终先 <code>git pull</code></strong> — 提交前拉取最新更改</li>
+        <li><strong>禁止 <code>git push --force</code></strong> — 绝对禁止</li>
+        <li>冲突或失败 → 通知用户并停止，不尝试破坏性变通</li>
+      </ul>
+      <h4>提交信息格式</h4>
+      <ul>
+        <li><code>fix({module}): {ErrorCode} - {brief description}</code></li>
+      </ul>
+      <div class="io-box">
+        <div class="io-item"><div class="label">输入</div><p>Phase 4 修复后的文件</p></div>
+        <div class="io-item"><div class="label">输出</div><p>git commit + push 结果</p></div>
+      </div>
+    </div>
+
+    <!-- Phase 6 -->
+    <div class="card phase6">
+      <div class="card-header">
+        <span class="card-num num-6">PHASE 6</span>
+        <span class="card-name">知识积累</span>
+        <span class="card-tag tag-conditional">有条件 — Phase 4 成功后</span>
+      </div>
+      <h4>触发条件</h4>
+      <ul>
+        <li>Phase 4 已执行 <strong>且</strong> 编译确认成功</li>
+        <li>仅诊断（未修复）时不执行此阶段</li>
+      </ul>
+      <h4>关键步骤</h4>
+      <ul>
+        <li>保存到 <code>knowledgeBase.rawDir</code>，文件名 <code>{jobShort}-{buildNumber}-{ErrorCode}-{ShortDesc}.md</code></li>
+        <li>检查 <code>rawDir/details/</code> 中是否有重复，有则更新而非新建</li>
+        <li><strong>仅保存已验证修复</strong> — 不保存推测性诊断</li>
+      </ul>
+      <h4>知识文件包含</h4>
+      <ul>
+        <li>Error Message / Root Cause / Fix / Evidence Sources / Epic Guidance / Prevention</li>
+      </ul>
+      <div class="io-box">
+        <div class="io-item"><div class="label">输入</div><p>已验证的修复 + 全部诊断证据</p></div>
+        <div class="io-item"><div class="label">输出</div><p>Markdown 知识文件（rawDir）</p></div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ========== SOURCE SELECTION ========== -->
+<section class="section" id="sources">
+  <div class="section-title"><span class="dot"></span>来源选择规则 (Phase 2)</div>
+
+  <table class="rules-table">
+    <thead>
+      <tr>
+        <th>步骤</th>
+        <th>来源</th>
+        <th>执行条件</th>
+        <th>跳过条件</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>2.1</strong></td>
+        <td>源码上下文</td>
+        <td><span class="pill pill-yes">始终执行</span></td>
+        <td>基础设施错误（OOM / 磁盘 / 网络无源码可读）</td>
+      </tr>
+      <tr>
+        <td><strong>2.2</strong></td>
+        <td>知识库搜索</td>
+        <td><span class="pill pill-yes">始终执行</span></td>
+        <td>知识库目录不存在</td>
+      </tr>
+      <tr>
+        <td><strong>2.3</strong></td>
+        <td>Epic UE 助手</td>
+        <td><span class="pill pill-skip">有条件</span> KB 评分 &lt; 8 且为 UE 错误</td>
+        <td>KB 评分 ≥ 8（已有验证修复）；非 UE 错误（基础设施 / 第三方库）</td>
+      </tr>
+      <tr>
+        <td><strong>2.4</strong></td>
+        <td>网络搜索</td>
+        <td><span class="pill pill-skip">有条件</span> KB &lt; 8 且 Epic 未明确</td>
+        <td>KB 评分 ≥ 8；Epic 已提供明确修复方案；基础设施错误</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div style="margin-top:28px">
+    <h4 style="color:var(--accent2);font-size:.95rem;margin-bottom:10px">知识库评分标准</h4>
+    <div class="score-bar">
+      <div class="score-seg seg-low">1 – 4 分：仅关键词重叠</div>
+      <div class="score-seg seg-mid">5 – 7 分：相同错误码 / 不同文件</div>
+      <div class="score-seg seg-high">8 – 10 分：完全匹配 + 修复段落</div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-top:8px">
+      <div style="background:var(--bg2);border-radius:8px;padding:12px 14px;border-left:3px solid var(--red)">
+        <div style="font-size:.78rem;color:var(--red);font-weight:600;margin-bottom:4px">1 – 4 分</div>
+        <div style="font-size:.82rem;color:var(--text2)">仅关键词重叠 → 继续查询 Epic</div>
+      </div>
+      <div style="background:var(--bg2);border-radius:8px;padding:12px 14px;border-left:3px solid var(--amber)">
+        <div style="font-size:.78rem;color:var(--amber);font-weight:600;margin-bottom:4px">5 – 7 分</div>
+        <div style="font-size:.82rem;color:var(--text2)">相同错误代码但不同文件路径，或修复不完整 → 继续查询 Epic</div>
+      </div>
+      <div style="background:var(--bg2);border-radius:8px;padding:12px 14px;border-left:3px solid var(--green)">
+        <div style="font-size:.78rem;color:var(--green);font-weight:600;margin-bottom:4px">8 – 10 分</div>
+        <div style="font-size:.82rem;color:var(--text2)">完全相同错误代码 + 相同文件路径 + 含修复段落 → <strong>跳过 Epic (2.3)</strong></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Decision flow SVG -->
+  <div style="margin-top:32px">
+    <h4 style="color:var(--accent2);font-size:.95rem;margin-bottom:16px">诊断决策流</h4>
+    <div style="overflow-x:auto">
+      <svg viewBox="0 0 800 320" xmlns="http://www.w3.org/2000/svg" style="max-width:800px;width:100%">
+        <!-- Defs -->
+        <defs>
+          <marker id="ah" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6Z" fill="#3b82f6"/></marker>
+          <marker id="ah-g" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6Z" fill="#10b981"/></marker>
+          <marker id="ah-a" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6Z" fill="#f59e0b"/></marker>
+        </defs>
+
+        <!-- 2.1 -->
+        <rect x="20" y="20" width="160" height="44" rx="8" fill="#1e3a5f" stroke="#3b82f6" stroke-width="1.5"/>
+        <text x="100" y="47" text-anchor="middle" fill="#3b82f6" font-size="13" font-weight="600">2.1 源码上下文</text>
+        <line x1="180" y1="42" x2="220" y2="42" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#ah)"/>
+
+        <!-- 2.2 -->
+        <rect x="224" y="20" width="160" height="44" rx="8" fill="#1e3a5f" stroke="#3b82f6" stroke-width="1.5"/>
+        <text x="304" y="47" text-anchor="middle" fill="#3b82f6" font-size="13" font-weight="600">2.2 知识库搜索</text>
+
+        <!-- Decision diamond -->
+        <line x1="384" y1="42" x2="430" y2="42" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#ah)"/>
+        <polygon points="500,12 570,42 500,72 430,42" fill="#162033" stroke="#f59e0b" stroke-width="1.5"/>
+        <text x="500" y="39" text-anchor="middle" fill="#f59e0b" font-size="11" font-weight="600">KB</text>
+        <text x="500" y="52" text-anchor="middle" fill="#f59e0b" font-size="11" font-weight="600">评分？</text>
+
+        <!-- KB >= 8 path (down) -->
+        <line x1="500" y1="72" x2="500" y2="120" stroke="#10b981" stroke-width="1.5" marker-end="url(#ah-g)"/>
+        <text x="520" y="100" fill="#10b981" font-size="11">≥ 8</text>
+        <rect x="420" y="124" width="160" height="40" rx="8" fill="#14532d" stroke="#10b981" stroke-width="1.5"/>
+        <text x="500" y="149" text-anchor="middle" fill="#10b981" font-size="12" font-weight="600">跳过 2.3 &amp; 2.4 →  Phase 3</text>
+
+        <!-- KB < 8 path (right) -->
+        <line x1="570" y1="42" x2="620" y2="42" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#ah-a)"/>
+        <text x="590" y="34" fill="#f59e0b" font-size="11">&lt; 8</text>
+
+        <!-- 2.3 -->
+        <rect x="624" y="20" width="160" height="44" rx="8" fill="#2d1f4e" stroke="#8b5cf6" stroke-width="1.5" stroke-dasharray="5,3"/>
+        <text x="704" y="47" text-anchor="middle" fill="#8b5cf6" font-size="13" font-weight="600">2.3 Epic 助手</text>
+
+        <!-- Decision 2 -->
+        <line x1="704" y1="64" x2="704" y2="110" stroke="#8b5cf6" stroke-width="1.5"/>
+        <polygon points="704,114 754,144 704,174 654,144" fill="#162033" stroke="#f59e0b" stroke-width="1.5"/>
+        <text x="704" y="141" text-anchor="middle" fill="#f59e0b" font-size="11" font-weight="600">明确？</text>
+
+        <!-- Epic clear (right → Phase 3) -->
+        <line x1="754" y1="144" x2="790" y2="144" stroke="#10b981" stroke-width="1.5"/>
+        <text x="760" y="136" fill="#10b981" font-size="10">是</text>
+        <text x="756" y="162" fill="#10b981" font-size="10">→ Phase 3</text>
+
+        <!-- Not clear (down) -->
+        <line x1="704" y1="174" x2="704" y2="210" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#ah-a)"/>
+        <text x="720" y="196" fill="#f59e0b" font-size="10">否</text>
+
+        <!-- 2.4 -->
+        <rect x="624" y="214" width="160" height="44" rx="8" fill="#2d1f4e" stroke="#8b5cf6" stroke-width="1.5" stroke-dasharray="5,3"/>
+        <text x="704" y="241" text-anchor="middle" fill="#8b5cf6" font-size="13" font-weight="600">2.4 网络搜索</text>
+
+        <!-- → Phase 3 -->
+        <line x1="704" y1="258" x2="704" y2="290" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#ah)"/>
+        <rect x="644" y="290" width="120" height="28" rx="6" fill="#1e3a5f" stroke="#3b82f6" stroke-width="1"/>
+        <text x="704" y="309" text-anchor="middle" fill="#3b82f6" font-size="12" font-weight="600">→ Phase 3</text>
+
+        <!-- Legend -->
+        <rect x="20" y="260" width="12" height="12" rx="2" fill="#1e3a5f" stroke="#3b82f6" stroke-width="1"/>
+        <text x="38" y="271" fill="#94a3b8" font-size="10">始终执行</text>
+        <rect x="120" y="260" width="12" height="12" rx="2" fill="#2d1f4e" stroke="#8b5cf6" stroke-width="1" stroke-dasharray="3,2"/>
+        <text x="138" y="271" fill="#94a3b8" font-size="10">有条件执行</text>
+        <polygon points="254,260 266,266 254,272 242,266" fill="#162033" stroke="#f59e0b" stroke-width="1"/>
+        <text x="274" y="271" fill="#94a3b8" font-size="10">决策点</text>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- ========== CONFIG ========== -->
+<section class="section" id="config">
+  <div class="section-title"><span class="dot"></span>配置结构 (config.json)</div>
+  <div class="config-grid">
+    <div class="config-item">
+      <div class="key">jenkins.baseUrl</div>
+      <div class="desc">Jenkins 服务器 URL。示例：<code>http://10.66.12.40</code></div>
+    </div>
+    <div class="config-item">
+      <div class="key">gitRepos</div>
+      <div class="desc">非浅克隆 git 仓库目录路径。用于读取源码上下文和应用修复。</div>
+    </div>
+    <div class="config-item">
+      <div class="key">knowledgeBase.wikiDir</div>
+      <div class="desc">精选 wiki 知识库路径（concepts + entities 子目录）。</div>
+    </div>
+    <div class="config-item">
+      <div class="key">knowledgeBase.rawDir</div>
+      <div class="desc">原始知识积累目录，新发现的已验证修复保存于此。</div>
+    </div>
+  </div>
+  <div style="margin-top:20px">
+    <h4 style="color:var(--accent2);font-size:.9rem;margin-bottom:12px">路径解析规则</h4>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
+      <div style="background:var(--bg2);border-radius:8px;padding:12px 14px;border-left:3px solid var(--accent)">
+        <div style="font-family:monospace;font-size:.85rem;color:var(--accent);margin-bottom:4px">~/...</div>
+        <div style="font-size:.82rem;color:var(--text2)">波浪号展开为 <code>$HOME</code></div>
+      </div>
+      <div style="background:var(--bg2);border-radius:8px;padding:12px 14px;border-left:3px solid var(--accent2)">
+        <div style="font-family:monospace;font-size:.85rem;color:var(--accent2);margin-bottom:4px">./...</div>
+        <div style="font-size:.82rem;color:var(--text2)">相对于 skill 目录（config.json 所在位置）</div>
+      </div>
+      <div style="background:var(--bg2);border-radius:8px;padding:12px 14px;border-left:3px solid var(--accent3)">
+        <div style="font-family:monospace;font-size:.85rem;color:var(--accent3);margin-bottom:4px">D:/Git</div>
+        <div style="font-size:.82rem;color:var(--text2)">绝对路径直接使用</div>
+      </div>
+    </div>
+  </div>
+  <div style="margin-top:16px;background:var(--bg2);border-radius:8px;padding:14px 16px;border:1px solid var(--border)">
+    <div style="font-size:.82rem;color:var(--text2)">
+      <strong style="color:var(--accent)">临时目录</strong>：<code>$env:TEMP/ue-error-solver</code> — 存放下载的日志文件（带时间戳命名避免冲突）<br>
+      <strong style="color:var(--accent)">环境变量</strong>：<code>$env:JENKINS_USER</code> / <code>$env:JENKINS_TOKEN</code> — Jenkins 认证（如已设置）
+    </div>
+  </div>
+</section>
+
+<!-- ========== CONSTRAINTS ========== -->
+<section class="section" id="constraints">
+  <div class="section-title"><span class="dot"></span>约束条件（12 条）</div>
+  <div class="constraint-list">
+    <div class="constraint">
+      <span class="idx">1</span>
+      <div class="txt"><strong>Jenkins 只读</strong> — 绝不修改 Jenkins 配置或触发构建</div>
+    </div>
+    <div class="constraint">
+      <span class="idx">2</span>
+      <div class="txt"><strong>禁止 force push</strong> — <code>git push --force</code> 绝对禁止</div>
+    </div>
+    <div class="constraint">
+      <span class="idx">3</span>
+      <div class="txt"><strong>提交前 pull</strong> — <code>git pull</code> 必须在任何提交前成功</div>
+    </div>
+    <div class="constraint">
+      <span class="idx">4</span>
+      <div class="txt"><strong>配置驱动路径</strong> — 所有路径来自 config.json，不硬编码</div>
+    </div>
+    <div class="constraint">
+      <span class="idx">5</span>
+      <div class="txt"><strong>UTF-8 without BOM</strong> — 所有输出文件，CRLF 换行</div>
+    </div>
+    <div class="constraint">
+      <span class="idx">6</span>
+      <div class="txt"><strong>优雅降级</strong> — Jenkins 不可达、Epic API 失败或知识库为空时继续使用可用来源并通知用户</div>
+    </div>
+    <div class="constraint">
+      <span class="idx">7</span>
+      <div class="txt"><strong>仅保存已验证知识</strong> — 编译确认修复有效后才保存到知识库</div>
+    </div>
+    <div class="constraint">
+      <span class="idx">8</span>
+      <div class="txt"><strong>不静默提交</strong> — 提交代码前始终通知用户</div>
+    </div>
+    <div class="constraint">
+      <span class="idx">9</span>
+      <div class="txt"><strong>使用 curl.exe</strong> — HTTP 请求使用 curl.exe（非 Invoke-WebRequest），避免 Cloudflare 拦截</div>
+    </div>
+    <div class="constraint">
+      <span class="idx">10</span>
+      <div class="txt"><strong>中文输出</strong> — 诊断报告以中文撰写，技术术语保持英文</div>
+    </div>
+    <div class="constraint">
+      <span class="idx">11</span>
+      <div class="txt"><strong>禁止纯模型诊断</strong> — 每条诊断必须引用至少一个已执行来源的证据</div>
+    </div>
+    <div class="constraint">
+      <span class="idx">12</span>
+      <div class="txt"><strong>认证假设已配置</strong> — Jenkins 使用 env 变量；Git 凭据假设已在系统凭据管理器中配置</div>
+    </div>
+  </div>
+</section>
+
+</div>
+
+<footer class="footer">
+  UE Error Solver Workflow Visualization · 基于 SKILL.md 自动生成 · 2026-05-24
+</footer>
+
+</body>
+</html>

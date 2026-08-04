@@ -1,0 +1,11 @@
+{
+  "eval_id": 1,
+  "eval_name": "compilation-error-c2061",
+  "prompt": "我的 UE5.3 插件编译报错 error C2061: syntax error: identifier FZoneGraphBuildData, 怎么修复这个错误?",
+  "assertions": [
+    {"name": "returns_answer", "description": "Non-empty answer returned"},
+    {"name": "has_references", "description": "At least 1 Epic reference URL"},
+    {"name": "mentions_build_cs", "description": "Mentions .Build.cs or module dependencies"},
+    {"name": "mentions_include", "description": "Mentions #include or header files"}
+  ]
+}

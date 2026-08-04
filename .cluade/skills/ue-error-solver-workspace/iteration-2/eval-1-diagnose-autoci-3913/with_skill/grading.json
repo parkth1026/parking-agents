@@ -1,0 +1,14 @@
+{
+  "eval_id": 1,
+  "eval_name": "diagnose-autoci-3913",
+  "variant": "with_skill",
+  "expectations": [
+    {"text": "Correctly parses Jenkins URL to extract job path and build number 3913", "passed": true, "evidence": "Parsed to aes6-ue-runtime-ci #3913"},
+    {"text": "Downloads the build console log from Jenkins", "passed": true, "evidence": "console.log saved at 44,966 bytes"},
+    {"text": "Extracts the COMPLETE error block including note: lines, code pointers, and instantiation chain", "passed": true, "evidence": "C1083 is a single-line fatal error (no note: chain for this error type), correctly extracted the full error line"},
+    {"text": "Searches local knowledge base and finds existing entries", "passed": true, "evidence": "Found exact match in wiki concepts and raw KB with score 10/10"},
+    {"text": "Queries Epic with the full error block and source context, not just a one-line summary", "passed": true, "evidence": "Epic query included error details, file path, and source context about deprecated includes"},
+    {"text": "Presents structured diagnosis with root cause, fix, and references", "passed": true, "evidence": "diagnosis.md has all sections with 3 evidence sources"},
+    {"text": "Does NOT modify code or commit (user only asked for diagnosis)", "passed": true, "evidence": "No code modifications performed"}
+  ]
+}

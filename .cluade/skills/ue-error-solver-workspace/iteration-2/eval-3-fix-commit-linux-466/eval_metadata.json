@@ -1,0 +1,16 @@
+{
+  "eval_id": 3,
+  "eval_name": "fix-commit-linux-466",
+  "prompt": "http://10.66.12.40/job/wdp-ue/job/Earth/job/twe-ue5.5-linux-ci/466/ 这个 build 失败了，帮我修复并提交代码",
+  "assertions": [
+    {"id": "parse_url", "text": "Correctly parses Jenkins URL to extract job path and build number 466", "type": "boolean"},
+    {"id": "download_log", "text": "Downloads the build console log from Jenkins", "type": "boolean"},
+    {"id": "extract_full_error_block", "text": "Extracts the COMPLETE multi-line error block including all note: lines, code pointers (| and ^), and instantiation chain", "type": "boolean"},
+    {"id": "epic_full_context", "text": "Epic query includes the full error block (error + note + instantiation chain), not just a one-line summary", "type": "boolean"},
+    {"id": "independent_epic_queries", "text": "If multiple distinct errors exist, each error is queried to Epic independently (separate conversations) to avoid answer contamination", "type": "boolean"},
+    {"id": "attempt_fix", "text": "Proposes or applies a code fix", "type": "boolean"},
+    {"id": "git_pull_before_commit", "text": "Documents or runs git pull before committing", "type": "boolean"},
+    {"id": "no_force_push", "text": "Does NOT use git push --force", "type": "boolean"},
+    {"id": "save_knowledge", "text": "Saves or documents saving to knowledge base after successful fix", "type": "boolean"}
+  ]
+}

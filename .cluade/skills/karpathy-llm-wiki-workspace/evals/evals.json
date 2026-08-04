@@ -1,0 +1,52 @@
+{
+  "skill_name": "karpathy-llm-wiki",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I want to start a fresh LLM wiki. I just watched Karpathy's 'Intro to Large Language Models' talk — can you ingest the key concepts from it? Here are the main topics he covered: what LLMs are (next token prediction on internet text), how training works (pretraining vs fine-tuning), emergent capabilities at scale, tool use and system prompts, security risks (jailbreaks, prompt injection), and the future of LLM OS. Set up the wiki structure and create the initial pages.",
+      "expected_output": "Should create wiki directory structure (SCHEMA.md, index.md, log.md), save raw source, create entity/concept/source pages with proper frontmatter and wikilinks, and pass validation",
+      "assertions": [
+        {"text": "SCHEMA.md exists with tag taxonomy", "type": "file_exists"},
+        {"text": "index.md exists and lists all created pages", "type": "file_exists"},
+        {"text": "log.md exists with ingestion entry", "type": "file_exists"},
+        {"text": "Source page created for the talk", "type": "content_check"},
+        {"text": "Entity pages created (e.g., Karpathy, OpenAI)", "type": "content_check"},
+        {"text": "Concept pages created (e.g., Transformer, Fine-tuning)", "type": "content_check"},
+        {"text": "All pages have YAML frontmatter with required fields", "type": "content_check"},
+        {"text": "Each page has at least 2 outbound wikilinks", "type": "content_check"},
+        {"text": "No broken wikilinks (all [[links]] resolve)", "type": "validation"},
+        {"text": "Validation score >= 9.0", "type": "validation"}
+      ],
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "I have an existing LLM wiki with a few pages about transformers and attention. Now I want to add this article about Flash Attention: 'Flash Attention by Tri Dao introduces an IO-aware exact attention algorithm that reduces memory from O(N^2) to O(N) by tiling the computation and avoiding materializing the full attention matrix. It achieves 2-4x wall-clock speedup over standard attention in PyTorch. FlashAttention-2 further improves this with better work partitioning across GPU thread blocks. Key insight: the bottleneck in attention is memory bandwidth, not FLOPs.' Add this to the wiki and make sure it connects to existing pages about attention and transformers.",
+      "expected_output": "Should read existing wiki state (session start protocol), create source page for the article, create/update concept pages for Flash Attention and related topics, update index and log, and run validation",
+      "assertions": [
+        {"text": "Session start protocol followed (read SCHEMA, index, log)", "type": "process_check"},
+        {"text": "Source page created for Flash Attention article", "type": "content_check"},
+        {"text": "Concept page created for Flash Attention", "type": "content_check"},
+        {"text": "Existing attention/transformer pages updated with links to Flash Attention", "type": "content_check"},
+        {"text": "index.md updated with new pages", "type": "content_check"},
+        {"text": "log.md updated with operation entry", "type": "content_check"},
+        {"text": "No broken wikilinks", "type": "validation"}
+      ],
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Run a quality check on my LLM wiki. I think there might be some broken links and pages that are missing proper metadata. Give me a full report and fix any issues you find.",
+      "expected_output": "Should run the Lint operation: execute validate-wiki.ps1, report all issues across 8 dimensions, fix broken links and missing frontmatter, and re-run until score >= 9.0",
+      "assertions": [
+        {"text": "validate-wiki.ps1 script executed", "type": "process_check"},
+        {"text": "Report includes all 8 validation dimensions", "type": "content_check"},
+        {"text": "Broken links identified and fixed", "type": "content_check"},
+        {"text": "Missing frontmatter identified and added", "type": "content_check"},
+        {"text": "Re-validation run after fixes", "type": "process_check"},
+        {"text": "Final score reported to user", "type": "content_check"}
+      ],
+      "files": []
+    }
+  ]
+}

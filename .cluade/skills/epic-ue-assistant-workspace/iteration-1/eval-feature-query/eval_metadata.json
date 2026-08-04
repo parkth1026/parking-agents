@@ -1,0 +1,11 @@
+{
+  "eval_id": 2,
+  "eval_name": "feature-query-world-partition",
+  "prompt": "How does UE5 World Partition work? How do I enable it for an existing level?",
+  "assertions": [
+    {"name": "returns_answer", "description": "Non-empty answer returned"},
+    {"name": "has_references", "description": "At least 1 Epic reference URL"},
+    {"name": "explains_concept", "description": "Explains World Partition (streaming, cells, grids, or data layers)"},
+    {"name": "has_enable_steps", "description": "Includes steps for enabling World Partition"}
+  ]
+}

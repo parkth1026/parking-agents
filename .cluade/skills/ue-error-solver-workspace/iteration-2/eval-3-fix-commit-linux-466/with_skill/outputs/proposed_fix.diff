@@ -1,0 +1,37 @@
+diff --git a/Source/AesWorldProfiling/Public/AesWorldProfilingTrace.h b/Source/AesWorldProfiling/Public/AesWorldProfilingTrace.h
+--- a/Source/AesWorldProfiling/Public/AesWorldProfilingTrace.h
++++ b/Source/AesWorldProfiling/Public/AesWorldProfilingTrace.h
+@@ -end of file, before #endif
+ #define AESWORLD_TRACE_SCOPE(Name)
+ #define AESWORLD_TRACE_SCOPE_STR(Str)
+ #define AESWORLD_TRACE_CACHE(EventType, ProducerId, MarkerInfo, InCacheName)
+
++// Complete-type stubs so TUniquePtr<T> compiles without -Wdelete-incomplete
++struct FAesTraceScope {};
++struct FAesTracePayloadScope {};
++struct FAesTraceProducerScope {};
++
+ #endif // WITH_EARTH_DEBUGGER
+
+diff --git a/Source/AesWorldProfiling/Private/AesWorldProfilingTrace.cpp b/Source/AesWorldProfiling/Private/AesWorldProfilingTrace.cpp
+--- a/Source/AesWorldProfiling/Private/AesWorldProfilingTrace.cpp
++++ b/Source/AesWorldProfiling/Private/AesWorldProfilingTrace.cpp
+@@ near top of file, inside #if WITH_EARTH_DEBUGGER block
+ #if WITH_EARTH_DEBUGGER
+
++#include "AesProducerGraphStore.h"
+ #include "AesWorldProfilingModule.h"
+
+--- NOTES ---
+This is the minimal fix (Approach A). It adds empty stub struct definitions in the
+#else branch of AesWorldProfilingTrace.h so that TUniquePtr<FAesTracePayloadScope>
+has a complete type to delete in all build configurations.
+
+Files changed:
+  1. Source/AesWorldProfiling/Public/AesWorldProfilingTrace.h  (+5 lines)
+  2. Source/AesWorldProfiling/Private/AesWorldProfilingTrace.cpp  (+1 line)
+
+The fix preserves the existing architecture -- AesLodSystem continues to depend on
+AesWorldProfiling, and the PayloadTraceScope member remains in the request classes.
+In non-debug builds, the TUniquePtr will simply hold a pointer to an empty struct
+(which will always be nullptr since creation is guarded by #if WITH_EARTH_DEBUGGER).

@@ -1,0 +1,42 @@
+{
+  "eval_id": 1,
+  "eval_name": "diagnose-autoci-3913",
+  "prompt": "帮我看看这个 build 怎么挂的 http://10.66.12.40/job/wdp-ue/job/Earth/job/aes6-ue-runtime-ci/3913/",
+  "assertions": [
+    {
+      "id": "parse_url",
+      "text": "Correctly parses Jenkins URL to extract job path and build number 3913",
+      "type": "boolean"
+    },
+    {
+      "id": "download_log",
+      "text": "Downloads the build console log from Jenkins",
+      "type": "boolean"
+    },
+    {
+      "id": "extract_error",
+      "text": "Identifies C1083 (TextureRenderTargetResource.h) as the primary error",
+      "type": "boolean"
+    },
+    {
+      "id": "search_kb",
+      "text": "Searches local knowledge base and finds existing entries about C1083/TextureRenderTargetResource",
+      "type": "boolean"
+    },
+    {
+      "id": "query_epic",
+      "text": "Queries Epic UE assistant for official guidance on the error",
+      "type": "boolean"
+    },
+    {
+      "id": "diagnosis_report",
+      "text": "Presents a structured diagnosis with root cause, recommended fix, and references",
+      "type": "boolean"
+    },
+    {
+      "id": "no_code_modification",
+      "text": "Does NOT attempt to modify code or commit (user only asked for diagnosis)",
+      "type": "boolean"
+    }
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "expectations": [
+    {
+      "text": "Correctly parsed URL to extract baseUrl, jobPath, and buildNumber",
+      "passed": true,
+      "evidence": "Diagnosis identifies 'Job: wdp-ue / Earth / aes6-ue-runtime-ci, Build Number: #3939' and constructs correct API URLs from the input URL"
+    },
+    {
+      "text": "All config paths resolved correctly (tmpDir, wikiDir, rawDir)",
+      "passed": false,
+      "evidence": "No config.json path resolution. The baseline does not know about or use the skill's config file."
+    },
+    {
+      "text": "Downloaded log and saved with timestamped filename to tmpDir",
+      "passed": false,
+      "evidence": "No log file saved with timestamped name. The baseline downloaded the log inline but did not persist it to a named file."
+    },
+    {
+      "text": "Searched knowledge base at resolved wikiDir path",
+      "passed": false,
+      "evidence": "No knowledge base search performed. The baseline diagnosed purely from the Jenkins log content."
+    },
+    {
+      "text": "Produced complete diagnosis report",
+      "passed": true,
+      "evidence": "Report includes Root Cause (missing precompiled manifest for TraceAnalysis), dependency chain analysis, explanation of why Editor passed but Package failed, 3 fix options with code examples, additional warnings section."
+    }
+  ],
+  "summary": {
+    "passed": 2,
+    "failed": 3,
+    "total": 5,
+    "pass_rate": 0.4
+  },
+  "claims": [
+    {
+      "claim": "Editor build succeeded with 519/519 targets",
+      "type": "factual",
+      "verified": true,
+      "evidence": "Consistent with actual Jenkins log for build #3939"
+    },
+    {
+      "claim": "ExitCode=6 from UBT",
+      "type": "factual",
+      "verified": true,
+      "evidence": "Consistent with actual Jenkins log"
+    }
+  ],
+  "eval_feedback": {
+    "suggestions": [],
+    "overall": "Baseline passes 2/5. Correctly parses the URL and produces a good diagnosis, but lacks all config-driven behavior (path resolution, KB search, timestamped log naming). These are expected gaps for a baseline without the skill."
+  }
+}
