@@ -1,0 +1,4 @@
+interface:
+  display_name: "CPU Monitor"
+  short_description: "Windows CPU 进程/线程 Top-N 采样 + WMI 诊断,不经 WMI 不拉高 WmiPrvSE"
+  default_prompt: "抓 10 秒内 CPU 占用最高的 Top 进程/线程"
