@@ -213,6 +213,7 @@ npm test
 
 **这些测试的价值在于把静默失败变成响亮失败** —— 技能加载在所有平台上都无报错、无警告，出错时技能只是不出现。详见 [docs/testing.md](./docs/testing.md)。
 
+- 哪些文件九平台共享、哪些必须放固定位置 → [docs/install-layout.md](./docs/install-layout.md)
 - 增加新平台支持 → [docs/porting-to-a-new-harness.md](./docs/porting-to-a-new-harness.md)
 - 测试分层与验收标准 → [docs/testing.md](./docs/testing.md)
 - 开发 VS Code Copilot agent → [AGENT_DEVELOPMENT.md](./AGENT_DEVELOPMENT.md)

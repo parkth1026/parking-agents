@@ -97,7 +97,7 @@ function stripFrontmatter(content: string): string {
 function piToolMapping(): string {
 	return `## Pi tool mapping
 
-Skills speak in actions ("dispatch a subagent", "create a todo", "read a file"). On Pi these resolve to the lowercase built-in tools:
+Skills speak in actions, not tool names ("dispatch a subagent", "create a todo", "read a file"). On Pi these resolve to the lowercase built-in tools:
 
 - Read a file → \`read\`
 - Create a file → \`write\`

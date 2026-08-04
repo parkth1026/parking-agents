@@ -1,6 +1,6 @@
 ---
 name: using-parking-skills
-description: Use when starting any conversation - establishes how to find and use the parking skills, and how to translate the tool names written in them into the tools your platform actually exposes.
+description: Use when starting any conversation - establishes how to find and use the parking skills, and how to resolve the actions they name into the tools your platform actually exposes.
 ---
 
 <SUBAGENT-STOP>
@@ -19,42 +19,59 @@ This is not negotiable. You cannot rationalize your way out of this.
 
 **Invoke relevant or requested skills BEFORE any response or action** — including clarifying questions, exploring the codebase, or checking files. If it turns out wrong for the situation, you don't have to use it.
 
-Then announce "Using [skill] to [purpose]" and follow the skill exactly. If it has a checklist, create a todo per item.
+Then announce "Using [skill] to [purpose]" and follow the skill exactly. If it has a checklist, track one task per item.
 
-## Tool names in these skills are ALIASES, not real tools
+## Skills speak in actions, not tool names
 
 **This is the single most important thing to understand about this skill library.**
 
-The skill bodies in this repository were originally written for VS Code Copilot. They name tools like `read_file`, `run_in_terminal`, `runSubagent`, `manage_todo_list`, `grep_search`, and `vscode_askQuestions`.
+The same skill bodies run unmodified on nine different platforms. That is only possible because they never name a tool. They name an **action**, and you resolve it to whichever of *your* tools performs it.
 
-**Those are not tools you can call.** Treat every such name as an *alias for an action*:
-
-| When a skill says | It means the action |
+| When a skill names this action | You do this |
 |---|---|
-| `read_file` | read a file |
-| `create_file` | create a file |
-| `replace_string_in_file` / `multi_replace_string_in_file` | edit a file |
-| `run_in_terminal` | run a shell command |
-| `grep_search` | search file contents |
-| `file_search` | find files by name |
-| `list_dir` | list a directory |
-| `manage_todo_list` | track tasks / todos |
-| `runSubagent` | dispatch a subagent |
-| `vscode_askQuestions` | ask the user a question |
-| `fetch_webpage` | fetch a URL or search the web |
-| `get_errors` | get diagnostics for a file |
+| read a file | read it with your file-reading tool |
+| create a file | create it |
+| edit a file | apply the edit |
+| run a shell command | run it |
+| search file contents | search them |
+| find files by name | find them |
+| list a directory | list it |
+| fetch a URL / search the web | fetch or search |
+| track tasks / mark a task complete | use your task-tracking mechanism |
+| ask your human partner a question | ask, through whatever mechanism reaches them |
+| get diagnostics for a file | run the project's own linter or type-checker |
+| dispatch a subagent | see the dispatch block below |
 
-Read your platform's reference file below to learn which of *your* tools performs each action, then use that tool. **Never call a tool by the name written in the skill body.** If a skill names an action your platform cannot perform, say so and degrade as the reference file instructs — never invent a tool call.
+If your platform cannot perform an action, **say so and degrade as your reference file instructs — never invent a tool call.** A fabricated call fails silently: the model either hallucinates a tool that does not exist, or stalls because it cannot find the named one.
+
+## Subagent dispatch blocks
+
+When a skill wants a subagent, it emits a block that looks like a call but names no real tool:
+
+```
+Subagent (general-purpose):
+  description: "<one-line task name>"
+  model: <required when your harness supports it; omitting it silently inherits the session's most expensive model>
+  prompt: |
+    <the full prompt>
+```
+
+Translate that block into your platform's own subagent dispatch. Your reference file below spells out which one, and which agent type to pass. Subagents cannot reach your human partner — a subagent that needs a decision must return and let the main agent ask.
 
 ## Platform Adaptation
 
 Read the reference file for the harness you are running in:
 
-- Claude Code: `references/claude-code-tools.md`
-- Codex: `references/codex-tools.md`
-- Pi: `references/pi-tools.md`
+| Harness | Where its mapping lives |
+|---|---|
+| Claude Code / Cursor / Copilot CLI | None needed — your tool surface already covers every action above |
+| Codex | `references/codex-tools.md` |
+| Pi | `references/pi-tools.md` |
+| Gemini CLI | `references/gemini-tools.md` |
+| Antigravity | `references/antigravity-tools.md` |
+| OpenCode / Kimi Code | Delivered inline with this bootstrap — nothing to read |
 
-If none of these matches your harness, apply the alias table above using whatever tools you do expose, and tell your human partner that this harness has no reference file yet.
+If none of these matches your harness, apply the action table above using whatever tools you do expose, and tell your human partner that this harness has no mapping yet.
 
 ## Two kinds of skills in this library
 
@@ -77,8 +94,8 @@ These thoughts mean STOP—you're rationalizing:
 | "This doesn't count as a task" | Action = task. Check for skills. |
 | "The skill is overkill" | Simple things become complex. Use it. |
 | "I'll just do this one thing first" | Check BEFORE doing anything. |
-| "The skill says `read_file`, so I'll call `read_file`" | That name is an alias. Translate it first. |
-| "No mapping for this tool, I'll guess a name" | Never invent tool calls. Report the gap. |
+| "The skill named an action, so there must be a tool with that name" | It named an action. Resolve it to one of *your* tools. |
+| "No mapping for this action, I'll guess a name" | Never invent tool calls. Report the gap. |
 
 ## User Instructions
 

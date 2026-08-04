@@ -92,7 +92,7 @@ function stripFrontmatter(content) {
 function openCodeToolMapping() {
 	return `## OpenCode tool mapping
 
-Skills speak in actions ("dispatch a subagent", "create a todo", "read a file"). On OpenCode these resolve to:
+Skills speak in actions, not tool names ("dispatch a subagent", "create a todo", "read a file"). On OpenCode these resolve to:
 
 - Read a file → \`read\`
 - Create, edit, or delete files → \`apply_patch\`

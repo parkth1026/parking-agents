@@ -71,13 +71,22 @@ const DENIED = {
 };
 
 // Paths (repo-relative, forward slashes) exempt from the rule, and why.
+//
+// The bundled checker (skills/making-skills-cross-platform/scripts/check-skill-repo.mjs)
+// applies the same invariant via its --allow flag. It auto-allows the bootstrap's
+// own references/ (using-parking-skills), so only the two non-bootstrap exemptions
+// below are duplicated as --allow in package.json's check:repo script. Keep both
+// in sync when you add or remove an exemption.
 const ALLOWLIST = [
 	// The tool-name conversion table IS this skill's subject matter.
+	// Also passed to the checker as --allow in package.json.
 	"skills/claude-to-vscode-skill-converter/",
 	// The adapter layer itself -- naming real tools is the entire point.
+	// Auto-allowed by the checker (bootstrap references).
 	"skills/using-parking-skills/references/",
 	// The porting blueprint: telling a porter which tool each harness exposes
 	// IS the deliverable. Its SKILL.md is still held to the rule.
+	// Also passed to the checker as --allow in package.json.
 	"skills/making-skills-cross-platform/references/",
 ];
 

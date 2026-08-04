@@ -1,22 +1,22 @@
 # Codex tool mapping
 
-The skill bodies in this repository name VS Code Copilot tools. Those names are aliases for actions. Use the Codex tool in the right-hand column instead.
+Skills speak in actions, not tool names ("dispatch a subagent", "create a todo", "read a file"). On Codex these resolve to:
 
-| Skill body says | Action | Use in Codex |
-|---|---|---|
-| `read_file` | read a file | your native file read, or `shell` + `cat` |
-| `create_file` | create a file | `apply_patch` |
-| `replace_string_in_file` | edit a file | `apply_patch` |
-| `multi_replace_string_in_file` | several edits in one file | `apply_patch` (one patch can carry several hunks) |
-| `run_in_terminal` | run a shell command | `shell` |
-| `grep_search` | search file contents | `shell` + `rg` (fall back to `grep -r`) |
-| `file_search` | find files by name | `shell` + `rg --files` or `find` |
-| `list_dir` | list a directory | `shell` + `ls` |
-| `manage_todo_list` | track tasks | No standard tool — see Degradations below |
-| `runSubagent` | dispatch a subagent | `spawn_agent` — **requires config, see below** |
-| `vscode_askQuestions` | ask the user a question | No tool — ask in your reply and wait |
-| `fetch_webpage` | fetch a URL / search the web | `shell` + `curl` where network is allowed |
-| `get_errors` | get diagnostics for a file | No tool — run the project's linter or type-checker via `shell` |
+| Action a skill names | Use in Codex |
+|---|---|
+| Read a file | your native file read, or `shell` + `cat` |
+| Create a file | `apply_patch` |
+| Edit a file | `apply_patch` |
+| Several edits in one file | `apply_patch` (one patch can carry several hunks) |
+| Run a shell command | `shell` |
+| Search file contents | `shell` + `rg` (fall back to `grep -r`) |
+| Find files by name | `shell` + `rg --files` or `find` |
+| List a directory | `shell` + `ls` |
+| Fetch a URL / search the web | `shell` + `curl` where network is allowed |
+| Track tasks | No standard tool — see Degradations below |
+| Ask your human partner a question | No tool — ask in your reply and wait |
+| Get diagnostics for a file | No tool — run the project's linter or type-checker via `shell` |
+| Dispatch a subagent | `spawn_agent` — **requires config, see below** |
 
 ## Invoking other skills
 
@@ -24,7 +24,7 @@ Codex discovers skills natively from the plugin's `skills/` directory. When a sk
 
 ## Subagent dispatch requires multi-agent support
 
-`runSubagent` appears in many skills in this library. It maps to `spawn_agent`, which is gated behind a config flag. Add to `~/.codex/config.toml`:
+When a skill emits a `Subagent (general-purpose):` block, it maps to `spawn_agent`, which is gated behind a config flag. Add to `~/.codex/config.toml`:
 
 ```toml
 [features]
@@ -33,13 +33,13 @@ multi_agent = true
 
 This enables `spawn_agent`, `wait_agent`, and `close_agent`. Close a subagent when its work returns.
 
-If multi-agent is not enabled, **do not invent a `runSubagent` or `Task` call.** Either do the work inline in this session, or tell your human partner that the skill wants a subagent and multi-agent support is off.
+If multi-agent is not enabled, **do not invent a subagent call.** Either do the work inline in this session, or tell your human partner that the skill wants a subagent and multi-agent support is off.
 
 ## Degradations
 
-- **Task tracking** — no standard todo tool. Track multi-step work in a plan file or a repo-local `TODO.md`. Treat `manage_todo_list` in a skill body as "keep a written task list".
-- **Asking the user** — no `AskUserQuestion` equivalent. When a skill says to ask, put the question in your reply and stop; do not guess and continue.
-- **Diagnostics** — no `get_errors`. Run the project's own checks (`tsc --noEmit`, `cargo check`, `dotnet build`, `ruff`, etc.) via `shell`.
+- **Task tracking** — no standard todo tool. Track multi-step work in a plan file or a repo-local `TODO.md`.
+- **Asking the user** — no interactive question tool. When a skill says to ask, put the question in your reply and stop; do not guess and continue.
+- **Diagnostics** — no diagnostics tool. Run the project's own checks (`tsc --noEmit`, `cargo check`, `dotnet build`, `ruff`, etc.) via `shell`.
 
 ## Environment detection
 

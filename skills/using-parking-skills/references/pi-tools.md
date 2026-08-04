@@ -1,34 +1,32 @@
 # Pi tool mapping
 
-The skill bodies in this repository name VS Code Copilot tools. Those names are aliases for actions. Use the Pi tool in the right-hand column instead.
+Skills speak in actions, not tool names ("dispatch a subagent", "create a todo", "read a file"). On Pi these resolve to the lowercase built-in tools:
 
-Pi's built-in coding tools are lowercase.
-
-| Skill body says | Action | Use in Pi |
-|---|---|---|
-| `read_file` | read a file | `read` |
-| `create_file` | create a file | `write` |
-| `replace_string_in_file` | edit a file | `edit` |
-| `multi_replace_string_in_file` | several edits in one file | `edit` (one call per replacement) |
-| `run_in_terminal` | run a shell command | `bash` |
-| `grep_search` | search file contents | `grep` |
-| `file_search` | find files by name | `find` |
-| `list_dir` | list a directory | `ls` |
-| `manage_todo_list` | track tasks | No standard tool — see Degradations below |
-| `runSubagent` | dispatch a subagent | `subagent` if `pi-subagents` is installed — see below |
-| `vscode_askQuestions` | ask the user a question | No tool — ask in your reply and wait |
-| `fetch_webpage` | fetch a URL / search the web | No standard tool — report the gap |
-| `get_errors` | get diagnostics for a file | No tool — run the project's linter or type-checker via `bash` |
+| Action a skill names | Use in Pi |
+|---|---|
+| Read a file | `read` |
+| Create a file | `write` |
+| Edit a file | `edit` |
+| Several edits in one file | `edit` (one call per replacement) |
+| Run a shell command | `bash` |
+| Search file contents | `grep` |
+| Find files by name | `find` |
+| List a directory | `ls` |
+| Fetch a URL / search the web | No standard tool — see Degradations below |
+| Track tasks | No standard tool — see Degradations below |
+| Ask your human partner a question | No tool — ask in your reply and wait |
+| Get diagnostics for a file | No tool — run the project's linter or type-checker via `bash` |
+| Dispatch a subagent | `subagent` if `pi-subagents` is installed — see below |
 
 ## Invoking other skills
 
-Pi has native skills but does not expose Claude Code's `Skill` tool. When a skill body tells you to use another skill, read the relevant `skills/<name>/SKILL.md` with `read` and follow it, or let your human partner invoke `/skill:name` explicitly.
+Pi has native skill discovery but no dedicated skill-invocation tool. When a skill body says to invoke another skill, load the relevant `skills/<name>/SKILL.md` with `read`, or let your human partner invoke `/skill:name` explicitly. Reading it that way IS Pi's skill-loading mechanism, so it does not bypass anything.
 
 ## Degradations
 
-- **Subagents** — `runSubagent` is the most common tool name in this library. Pi does not ship a subagent tool by default. If one is available (such as `subagent` from the optional `pi-subagents` package), use it. If none is available, **do the work inline in this session or explain the missing capability — never invent a `runSubagent` or `Task` call.**
+- **Subagents** — Pi does not ship a subagent tool by default. When a skill emits a `Subagent (general-purpose):` block, use `subagent` from `pi-subagents` if it is installed. If no subagent tool is available, do the work in this session or explain the missing capability — **never invent a subagent call.**
 - **Task tracking** — no standard todo tool. If an installed todo/task tool is available, use it. Otherwise track work in plan files or a repo-local `TODO.md`.
-- **Asking the user** — no `AskUserQuestion` equivalent. When a skill says to ask, put the question in your reply and stop; do not guess and continue.
+- **Asking the user** — no interactive question tool. When a skill says to ask, put the question in your reply and stop; do not guess and continue.
 - **Web access** — no standard fetch or search tool. If a skill's core purpose needs the web (`research`, `grill-with-docs`), say the capability is missing rather than answering from memory.
 
 ## Windows-only skills
@@ -37,4 +35,4 @@ Pi has native skills but does not expose Claude Code's `Skill` tool. When a skil
 
 ---
 
-**Maintainers:** this mapping is duplicated in `.pi/extensions/parking-skills.ts` (`piToolMapping()`), which is what actually gets injected at session start. Change both together.
+**Maintainers:** this mapping is duplicated in `.pi/extensions/parking-skills.ts` (`piToolMapping()`), which is what actually gets injected at session start. Change both together — `tests/pi/test-pi-extension.mjs` cross-checks them.

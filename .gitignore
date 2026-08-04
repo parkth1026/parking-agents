@@ -7,3 +7,4 @@ reports/*
 *reports/*
 
 node_modules/
+/.zcode/plans
