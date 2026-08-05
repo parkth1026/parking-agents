@@ -1,0 +1,49 @@
+﻿{
+  "trackFile": "C:/Users/Administrator/.openclaw-autoclaw/workspace/wiki-raw/jenkins-learnings/analyzed-builds.json",
+  "gitRepos": "D:/Git",
+  "jobs": [
+    {
+      "enabled": true,
+      "name": "twe-ue5.5",
+      "path": "job/wdp-ue/job/Earth/job/twe-ue5.5"
+    },
+    {
+      "enabled": true,
+      "name": "twe-ue5.5-linux-ci",
+      "path": "job/wdp-ue/job/Earth/job/twe-ue5.5-linux-ci"
+    },
+    {
+      "enabled": true,
+      "name": "aes6-ue-runtime-ci",
+      "path": "job/wdp-ue/job/Earth/job/aes6-ue-runtime-ci"
+    },
+    {
+      "enabled": true,
+      "name": "twe-ue5.5-installed",
+      "path": "job/wdp-ue/job/Earth/job/twe-ue5.5-installed"
+    },
+    {
+      "enabled": true,
+      "name": "wdp5-ue5.5-runtime-ci",
+      "path": "job/wdp-ue/job/wdp5-ue5.5-runtime-ci"
+    },
+    {
+      "enabled": true,
+      "name": "wdp5-runtime-ue5.5-linux-ci",
+      "path": "job/wdp-ue/job/WDP5_Runtime/job/wdp5-runtime-ue5.5-linux-ci"
+    },
+    {
+      "enabled": true,
+      "name": "wdp5-plugins-ue5.5",
+      "path": "job/wdp-ue/job/WDP5_InstalledPlugins/job/wdp5-plugins-ue5.5"
+    }
+  ],
+  "tmpDir": "C:/Users/Administrator/.openclaw-autoclaw/workspace/tmp/ue-error",
+  "knowledgeBase": {
+    "rawDir": "C:/Users/Administrator/.openclaw-autoclaw/workspace/wiki-raw/jenkins-learnings",
+    "wikiDir": "C:/Users/Administrator/memory/jenkins-learnings"
+  },
+  "jenkins": {
+    "baseUrl": "http://10.66.12.40"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "timestamp": "2026-05-03T12:33:00+08:00",
+  "buildsAnalyzed": 6,
+  "buildsSkipped": 1,
+  "failurePairsFound": 2,
+  "knowledgeWritten": 2,
+  "details": [
+    "058-C2039-UEarthRegionalPrefabAssetLibrary-Reset.md (score=7, twe-ue55-linux#466→#469)",
+    "059-C2039-AesEmbankmentGeoSourceMarkerProducer.md (score=7, aes6-runtime#4016→#4018)"
+  ]
+}
