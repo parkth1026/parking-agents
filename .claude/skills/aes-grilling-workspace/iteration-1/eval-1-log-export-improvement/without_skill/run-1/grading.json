@@ -1,0 +1,49 @@
+{
+  "expectations": [
+    {
+      "text": "批量提问:interview-log.md 显示所有初始歧义问题在同一轮一次性给出,追加提问不超过 1 轮且有明确理由",
+      "passed": true,
+      "evidence": "第 1 轮一次性给出 A/B/C/D 四组共 13 个问题。追加仅第 2 轮 1 次,且有明确理由:「还剩几个边界情况」——这 5 个边界问题(单端日期、非法格式、from>to、0 跳过是否打印、stdout 行保留)均依赖第 1 轮才获知的 --from/--to 需求,第 1 轮无法提出。"
+    },
+    {
+      "text": "不问可查事实:没有任何问题询问 fixture 代码可直接读到的事实(输出路径写死、跳过不可解析行、CSV 列结构等应自查后告知)",
+      "passed": true,
+      "evidence": "第 1 轮开头即自查后告知:「固定读取脚本旁的 logs/*.log,按正则解析出 (timestamp, level, message),固定写到 ./export.csv(总是覆盖),无法解析的行静默跳过」。13 个问题均为用户侧场景/偏好(使用者、频率规模、痛点、轮转文件、多行日志、Python 版本等生产环境事实),无一询问 fixture 代码可直接读到的事实。"
+    },
+    {
+      "text": "先给推荐候选:第一批问题之前给出了推荐候选(Goal 一句话、In/Out 各一句、AC 大致方向)",
+      "passed": false,
+      "evidence": "第 1 轮在陈述现状事实后直接进入 13 个问题,之前没有推荐候选:无 Goal 一句话、无 In/Out 各一句、无 AC 方向。部分问题内嵌了建议(如问题 11 列选项),但不构成第一批问题前的整体候选靶子。"
+    },
+    {
+      "text": "AC 独立对齐:验收标准以 1-7 条编号列表单独一步呈现,并明确告知用户可以一次回复完所有裁决",
+      "passed": false,
+      "evidence": "AC 草案(AC1-AC8 共 8 条,超出 1-7 条)在第 2 轮与 5 个边界情况问题混在同一条消息里呈现,不是单独一步;告知语为「请逐条裁决:通过 / 改措辞 / 删除,也欢迎补充」,未明确告知可以一次回复完所有裁决。三项要求(1-7 条、单独一步、明确告知一次回复完)均不满足。"
+    },
+    {
+      "text": "AC 裁决被吸收:画像在 AC 阶段做出的修改(改措辞、补充或删除条目)被如实反映进最终 Contract 的 Success Criteria",
+      "passed": true,
+      "evidence": "用户第 2 轮裁决:改写 AC2 措辞(按时间戳前 10 字符日期部分比较,不得按完整时间比较)、AC6 合并 0 也打印/只算解析失败、补充 AC9(stdout 保留 exported N rows -> 路径,N 为过滤后行数)。goal-contract.md 第 6 节如实反映:AC2 标注「(用户改写措辞)」并含日期部分比较口径,AC6 含「为 0 也要打印;只统计解析失败的行」,AC9 标注「(用户补充)」且内容逐点对应。"
+    },
+    {
+      "text": "校验通过:goal-contract.md 经 validate-goal-contract.ps1 校验退出码为 0",
+      "passed": false,
+      "evidence": "评分时实际运行 validate-goal-contract.ps1,输出「INVALID」并报 24 条 ERROR(「Preamble requires exactly one Status: Ready or Blocked」「Missing heading: Goal/Why/Scope/Success Criteria/Constraints/Agent Mandate/Completion/Blockers」等),退出码 1。契约标题为「# Goal Contract:log-export 脚本改进」但章节结构(1-8 节自由编排)不符合 AES 模板。"
+    },
+    {
+      "text": "意图命中:Contract 包含 --from/--to 日期过滤、--output 且缺省保持原默认路径、CSV 列与 UTF-8 不变、跳过行数统计到 stderr;Out 明确排除压缩/上传/级别过滤",
+      "passed": true,
+      "evidence": "第 2 节目标 1「--from/--to 日期范围过滤(两端含当天)」;第 5 节「--output…缺省时为脚本同目录 export.csv」+ 第 4 节红线「不传 --output 时…一个字都不能变」;红线「编码 UTF-8(无 BOM);表头与列顺序固定为 timestamp,level,message」;目标 3/AC6「跳过的行数统计打印到 stderr(为 0 也打印)」;第 3 节非目标明确列出「按日志级别过滤」「压缩输出、自动上传」。五项全部命中。"
+    },
+    {
+      "text": "handoff 生成:handoff.md 存在,包含 contract 绝对路径,结构与 handoff-prompt.md 模板一致",
+      "passed": false,
+      "evidence": "without_skill\\outputs\\ 目录下只有 interview-log.md 和 goal-contract.md,不存在 handoff.md。"
+    }
+  ],
+  "summary": {
+    "passed": 4,
+    "total": 8,
+    "pass_rate": 0.5
+  }
+}

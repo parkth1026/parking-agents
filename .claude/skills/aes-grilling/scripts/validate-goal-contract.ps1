@@ -53,7 +53,7 @@ function Test-MeaningfulValue {
     if ([string]::IsNullOrWhiteSpace($Value)) {
         return $false
     }
-    return $Value -notmatch '(?i)^(none|n/?a|unknown|pending|later|-)$'
+    return $Value -notmatch '(?i)^(none|n/?a|unknown|pending|later|-|todo|tbd|fixme|xxx)[.!]?$'
 }
 
 function Get-BulletLines {
@@ -100,8 +100,19 @@ if ($updatedMatches.Count -ne 1 -or $updated -notmatch '^\d{4}-\d{2}-\d{2}$') {
 
 # 占位符判据只认模板那种 <letter...> 的形式。放宽到任意 <...> 会把
 # "响应时间 < 200ms 且 QPS > 100" 这类数值阈值 AC 当成占位符拒掉，而阈值恰恰是好 AC 该写的。
-if ($content -match '(?i)\b(TODO|TBD|FIXME|XXX)\b|<[A-Za-z][A-Za-z0-9 ,._/|-]{1,80}>') {
-    $errors.Add('Contract contains a placeholder.')
+if ($content -match '<[A-Za-z][A-Za-z0-9 ,._/|-]{1,80}>') {
+    $errors.Add('Contract contains a template placeholder like <...>.')
+}
+
+# TODO/TBD/FIXME/XXX 只有以占位符形态出现才算错：独占一行，或行首后跟冒号的空承诺。
+# 出现在句子中间的多半是内容本身——「搜索标题含 TODO 的笔记」是合法 AC，拒掉会逼用户
+# 为绕过校验器改需求措辞。句中出现降级为 WARNING，供人复核。作为字段值出现
+# (如 "- Evidence: TODO") 由 Test-MeaningfulValue 拦截。
+if ($content -match '(?im)^\s*(?:[-*+]\s*)?(?:\*\*)?(TODO|TBD|FIXME|XXX)\b\s*(?:[:：]|[\s.!-]*$)') {
+    $errors.Add('Contract contains an unresolved TODO/TBD/FIXME marker.')
+}
+elseif ($content -match '(?i)\b(TODO|TBD|FIXME|XXX)\b') {
+    $warnings.Add('Contract mentions TODO/TBD/FIXME/XXX inside a sentence; confirm it is real content, not a deferred-work marker.')
 }
 
 $requiredHeadings = @(

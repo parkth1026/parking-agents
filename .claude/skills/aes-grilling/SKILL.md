@@ -1,7 +1,6 @@
 ---
 name: aes-grilling
-description: "批量问清歧义，逐条对齐验收标准，生成可直接交给执行 Agent 的轻量 Goal Contract。"
-disable-model-invocation: true
+description: "把模糊请求收敛为可直接交给执行 Agent 的轻量 Goal Contract：批量问清歧义，逐条对齐验收标准，产出经校验的契约。当用户提出模糊、宽泛或存在多种理解的开发需求，说「帮我理清需求」「先对齐目标」「写份需求文档 / 验收标准 / goal contract」，或在动手实现前需要先确认边界和完成标准时使用，即使用户没有明说要「契约」或「访谈」。"
 ---
 
 # AES 目标对齐（纯文本）

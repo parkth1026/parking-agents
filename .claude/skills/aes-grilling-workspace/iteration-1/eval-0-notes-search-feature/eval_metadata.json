@@ -1,0 +1,14 @@
+{
+  "eval_id": 0,
+  "eval_name": "notes-search-feature",
+  "prompt": "我想给 fixtures/notes-cli 这个笔记工具加一个搜索功能。帮我先把需求理清楚,最后给我一份可以直接交给执行 agent 的 goal contract。先不要写代码。",
+  "assertions": [
+    "批量提问:interview-log.md 显示所有初始歧义问题在同一轮一次性给出,追加提问不超过 1 轮且有明确理由",
+    "不问可查事实:没有任何问题询问 fixture 代码可直接读到的事实(数据存哪、有哪些命令、是否有 archived 字段等)",
+    "先给推荐候选:第一批问题之前给出了推荐候选(Goal 一句话、In/Out 各一句、AC 大致方向)",
+    "AC 独立对齐:验收标准以 1-7 条编号列表单独一步呈现,并明确告知用户可以一次回复完所有裁决",
+    "校验通过:goal-contract.md 经 validate-goal-contract.ps1 校验退出码为 0",
+    "意图命中:Contract 覆盖画像关键意图——标题+正文、不区分大小写子串、默认排除归档且 --all 包含归档、Out 排除正则/模糊匹配/排序,现有命令兼容性写入 Constraints 或 AC",
+    "handoff 生成:handoff.md 存在,包含 contract 绝对路径,结构与 handoff-prompt.md 模板一致"
+  ]
+}

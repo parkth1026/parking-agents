@@ -1,0 +1,21 @@
+{
+  "skill_name": "aes-grilling",
+  "evals": [
+    {
+      "id": 0,
+      "eval_name": "notes-search-feature",
+      "prompt": "我想给 fixtures/notes-cli 这个笔记工具加一个搜索功能。帮我先把需求理清楚,最后给我一份可以直接交给执行 agent 的 goal contract。先不要写代码。",
+      "expected_output": "一轮批量问清搜索范围/匹配方式/归档处理等歧义(不问代码里查得到的事实),单独一步逐条对齐 AC,产出通过 validate-goal-contract.ps1 校验的 Goal Contract,内容与模拟用户画像一致,并生成 handoff 启动指令。",
+      "files": ["fixtures/notes-cli"],
+      "assertions": []
+    },
+    {
+      "id": 1,
+      "eval_name": "log-export-improvement",
+      "prompt": "fixtures/log-export 这个日志导出脚本太难用了,帮我改进一下。先把需求理清楚再给我一份 goal contract,别直接动手改。",
+      "expected_output": "面对'太难用'这种高度模糊的请求,先给推荐候选再一轮批量提问挖出日期过滤/输出路径/兼容约束,AC 阶段接受模拟用户的逐条修改(改措辞/补删条目),产出通过校验的 Goal Contract,Out 明确排除压缩/上传/级别过滤。",
+      "files": ["fixtures/log-export"],
+      "assertions": []
+    }
+  ]
+}
