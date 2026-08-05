@@ -1,7 +1,7 @@
 ---
-  name: simplify
-  description: Review changed code for reuse, quality, and efficiency, then fix any issues found.
-  ---
+name: simplify
+description: Review changed code for reuse, quality, and efficiency, then fix any issues found.
+---
 
   # Simplify: Code Review and Cleanup
 
@@ -14,7 +14,8 @@
 
   ## Phase 2: Launch three review subagents one by one.
 
-  Use the Agent tool to launch all three agents concurrently in a single message. Pass each agent the full diff so it has the complete context.
+  Dispatch all three subagents in a single message so they run concurrently. Each one is a
+  `Subagent (general-purpose):` dispatch. Pass each subagent the full diff so it has the complete context.
 
   ### Agent 1: Code Reuse Review
 
