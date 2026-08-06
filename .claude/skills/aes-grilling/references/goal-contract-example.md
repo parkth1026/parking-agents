@@ -33,8 +33,8 @@
 
 ## Agent Mandate
 
-- May decide: 自主调查仓库、确定 JSON schema 和可逆实现细节、修改代码与文档、补充测试、审查最终 diff，并在不改变行为的前提下 simplify。
-- Must ask: 只有实现 Goal 必须破坏当前默认行为、改变 Scope 或 Success Criteria，或需要未授权的外部/破坏性操作时才询问。
+- May decide: 自主调查仓库、确定 JSON schema 和可逆实现细节、修改代码与文档、补充测试、审查最终 diff。不改变行为的前提下可做 simplify。
+- Must ask: 实现 Goal 必须破坏默认行为、改 Scope 或 Success Criteria 时询问。需要未授权的外部或破坏性操作时也询问。
 - Must not: 停在计划阶段、询问可从仓库发现的事实、创建平行审计路径，或在没有每条 AC 新鲜证据时宣布完成。
 
 ## Completion
