@@ -14,6 +14,9 @@
   8. Optional sections Read First, Deliverables, and Iteration Strategy are allowed; when
      Deliverables exists its bullets must be sequential unique "- D-01: <path>: <requirement>".
   9. A [B] Verify without a Deliverables section emits a WARNING (fixtures may already exist on disk).
+  10. A contract referencing an alignment artifact (mock HTML or *-behavior.md contrast
+      doc) without a Read First section emits a WARNING (the approved artifact should be
+      pointed at, not implied).
 #>
 [CmdletBinding()]
 param(
@@ -314,6 +317,13 @@ foreach ($optionalHeading in @('Read First', 'Deliverables', 'Iteration Strategy
 $readFirst = Get-SectionBody -Heading 'Read First'
 if ($null -ne $readFirst -and @(Get-BulletLines -Section $readFirst).Count -lt 1) {
     $errors.Add('Read First, when present, requires at least one pointer bullet.')
+}
+
+# 确认版对照物（界面 mock / 行为对照表）应从 Read First 指路。引用了对照物却没有
+# Read First 时，执行 Agent 只能从 Verify 行反推对照物是什么。对照物是条件产物，
+# 不涉界面与行为变更的契约没有它完全合法，所以只降级为 WARNING，不做硬性要求。
+if ($content -match '(?i)[\w./\\-]*mock[\w-]*\.html|[\w./\\-]*-behavior\.md' -and $null -eq $readFirst) {
+    $warnings.Add('Contract references an alignment artifact (mock HTML / behavior doc) but has no Read First section pointing at it.')
 }
 
 $deliverables = Get-SectionBody -Heading 'Deliverables'

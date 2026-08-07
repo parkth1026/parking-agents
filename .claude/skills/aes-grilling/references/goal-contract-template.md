@@ -16,7 +16,9 @@
 ## Read First
 
 <!-- Optional section: omit entirely when there is nothing worth pointing at.
-     Point, do not summarize: sources the interview actually relied on. -->
+     Point, do not summarize: sources the interview actually relied on.
+     Goals with an alignment artifact: include the user-approved mock HTML or
+     behavior-contrast doc path here. -->
 - <file path, issue link, or design doc the executing agent should read before starting>
 
 ## Scope
@@ -38,7 +40,13 @@
      [C] reproducible manual steps → observable result
      [D] named file content check
      Verify comes from repository best practice by default, or from a user-supplied
-     real test when judgment (which data, which threshold, which scenario) is involved. -->
+     real test when judgment (which data, which threshold, which scenario) is involved.
+     UI-facing goals: include one mock-comparison AC — delivered UI matches the approved
+     mock in structure and key interactions; Verify [C] names the mock path (upgrade to
+     [A] when visual-regression tooling exists). Behavior-changing goals: confirmed
+     contrast rows become [A] assertions or [B] golden cases (inputs and expected outputs
+     come from the behavior doc, never invented); the unchanged-list goes to Constraints.
+     Approved artifacts are read-only. -->
 - AC-01: <one observable, decidable result>
   - Verify: [A] `<command>` → <expected exit code or threshold>
 - AC-02: <one observable, decidable result>
@@ -52,7 +60,7 @@
 
 - May decide: <concrete named actions, e.g.: create branches, edit code under <path>, add or update tests, install devDependencies already declared. Abstract grants like "reversible details" are undecidable at the permission boundary.>
 - Must ask: <when the Goal, Scope, Success Criteria, or Constraints must change, or when a destructive, credentialed, production, or otherwise unauthorized action is required>
-- Must not: <concrete named actions, e.g.: push, delete files, change CI config. Plus: stop at analysis, ask for discoverable repository facts, expand scope silently, or claim completion without fresh evidence for every AC.>
+- Must not: <concrete named actions, e.g.: push, delete files, change CI config, modify the approved alignment artifact (mock HTML / behavior doc). Plus: stop at analysis, ask for discoverable repository facts, expand scope silently, or claim completion without fresh evidence for every AC.>
 
 ## Iteration Strategy
 
