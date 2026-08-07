@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>确认版 Mock · 团队看板 · 按负责人筛选</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0; }
+  .note { background: #fff8e1; border-bottom: 1px solid #e6d9a8; padding: 8px 16px; font-size: 13px; }
+  .topbar { padding: 12px 16px; border-bottom: 1px solid #ddd; display: flex; align-items: center; justify-content: space-between; }
+  .topbar h1 { margin: 0; font-size: 22px; }
+  /* 新增：顶部工具栏右侧筛选区（虚线标注为本次改动点） */
+  .filter-bar { display: flex; align-items: center; gap: 8px; border: 2px dashed #e91e63; border-radius: 8px; padding: 6px 10px; position: relative; }
+  .badge { position: absolute; top: -10px; left: 8px; background: #e91e63; color: #fff; font-size: 11px; padding: 1px 6px; border-radius: 4px; }
+  .filter-bar select, .filter-bar button { font: inherit; padding: 4px 8px; }
+  #board { display: flex; gap: 16px; padding: 16px; }
+  #board section { flex: 1; background: #f6f6f6; border-radius: 8px; padding: 8px; }
+  .card { background: #fff; border-radius: 6px; padding: 8px; margin: 8px 0; list-style: none; }
+  /* 新增：列级空态（筛选后该列无匹配卡片时显示） */
+  .empty { color: #888; font-size: 13px; padding: 8px; text-align: center; border: 1px dashed #ccc; border-radius: 6px; margin: 8px 0; list-style: none; }
+</style>
+</head>
+<body>
+<div class="note">确认版 Mock（示例数据写死，不连真实后端；对齐结构与关键交互，非像素规范）。
+虚线粉框 = 本次新增；其余为现状结构。真实实现中筛选状态同步到 URL 查询参数：刷新保持，链接发给同事打开可见相同筛选结果。</div>
+<header class="topbar">
+  <h1>团队看板</h1>
+  <div class="filter-bar"><span class="badge">新增</span>
+    <label for="assignee">负责人</label>
+    <select id="assignee">
+      <option value="">全部</option>
+      <option>ayan</option>
+      <option>bo</option>
+      <option>chen</option>
+    </select>
+    <button id="clear" type="button">清除筛选</button>
+  </div>
+</header>
+<main id="board">
+  <section data-status="todo"><h2>待办</h2><ul></ul></section>
+  <section data-status="doing"><h2>进行中</h2><ul></ul></section>
+  <section data-status="done"><h2>已完成</h2><ul></ul></section>
+</main>
+<script>
+// 示例数据与当前仓库 /api/tasks 一致；负责人选项由任务数据去重得出（含默认「全部」）。
+const TASKS = [
+  { id: 1, title: '整理季度目标', assignee: 'ayan', status: 'todo' },
+  { id: 2, title: '客户回访记录', assignee: 'bo', status: 'doing' },
+  { id: 3, title: '发布说明草稿', assignee: 'ayan', status: 'doing' },
+  { id: 4, title: '归档旧项目', assignee: 'chen', status: 'done' }
+];
+const select = document.getElementById('assignee');
+function render(filter) {
+  for (const section of document.querySelectorAll('#board section')) {
+    const ul = section.querySelector('ul');
+    ul.innerHTML = '';
+    const matched = TASKS.filter(t => t.status === section.dataset.status && (!filter || t.assignee === filter));
+    for (const t of matched) {
+      const li = document.createElement('li');
+      li.className = 'card';
+      li.textContent = t.title + ' — ' + t.assignee;
+      ul.append(li);
+    }
+    if (matched.length === 0) {
+      const li = document.createElement('li');
+      li.className = 'empty';
+      li.textContent = '没有匹配的任务';
+      ul.append(li);
+    }
+  }
+  // 真实实现：此处将筛选值写入 URL 查询参数（如 ?assignee=ayan），清除时移除该参数。
+}
+select.addEventListener('change', () => render(select.value));
+document.getElementById('clear').addEventListener('click', () => { select.value = ''; render(''); });
+render('');
+</script>
+</body>
+</html>

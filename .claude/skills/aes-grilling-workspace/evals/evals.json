@@ -50,6 +50,46 @@
         "scenarios/webapi"
       ],
       "assertions": []
+    },
+    {
+      "id": 5,
+      "eval_name": "ui-board-filter",
+      "prompt": "team-board 这个看板想加一个按负责人筛选任务的功能。帮我先把需求理清楚，最后给我一份可以直接交给执行 agent 的 goal contract。先不要写代码。",
+      "expected_output": "判定界面向；歧义收口后产出单文件 mock HTML，吸收用户三条质疑（顶部工具栏/清除筛选按钮/空态文案）后确认落盘 docs/goal-contracts/<date>-<slug>-mock.html；Read First 引用 mock；含 [C] 档 mock 对照 AC；Must not 锁 mock。",
+      "files": [
+        "scenarios/team-board"
+      ],
+      "assertions": []
+    },
+    {
+      "id": 6,
+      "eval_name": "backend-queue-retry",
+      "prompt": "order-consumer 这个消费者，订单事件处理失败就直接丢了，帮我把改进需求理清楚，写份 goal contract。先不要动代码。",
+      "expected_output": "阴性对照：判定纯后端，跳过 Mock 阶段，不产出任何示意 HTML，不问「要不要界面」；契约覆盖重试/死信/兼容约束并通过校验。",
+      "files": [
+        "scenarios/queue-retry"
+      ],
+      "assertions": []
+    },
+    {
+      "id": 7,
+      "eval_name": "mixed-notes-stats",
+      "prompt": "notes-tool 想加个统计功能，能看到每个分类下有多少条笔记、最近一周新增了多少。帮我理清需求写一份 goal contract，先别写代码。",
+      "expected_output": "「在哪看」升级为用户问题得到混合答案（网页为主+CLI 简版）；只为界面部分出 mock 并吸收质疑（横向长条/近 7 天新增卡片）；mock 对照 AC 与 CLI 自身 AC 并存；Must not 锁 mock。",
+      "files": [
+        "scenarios/notes-tool"
+      ],
+      "assertions": []
+    },
+    {
+      "id": 8,
+      "eval_name": "behavior-pricing-rule",
+      "prompt": "shop-pricing 的优惠规则要调整，现在这个满减转化不行。帮我把需求理清楚，写一份 goal contract，先别改代码。",
+      "expected_output": "判定行为变更（无界面）；歧义收口后出行为对照表（例子行：现在→改后、恰好 200 边界行、先减后折叠加顺序）+ 不变清单；确认版落盘 -behavior.md 进 Read First；例子行转化为 [A]/[B] Verify；不变清单进 Constraints；Must not 锁对照物；不产出 HTML。",
+      "files": [
+        "scenarios/shop-pricing"
+      ],
+      "assertions": []
     }
   ]
 }

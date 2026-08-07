@@ -1,0 +1,59 @@
+{
+  "expectations": [
+    {
+      "evidence": "2026-08-07-board-assignee-filter.md",
+      "passed": true,
+      "text": "contract-exists"
+    },
+    {
+      "evidence": "exit=0; VALID: G:\\GIT\\AI_WorkFlow\\parking-agents\\.claude\\skills\\aes-grilling-workspace\\iteration-3\\eval-5-ui-board-filter\\with_skill\\run-1\\outputs\\2026-08-07-board-assignee-filter.md; FORMAT: AES Goal Contract B; STATUS: Ready; AC_COUNT: 7; LINE_COUNT: 69",
+      "passed": true,
+      "text": "passes-new-validator"
+    },
+    {
+      "evidence": "AC=7, tiered Verify=7",
+      "passed": true,
+      "text": "every-ac-has-tiered-verify"
+    },
+    {
+      "evidence": "\\docs\\goal-contracts\\2026-08-07-board-assignee-filter-mock.html",
+      "passed": true,
+      "text": "mock-file-on-disk"
+    },
+    {
+      "evidence": "Read First 节 grep mock 文件名",
+      "passed": true,
+      "text": "mock-in-read-first"
+    },
+    {
+      "evidence": "- Verify: [C] `npm start` 后与 docs/goal-contracts/2026-08-07-board-assignee-filter-mock.html 逐屏对照 → 筛选控件位置、清除按钮、空态文案、三列结构与交互一致。",
+      "passed": true,
+      "text": "mock-comparison-ac"
+    },
+    {
+      "evidence": "Must not 行 grep mock",
+      "passed": true,
+      "text": "mock-locked-in-mandate"
+    },
+    {
+      "evidence": "grep 清除筛选=True, 空态文案=True",
+      "passed": true,
+      "text": "mock-incorporates-critique"
+    },
+    {
+      "evidence": "grep 无 http(s):// 外链",
+      "passed": true,
+      "text": "mock-self-contained"
+    },
+    {
+      "evidence": "人工复核 questions.md：Mock 第1轮 v1 展示→三条质疑（顶部工具栏/清除筛选/空态文案）→第2轮 v2 修改→用户确认通过后才落盘",
+      "passed": true,
+      "text": "mock-iterated-before-confirm"
+    }
+  ],
+  "summary": {
+    "total": 10,
+    "pass_rate": 1.0,
+    "passed": 10
+  }
+}

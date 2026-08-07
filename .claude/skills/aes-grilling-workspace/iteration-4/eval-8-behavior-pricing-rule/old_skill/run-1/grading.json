@@ -1,0 +1,64 @@
+{
+  "expectations": [
+    {
+      "text": "contract-exists",
+      "evidence": "2026-08-07-pricing-rule-200-30.md",
+      "passed": true
+    },
+    {
+      "text": "passes-new-validator",
+      "evidence": "exit=0; VALID: G:\\GIT\\AI_WorkFlow\\parking-agents\\.claude\\skills\\aes-grilling-workspace\\iteration-4\\eval-8-behavior-pricing-rule\\old_skill\\run-1\\outputs\\2026-08-07-pricing-rule-200-30.md; FORMAT: AES Goal Contract B; STATUS: Ready; AC_COUNT: 5; LINE_COUNT: 65",
+      "passed": true
+    },
+    {
+      "text": "every-ac-has-tiered-verify",
+      "evidence": "AC=5, tiered Verify=5",
+      "passed": true
+    },
+    {
+      "text": "behavior-doc-on-disk",
+      "evidence": "docs/goal-contracts 下无 *behavior*.md",
+      "passed": false
+    },
+    {
+      "text": "behavior-doc-has-contrast",
+      "evidence": "今昔对照 grep：现在/现行=False, 改后=False",
+      "passed": false
+    },
+    {
+      "text": "unchanged-list-present",
+      "evidence": "对照表 grep 不变清单",
+      "passed": false
+    },
+    {
+      "text": "behavior-doc-in-read-first",
+      "evidence": "Read First grep 对照表文件名",
+      "passed": false
+    },
+    {
+      "text": "artifact-locked-in-mandate",
+      "evidence": "Must not 行 grep 对照物",
+      "passed": false
+    },
+    {
+      "text": "critique-incorporated",
+      "evidence": "grep 先减后折=False, 恰好(200 边界行)=False",
+      "passed": false
+    },
+    {
+      "text": "no-mock-file",
+      "evidence": "workdir 内 html 文件数=0",
+      "passed": true
+    },
+    {
+      "text": "examples-become-verify",
+      "evidence": "人工复核：无对照表产物；金额在 AC 起草时现场计算。聊天草案曾展示「合计 300 现行 260 → 新 270」对比，但落盘契约丢失了「现行 260」侧，影响对比未持久化",
+      "passed": false
+    }
+  ],
+  "summary": {
+    "total": 11,
+    "pass_rate": 0.3636,
+    "passed": 4
+  }
+}

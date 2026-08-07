@@ -1,0 +1,15 @@
+{
+  "eval_id": 6,
+  "eval_name": "backend-queue-retry",
+  "prompt": "order-consumer 这个消费者，订单事件处理失败就直接丢了，帮我把改进需求理清楚，写份 goal contract。先不要动代码。",
+  "assertions": [
+    "contract-exists: outputs 里有落盘的 Goal Contract .md",
+    "passes-new-validator: 契约通过新版 validate-goal-contract.ps1（exit 0）",
+    "every-ac-has-tiered-verify: 每条 AC 紧跟一条带 [A-D] 档位标签的缩进 Verify 行",
+    "no-mock-file: 全程未产出任何 mock/示意 HTML 文件（纯后端需求不走 Mock 阶段）",
+    "no-mock-ac: 契约中没有任何引用界面示意/mock 的 AC 或 Read First 条目",
+    "classification-not-wasted: 没有把「要不要界面」当问题去问用户（仓库无 UI 是可调查事实）",
+    "dead-letter-in-contract: 契约覆盖死信文件 data/dead-letter.jsonl 与可回放格式",
+    "compat-preserved: ledger.jsonl 兼容与成功路径不变进入 Constraints"
+  ]
+}
