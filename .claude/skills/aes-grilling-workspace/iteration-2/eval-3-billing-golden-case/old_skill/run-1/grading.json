@@ -1,0 +1,49 @@
+{
+  "expectations": [
+    {
+      "evidence": "2026-08-07-billing-monthly-summary.md",
+      "passed": true,
+      "text": "contract-exists"
+    },
+    {
+      "evidence": "exit=1; INVALID: G:\\GIT\\AI_WorkFlow\\parking-agents\\.claude\\skills\\aes-grilling-workspace\\iteration-2\\eval-3-billing-golden-case\\old_skill\\run-1\\outputs\\2026-08-07-billing-monthly-summary.md; ERROR: AC-01 requires exactly one indented Verify line; found 0.; ERROR: AC-02 requires exactly one indented Verify line; found 0.; ERROR: AC-03 requires exactly one indented Verify line; found 0.; ERROR: AC-04 requires exactly one indented Verify line; found 0.",
+      "passed": false,
+      "text": "passes-new-validator"
+    },
+    {
+      "evidence": "AC=4, tiered Verify=0",
+      "passed": false,
+      "text": "every-ac-has-tiered-verify"
+    },
+    {
+      "evidence": "grep: [B] 且 bill-2026-07.csv",
+      "passed": false,
+      "text": "golden-case-b-tier"
+    },
+    {
+      "evidence": "fixture: \\docs\\goal-contracts\\2026-08-07-billing-monthly-summary.md",
+      "passed": true,
+      "text": "expected-summary-pinned"
+    },
+    {
+      "evidence": "tests/fixtures exists=False",
+      "passed": true,
+      "text": "fixture-planned-on-disk"
+    },
+    {
+      "evidence": "只问了格式基准（Q1），没有把「用哪份数据验收、期望输出落不落盘」作为问题；期望数值是用户在答复中主动给的",
+      "passed": false,
+      "text": "verification-escalated"
+    },
+    {
+      "evidence": "1 轮 4 问",
+      "passed": true,
+      "text": "single-batched-round"
+    }
+  ],
+  "summary": {
+    "total": 8,
+    "pass_rate": 0.5,
+    "passed": 4
+  }
+}

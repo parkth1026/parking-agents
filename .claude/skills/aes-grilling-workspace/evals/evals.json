@@ -6,7 +6,9 @@
       "eval_name": "notes-search-feature",
       "prompt": "我想给 fixtures/notes-cli 这个笔记工具加一个搜索功能。帮我先把需求理清楚,最后给我一份可以直接交给执行 agent 的 goal contract。先不要写代码。",
       "expected_output": "一轮批量问清搜索范围/匹配方式/归档处理等歧义(不问代码里查得到的事实),单独一步逐条对齐 AC,产出通过 validate-goal-contract.ps1 校验的 Goal Contract,内容与模拟用户画像一致,并生成 handoff 启动指令。",
-      "files": ["fixtures/notes-cli"],
+      "files": [
+        "fixtures/notes-cli"
+      ],
       "assertions": []
     },
     {
@@ -14,7 +16,39 @@
       "eval_name": "log-export-improvement",
       "prompt": "fixtures/log-export 这个日志导出脚本太难用了,帮我改进一下。先把需求理清楚再给我一份 goal contract,别直接动手改。",
       "expected_output": "面对'太难用'这种高度模糊的请求,先给推荐候选再一轮批量提问挖出日期过滤/输出路径/兼容约束,AC 阶段接受模拟用户的逐条修改(改措辞/补删条目),产出通过校验的 Goal Contract,Out 明确排除压缩/上传/级别过滤。",
-      "files": ["fixtures/log-export"],
+      "files": [
+        "fixtures/log-export"
+      ],
+      "assertions": []
+    },
+    {
+      "id": 2,
+      "eval_name": "cli-json-with-infra",
+      "prompt": "帮我给 minicli 加个 --json 输出。先别写代码，帮我理清需求、写份 goal contract。",
+      "expected_output": "契约落盘且通过校验；每条 AC 带 Verify 行，[A] 档引用仓库真实测试命令（npm test）；验证方式走默认档，不占提问轮次",
+      "files": [
+        "scenarios/cli-json"
+      ],
+      "assertions": []
+    },
+    {
+      "id": 3,
+      "eval_name": "billing-golden-case",
+      "prompt": "把账单 CSV 转成月度分类汇总，格式要和我给老板看的那份一致。先对齐目标再动手。",
+      "expected_output": "验证方式升级为用户问题并落 [B] 黄金用例；契约引用 data/bill-2026-07.csv 与用户手工核对的期望汇总；期望输出落盘为 fixture 或列入 Deliverables",
+      "files": [
+        "scenarios/billing"
+      ],
+      "assertions": []
+    },
+    {
+      "id": 4,
+      "eval_name": "perf-threshold-lock-scale",
+      "prompt": "首页 /summary 接口太慢了，想优化一下。先写份契约。",
+      "expected_output": "门槛升级为用户问题；契约含 p95 < 200ms 门槛与测量脚本 scripts/bench.mjs；声明测量脚本定稿后不可修改（锁尺子）；响应内容不变作为约束",
+      "files": [
+        "scenarios/webapi"
+      ],
       "assertions": []
     }
   ]

@@ -1,6 +1,6 @@
 interface:
   display_name: "aes-grilling"
   short_description: "收敛并交付可直接驱动执行 Agent 的轻量 Goal Contract"
-  default_prompt: "使用 $aes-grilling：先调查目标仓库事实，有多个独立事实问题时让 subagent 并行只读调查，当前 Agent 汇总证据；再一轮问完所有互不依赖的歧义，只问会改变目标、边界、公共行为或成功标准的问题，靠维度状态和收口审计判断何时停止提问；然后单独一步逐条对齐验收标准；最后生成可直接交给执行 Agent 的轻量 Goal Contract。"
+  default_prompt: "使用 $aes-grilling：先调查目标仓库事实（含验证基建），有多个独立事实问题时让 subagent 并行只读调查，当前 Agent 汇总证据；再一轮问完所有互不依赖的歧义，只问会改变目标、边界、公共行为或成功标准的问题，靠维度状态和收口审计判断何时停止提问；然后单独一步逐条对齐验收标准，为每条 AC 落定怎么算过——默认用仓库最佳实践，判据含用户裁量时用用户指认的真实测试；最后生成可直接交给执行 Agent 的轻量 Goal Contract。"
 policy:
   allow_implicit_invocation: true

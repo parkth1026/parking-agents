@@ -1,0 +1,15 @@
+{
+  "eval_id": 4,
+  "eval_name": "perf-threshold-lock-scale",
+  "prompt": "首页 /summary 接口太慢了，想优化一下。先写份契约。",
+  "assertions": [
+    "contract-exists: outputs 里有落盘的 Goal Contract .md",
+    "passes-new-validator: 契约通过新版 validate-goal-contract.ps1（exit 0）",
+    "every-ac-has-tiered-verify: 每条 AC 紧跟一条带 [A-D] 档位标签的缩进 Verify 行",
+    "threshold-present: 契约含 p95 与 200ms 门槛",
+    "bench-script-named: 契约点名测量脚本（scripts/bench.mjs 或等价物）",
+    "scale-locked: 契约声明测量脚本定稿后不可修改（防刷分）",
+    "verification-escalated: questions.md 中把门槛/尺子作为问题交用户裁决（仓库无基建）",
+    "single-batched-round: 提问一轮问完互不依赖歧义（追加轮需有明确解锁理由）"
+  ]
+}

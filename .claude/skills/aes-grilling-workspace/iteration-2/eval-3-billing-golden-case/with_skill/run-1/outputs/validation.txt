@@ -1,0 +1,7 @@
+VALID: G:\GIT\AI_WorkFlow\parking-agents\.claude\skills\aes-grilling-workspace\iteration-2\eval-3-billing-golden-case\with_skill\run-1\workdir\docs\goal-contracts\2026-08-07-monthly-billing-summary.md
+FORMAT: AES Goal Contract B
+STATUS: Ready
+AC_COUNT: 3
+LINE_COUNT: 65
+
+EXIT CODE: 0

@@ -1,0 +1,6 @@
+{
+  "name": "minicli",
+  "version": "1.2.0",
+  "type": "module",
+  "scripts": { "test": "node test/run-tests.mjs" }
+}
