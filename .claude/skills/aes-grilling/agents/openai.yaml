@@ -1,6 +1,5 @@
 interface:
   display_name: "aes-grilling"
-  short_description: "问清楚要做什么、怎么算做完，产出自包含的 Goal Contract"
-  default_prompt: "使用 $aes-grilling：先调查目标仓库事实（含现有的验证基建），有多个独立事实问题时让 subagent 并行只读调查，当前 Agent 汇总证据；再一轮问完所有互不依赖的歧义，只问答案会改变目标、边界、公共行为或验收的问题，靠维度状态和收口审计判断何时停止；界面改动先出 mock、行为变更先出对照表，让用户逐处质疑到确认；然后单独一步对齐验收条件，从具体例子聚类得出条数，每条带候选提问并落定怎么算过，候选池是这个仓库此刻真能跑的验证途径，加上用户提供真实数据或场景；最后产出一份自包含的 Goal Contract（含访谈记录、设计取舍两个可选节），跑校验器判定。"
+  short_description: "aes-grilling"
 policy:
-  allow_implicit_invocation: true
+  allow_implicit_invocation: false
