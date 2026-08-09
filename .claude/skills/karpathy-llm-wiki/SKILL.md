@@ -10,6 +10,7 @@ description: |
   (2) Ingest articles, papers, transcripts, or notes into the wiki
   (3) Validate wikilinks, lint pages, fix broken references, or check wiki quality
   (4) User mentions "wiki", "knowledge base", "Karpathy", "整理到wiki", or "ingest"
+disable-model-invocation: true
 ---
 
 # Karpathy LLM Wiki

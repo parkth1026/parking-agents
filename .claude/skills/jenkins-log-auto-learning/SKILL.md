@@ -10,6 +10,7 @@ description: |
   (3) 查找 FAILURE→SUCCESS 构建对或构建知识库
 
   **不适用于单次构建诊断** —— 请使用 `ue-error-solver`。
+disable-model-invocation: true
 ---
 
 # Jenkins 日志自动学习技能 v5.1

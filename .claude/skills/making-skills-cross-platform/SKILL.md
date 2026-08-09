@@ -1,6 +1,7 @@
 ---
 name: making-skills-cross-platform
 description: Convert a single-platform skills repository into a plugin that installs on many harnesses (Claude Code, Codex, Cursor, Pi, Gemini, OpenCode, Kimi, Antigravity) through each one's own native mechanism. Use when a skills repo only works on one tool, when adding a new harness to an existing multi-platform repo, or when auditing whether such a repo is correctly wired.
+disable-model-invocation: true
 ---
 
 # Making a skills repo cross-platform

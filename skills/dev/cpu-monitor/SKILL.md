@@ -1,6 +1,7 @@
 ---
 name: cpu-monitor
 description: Windows CPU 性能采样与 WMI 诊断工具集。用 Win32 API(EnumProcesses/GetProcessTimes + CreateToolhelp32Snapshot/GetThreadTimes)直接读取进程/线程 CPU 数据,完全绕开 WMI Provider Service,不会像 wmic/Get-CimInstance 那样拉高 WmiPrvSE。当用户提到以下场景时使用:(1) 机器卡/CPU 高,要找 Top 进程;(2) 要抓 Top 线程定位热点;(3) WmiPrvSE.exe 异常高 CPU 要找根因;(4) 怀疑 WMI 仓库损坏或被滥用;(5) 任何"抓 10/60 秒 CPU Top N"的请求。不适用于 Linux/macOS。
+disable-model-invocation: true
 ---
 
 # CPU Monitor

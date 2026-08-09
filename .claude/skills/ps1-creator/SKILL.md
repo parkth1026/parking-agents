@@ -1,6 +1,7 @@
 ---
 name: ps1-creator
 description: "Use when: creating, modifying, or reviewing PowerShell (.ps1) scripts, user mentions 'ps1', 'PowerShell script', '脚本' in context of .ps1 files. Enforces expected-behavior header contract, minimal code principle, mandatory post-write testing. DO NOT USE FOR: general shell commands, non-ps1 scripting, bat/cmd files."
+disable-model-invocation: true
 ---
 
 # PowerShell Script Creation Discipline

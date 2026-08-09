@@ -5,6 +5,7 @@ description: >
   and full flow (quality gate) strategies based on Deno CLAUDE.md, Ruff AGENTS.md,
   and uv AGENTS.md real-world practices. Use when writing, checking, testing, or
   committing Rust code.
+disable-model-invocation: true
 ---
 
 # Rust/Cargo 双流开发工作流

@@ -1,6 +1,7 @@
 ---
 name: dev-environment
 description: Use when setting up or fixing a local .NET backend plus Vite or Node frontend development environment with idempotent startup, shared .env port configuration, Ctrl+C cleanup, PowerShell dev.ps1 and dev.bat entrypoints, smart-dev.mjs and stop-dev.mjs scripts, or Windows port and process troubleshooting.
+disable-model-invocation: true
 ---
 
 # Dev Environment — .NET + Frontend 一键启动
