@@ -8,3 +8,4 @@ reports/*
 
 node_modules/
 /.zcode/plans
+/.claude/launch.json
