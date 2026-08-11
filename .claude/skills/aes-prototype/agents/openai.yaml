@@ -1,0 +1,6 @@
+interface:
+  display_name: "aes-prototype"
+  short_description: "锁定对照物：扫影响面、出确认版 mock 与对照表"
+policy:
+  # 由 workflow-interview 编排调用，所以不能整个关掉隐式调用。
+  allow_implicit_invocation: true

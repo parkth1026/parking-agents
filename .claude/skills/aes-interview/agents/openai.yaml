@@ -1,0 +1,6 @@
+interface:
+  display_name: "aes-interview"
+  short_description: "锁定需求：调查事实、分诊、批量问清歧义"
+policy:
+  # 由 workflow-interview 编排调用，所以不能整个关掉隐式调用。
+  allow_implicit_invocation: true

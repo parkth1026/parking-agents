@@ -1,0 +1,5 @@
+interface:
+  display_name: "workflow-interview"
+  short_description: "workflow-interview"
+policy:
+  allow_implicit_invocation: false
