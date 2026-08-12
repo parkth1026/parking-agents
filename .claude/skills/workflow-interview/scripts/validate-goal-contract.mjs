@@ -20,6 +20,8 @@
  *      而漏跑的那条 AC 看起来跟通过了一模一样。
  *  11. 契约在 issue 目录里但同级没有 manifest.json 时给 WARNING。
  *  12. 「读什么」指向 2-prototype 下的对照物但文件不在时给 WARNING。
+ *  13. 「自主边界」「残留风险」写了就不能空着，且只能各出现一次。
+ *  14. 引用 issue 目录里的过程文件直接拒——契约必须自包含。
  */
 
 import { existsSync, readFileSync } from 'node:fs';
@@ -201,10 +203,30 @@ for (const verifyMatch of acceptance.matchAll(/^\s+-\s+Verify:\s*(\S.*)$/gm)) {
   }
 }
 
-for (const optional of ['读什么', '要落盘的东西', '挡着的事']) {
+for (const optional of ['读什么', '要落盘的东西', '挡着的事', '自主边界', '残留风险']) {
   if ((sections.get(optional)?.length ?? 0) > 1) {
     errors.push(`章节只能出现一次：${optional}`);
   }
+}
+
+// 这两节空着比不写更糟：写了标题就等于宣称「这件事想过了」，执行 Agent 和下一个改契约的
+// 人都会照此当真，而底下什么都没有。要么写满，要么整节删掉。
+for (const declared of ['自主边界', '残留风险']) {
+  const body = section(declared);
+  if (body !== null && bulletLines(body).length < 1) {
+    errors.push(`「${declared}」写了标题就至少给一条，空着看起来像已经想过了。不写就整节删掉。`);
+  }
+}
+
+// 契约必须自包含：单独拿走它仍然完整可交接。唯一允许指向 issue 目录内部的，是「读什么」
+// 点名的确认版对照物（2-prototype/ 根下那几份）。指回过程文件的契约一旦被单独拿走就残废了,
+// 而它恰恰是这套流程里唯一会被单独拿走的那份文件——交接指令只给它一个路径。
+const processRefs = new Set(
+  [...content.matchAll(/(1-interview\/|2-prototype\/drafts\/|manifest\.json|rounds\.jsonl|impact-surface\.md)/g)]
+    .map((match) => match[1]),
+);
+for (const ref of processRefs) {
+  errors.push(`引用了过程文件 ${ref}，契约就不自包含了。那里的结论要聚进契约本身，不是指回素材。`);
 }
 
 const readFirst = section('读什么');

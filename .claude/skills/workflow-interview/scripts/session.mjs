@@ -10,14 +10,14 @@
  *   stage <dir> <stage> <status> [flags]  推进阶段状态
  *   verify <dir> [--write]                跑 contract.md 里全部 [A] 档命令
  *   rebuild <dir>                         从目录扫描重建 manifest
- *   finalize <dir>                        校验 + 冒烟 + 生成交接指令
+ *   finalize <dir>                        校验 + 冒烟 + 交接闸门 + 生成交接指令
  *   list                                  现扫全部 issue，输出一张表
  *
  * 退出码：0 成功 / 1 有问题需要处理 / 2 用法或路径错
  */
 
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync, appendFileSync } from 'node:fs';
-import { dirname, join, resolve, basename } from 'node:path';
+import { dirname, join, resolve, basename, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
@@ -244,23 +244,36 @@ function cmdStage(argv) {
 // ─────────────────────────────── verify ───────────────────────────────
 
 /**
- * 抽出 contract.md 里全部 [A] 档 Verify 命令。
- * 只抽 [A]：[B] 要 fixture 就位，[C] 是人工步骤，[D] 的判据写在自然语言里抽不干净。
- * 硬抽剩下三档只会制造假绿。
+ * 抽出 contract.md 里全部 Verify 行，连档位一起。
+ *
+ * 只有 [A] 会被真的执行：[B] 要 fixture 就位，[C] 是人工步骤，[D] 的判据写在自然语言里
+ * 抽不干净，硬跑剩下三档只会制造假绿。但四档都要**数出来**——非 [A] 的那几条正是长时程
+ * 执行里没有任何东西能反驳「我做完了」的地方，得让人看见有多少。
  */
-function extractTierACommands(md) {
+function extractVerifyLines(md) {
   const lines = md.split(/\r?\n/);
   const out = [];
   let currentAc = null;
   for (const line of lines) {
     const ac = /^\s*-\s*(AC-\d{3})\s*:/.exec(line);
     if (ac) currentAc = ac[1];
-    const v = /^\s*-\s*Verify\s*:\s*\[A\]\s*(.+)$/.exec(line);
+    const v = /^\s*-\s*Verify\s*:\s*\[([ABCD])\]\s*(.+)$/.exec(line);
     if (!v) continue;
-    const cmd = /`([^`]+)`/.exec(v[1]);
-    out.push({ ac: currentAc || '(未编号)', command: cmd ? cmd[1] : null, raw: v[1].trim() });
+    const cmd = /`([^`]+)`/.exec(v[2]);
+    out.push({
+      ac: currentAc || '(未编号)',
+      tier: v[1],
+      command: cmd ? cmd[1] : null,
+      raw: v[2].trim(),
+    });
   }
   return out;
+}
+
+function tallyTiers(verifies) {
+  const tiers = { A: 0, B: 0, C: 0, D: 0 };
+  for (const v of verifies) tiers[v.tier] += 1;
+  return tiers;
 }
 
 /** 区分「跑起来了但失败」和「根本跑不起来」——后者说明 AC 写错了。 */
@@ -280,9 +293,11 @@ function cmdVerify(argv) {
   const cpath = contractPath(dir);
   if (!existsSync(cpath)) die(`${cpath} 不存在，没有可跑的验收条件。`);
 
-  const items = extractTierACommands(readFileSync(cpath, 'utf8'));
+  const verifies = extractVerifyLines(readFileSync(cpath, 'utf8'));
+  const items = verifies.filter((v) => v.tier === 'A');
+  const manual = verifies.filter((v) => v.tier !== 'A');
   if (items.length === 0) {
-    console.log('契约里没有 [A] 档 Verify，无可执行项。');
+    console.log(`契约里没有 [A] 档 Verify，无可执行项（另有 ${manual.length} 条非 [A] 档，本命令不跑）。`);
     return 0;
   }
 
@@ -306,6 +321,9 @@ function cmdVerify(argv) {
   }
 
   report.push('', `绿 ${tally.green} / 红 ${tally.red} / 跑不起来 ${tally.unrunnable}`);
+  if (manual.length > 0) {
+    report.push(`另有 ${manual.length} 条非 [A] 档没跑：${manual.map((v) => `${v.ac} [${v.tier}]`).join('、')}`);
+  }
   const text = report.join('\n');
   console.log(text);
 
@@ -405,11 +423,55 @@ function cmdFinalize(argv) {
   const smoke = cmdVerify([dir, '--write']);
   if (smoke !== 0) failed = true;
 
-  // 3. 交接指令现场生成，不落盘：契约改了它就该跟着变。
+  // 3. 交接可执行性闸门。
+  //    codex `/goal` 交接之后，执行 Agent 手上只有「一句话 + 一个路径」。所以路径读不到、
+  //    完成判定全靠自陈、访谈里赌掉的风险没跟着走，这三件事一旦过了这道门就再无人可拦。
+  console.log('\n─── 交接可执行性 ───');
+
+  const root = repoRoot();
+  if (cpath !== root && !cpath.startsWith(root + sep)) {
+    console.log(`WARNING: 契约不在仓库根 ${root} 之下。`);
+    console.log('         执行 Agent 的工作区通常就是仓库根。路径读不到时它不会报错，会只凭 objective');
+    console.log('         那一句话硬编——表面在跑，实际整份契约失效。挪进仓库，或确认它访问得到这个路径。');
+  }
+
+  const verifies = extractVerifyLines(md);
+  const tiers = tallyTiers(verifies);
+  const manual = verifies.filter((v) => v.tier !== 'A');
+  console.log(`档位分布：[A] ${tiers.A} / [B] ${tiers.B} / [C] ${tiers.C} / [D] ${tiers.D}`);
+  if (manual.length > 0) {
+    console.log(`以下 ${manual.length} 条无法自动判定，长时程执行里只有执行 Agent 的自陈：`);
+    for (const v of manual) console.log(`  ${v.ac} [${v.tier}] ${v.raw.slice(0, 64)}`);
+    console.log('  这不是错。但它们不会在 /goal 每轮的完成审计里被反驳，交接时要当面说清哪几条得人来看。');
+  }
+  if (verifies.length > 0 && tiers.A === 0) {
+    console.log('WARNING: 一条 [A] 档都没有。完成判定全部依赖自陈，长时程执行等于没有终止条件。');
+    console.log('         回去看有没有哪条能升到 [A]；确实一条都升不了，就跟用户说清这次靠人验收。');
+  }
+
+  // 残留风险对账：manifest 记着赌过的东西，契约里却没有这一节时直接拒。
+  // 契约会被单独拿走，manifest 不会跟着走——这一节缺失时，最先丢的就是它。
+  const skippedStages = STAGES.filter((s) => m.stage_gates?.[s]?.status === 'skipped');
+  if ((m.residual_risk || skippedStages.length > 0) && extractSection(md, '残留风险') === null) {
+    console.error('\n这次访谈留了没问清的东西，但契约里没有「残留风险」这一节：');
+    if (m.residual_risk) console.error(`  manifest 记着：${m.residual_risk}`);
+    for (const s of skippedStages) {
+      console.error(`  ${s} 被跳过：${m.stage_gates[s].reason || '未写理由'}`);
+    }
+    console.error('补一节写清没问清什么、错了会怎样，再 finalize。');
+    failed = true;
+  }
+
+  // 4. 交接指令现场生成，不落盘：契约改了它就该跟着变。
   const goal = extractSection(md, '目标');
   const oneline = ((goal || '').split(/\r?\n/).map((s) => s.trim()).filter(Boolean)[0] || '')
     .replace(/[。.！!]+$/, '');
-  const handoff = `/goal 完成 ${cpath} 定义的目标：${oneline}。验收以该文档「验收条件」节全部 Verify 通过、「强约束」节全部保持为准。`;
+  // 「自主边界」写了才进这一句：它决定执行 Agent 计划外情况下停不停手，是每 turn 重注入
+  // 的 objective 里唯一值得多花的字符。没写就不提，免得指向一节不存在的内容。
+  const autonomy = extractSection(md, '自主边界') === null
+    ? ''
+    : '计划外的事按该文档「自主边界」节自行判断。';
+  const handoff = `/goal 完成 ${cpath} 定义的目标：${oneline}。验收以该文档「验收条件」节全部 Verify 通过、「强约束」节全部保持为准。${autonomy}`;
   console.log('\n─── 交接指令 ───');
   console.log(handoff);
   if (handoff.length > GOAL_OBJECTIVE_LIMIT) {
@@ -418,6 +480,7 @@ function cmdFinalize(argv) {
     failed = true;
   }
 
+  m.validation.verify_tiers = tiers;
   if (m.validation.status === 'valid' && !failed) {
     m.status = 'ready';
     m.next_action = `契约已就绪，把交接指令发给执行 Agent。契约：${cpath}`;

@@ -1,7 +1,7 @@
 ---
 name: workflow-interview
 description: workflow-interview
-disable-model-invocation: true
+disable-model-invocation: false
 ---
 
 # 问清楚要做什么，以及怎么算做完
@@ -51,7 +51,8 @@ subagent 都不许用 Edit/Write 直接改它。
   且五个自评维度没有一个停在「未定」。
 - `aes-prototype` 交出 `2-prototype/impact-surface.md`，以及它据此判定需要的那几份
   确认版对照物。没有可观察差异是一种结论，不是一种跳过。
-- `aes-goal-contract` 交出 `3-contract/contract.md`，且校验器退出码为 0。
+- `aes-goal-contract` 交出 `3-contract/contract.md`，且 `finalize` 退出码为 0。它一条命令
+  跑完结构校验、`[A]` 档冒烟和交接可执行性闸门，只看这一个码，不逐项复核。
 
 ### 门禁
 
@@ -71,6 +72,10 @@ subagent 都不许用 Edit/Write 直接改它。
 三阶段走完后报告：契约路径、目标一句话、范围、验收条件条数、校验结果，以及精确
 阻塞项或可复制的启动指令。启动指令由 `aes-goal-contract` 现场生成。有阻塞项时不
 启动实现。
+
+`finalize` 列出的非 `[A]` 档验收条件要一并报给用户，点名是哪几条。它们在长时程执行
+里没有任何东西能反驳「我做完了」，用户得知道交接之后哪部分要自己看。这不是阻塞项，
+是交接面的一部分——不说，用户会以为整份契约都能自动判定。
 
 跨 issue 的全局视图不落盘，要看时现扫：
 
@@ -92,5 +97,8 @@ node <skill-dir>/scripts/session.mjs list
 | 就这么点事，直接排计划 | 计划的每一步都要指回设计里的某条决定，没有设计计划无处生根 |
 | 验收标准你看着定就行 | 定偏了要执行完才发现。你只要答「什么情况下你会说这没做对」 |
 
-用户说「别问了直接干」时照办，但把因此没问的东西记成一句残留风险落盘。
+用户说「别问了直接干」时照办，但把因此没问的东西记成一句残留风险落盘：当场用
+`session.mjs stage ... --residual-risk "<一句>"` 记进 manifest，`aes-goal-contract`
+到时候会把它写进契约，`finalize` 会对账。只说给用户听不落盘，交接的时候就没了。
+
 本技能不实现任务里的目标。
