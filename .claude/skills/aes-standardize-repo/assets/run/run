@@ -1,0 +1,5 @@
+#!/usr/bin/env sh
+# run-wrapper-version: 1.0.0
+set -eu
+RUN_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+exec node "$RUN_ROOT/scripts/run.mjs" "$@"

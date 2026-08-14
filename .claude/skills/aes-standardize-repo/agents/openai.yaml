@@ -1,0 +1,6 @@
+interface:
+  display_name: "Standardize Repository"
+  short_description: "Add a zero-install run interface to repositories"
+  default_prompt: "Use $aes-standardize-repo to standardize this repository with the zero-install run interface."
+policy:
+  allow_implicit_invocation: false

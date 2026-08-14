@@ -1,0 +1,8 @@
+[project]
+id = "local/repository"
+
+[[actions]]
+id = "check"
+name = "Validate the run interface"
+kind = "task"
+run = ["node", "--check", "scripts/run.mjs"]
