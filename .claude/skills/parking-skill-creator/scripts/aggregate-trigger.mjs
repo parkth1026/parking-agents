@@ -1,0 +1,237 @@
+#!/usr/bin/env node
+// aggregate-trigger.mjs — 触发评测聚合（subagent 探针机制，官方 run_loop 口径）
+// 读 trigger-evals.json（评测集）+ probe-results.jsonl（探针首行结果），输出 trigger-benchmark.json。
+// 口径（与官方 run_loop 对齐）:
+//   - train/test 60/40 按 should_trigger 分层切分（每组洗牌后取前 max(1, floor(n*0.4)) 进 test）
+//   - 每 query 默认 3 探针取严格多数（有效探针中 triggered > 半数才算触发）
+//   - 首行 `SKILL: <名或 none>` 是唯一判定源；解析失败记 invalid 不猜
+//   - best_description 按 test 正确率选出（防过拟合，平局取先出现轮）
+// 用法: node aggregate-trigger.mjs <workspace目录> [--eval-set <路径>] [--probes <路径>] [--output <路径>]
+// 退出码: 0 成功 / 1 数据缺失或无有效结果 / 2 用法错
+import { existsSync, readFileSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { readJson, writeJson } from "./lib/jsonio.mjs";
+
+const SPLIT_SEED = 42;
+const HOLDOUT = 0.4;
+
+function usage() {
+  console.log("用法: node aggregate-trigger.mjs <workspace目录> [--eval-set <路径>] [--probes <路径>] [--output <路径>]");
+  console.log("示例: node aggregate-trigger.mjs ../my-skill-workspace");
+  process.exit(2);
+}
+
+/** 确定性 PRNG（mulberry32），保证黄金切分可复现 */
+export function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0; a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function shuffled(arr, rand) {
+  const x = [...arr];
+  for (let i = x.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [x[i], x[j]] = [x[j], x[i]];
+  }
+  return x;
+}
+
+/** 官方 split_eval_set 口径：按 should_trigger 分层，每组洗牌后取前 n_test 进 test */
+export function splitEvalSet(queries, holdout = HOLDOUT, seed = SPLIT_SEED) {
+  const rand = mulberry32(seed);
+  const trigger = queries.filter((q) => q.should_trigger).map((q) => q.id);
+  const noTrigger = queries.filter((q) => !q.should_trigger).map((q) => q.id);
+
+  const trigShuffled = shuffled(trigger, rand);
+  const noTrigShuffled = shuffled(noTrigger, rand);
+
+  const nTrigTest = Math.max(1, Math.floor(trigShuffled.length * holdout));
+  const nNoTrigTest = Math.max(1, Math.floor(noTrigShuffled.length * holdout));
+
+  const test = [...trigShuffled.slice(0, nTrigTest), ...noTrigShuffled.slice(0, nNoTrigTest)];
+  const train = [...trigShuffled.slice(nTrigTest), ...noTrigShuffled.slice(nNoTrigTest)];
+  return { train, test };
+}
+
+/**
+ * 解析探针首行。返回 { status: "hit"|"miss"|"invalid", triggered }。
+ *   `SKILL: <被测技能名>` → hit（触发）
+ *   `SKILL: none` / `SKILL: <其他技能名>` → miss（协议合法但未触发本技能）
+ *   不匹配 `SKILL: x` 协议 → invalid（不猜）
+ */
+export function parseFirstLine(firstLine, skillName) {
+  if (typeof firstLine !== "string") return { status: "invalid", triggered: null };
+  const m = firstLine.match(/^SKILL:\s*(\S.*)$/);
+  if (!m) return { status: "invalid", triggered: null };
+  const value = m[1].trim();
+  if (value === skillName) return { status: "hit", triggered: true };
+  return { status: "miss", triggered: false }; // none 或其他技能名
+}
+
+/** 读 jsonl（跳过空行与坏行并计数） */
+function readJsonl(path) {
+  const rows = [];
+  const bad = [];
+  const text = readFileSync(path, "utf8");
+  for (const [i, line] of text.split(/\r?\n/).entries()) {
+    if (!line.trim()) continue;
+    try {
+      rows.push(JSON.parse(line));
+    } catch {
+      bad.push({ line: i + 1 });
+    }
+  }
+  return { rows, bad };
+}
+
+/**
+ * 聚合。返回 trigger-benchmark 对象（写入 json）。
+ * jsonl 行: { query_id, probe, first_line, description? }；description 用于多轮迭代分组（缺省归入 null 轮）。
+ */
+export function aggregateTrigger(evalSet, probeRows) {
+  const skill = evalSet.skill;
+  const byId = new Map(evalSet.queries.map((q) => [q.id, q]));
+  const split = splitEvalSet(evalSet.queries);
+
+  // 按 description 分轮（保序：首次出现顺序）
+  const roundOrder = [];
+  const rounds = new Map();
+  for (const row of probeRows) {
+    const key = Object.prototype.hasOwnProperty.call(row, "description") ? row.description : null;
+    if (!rounds.has(key)) {
+      rounds.set(key, []);
+      roundOrder.push(key);
+    }
+    rounds.get(key).push(row);
+  }
+
+  let invalidProbes = 0;
+  const roundStats = [];
+  for (const key of roundOrder) {
+    // query_id → 首行判定列表
+    const perQuery = new Map();
+    for (const row of rounds.get(key)) {
+      const parsed = parseFirstLine(row.first_line, skill);
+      if (parsed.status === "invalid") {
+        invalidProbes++;
+        continue; // invalid 探针不参与判定，不猜
+      }
+      const list = perQuery.get(row.query_id) ?? [];
+      list.push(parsed.triggered);
+      perQuery.set(row.query_id, list);
+    }
+
+    const splitStats = (ids) => {
+      let should = 0, shouldTriggered = 0;
+      let shouldNot = 0, falseTriggered = 0;
+      let correct = 0, invalidQueries = 0;
+      for (const id of ids) {
+        const q = byId.get(id);
+        if (!q) continue;
+        const probes = perQuery.get(id);
+        if (!probes || probes.length === 0) {
+          invalidQueries++; // 该 query 无任何有效探针
+          continue;
+        }
+        const triggered = probes.filter(Boolean).length * 2 > probes.length; // 严格多数
+        if (q.should_trigger) {
+          should++;
+          if (triggered) { shouldTriggered++; correct++; }
+        } else {
+          shouldNot++;
+          if (triggered) falseTriggered++;
+          else correct++;
+        }
+      }
+      return {
+        queries: ids.length,
+        trigger_rate_on_should: should > 0 ? round4(shouldTriggered / should) : 0,
+        false_trigger_rate_on_should_not: shouldNot > 0 ? round4(falseTriggered / shouldNot) : 0,
+        correct,
+        invalid_queries: invalidQueries,
+      };
+    };
+
+    roundStats.push({
+      description: key,
+      train: splitStats(split.train),
+      test: splitStats(split.test),
+    });
+  }
+
+  // best_description：按 test 正确率选优（防过拟合）；平局取先出现轮
+  let best = null;
+  for (const r of roundStats) {
+    if (best === null || r.test.correct > best.test.correct) best = r;
+  }
+
+  return {
+    skill,
+    split: { train: split.train, test: split.test, seed: SPLIT_SEED, holdout: HOLDOUT },
+    rounds: roundStats,
+    best_description: best ? best.description : null,
+    invalid_probes: invalidProbes,
+  };
+}
+
+function round4(x) {
+  return Math.round(x * 10000) / 10000;
+}
+
+// --- CLI ---
+const argv = process.argv.slice(2);
+const wsArg = argv.find((a) => !a.startsWith("--"));
+if (!wsArg || argv.includes("--help")) usage();
+
+const flag = (name) => {
+  const i = argv.indexOf(name);
+  return i !== -1 ? argv[i + 1] : undefined;
+};
+
+const ws = resolve(wsArg);
+const evalSetPath = flag("--eval-set") ?? join(ws, "trigger-evals.json");
+const probesPath = flag("--probes") ?? join(ws, "probe-results.jsonl");
+const outPath = flag("--output") ?? join(ws, "trigger-benchmark.json");
+
+const evalSet = readJson(evalSetPath);
+if (!evalSet || !Array.isArray(evalSet.queries) || typeof evalSet.skill !== "string") {
+  console.log(`评测集缺失或结构不符: ${evalSetPath}（需要 { skill, queries: [{id, text, should_trigger}] }）`);
+  process.exit(1);
+}
+if (!existsSync(probesPath)) {
+  console.log(`探针结果缺失: ${probesPath}`);
+  process.exit(1);
+}
+
+const { rows, bad } = readJsonl(probesPath);
+if (bad.length > 0) {
+  console.log(`警告: ${probesPath} 有 ${bad.length} 行不可解析，已跳过`);
+}
+
+const result = aggregateTrigger(evalSet, rows);
+if (result.rounds.length === 0) {
+  console.log("无有效探针结果");
+  process.exit(1);
+}
+
+writeJson(outPath, result);
+
+// 终端摘要
+const label = (r) => ({
+  train: `train (${r.train.queries} queries): 应触发触发率 ${r.train.trigger_rate_on_should.toFixed(2)}  误触发率 ${r.train.false_trigger_rate_on_should_not.toFixed(2)}`,
+  test: `test  (${r.test.queries} queries):  应触发触发率 ${r.test.trigger_rate_on_should.toFixed(2)}  误触发率 ${r.test.false_trigger_rate_on_should_not.toFixed(2)}`,
+});
+result.rounds.forEach((r, i) => {
+  console.log(`第 ${i + 1} 轮${r.description === null ? "" : ` (${String(r.description).slice(0, 40)}…)`}`);
+  console.log("  " + label(r).train);
+  console.log("  " + label(r).test);
+});
+console.log(`best_description: 按 test 分数选出（correct=${result.rounds.find((r) => r.description === result.best_description)?.test.correct ?? "?"}，防过拟合）`);
+console.log(`invalid 探针: ${result.invalid_probes}`);
+console.log(`→ ${outPath}`);
+process.exit(0);
