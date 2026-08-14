@@ -18,9 +18,10 @@ Add the run standard as the first independently versioned standardization phase.
 
 1. Read package manifests, lockfiles, task-runner configuration, `README*`, and `AGENTS.md` files.
 2. Extract only repository operations: setup, development/start, build, check, typecheck, test/gate, and distribution.
-3. Keep Git commands out of the action list.
-4. Preserve existing commands exactly; map to them instead of replacing or rewriting them.
-5. Check the proposed ids and argv against [references/run-standard.md](references/run-standard.md).
+3. Read the repository's existing scripts and task definitions to recover the operations they already implement; map actions to that existing business instead of inventing parallel commands.
+4. Keep Git commands out of the action list.
+5. Preserve existing commands exactly; map to them instead of replacing or rewriting them.
+6. Check the proposed ids and argv against [references/run-standard.md](references/run-standard.md).
 
 ## Generate the interface
 
