@@ -109,6 +109,17 @@ function inferActions(target, pkg) {
   return actions;
 }
 
+function copyTree(source, destination, asJson = false) {
+  mkdirSync(destination, { recursive: true });
+  for (const entry of readdirSync(source, { withFileTypes: true })) {
+    const sourcePath = join(source, entry.name);
+    const destinationPath = join(destination, entry.name);
+    if (entry.isDirectory()) copyTree(sourcePath, destinationPath, asJson);
+    else if (entry.isFile()) copyFileSync(sourcePath, destinationPath);
+    else fail(`template contains unsupported entry: ${sourcePath}`, 70, asJson);
+  }
+}
+
 function tomlString(value) {
   return JSON.stringify(value);
 }
@@ -159,7 +170,7 @@ function main() {
     if (result.status !== 0) fail(`git init failed: ${(result.stderr || result.error?.message || "unknown error").trim()}`, 70, options.json);
   }
 
-  const destinations = ["run.cmd", "run", "run.toml", join("scripts", "run.mjs")];
+  const destinations = ["run.cmd", "run", "run.toml", join("scripts", "run.mjs"), join("scripts", "vendor", "toml")];
   const collisions = destinations.filter((relative) => existsSync(join(options.target, relative)));
   if (collisions.length > 0 && !options.force) fail(`run interface already exists (${collisions.join(", ")}); review it or explicitly use --force`, 64, options.json);
 
@@ -171,13 +182,14 @@ function main() {
   copyFileSync(join(templateRoot, "run.cmd"), join(options.target, "run.cmd"));
   copyFileSync(join(templateRoot, "run"), join(options.target, "run"));
   copyFileSync(join(templateRoot, "scripts", "run.mjs"), join(options.target, "scripts", "run.mjs"));
+  copyTree(join(templateRoot, "scripts", "vendor"), join(options.target, "scripts", "vendor"), options.json);
   chmodSync(join(options.target, "run"), 0o755);
   writeFileSync(join(options.target, "run.toml"), renderConfig(projectId, actions), "utf8");
   const agents = appendIntegration(options.target);
   const result = { status: "ok", target: options.target, createdRepository: options.create, project: projectId, actions: actions.map((action) => action.id), scanned: scannedInputs(options.target), agents };
   if (options.json) process.stdout.write(`${JSON.stringify(result)}\n`);
   else {
-    process.stdout.write(`[aes-standardize-repo] generated run.cmd, run, run.toml, and scripts/run.mjs\n`);
+    process.stdout.write(`[aes-standardize-repo] generated run.cmd, run, run.toml, scripts/run.mjs, and the vendored TOML parser\n`);
     process.stdout.write(`[aes-standardize-repo] project ${projectId}; actions: ${result.actions.join(", ")}\n`);
     process.stdout.write(`[aes-standardize-repo] AGENTS.md: ${agents}\n`);
   }

@@ -10,6 +10,7 @@
 - Restrict action ids to unique lowercase dot-separated tokens.
 - Reserve `list`, `show`, `doctor`, `help`, and `run`.
 - Execute `run` as an argv array with `shell: false` from the repository root.
+- Parse `run.toml` with the vendored TOML parser shipped at `scripts/vendor/toml/`; support the complete TOML 1.0 syntax rather than a line-oriented subset. Keep the run/v1 schema validation after parsing.
 - Match commands, action ids, and option names without case sensitivity.
 
 Example:
@@ -59,3 +60,4 @@ run = ["npm", "run", "build"]
 - Do not edit existing task definitions, package scripts, or task-runner commands.
 - Treat missing gate tooling as expected unavailability for `kind = "gate"`; keep those actions visible in list and doctor.
 - Keep templates and the runner dependency-free so cloning a standardized repository is sufficient.
+- Preserve the vendored parser license alongside its source; no package install or network access is required at run time.

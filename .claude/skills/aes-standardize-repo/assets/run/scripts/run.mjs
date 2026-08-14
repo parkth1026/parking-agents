@@ -2,8 +2,12 @@
 
 import { spawn } from "node:child_process";
 import { accessSync, constants, existsSync, readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { delimiter, dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
+const require = createRequire(import.meta.url);
+const toml = require("./vendor/toml/index.cjs");
 
 const RUNNER_VERSION = "1.0.0";
 const SCHEMA = "run/v1";
@@ -20,67 +24,34 @@ class RunError extends Error {
   }
 }
 
-function stripComment(line) {
-  let quoted = false;
-  let escaped = false;
-  for (let index = 0; index < line.length; index += 1) {
-    const character = line[index];
-    if (escaped) escaped = false;
-    else if (character === "\\" && quoted) escaped = true;
-    else if (character === '"') quoted = !quoted;
-    else if (character === "#" && !quoted) return line.slice(0, index);
-  }
-  return line;
-}
-
-function parseValue(raw, lineNumber) {
-  try {
-    const value = JSON.parse(raw);
-    if (typeof value === "string") return value;
-    if (Array.isArray(value) && value.length > 0 && value.every((item) => typeof item === "string")) return value;
-  } catch {
-    // Report one stable configuration error below.
-  }
-  throw new RunError(`run.toml line ${lineNumber}: expected a quoted string or non-empty string array`, EXIT.CONFIG);
-}
-
 function parseConfig(text) {
-  let section = null;
-  let project = null;
-  const actions = [];
-
-  for (const [offset, sourceLine] of text.split(/\r?\n/u).entries()) {
-    const lineNumber = offset + 1;
-    const line = stripComment(sourceLine).trim();
-    if (!line) continue;
-    if (line === "[project]") {
-      if (project) throw new RunError("run.toml defines [project] more than once", EXIT.CONFIG);
-      project = {};
-      section = project;
-      continue;
-    }
-    if (line === "[[actions]]") {
-      const action = {};
-      actions.push(action);
-      section = action;
-      continue;
-    }
-    if (line.startsWith("[")) throw new RunError(`run.toml line ${lineNumber}: unsupported table '${line}'`, EXIT.CONFIG);
-    if (!section) throw new RunError(`run.toml line ${lineNumber}: value appears before a table`, EXIT.CONFIG);
-
-    const match = /^([a-z][a-z0-9]*)\s*=\s*(.+)$/u.exec(line);
-    if (!match) throw new RunError(`run.toml line ${lineNumber}: invalid assignment`, EXIT.CONFIG);
-    const [, key, raw] = match;
-    if (Object.hasOwn(section, key)) throw new RunError(`run.toml line ${lineNumber}: duplicate key '${key}'`, EXIT.CONFIG);
-    section[key] = parseValue(raw, lineNumber);
+  let document;
+  try {
+    document = toml.parse(text);
+  } catch (error) {
+    const line = Number.isInteger(error?.line) ? error.line : error?.location?.start?.line;
+    const column = Number.isInteger(error?.column) ? error.column : error?.location?.start?.column;
+    const location = Number.isInteger(line)
+      ? ` line ${line}${Number.isInteger(column) ? `, column ${column}` : ""}`
+      : "";
+    throw new RunError(`run.toml${location}: ${error instanceof Error ? error.message : String(error)}`, EXIT.CONFIG);
   }
 
+  if (!document || typeof document !== "object" || Array.isArray(document)) {
+    throw new RunError("run.toml must contain [project] and [[actions]] tables", EXIT.CONFIG);
+  }
+  const unsupported = Object.keys(document).filter((key) => key !== "project" && key !== "actions");
+  if (unsupported.length > 0) throw new RunError(`run.toml has unsupported top-level keys: ${unsupported.join(", ")}`, EXIT.CONFIG);
+  const project = document.project;
+  const parsedActions = document.actions;
+  if (!Array.isArray(parsedActions)) throw new RunError("run.toml must define [[actions]] entries", EXIT.CONFIG);
+  const actions = parsedActions;
   validateConfig(project, actions);
   return { project, actions };
 }
 
 function validateConfig(project, actions) {
-  if (!project || typeof project.id !== "string" || !/^[a-z0-9][a-z0-9.-]*\/[a-z0-9][a-z0-9.-]*$/u.test(project.id)) {
+  if (!project || typeof project !== "object" || Array.isArray(project) || typeof project.id !== "string" || !/^[a-z0-9][a-z0-9.-]*\/[a-z0-9][a-z0-9.-]*$/u.test(project.id)) {
     throw new RunError("run.toml [project].id must have namespace/name form", EXIT.CONFIG);
   }
   if (Object.keys(project).sort().join(",") !== "id") throw new RunError("run.toml [project] supports only the id field", EXIT.CONFIG);
@@ -88,7 +59,7 @@ function validateConfig(project, actions) {
 
   const ids = new Set();
   for (const action of actions) {
-    if (Object.keys(action).sort().join(",") !== "id,kind,name,run") {
+    if (!action || typeof action !== "object" || Array.isArray(action) || Object.keys(action).sort().join(",") !== "id,kind,name,run") {
       throw new RunError("each [[actions]] entry must contain exactly id, name, kind, and run", EXIT.CONFIG);
     }
     if (typeof action.id !== "string" || !/^[a-z][a-z0-9]*(?:\.[a-z][a-z0-9]*)*$/u.test(action.id)) {

@@ -44,6 +44,8 @@ The generator copies the templates from `assets/run/`, creates `run.toml`, prese
 
 Do not pass `--force` unless the user explicitly authorizes replacing an existing run interface. Treat generated `run.toml` as a candidate until repository-specific argv have been reviewed.
 
+The generated runner parses `run.toml` with the vendored, zero-runtime-dependency TOML parser under `scripts/vendor/toml/`. It accepts the complete TOML 1.0 syntax, including multiline arrays, comments, quoted keys, inline tables, and date/time literals; the `run/v1` schema still restricts the resulting document to `[project].id` and `[[actions]]` entries with `id`, `name`, `kind`, and string-array `run`.
+
 ## Review the action map
 
 1. Keep `[project]` and `[[actions]]` as the only top-level table forms.
@@ -51,6 +53,7 @@ Do not pass `--force` unless the user explicitly authorizes replacing an existin
 3. Represent every command as an explicit argv array. Never use shell strings, pipes, redirection, command chaining, or implicit working-directory changes.
 4. Mark gate actions by `kind = "gate"`; the runner derives availability from the executable, so future installation activates them without changing the interface.
 5. Never place `list`, `show`, `doctor`, `help`, or `run` in action ids.
+6. Do not replace TOML arrays with JSON as a workaround. The generated runner owns TOML parsing; formatter-written multiline arrays and comments are valid input.
 
 ## Validate the result
 
