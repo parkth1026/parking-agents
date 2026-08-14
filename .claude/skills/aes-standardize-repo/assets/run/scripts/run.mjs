@@ -177,12 +177,13 @@ function runDoctor(config, asJson) {
   const wrapperOk = wrapperVersions.cmd === RUNNER_VERSION && wrapperVersions.sh === RUNNER_VERSION;
   const tools = [...new Set(config.actions.map((action) => action.run[0].toLowerCase()))].map((command) => ({ command, available: commandAvailable(command) }));
   const nonGateMissing = config.actions.filter((action) => action.kind !== "gate" && !commandAvailable(action.run[0])).map((action) => action.id);
+  const gateActions = config.actions.filter((action) => action.kind === "gate");
   const checks = {
     wrapper: { ok: wrapperOk, runnerVersion: RUNNER_VERSION, versions: wrapperVersions },
     config: { ok: true, actions: config.actions.length },
     node: { ok: true, version: process.version },
     tools,
-    gate: { available: commandAvailable("gate"), actions: config.actions.filter((action) => action.kind === "gate").map((action) => action.id) },
+    gate: { available: gateActions.every((action) => commandAvailable(action.run[0])), actions: gateActions.map((action) => action.id) },
   };
   const exitCode = wrapperOk && nonGateMissing.length === 0 ? EXIT.OK : EXIT.UNAVAILABLE;
   if (asJson) {
