@@ -6,8 +6,8 @@
  * Agent 一律通过子命令更新，不用 Edit/Write 直接改 manifest.json。
  *
  *   init <slug> [--request <原话>]        建/读 issue 目录（幂等）
- *   round <dir> <json>                    追加一行到 rounds.jsonl
- *   stage <dir> <stage> <status> [flags]  推进阶段状态
+ *   round <dir> <json>                    追加一行到 rounds.jsonl（先过 schema 校验）
+ *   stage <dir> <stage> <status> [flags]  推进阶段状态（done/skipped 先过结构闸门）
  *   verify <dir> [--write]                跑 contract.md 里全部 [A] 档命令
  *   rebuild <dir>                         从目录扫描重建 manifest
  *   finalize <dir>                        校验 + 冒烟 + 交接闸门 + 生成交接指令
@@ -17,7 +17,7 @@
  */
 
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync, appendFileSync } from 'node:fs';
-import { dirname, join, resolve, basename, sep } from 'node:path';
+import { dirname, join, resolve, basename, relative, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
@@ -135,6 +135,173 @@ function resolveIssueDir(arg) {
   die(`找不到 issue 目录：${arg}`);
 }
 
+// ─────────────────────────────── 阶段闸门校验 ───────────────────────────────
+//
+// 只验结构，不验质量：节齐不齐、行合不合 schema、文件在不在是机器能判的；问得好不好、
+// mock 像不像只有用户能判，写进脚本只会造出为过检而写的仪式。产出方自查自报是自陈，
+// 同一份检查在 stage done 时强制执行才是判据——和 finalize 拦 UNRUNNABLE、拦残留风险
+// 对不上账是同一个信任模型。闸门只查本阶段自己的产物，不查上游阶段状态：子技能允许
+// 被单独调用，上游门禁由编排器负责。
+
+const ROUND_TIERS = ['default', 'confirm', 'ask'];
+const ASSESS_DIMS = ['意图', '结果', '边界', '约束', '现状'];
+const CONTEXT_SECTIONS = ['任务陈述', '用户提出的方案', '意图假设', '已查事实', '验证基建候选池', '四分类'];
+const IMPACT_SURFACES = ['用户可见界面', '可观察行为', '可运行输出', '对外接口报文', '用户配置', '历史兼容性'];
+
+function validateRoundObj(obj) {
+  const errs = [];
+  if (!STAGES.includes(obj.stage)) {
+    errs.push(`stage 要是 ${STAGES.join(' / ')} 之一，现在是 ${JSON.stringify(obj.stage ?? null)}。`);
+  }
+  if (obj.round === undefined || obj.round === null || Number.isNaN(Number(obj.round))) {
+    errs.push('round 要写这是第几轮（数字）。');
+  }
+  if (!ROUND_TIERS.includes(obj.tier)) {
+    errs.push(`tier 要是 ${ROUND_TIERS.join(' / ')} 之一，现在是 ${JSON.stringify(obj.tier ?? null)}。`);
+  } else if (obj.tier === 'ask') {
+    if (typeof obj.question !== 'string' || !obj.question.trim()) errs.push('ask 行要带 question。');
+    if (obj.options !== undefined) {
+      if (!Array.isArray(obj.options) || obj.options.length === 0) {
+        errs.push('options 要是非空数组。');
+      } else {
+        let sum = 0;
+        let shapeOk = true;
+        obj.options.forEach((o, i) => {
+          if (!o || typeof o !== 'object' || !o.key || !o.text || typeof o.pct !== 'number') {
+            shapeOk = false;
+            errs.push(`options[${i}] 每项要有 key、text 和数字 pct。`);
+          } else {
+            sum += o.pct;
+          }
+        });
+        // pct 是主观估计，卡整不卡准：±2 容差消掉凑整摩擦，整体给虚照样挡。
+        if (shapeOk && Math.abs(sum - 100) > 2) {
+          errs.push(`options 的 pct 加和是 ${sum}，要落在 100±2 内——百分比先决定分诊档位，给虚了会把该问的误分进默认区。`);
+        }
+      }
+    }
+  } else if (typeof obj.item !== 'string' || !obj.item.trim()) {
+    errs.push(`${obj.tier} 行要带 item（定了什么）。`);
+  }
+  return errs;
+}
+
+function validateContextFile(dir) {
+  const p = join(dir, '1-interview', 'context.md');
+  if (!existsSync(p)) return ['1-interview/context.md 不存在。'];
+  const content = readFileSync(p, 'utf8');
+  const errs = [];
+  for (const name of CONTEXT_SECTIONS) {
+    if (!new RegExp(`^##\\s+${name}`, 'm').test(content)) {
+      errs.push(`context.md 缺「## ${name}」一节。`);
+    }
+  }
+  return errs;
+}
+
+function validateRoundsFile(dir) {
+  const p = roundsPath(dir);
+  if (!existsSync(p)) return ['1-interview/rounds.jsonl 不存在。'];
+  const errs = [];
+  readFileSync(p, 'utf8').split(/\r?\n/).forEach((line, i) => {
+    if (!line.trim()) return;
+    let obj;
+    try {
+      obj = JSON.parse(line);
+    } catch {
+      errs.push(`rounds.jsonl 第 ${i + 1} 行不是合法 JSON。`);
+      return;
+    }
+    for (const e of validateRoundObj(obj)) errs.push(`rounds.jsonl 第 ${i + 1} 行：${e}`);
+  });
+  return errs;
+}
+
+function validateAssessment(assessment) {
+  if (!assessment || typeof assessment !== 'object') {
+    return [`缺五维自评。用 --assessment 交齐：${ASSESS_DIMS.join('、')}。`];
+  }
+  const errs = [];
+  for (const dim of ASSESS_DIMS) {
+    if (!(dim in assessment)) errs.push(`自评缺维度「${dim}」。`);
+    else if (assessment[dim] === '未定') errs.push(`自评维度「${dim}」停在「未定」，不能报 done。`);
+  }
+  return errs;
+}
+
+function validateImpactSurfaceFile(dir) {
+  const p = join(dir, '2-prototype', 'impact-surface.md');
+  if (!existsSync(p)) return ['2-prototype/impact-surface.md 不存在。'];
+  const content = readFileSync(p, 'utf8');
+  const errs = [];
+  for (const s of IMPACT_SURFACES) {
+    if (!content.includes(s)) {
+      errs.push(`impact-surface.md 没提到影响面「${s}」。六面逐面扫，判「无」也要写下来。`);
+    }
+  }
+  return errs;
+}
+
+/** artifacts 名到确认版文件的映射；未知名字按 2-prototype/<name>[.md|.html] 找。 */
+function missingArtifacts(dir, names) {
+  const errs = [];
+  for (const name of names) {
+    const candidates = name === 'mock' ? ['mock.html'] : [`${name}.md`, `${name}.html`, name];
+    if (!candidates.some((f) => existsSync(join(dir, '2-prototype', f)))) {
+      errs.push(`--artifacts 列了「${name}」，但 2-prototype/ 下找不到对应文件（找过 ${candidates.join('、')}）。`);
+    }
+  }
+  return errs;
+}
+
+/** rebuild 用：扫 2-prototype/ 根下的对照物（除影响面清单外的 .md/.html），名字去扩展名。 */
+function scanArtifacts(dir) {
+  const p = join(dir, '2-prototype');
+  if (!existsSync(p)) return [];
+  return readdirSync(p)
+    .filter((f) => statSync(join(p, f)).isFile() && /\.(md|html)$/i.test(f) && !/^impact-surface\.md$/i.test(f))
+    .map((f) => f.replace(/\.(md|html)$/i, ''));
+}
+
+function gateDone(dir, stage, gate, m) {
+  if (stage === '1-interview') {
+    return [
+      ...validateContextFile(dir),
+      ...validateRoundsFile(dir),
+      ...validateAssessment(gate.self_assessment),
+    ];
+  }
+  if (stage === '2-prototype') {
+    const errs = validateImpactSurfaceFile(dir);
+    // 影响面清单是扫描记录，不是给用户确认过的对照物——拿它填 --artifacts 是凑数。
+    const artifacts = [];
+    for (const n of gate.artifacts_confirmed || []) {
+      if (/^impact-surface(\.md)?$/i.test(n)) {
+        errs.push(`--artifacts 列了「${n}」，但影响面清单不是对照物，凑不了数。`);
+      } else {
+        artifacts.push(n);
+      }
+    }
+    if (artifacts.length === 0) {
+      errs.push('done 至少要用 --artifacts 列一份确认版对照物。六面全「无」该报 needs_reinterview；差异极小且用户文字确认过才是 skipped。');
+    } else {
+      errs.push(...missingArtifacts(dir, artifacts));
+    }
+    return errs;
+  }
+  // 3-contract：先 finalize 后 done。顺序反了，或 finalize 之后又改了契约，这道闸就是空的。
+  const cpath = contractPath(dir);
+  if (!existsSync(cpath)) return ['3-contract/contract.md 不存在。'];
+  const errs = [];
+  const v = m.validation;
+  if (!v || v.status !== 'valid') {
+    errs.push('finalize 还没通过（manifest.validation.status ≠ valid）。先跑 finalize 再报 done。');
+  } else if (statSync(cpath).mtimeMs > Date.parse(v.ran_at) + 2000) {
+    errs.push('contract.md 在上次 finalize 之后又改过。重跑 finalize，别让改动绕过校验和冒烟。');
+  }
+  return errs;
+}
+
 // ─────────────────────────────── init ───────────────────────────────
 
 function cmdInit(argv) {
@@ -176,6 +343,11 @@ function cmdRound(argv) {
     die(`round 的参数不是合法 JSON：${e.message}`);
   }
   if (!obj.ts) obj.ts = iso();
+  const schemaErrs = validateRoundObj(obj);
+  if (schemaErrs.length > 0) {
+    for (const e of schemaErrs) console.error(`round: ${e}`);
+    die('这行不合 rounds.jsonl 的 schema（字段表见 aes-interview 的 SKILL.md），没有写入。', 1);
+  }
   mkdirSync(dirname(roundsPath(dir)), { recursive: true });
   // 追加一行是单次 O_APPEND 写，短行天然原子；这是并发点上唯一安全的写法。
   appendFileSync(roundsPath(dir), `${JSON.stringify(obj)}\n`, 'utf8');
@@ -209,6 +381,32 @@ function cmdStage(argv) {
   }
   if (typeof flags.reason === 'string') gate.reason = flags.reason;
   m.stage_gates[stage] = gate;
+
+  // 阶段闸门：done 不是自报的。产出方自查自报是自陈，这里当场验结构才是判据。
+  if (status === 'done') {
+    const gateErrs = gateDone(dir, stage, gate, m);
+    if (gateErrs.length > 0) {
+      for (const e of gateErrs) console.error(`gate: ${e}`);
+      die(`${stage} 的阶段闸门没过，done 没有写入。挡的是结构不是质量，逐条补齐再来。`, 1);
+    }
+  }
+  // 跳过是一次下注，finalize 会拿 reason 跟契约「残留风险」对账，没写理由就没法对。
+  // skipped 的语义只在对照物阶段成立：差异极小且用户文字确认过。访谈或契约被跳过，
+  // 工作流就没有产出了，却照样能点亮 ready——那是 done 闸门旁边的旁门，一并堵上。
+  if (status === 'skipped') {
+    if (stage !== '2-prototype') {
+      die(`${stage} 不能 skipped：跳过访谈或契约，这个流程就没有产出了。走不下去用 needs_reinterview 打回。`, 1);
+    }
+    if (typeof gate.reason !== 'string' || !gate.reason.trim()) {
+      die('skipped 必须带 --reason 写清为什么跳、赌的是什么。', 1);
+    }
+    // skipped 的前提是六面扫过了、只是差异极小——扫过的证据就是 impact-surface.md 在盘。
+    const skipErrs = validateImpactSurfaceFile(dir);
+    if (skipErrs.length > 0) {
+      for (const e of skipErrs) console.error(`gate: ${e}`);
+      die('skipped 不豁免六面扫描。理由写进 impact-surface.md（见 aes-prototype 的 SKILL.md），再来跳。', 1);
+    }
+  }
 
   if (typeof flags.next === 'string') m.next_action = flags.next;
   if (typeof flags.goal === 'string') m.goal_oneline = flags.goal;
@@ -356,19 +554,36 @@ function cmdRebuild(argv) {
 
   const has = (...p) => existsSync(join(dir, ...p));
   const gates = m.stage_gates || {};
+  // skipped 是人裁决过的状态，盘上本来就没有对应产物，重扫不该把它冲掉。
+  const keep = (s, next) => (gates[s]?.status === 'skipped' ? 'skipped' : next);
 
-  const interviewDone = has('1-interview', 'context.md') && has('1-interview', 'rounds.jsonl');
-  gates['1-interview'] = { ...(gates['1-interview'] || {}), status: interviewDone ? 'done' : 'in_progress' };
+  // 判 done 用和 stage done 同一批结构校验，判定口径不分叉。
+  // 只有五维自评例外：它只活在 manifest 里、盘上没有，rebuild 不因它降级；
+  // 正常流转时 stage done 的闸门会查它。
+  const interviewOk = validateContextFile(dir).length === 0 && validateRoundsFile(dir).length === 0;
+  gates['1-interview'] = { ...(gates['1-interview'] || {}), status: keep('1-interview', interviewOk ? 'done' : 'in_progress') };
 
-  const confirmed = ['behavior', 'api-mock', 'example-run', 'mock']
-    .filter((n) => has('2-prototype', n === 'mock' ? 'mock.html' : `${n}.md`));
-  if (has('2-prototype', 'impact-surface.md')) {
-    gates['2-prototype'] = { ...(gates['2-prototype'] || {}), status: 'done', artifacts_confirmed: confirmed };
+  // 对照物判定和 gateDone 同一口径（开放命名）：manifest 记过的清单先用 missingArtifacts
+  // 复核；清单丢了（manifest 损坏重建）就扫目录，根下除影响面清单外的 .md/.html 都算。
+  const recorded = (gates['2-prototype']?.artifacts_confirmed || [])
+    .filter((n) => !/^impact-surface(\.md)?$/i.test(n));
+  const confirmed = recorded.length > 0 && missingArtifacts(dir, recorded).length === 0
+    ? recorded
+    : scanArtifacts(dir);
+  if (validateImpactSurfaceFile(dir).length === 0 && confirmed.length > 0) {
+    gates['2-prototype'] = { ...(gates['2-prototype'] || {}), status: keep('2-prototype', 'done'), artifacts_confirmed: confirmed };
   } else {
-    gates['2-prototype'] = { ...(gates['2-prototype'] || {}), status: 'pending' };
+    gates['2-prototype'] = {
+      ...(gates['2-prototype'] || {}),
+      status: keep('2-prototype', has('2-prototype', 'impact-surface.md') ? 'in_progress' : 'pending'),
+    };
   }
 
-  gates['3-contract'] = { ...(gates['3-contract'] || {}), status: has('3-contract', 'contract.md') ? 'done' : 'pending' };
+  const contractOk = has('3-contract', 'contract.md') && m.validation?.status === 'valid';
+  gates['3-contract'] = {
+    ...(gates['3-contract'] || {}),
+    status: keep('3-contract', contractOk ? 'done' : (has('3-contract', 'contract.md') ? 'in_progress' : 'pending')),
+  };
 
   m.slug = slug;
   m.stage_gates = gates;
@@ -429,7 +644,9 @@ function cmdFinalize(argv) {
   console.log('\n─── 交接可执行性 ───');
 
   const root = repoRoot();
-  if (cpath !== root && !cpath.startsWith(root + sep)) {
+  // 用 relative 判包含：Windows 上盘符大小写不定（G:\ vs g:\），startsWith 会误报出仓。
+  const rel = relative(root, cpath);
+  if (rel.startsWith('..') || isAbsolute(rel)) {
     console.log(`WARNING: 契约不在仓库根 ${root} 之下。`);
     console.log('         执行 Agent 的工作区通常就是仓库根。路径读不到时它不会报错，会只凭 objective');
     console.log('         那一句话硬编——表面在跑，实际整份契约失效。挪进仓库，或确认它访问得到这个路径。');

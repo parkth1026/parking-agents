@@ -235,6 +235,9 @@ node <workflow-interview>/scripts/session.mjs finalize <issue-dir>
 node <workflow-interview>/scripts/session.mjs stage <issue-dir> 3-contract done --next "<一句话>"
 ```
 
+`done` 要求 finalize 已通过（validation.status = valid）且契约在那之后没再改过；
+先 done 后 finalize、或 finalize 完又改了契约，都会被拒收——顺序反了这道闸就是空的。
+
 最终报告契约路径、目标、范围、验收条件数量、校验与冒烟结果，以及精确阻塞项或那条
 可复制的交接指令。**交接指令不落盘**：它是模板加两个变量，落一份只会在契约改了之后
 变成陈旧的错误指令，每次由 `finalize` 现场生成。

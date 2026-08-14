@@ -1,5 +1,5 @@
 interface:
   display_name: "workflow-interview"
-  short_description: "workflow-interview"
+  short_description: "三阶段需求访谈编排器：问清需求 → 出对照物 → 落盘 Goal Contract。仅在显式调用时使用。"
 policy:
   allow_implicit_invocation: false

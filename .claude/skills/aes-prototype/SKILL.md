@@ -65,7 +65,8 @@ node <workflow-interview>/scripts/session.mjs stage <issue-dir> 2-prototype need
 回 `aes-interview`，不进下一阶段，也不硬造一份对照物。
 
 真正的 `skipped` 只留给一种情况：差异确实存在但极小，且用户已经在需求阶段用文字确认过
-它的具体形态。理由必须写进 `impact-surface.md`。
+它的具体形态。理由必须写进 `impact-surface.md`——`stage` 命令收到 skipped 时会当场验
+六面扫描在盘，`impact-surface.md` 不齐就跳不了。
 
 ## 2. 出对照物
 
@@ -175,4 +176,8 @@ node <workflow-interview>/scripts/session.mjs stage <issue-dir> 2-prototype done
   --artifacts "behavior,api-mock,example-run" --next "<下一步一句话>"
 ```
 
-`--artifacts` 只列实际产出的确认版。然后交回 `workflow-interview` 继续流转。
+`--artifacts` 只列实际产出的确认版。`done` 不是自报的：命令会当场校验
+impact-surface.md 六面都被扫过、`--artifacts` 至少一份且列的文件真的在
+`2-prototype/` 下，不过就拒收。挡的是结构不是质量——对照物像不像，由用户确认负责。
+
+然后交回 `workflow-interview` 继续流转。

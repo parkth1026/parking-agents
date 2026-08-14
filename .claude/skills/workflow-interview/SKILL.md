@@ -1,6 +1,6 @@
 ---
 name: workflow-interview
-description: workflow-interview
+description: 三阶段需求访谈编排器：问清需求（aes-interview）→ 出对照物（aes-prototype）→ 落盘 Goal Contract（aes-goal-contract）。仅在用户显式调用 /workflow-interview 或明确要求走完整需求访谈流程时使用；普通需求讨论、代码修改任务不要自动触发。
 disable-model-invocation: false
 ---
 
@@ -45,7 +45,8 @@ subagent 都不许用 Edit/Write 直接改它。
 
 ### 每个阶段必须交出什么
 
-只看存在性，不看内容——内容由产出它的子技能负责：
+只看存在性与结构，不看质量——质量由产出它的子技能负责。结构由
+`session.mjs stage ... done` 当场强制校验，缺节、缺文件、不合 schema 都报不出 done：
 
 - `aes-interview` 交出 `1-interview/context.md` 与 `1-interview/rounds.jsonl`，
   且五个自评维度没有一个停在「未定」。
@@ -58,6 +59,12 @@ subagent 都不许用 Edit/Write 直接改它。
 
 前一阶段的状态不是 `done` 或 `skipped` 时，不得进入下一阶段。手上没有产物就往下走，
 后面每一步都是在猜。
+
+`done` 不是自报的：`session.mjs` 收到 done 时跑该阶段的结构闸门，不过就拒收；
+`skipped` 只有 2-prototype 能用（差异极小且用户文字确认过），必须带 `--reason`
+且六面扫描已落盘，`finalize` 拿 reason 跟契约「残留风险」对账——访谈和契约没有
+「跳过」，走不下去用 `needs_reinterview` 打回。闸门挡结构不挡质量——问得好不好、
+对照物像不像，仍由自评与用户确认负责。
 
 ### 回退
 

@@ -1,0 +1,55 @@
+{
+  "skill_name": "workflow-interview",
+  "evals": [
+    {
+      "id": 1,
+      "name": "cli-list-grouping",
+      "prompt": "session.mjs 的 list 命令现在把所有 issue 摊平打印成一张表，issue 一多就看不过来了。我想让它按 stage 分组显示，并且能加个筛选只看某个 stage 或者只看 in_progress 的。",
+      "persona": "你是这个仓库的维护者本人，也是 workflow-interview 这套工具日常最重的使用者。\n- 动机：手头挂着的 issue 一多，`session.mjs list` 摊平成一张长表就看不过来了，想按 stage 分组，并能加个筛选。\n- 想要：按 stage 分组显示；能只看某个 stage，或者只看 in_progress 的。\n- 如果 Agent 问起「有没有别的东西依赖这份输出的格式」这类问题：你想起来自己写过一个不在这个仓库里的本地小脚本（自己电脑上的一个 PowerShell 脚本），靠固定列宽/列顺序去 parse `session.mjs list` 的纯文本输出，喂给自己的一个提醒小工具。这件事你一开始不会主动说，只有 Agent 明确问到「输出格式有没有别的东西在依赖」或类似问题时才说出来。你不确定新格式要不要兼容它，愿意让 Agent 给建议。\n- 如果 Agent 给你看行为对照表（behavior.md / example-run.md）之类的东西确认：第一次看你会提两条意见——分组标题行要清楚标出 stage 名字和数量；筛选参数命中 0 条时不能什么都不打印，得明确提示「没有匹配项」。改完后第二次看你就确认通过，不再提新意见。\n- 不变的（你依赖的）：没加任何 flag 时，`list` 的默认输出行为不能变（这是给你自己那个脚本兜底的），除非 Agent 跟你确认要不要迁移。\n- 验收方式：跟着仓库已有的测试/校验惯例走，Agent 推荐什么就是什么。\n- 其他任何未覆盖的问题：选 Agent 推荐项。",
+      "expected_output": "锁清楚：分组维度（按 stage 还是按 status）、筛选参数的具体形态（新增 flag 还是复用现有参数）、排序规则、无匹配项时的输出、是否要保持现有无参数调用的输出不变（历史兼容性）。产出行为对照表（behavior.md）与终端输出示例（example-run.md），落盘 contract.md 并通过校验+冒烟。",
+      "files": [],
+      "assertions": [
+        {"text": "contract.md 存在且 finalize 校验 status=valid", "type": "programmatic"},
+        {"text": "每条 AC 都带 Verify: [A-D] 档位标注", "type": "programmatic"},
+        {"text": "访谈中主动问到「现在有没有别的东西依赖这个命令的输出格式」这类历史兼容性问题", "type": "judgment"},
+        {"text": "人设藏的个人脚本解析依赖这一隐藏事实被问出来并写进 context.md 或 rounds.jsonl", "type": "judgment"},
+        {"text": "2-prototype 下存在 behavior.md 或 example-run.md，记录改前改后的具体输出对照", "type": "programmatic"},
+        {"text": "同一轮 round 内出现多条 tier=ask 的问题（批量问而不是挤牙膏）", "type": "programmatic"},
+        {"text": "baseline（without_skill）是否也问到或假设了输出格式的历史兼容性风险，用作对比", "type": "judgment"}
+      ]
+    },
+    {
+      "id": 2,
+      "name": "vague-mid-flight-requirement",
+      "prompt": "帮我给 workflow-interview 加个功能，允许用户中途改需求。",
+      "persona": "你是 workflow-interview 这个技能的作者，提需求时确实没想清楚。\n- 你说「中途改需求」时，脑子里其实想的是：访谈已经问完、对照物也确认过了，进入到 3-contract 阶段快收尾时，你才突然想加一条新的验收条件——这算不算「中途改需求」，你自己也没细分过。\n- 如果 Agent 问「你要的和现有 needs_reinterview 回退机制有什么不一样」：你愣一下，想起来仓库里已经有这套机制（子技能报 needs_reinterview 就退回 aes-interview），承认「好像……还真有点像，我可能就是想要一个更轻的版本——不用整个打回第一阶段重新走一遍，只是想在契约还没定稿前，能追加一条新的验收条件」。\n- 如果 Agent 问「新加的验收条件要不要触发 aes-prototype 重新出一次对照物」：说看情况，如果新条件涉及界面/行为变化就要，纯文字性质的（比如补一句边界说明）就不用，让 Agent 按现有门禁规则判断。\n- 你不想要一个全新的子系统或者新命令；如果 Agent 打算新增一整套机制，先跟你确认一下是不是有更小的改法。\n- 验收方式：跟着仓库现有校验脚本 validate-goal-contract.mjs 走。\n- 其他任何未覆盖的问题：选 Agent 推荐项。",
+      "expected_output": "这是一句故意含糊的请求：没说清「中途」指哪个阶段、「改需求」是改哪一类（目标本身/范围/某条已确认的对照物/某条已定的验收条件）、和已有的 needs_reinterview 回退机制是什么关系。好的表现是批量问出这些会改变边界的歧义、区分 Fact/User decision/Agent-owned，不用「我理解你的意思」替用户拍板；差的表现是脑补一个具体方案直接开始设计。",
+      "files": [],
+      "assertions": [
+        {"text": "调查阶段主动查过仓库里已有的 needs_reinterview 回退机制（Fact 调查），而不是假装它不存在", "type": "judgment"},
+        {"text": "context.md 的四分类节把「中途改需求」拆成了多个子问题并分别归类，而不是整句话归成一类", "type": "programmatic"},
+        {"text": "访谈中问到了「你要的和现有 needs_reinterview 机制有什么不一样」这类澄清问题", "type": "judgment"},
+        {"text": "契约最终范围与人设被问到后透露的信息一致（人设可能说这未必需要新功能，契约范围应体现这一点而不是硬做一个新子系统）", "type": "judgment"},
+        {"text": "rounds.jsonl 里没有在歧义收口前就把具体实现方案当成既定事实写死的情况", "type": "judgment"},
+        {"text": "baseline（without_skill）是否也发现或提到了现有 needs_reinterview 机制，用作对比", "type": "judgment"}
+      ]
+    },
+    {
+      "id": 3,
+      "name": "insight-report-filter-ui",
+      "prompt": ".copilot/agents/insight/generate-insight-report.js 生成的报告现在是一份很长的静态大页面，想加一个按 facet 筛选的下拉框，选了之后只显示对应 facet 的内容，不用整页翻。",
+      "persona": "你是 .copilot/agents/insight/generate-insight-report.js 生成的那份报告的日常使用者（运营/分析同学），不写代码。\n- 动机：报告一次性把所有 facet 都铺开，页面巨长，每次只想看某一个 facet 的内容，不想整页翻。\n- 想要：加一个下拉框，选了某个 facet 之后只显示对应内容。\n- 如果 Agent 问下拉框选项文案：你明确要人话，不要内部 key（比如不能显示「facet_conv_rate」这种，要显示「转化率」这种人能看懂的名字）。\n- 如果 Agent 问某个 facet 没有数据时下拉框怎么表现：你要求选项依然在列表里（不隐藏、不置灰），但选中后主区域显示一句「这个 facet 暂无数据」，不要空白一片。\n- 如果 Agent 问要不要记住上次选择：不需要，每次打开报告默认显示第一个 facet 就行。\n- 如果 Agent 给你看 mock.html 确认：第一次看你会提两条意见——下拉框要放在页面顶部醒目位置，不要塞在某个 facet 区块里面；选中态要有明显视觉反馈（比如高亮当前选中的 facet 名字）。改完后第二次看你确认通过，不再提新意见。\n- 不变的：其他没被选中的 facet 内容不用删掉，只是隐藏，你偶尔还是想用浏览器内搜索（Ctrl+F）找到别的 facet 的内容。\n- 验收方式：这是纯前端静态报告，没有自动化视觉回归基建，跟着仓库惯例，Agent 推荐什么就是什么。\n- 其他任何未覆盖的问题：选 Agent 推荐项。",
+      "expected_output": "识别出这是一处用户可见界面变更，出一份自包含 mock.html（内联 CSS/JS，写死示例数据，标出改动点，注明新增什么/不变什么），并追问筛选是否需要多选、无匹配 facet 时怎么显示、是否要记住上次选择等会改变实现边界的问题。契约里验收条件应引用 mock.html 而不是重新用文字描述界面。",
+      "files": [],
+      "assertions": [
+        {"text": "2-prototype/mock.html 存在", "type": "programmatic"},
+        {"text": "mock.html 自包含：无外部 CDN 的 <script src=http...> 或 <link href=http...>，CSS/JS 都内联", "type": "programmatic"},
+        {"text": "mock.html 标出了改动点并在文件末尾注明新增什么/不变什么", "type": "programmatic"},
+        {"text": "contract.md 的「读什么」引用了 mock.html 路径，而不是重新用文字描述界面", "type": "programmatic"},
+        {"text": "问到了下拉框选项文案用内部 key 名还是人话这一点", "type": "judgment"},
+        {"text": "问到了某个 facet 没数据时下拉框如何表现这一点", "type": "judgment"},
+        {"text": "界面相关 AC 的 Verify 档位默认标 [C]，不是编不出证据链的 [A]（仓库没有视觉回归基建）", "type": "programmatic"}
+      ]
+    }
+  ]
+}

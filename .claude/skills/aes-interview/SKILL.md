@@ -176,7 +176,10 @@ node <workflow-interview>/scripts/session.mjs round <issue-dir> '<一行 JSON>'
 | `cross_repo_boundary` | 都可有 | 这一项跨出仓库边界时为 `true` |
 | `triggered_by` | 回流的问题 | 由哪份草稿或哪个阶段撞出来 |
 
-同一轮内 `ask` 行的 `pct` 加和 100。
+同一轮内 `ask` 行的 `pct` 加和 100（校验留 ±2 容差——pct 是主观估计，卡整不卡准）。
+`round` 命令会按这张表当场校验：`stage`、`round`、`tier` 必填，`ask` 行要带
+`question` 且 `options` 的 `pct` 加和落在 100±2，`default` / `confirm` 行要带
+`item`。不合 schema 的行拒收，不落盘。
 
 `overturned_recommendation` 做成可 grep 的字段而不是靠人眼在表格里找，因为它是整份
 记录里唯一能看出「当时判断偏在哪」的信号。下一个改这份契约的人靠它知道该重新验证
@@ -192,6 +195,10 @@ node <workflow-interview>/scripts/session.mjs stage <issue-dir> 1-interview done
 
 有维度停在「未定」就别报 `done`。用户说「别问了直接干」时照办，但把因此没问的东西
 用 `--residual-risk` 记一句话。
+
+`done` 不是自报的：命令会当场校验 context.md 必需节齐全、rounds.jsonl 每行合
+schema、五维自评无「未定」，不过就拒收。它挡的是结构不是质量——问得好不好，
+仍由自评与用户确认负责。
 
 然后交回 `workflow-interview` 继续流转。
 
