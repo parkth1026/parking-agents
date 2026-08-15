@@ -1,6 +1,6 @@
 ---
 name: parking-skill-creator
-description: 本机技能生产流水线：在 Windows+Node 环境创建、评测、迭代与打包 agent 技能。用于从零创建新技能（确定性脚手架+六步方法论）、评测既有技能（输出评测 with/without 对照、触发评测同宿主 subagent 探针、浏览器逐例评审）、优化 description 触发准确率、打包 .skill 分发包。用户想建技能、改技能、跑技能评测、优化技能触发描述或打包分发时使用。全部脚本零外部依赖，纯 Node 内置模块。
+description: 本机技能生产流水线：创建、评测、迭代与打包 agent 技能。用于从零创建新技能（确定性脚手架+六步方法论）、评测既有技能（输出评测 with/without 对照、触发评测同宿主 subagent 探针、浏览器逐例评审）、优化 description 触发准确率、打包 .skill 分发包。用户想建技能、改技能、跑技能评测、优化技能触发描述或打包分发时使用。全部脚本零外部依赖，纯 Node 内置模块。
 ---
 
 # parking-skill-creator：技能生产流水线
