@@ -3,7 +3,7 @@
 配置分两层，深合并（环境层覆盖技能层）：
 
 - **技能固有默认** `config.json`（与 SKILL.md 同目录，随仓库版本化）：本技能当前无固有项。
-- **环境层** `~/.config/parking-agents/skill-env.json`（工具中立位置，不进任何仓库）：下列字段的真实值都在这里（本机指向 NAS 知识库 `//nas.51vr.local/PaaS/UE5/ue-llm-wiki/`）。解析链：`$SKILL_ENV` > 该路径 > `~/.claude/skill-env.json`（旧位置回退）。模板见 `config.example.json`（默认已指向 NAS，拷贝后按机器改 `gitRepos` 即可用）；三层都无配置时脚本打印三步配置引导后退出。
+- **环境层** `~/.config/parking-agents/skill-env.json`（工具中立位置，不进任何仓库）：下列字段的真实值都在这里（本机指向 NAS 知识库 `//nas.51vr.local/x.public/UE5/ue-llm-wiki/`）。解析链：`$SKILL_ENV` > 该路径 > `~/.claude/skill-env.json`（旧位置回退）。模板见 `config.example.json`（默认已指向 NAS，拷贝后按机器改 `gitRepos` 即可用）；三层都无配置时脚本打印三步配置引导后退出。
 
 下列字段指合并后的有效配置。
 

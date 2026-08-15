@@ -5,12 +5,12 @@
   },
   "gitRepos": "D:/Git",
   "knowledgeBase": {
-    "rawDir": "//nas.51vr.local/PaaS/UE5/ue-llm-wiki/raw",
-    "wikiDir": "//nas.51vr.local/PaaS/UE5/ue-llm-wiki/wiki"
+    "rawDir": "//nas.51vr.local/x.public/UE5/ue-llm-wiki/raw",
+    "wikiDir": "//nas.51vr.local/x.public/UE5/ue-llm-wiki/wiki"
   },
-  "trackFile": "//nas.51vr.local/PaaS/UE5/ue-llm-wiki/raw/analyzed-builds.json",
-  "workflowFile": "//nas.51vr.local/PaaS/UE5/ue-llm-wiki/raw/workflow.json",
-  "tmpDir": "//nas.51vr.local/PaaS/UE5/ue-llm-wiki/raw/tmp/ue-error",
+  "trackFile": "//nas.51vr.local/x.public/UE5/ue-llm-wiki/raw/analyzed-builds.json",
+  "workflowFile": "//nas.51vr.local/x.public/UE5/ue-llm-wiki/raw/workflow.json",
+  "tmpDir": "//nas.51vr.local/x.public/UE5/ue-llm-wiki/raw/tmp/ue-error",
   "jobs": [
     { "enabled": true, "name": "aes6-ue-runtime-ci", "path": "job/wdp-ue/job/Earth/job/aes6-ue-runtime-ci" },
     { "enabled": true, "name": "twe-ue5.5-installed", "path": "job/wdp-ue/job/Earth/job/twe-ue5.5-installed" },

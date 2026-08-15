@@ -5,8 +5,8 @@
   },
   "gitRepos": "D:/Git",
   "knowledgeBase": {
-    "rawDir": "//nas.51vr.local/PaaS/UE5/ue-llm-wiki/raw",
-    "wikiDir": "//nas.51vr.local/PaaS/UE5/ue-llm-wiki/wiki"
+    "rawDir": "//nas.51vr.local/x.public/UE5/ue-llm-wiki/raw",
+    "wikiDir": "//nas.51vr.local/x.public/UE5/ue-llm-wiki/wiki"
   },
-  "tmpDir": "//nas.51vr.local/PaaS/UE5/ue-llm-wiki/raw/tmp/ue-error"
+  "tmpDir": "//nas.51vr.local/x.public/UE5/ue-llm-wiki/raw/tmp/ue-error"
 }

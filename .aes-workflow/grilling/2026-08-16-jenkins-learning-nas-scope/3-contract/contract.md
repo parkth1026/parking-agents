@@ -3,6 +3,7 @@
 - Status: Ready
 - Target: `D:\GIT_dev\parking-agents`（.claude/skills 下 jenkins-log-auto-learning、ue-error-solver、karpathy-llm-wiki 三技能）+ 本机用户配置 + NAS `\\nas.51vr.local\PaaS\UE5\ue-llm-wiki`
 - Updated: 2026-08-16
+- 变更记录: 2026-08-16 执行后用户裁定 NAS 地址改为 `\\nas.51vr.local\x.public\UE5\ue-llm-wiki`（x.public 下已有 8-15 预建的空 raw/wiki 骨架；PaaS 侧已迁内容整体搬至 x.public 后清理）。正文与 AC 中的 `PaaS` 地址按新地址等价理解，AC-001/003/004/005/006/007 已按 x.public 复现通过；对照物 behavior.md / example-run.md 按约定未修改。
 
 ## 原始请求
 
