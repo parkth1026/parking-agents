@@ -109,14 +109,16 @@ node scripts/quick-validate.mjs <技能目录>
 - 技能路径: <path-to-skill>
 - 任务: <eval prompt>
 - 输入文件: <有则列出，无则 "none">
-- 产物保存到: <workspace>/iteration-<N>/eval-<名>/with_skill/outputs/
+- 产物保存到: <workspace>/iteration-<N>/eval-<名>/with_skill/run-1/outputs/
 - 要保存的产物: <用户关心的东西，如 "最终的 .docx 文件">
 ```
 
+目录布局对齐聚合器口径：`<config>/run-<K>/outputs/`（run 序号从 1 起，同一 eval 重跑多个 run 时递增）——聚合器只认 `run-<数字>` 子目录，产物直接放 `<config>/outputs/` 会收不到。
+
 基线 run（同 prompt）：
 
-- **新建技能**：不给技能，存到 `without_skill/outputs/`。
-- **改进既有技能**：改动前先快照（把技能目录复制到 `<workspace>/skill-snapshot/`），基线指向快照，存到 `old_skill/outputs/`。
+- **新建技能**：不给技能，存到 `without_skill/run-1/outputs/`。
+- **改进既有技能**：改动前先快照（把技能目录复制到 `<workspace>/skill-snapshot/`），基线指向快照，存到 `old_skill/run-1/outputs/`。
 
 每个 eval 目录写 `eval_metadata.json`（断言可先空，见 6.2）：
 
@@ -149,7 +151,7 @@ node scripts/quick-validate.mjs <技能目录>
 2. **聚合**：
 
    ```bash
-   node scripts/aggregate-benchmark.mjs <workspace>/iteration-<N>
+   node scripts/aggregate-benchmark.mjs <workspace>/iteration-<N> --skill-name <技能名>
    ```
 
    产出 `benchmark.json` + `benchmark.md`：pass_rate/time_ms/tokens 的 mean±stddev（样本方差）+ delta（with − baseline）。配置目录名动态发现（with_skill/without_skill/old_skill/自定义都行）。
@@ -207,9 +209,11 @@ description 决定技能会不会被调用。技能做完（或触发不准）�
 
 ### 并行 spawn 探针
 
-对每条 query spawn 探针 subagent（同宿主、并行、每条默认 3 个探针）。探针 prompt 模板：
+对每条 query spawn 探针 subagent（同宿主、并行、每条默认 3 个探针；宿主支持无工具 agent 类型时探针优先用无工具类型）。探针 prompt 模板：
 
 ```
+你是一个技能路由判断器。你不需要、也不允许实际执行任务、调用任何工具或浏览任何文件——你只做一件事：从下面的技能清单里选出会用到的技能。
+
 用户向你提出以下请求：
 
 <query 原文>
@@ -222,7 +226,7 @@ description 决定技能会不会被调用。技能做完（或触发不准）�
 第二行起用不超过 15 个字说明理由。
 ```
 
-**防泄漏红线**：探针 prompt 不得包含 should_trigger 预期答案、评测意图暗示、「我们在测试 X 技能」等信息。探针要知道的只有：请求原文、技能清单、首行协议。
+首行的护栏句必保：没有它，任务形状的请求会诱使探针真去执行任务（实测 5~10 倍 token 与耗时）或翻到评测文件。**防泄漏红线**：探针 prompt 不得包含 should_trigger 预期答案、评测意图暗示、「我们在测试 X 技能」等信息；评测集与探针结果就放在 workspace，探针浏览文件即泄漏，护栏句已禁止。探针要知道的只有：请求原文、技能清单、首行协议。
 
 每个探针完成后，**逐条追加**进 `<workspace>/probe-results.jsonl`：
 

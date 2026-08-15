@@ -5,7 +5,7 @@
 //   - train/test 60/40 按 should_trigger 分层切分（每组洗牌后取前 max(1, floor(n*0.4)) 进 test）
 //   - 每 query 默认 3 探针取严格多数（有效探针中 triggered > 半数才算触发）
 //   - 首行 `SKILL: <名或 none>` 是唯一判定源；解析失败记 invalid 不猜
-//   - best_description 按 test 正确率选出（防过拟合，平局取先出现轮）
+//   - best_description 按 test 分数选出（防过拟合）：correct ↓ → 应触发率 ↓ → 误触发率 ↑，全平取先出现轮
 // 用法: node aggregate-trigger.mjs <workspace目录> [--eval-set <路径>] [--probes <路径>] [--output <路径>]
 // 退出码: 0 成功 / 1 数据缺失或无有效结果 / 2 用法错
 import { existsSync, readFileSync } from "node:fs";
@@ -164,10 +164,22 @@ export function aggregateTrigger(evalSet, probeRows) {
     });
   }
 
-  // best_description：按 test 正确率选优（防过拟合）；平局取先出现轮
+  // best_description：按 test 分数选优（防过拟合）。
+  // 分数字典序：correct ↓ → 应触发率 ↓ → 误触发率 ↑ → 全平取先出现轮（保守保底）。
+  // 官方 run_loop 只比 correct（平局取先）；小 test 集上 correct 平局常见，
+  // 用率细分避免「触发率大涨但 correct 撞平」的更优轮被丢弃。误触发率一步仅在
+  // 两轮 valid 探针分母不同导致率与 correct 同时打平时才可达，兜底用。
+  function beats(challenger, champ) {
+    if (challenger.test.correct !== champ.test.correct) return challenger.test.correct > champ.test.correct;
+    if (challenger.test.trigger_rate_on_should !== champ.test.trigger_rate_on_should)
+      return challenger.test.trigger_rate_on_should > champ.test.trigger_rate_on_should;
+    if (challenger.test.false_trigger_rate_on_should_not !== champ.test.false_trigger_rate_on_should_not)
+      return challenger.test.false_trigger_rate_on_should_not < champ.test.false_trigger_rate_on_should_not;
+    return false; // 全平：保守保留先出现轮
+  }
   let best = null;
   for (const r of roundStats) {
-    if (best === null || r.test.correct > best.test.correct) best = r;
+    if (best === null || beats(r, best)) best = r;
   }
 
   return {
@@ -231,7 +243,8 @@ result.rounds.forEach((r, i) => {
   console.log("  " + label(r).train);
   console.log("  " + label(r).test);
 });
-console.log(`best_description: 按 test 分数选出（correct=${result.rounds.find((r) => r.description === result.best_description)?.test.correct ?? "?"}，防过拟合）`);
+const bestRound = result.rounds.find((r) => r.description === result.best_description);
+console.log(`best_description: 按 test 分数选出（correct=${bestRound?.test.correct ?? "?"}/${bestRound?.test.queries ?? "?"}, 触发率=${bestRound?.test.trigger_rate_on_should.toFixed(2) ?? "?"}，平局比率细分，防过拟合）`);
 console.log(`invalid 探针: ${result.invalid_probes}`);
 console.log(`→ ${outPath}`);
 process.exit(0);
