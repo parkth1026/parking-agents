@@ -1,5 +1,0 @@
-Started by timer
-Obtained Groovy/TWE_UE_Runtime.groovy from git http://10.100.10.55/neon/AesBuilderJenkins.git
-java.lang.OutOfMemoryError: Java heap space
-Finished: FAILURE
-

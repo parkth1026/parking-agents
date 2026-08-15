@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // validate-wiki.mjs — Wiki 校验 v4：8 维度综合检查
-// （validate-wiki.ps1 的 Node ESM 移植，行为与输出格式保持一致）
+// （唯一入口；原 validate-wiki.ps1 已按仓库脚本标准移除）
 //
 // 用法: node validate-wiki.mjs --wiki <path/to/wiki> [--config <path/to/config.json>]
 // 退出码: 0 = PASS（总分 >= minScore 且断链为 0），1 = FAIL
