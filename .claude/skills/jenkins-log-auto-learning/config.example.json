@@ -1,17 +1,19 @@
 {
-  "_README": "示例 schema（仅文档，不被加载）。真实环境值写入 ~/.claude/skill-env.json；可用 $SKILL_ENV 环境变量覆盖路径。与 skill 的 config.json 深合并，环境层优先。",
+  "_README": "环境层模板（工具中立位置，所有 skill 共享）。默认值即团队 NAS 知识库与 3 个 Earth 下目标 job——拷到 ~/.config/parking-agents/skill-env.json 即可用；仅需按机器改 gitRepos（如 D:/Git）。解析链: $SKILL_ENV > ~/.config/parking-agents/skill-env.json > ~/.claude/skill-env.json（旧位置回退）。与 skill 的 config.json 深合并，环境层优先。范围外 job 需要时自行加条目并置 enabled:true/false。",
   "jenkins": {
-    "baseUrl": "http://your-jenkins-host"
+    "baseUrl": "http://10.66.12.40"
   },
   "gitRepos": "D:/Git",
   "knowledgeBase": {
-    "rawDir": "~/memory/jenkins-learnings-raw",
-    "wikiDir": "~/memory/jenkins-learnings"
+    "rawDir": "//nas.51vr.local/PaaS/UE5/ue-llm-wiki/raw",
+    "wikiDir": "//nas.51vr.local/PaaS/UE5/ue-llm-wiki/wiki"
   },
-  "trackFile": "~/memory/jenkins-learnings-raw/analyzed-builds.json",
-  "workflowFile": "~/memory/jenkins-learnings-raw/workflow.json",
-  "tmpDir": "~/memory/jenkins-learnings-raw/tmp/ue-error",
+  "trackFile": "//nas.51vr.local/PaaS/UE5/ue-llm-wiki/raw/analyzed-builds.json",
+  "workflowFile": "//nas.51vr.local/PaaS/UE5/ue-llm-wiki/raw/workflow.json",
+  "tmpDir": "//nas.51vr.local/PaaS/UE5/ue-llm-wiki/raw/tmp/ue-error",
   "jobs": [
-    { "enabled": true, "name": "your-job-ci", "path": "job/team/job/your-job-ci" }
+    { "enabled": true, "name": "aes6-ue-runtime-ci", "path": "job/wdp-ue/job/Earth/job/aes6-ue-runtime-ci" },
+    { "enabled": true, "name": "twe-ue5.5-installed", "path": "job/wdp-ue/job/Earth/job/twe-ue5.5-installed" },
+    { "enabled": true, "name": "twe-ue5.5-linux-ci", "path": "job/wdp-ue/job/Earth/job/twe-ue5.5-linux-ci" }
   ]
 }

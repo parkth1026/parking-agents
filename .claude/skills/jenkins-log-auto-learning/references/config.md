@@ -3,13 +3,13 @@
 配置分两层，深合并（环境层覆盖技能层）：
 
 - **技能固有默认** `config.json`（与 SKILL.md 同目录，随仓库版本化）：本技能当前无固有项。
-- **环境层** `~/.claude/skill-env.json`（不进任何仓库）：下列字段的真实值都在这里；可用 `SKILL_ENV` 环境变量覆盖路径。schema 示例见 `config.example.json`。
+- **环境层** `~/.config/parking-agents/skill-env.json`（工具中立位置，不进任何仓库）：下列字段的真实值都在这里（本机指向 NAS 知识库 `//nas.51vr.local/PaaS/UE5/ue-llm-wiki/`）。解析链：`$SKILL_ENV` > 该路径 > `~/.claude/skill-env.json`（旧位置回退）。模板见 `config.example.json`（默认已指向 NAS，拷贝后按机器改 `gitRepos` 即可用）；三层都无配置时脚本打印三步配置引导后退出。
 
 下列字段指合并后的有效配置。
 
 ## 关键字段
 
-- `jenkins.baseUrl` —— Jenkins 服务器 URL（实际值在环境层 `~/.claude/skill-env.json`）
+- `jenkins.baseUrl` —— Jenkins 服务器 URL（实际值在环境层配置文件，见上）
 - `gitRepos` —— 非浅克隆 git 仓库目录的路径（用于获取实际代码差异）
 - `jobs[]` —— 要扫描的任务列表（只处理 `"enabled": true` 的条目）
 - `tmpDir` —— 仅存放临时工作文件（下载的日志、中间数据）

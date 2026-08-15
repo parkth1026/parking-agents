@@ -24,7 +24,7 @@ node "$SCRIPT" <command> [--flags]     # 输出 JSON 到 stdout；业务失败 e
 node "$SCRIPT" --help                  # 查看全部子命令
 ```
 
-**配置**：`config.json`（技能默认）⊕ `$SKILL_ENV` 或 `~/.claude/skill-env.json`（环境层，优先），深合并。`node "$SCRIPT" config` 输出合并并解析后的配置（含 `gitRepos`、`knowledgeBase.*`、`tmpDir`）。
+**配置**：`config.json`（技能默认）⊕ 环境层（优先），深合并。环境层解析链：`$SKILL_ENV` > `~/.config/parking-agents/skill-env.json` > `~/.claude/skill-env.json`（旧位置回退）；本机知识库路径指向 NAS。`node "$SCRIPT" config` 输出合并并解析后的配置（含 `gitRepos`、`knowledgeBase.*`、`tmpDir`，`_configSource` 标注配置来源）。
 
 **临时文件**：日志等临时输出一律写入 `config.tmpDir`（或 `os.tmpdir()`），**绝不写入 skill 目录**。
 
@@ -47,7 +47,7 @@ node "$SCRIPT" check-env --repos "AesWorld"   # 仓库名从错误日志/用户�
 
 | # | 检查项 | 失败动作 |
 |---|---|---|
-| 1 | 合并后配置含必要字段（`config.json` + `~/.claude/skill-env.json`） | 终止，提示用户初始化 `skill-env.json` |
+| 1 | 合并后配置含必要字段（`config.json` + 环境层 `~/.config/parking-agents/skill-env.json`） | 终止，按脚本打印的三步配置引导初始化 |
 | 2 | `config.gitRepos` 存在且目录为真 | 终止，列出实际探测到的路径 |
 | 3 | 错误日志提到的仓库名（如 `AesWorld`）在 `$config.gitRepos/<RepoName>` 下存在 | 警告并给出 `git clone` 指引，请求用户授权后 clone 到 `$config.gitRepos/<RepoName>` |
 | 4 | 本地仓库的 `origin` remote 与 CI 用的 GitLab 一致（可传 `--expected-remote`） | 警告并继续 |

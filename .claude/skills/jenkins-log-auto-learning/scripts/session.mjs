@@ -33,7 +33,7 @@
 import { fileURLToPath } from "node:url";
 import { dirname, join, isAbsolute, relative, resolve } from "node:path";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { readJson, readJsonOrDie, expandHome, loadConfig, writeJsonAtomicCRLF, localTimestamp } from "./config.mjs";
+import { readJson, readJsonOrDie, expandHome, loadConfig, resolveEnvLayer, writeJsonAtomicCRLF, localTimestamp } from "./config.mjs";
 
 const SCHEMA_VERSION = 1;
 const STAGES = ["1-analyze", "2-track"];
@@ -215,6 +215,10 @@ function cmdStatus(argv) {
   const session = readSession(workflowFile);
   const track = readTrack(trackFile);
 
+  const layer = resolveEnvLayer();
+  const viaTag = layer.via === "SKILL_ENV" ? " (SKILL_ENV)" : layer.via === "fallback" ? " (fallback)" : "";
+  console.log(`配置来源: ${layer.path}${viaTag}`);
+
   console.log(`会话: ${session ? (session.status === "done" ? "已终结(上一轮)" : "进行中") : "无"}`);
   if (session) {
     const p = session.pair;
@@ -231,6 +235,7 @@ function cmdStatus(argv) {
   console.log(`      gitRepos=${config.gitRepos || "(未设)"}`);
   console.log(`      rawDir=${config.knowledgeBase?.rawDir || "(未设)"} tmpDir=${config.tmpDir || "(未设)"}`);
   console.log(`      trackFile=${trackFile}`);
+  console.log(`      jobs(enabled): ${(config.jobs || []).filter((j) => j.enabled === true).map((j) => j.name).join(" | ") || "(无)"}`);
 
   const pending = readPending(pendingFile);
   if (pending) {

@@ -1,12 +1,15 @@
 #!/usr/bin/env node
 // UeErrorSolver.mjs — Jenkins CI 构建错误诊断与修复工具集
-// （UeErrorSolver.psm1 的 Node ESM 移植，行为保持一致）
+// （唯一入口；原 PowerShell 版已按仓库脚本标准移除）
 //
 // 用法: node UeErrorSolver.mjs <command> [--flags]
 // 所有子命令输出 JSON 到 stdout；业务失败 exit 1，用法错误 exit 2。
 //
-// 配置 = 技能固有默认（config.json，默认取脚本上级）⊕ 环境覆盖
-//        （$SKILL_ENV 或 ~/.claude/skill-env.json），深合并，环境层优先。
+// 配置 = 技能固有默认（config.json，默认取脚本上级）⊕ 环境层，深合并，环境层优先。
+//        环境层解析链（只查本地文件，不依赖网络）:
+//        $SKILL_ENV > ~/.config/parking-agents/skill-env.json > ~/.claude/skill-env.json（旧位置回退）
+//        三层都无 → 打印配置引导后 exit 1；配置加载成功后首步对 UNC（NAS）路径
+//        做 fail-fast 连通检查，不可达时打印现状报告后 exit 1。
 // 临时文件一律写入 config.tmpDir 或 os.tmpdir()，绝不写入 skill 目录。
 // HTTP 请求统一走 curl.exe（Cloudflare/部分 Jenkins 会拦截非 curl 客户端）。
 // 输出文件编码 UTF-8 无 BOM；正则匹配大小写不敏感（与 PowerShell -match 一致）。
@@ -41,15 +44,87 @@ function deepMerge(base, over) {
   return out;
 }
 
-// 技能固有默认（config.json）⊕ 环境覆盖（$SKILL_ENV 或 ~/.claude/skill-env.json）
+// 环境层解析链: $SKILL_ENV > ~/.config/parking-agents/skill-env.json > ~/.claude/skill-env.json（回退）
+function resolveEnvLayer() {
+  const candidates = [];
+  if (process.env.SKILL_ENV) candidates.push({ path: process.env.SKILL_ENV, via: "SKILL_ENV" });
+  candidates.push({ path: join(homedir(), ".config", "parking-agents", "skill-env.json"), via: "new" });
+  candidates.push({ path: join(homedir(), ".claude", "skill-env.json"), via: "fallback" });
+  for (const c of candidates) if (existsSync(c.path)) return c;
+  return null;
+}
+
+// 三层都无配置文件：给可照做的三步引导，而不是裸报缺失字段
+function guideOnMissingConfig() {
+  const template = join(scriptDir, "..", "config.example.json");
+  const newPath = join(homedir(), ".config", "parking-agents", "skill-env.json");
+  const oldPath = join(homedir(), ".claude", "skill-env.json");
+  console.error(`未找到配置文件（已查: $SKILL_ENV${process.env.SKILL_ENV ? `=${process.env.SKILL_ENV}` : "（未设置）"}、${newPath}、${oldPath}）`);
+  console.error("配置引导:");
+  console.error(`  1. 拷贝模板: ${template}（默认已指向 NAS 知识库）`);
+  console.error(`  2. 放到:     ${newPath}`);
+  console.error("  3. 按机器改: gitRepos（如 D:/Git）");
+  process.exit(1);
+}
+
+// 从 UNC 路径取 //主机/共享 根（子目录允许懒创建，根不可达才判定 NAS 不可达）
+function uncRoot(p) {
+  const m = String(p).replace(/\\/g, "/").match(/^(\/\/[^/]+\/[^/]+)/);
+  return m ? m[1] : null;
+}
+
+// 配置加载成功后的首步动作：UNC（NAS）路径共享根不可达时打印现状报告后 exit 1
+function assertNasReachable(merged) {
+  const fields = [];
+  if (merged.knowledgeBase) {
+    if (merged.knowledgeBase.rawDir) fields.push(["knowledgeBase.rawDir", merged.knowledgeBase.rawDir]);
+    if (merged.knowledgeBase.wikiDir) fields.push(["knowledgeBase.wikiDir", merged.knowledgeBase.wikiDir]);
+  }
+  if (merged.tmpDir) fields.push(["tmpDir", merged.tmpDir]);
+  if (merged.trackFile) fields.push(["trackFile", merged.trackFile]);
+  if (merged.workflowFile) fields.push(["workflowFile", merged.workflowFile]);
+  if (merged.gitRepos) fields.push(["gitRepos", merged.gitRepos]);
+
+  const unreachable = new Map(); // root -> [{label, path}]
+  for (const [label, raw] of fields) {
+    const p = resolveConfigPath(String(raw));
+    const root = uncRoot(p);
+    if (!root) continue; // 非 UNC（本地盘）不检查
+    if (!existsSync(root)) {
+      if (!unreachable.has(root)) unreachable.set(root, []);
+      unreachable.get(root).push({ label, path: p });
+    }
+  }
+  if (unreachable.size === 0) return;
+
+  console.error("现状报告: NAS 不可达");
+  for (const [root, hits] of unreachable) {
+    console.error(`  不可达路径: ${hits[0].path}（${hits.map((h) => h.label).join("、")}，共享根 ${root}）`);
+  }
+  console.error("  受影响操作: 知识库读写（raw/wiki）、学习账本、日志暂存均位于 NAS，本次操作无法继续");
+  console.error("  建议检查: 网络或 VPN 连接; NAS 共享权限; 共享根主机是否在线");
+  process.exit(1);
+}
+
+// 技能固有默认（config.json）⊕ 环境层（解析链见文件头）
 function loadConfig(configPath) {
   const cfgPath = configPath || join(scriptDir, "..", "config.json");
   let defaults = {};
   if (existsSync(cfgPath)) defaults = readJson(cfgPath);
-  const envPath = process.env.SKILL_ENV || join(homedir(), ".claude", "skill-env.json");
+  const layer = resolveEnvLayer();
+  if (!layer) guideOnMissingConfig();
   let env = {};
-  if (existsSync(envPath)) env = readJson(envPath);
-  return deepMerge(defaults, env);
+  if (existsSync(layer.path)) {
+    try {
+      env = readJson(layer.path);
+    } catch (e) {
+      console.error(`环境层配置 ${layer.path} 不是合法 JSON（${e.message}）。修复后重试，或参考模板 config.example.json 重建。`);
+      process.exit(1);
+    }
+  }
+  const merged = deepMerge(defaults, env);
+  assertNasReachable(merged);
+  return merged;
 }
 
 // 将 ~/…、./…（相对 skill 目录）、其余相对路径统一解析为规范化绝对路径
@@ -171,7 +246,7 @@ function resolveFullConfig(configPath) {
   const warnings = [];
 
   if (!merged.gitRepos) {
-    output({ error: "Config missing required property: gitRepos — 请在 ~/.claude/skill-env.json（或 config.json / $SKILL_ENV 指向的文件）中设置" }, true);
+    output({ error: "Config missing required property: gitRepos — 请在 ~/.config/parking-agents/skill-env.json（或 config.json / $SKILL_ENV 指向的文件）中设置" }, true);
     return null;
   }
   merged.gitRepos = resolveConfigPath(merged.gitRepos);
@@ -181,11 +256,11 @@ function resolveFullConfig(configPath) {
   }
 
   if (!merged.knowledgeBase) {
-    output({ error: "Config missing required property: knowledgeBase — 请在 skill-env.json 中设置 knowledgeBase.wikiDir 与 rawDir" }, true);
+    output({ error: "Config missing required property: knowledgeBase — 请在 ~/.config/parking-agents/skill-env.json 中设置 knowledgeBase.wikiDir 与 rawDir" }, true);
     return null;
   }
   if (!merged.knowledgeBase.wikiDir || !merged.knowledgeBase.rawDir) {
-    output({ error: "Config knowledgeBase missing wikiDir or rawDir — 请在 skill-env.json 中补齐" }, true);
+    output({ error: "Config knowledgeBase missing wikiDir or rawDir — 请在 ~/.config/parking-agents/skill-env.json 中补齐" }, true);
     return null;
   }
   merged.knowledgeBase.wikiDir = resolveConfigPath(merged.knowledgeBase.wikiDir);
@@ -862,7 +937,7 @@ function requireArgs(args, names, command) {
 function resolveBaseUrl(args, config) {
   if (args.baseUrl) return args.baseUrl;
   if (config && config.jenkins && config.jenkins.baseUrl) return config.jenkins.baseUrl;
-  console.error("缺少 Jenkins baseUrl —— 请传 --base-url 或在 skill-env.json 中设置 jenkins.baseUrl");
+  console.error("缺少 Jenkins baseUrl —— 请传 --base-url 或在 ~/.config/parking-agents/skill-env.json 中设置 jenkins.baseUrl");
   process.exit(1);
 }
 
@@ -870,11 +945,15 @@ const CONFIG_FLAG = { "--config": ["configPath", "value", () => join(scriptDir, 
 
 const COMMANDS = {
   config: {
-    desc: "读取并深合并配置（config.json ⊕ skill-env.json），解析并校验路径",
+    desc: "读取并深合并配置（config.json ⊕ 环境层），解析并校验路径；_configSource 标注配置来源",
     flags: { ...CONFIG_FLAG },
     async run(args) {
       const cfg = resolveFullConfig(args.configPath);
-      if (cfg) output(cfg);
+      if (cfg) {
+        const layer = resolveEnvLayer();
+        cfg._configSource = { path: layer ? layer.path : null, via: layer ? layer.via : null };
+        output(cfg);
+      }
     },
   },
 
@@ -1020,7 +1099,7 @@ const COMMANDS = {
       if (!gitRepos) {
         const cfg = loadConfig(args.configPath);
         if (!cfg.gitRepos) {
-          console.error("缺少 gitRepos —— 请传 --git-repos 或在 skill-env.json 中设置");
+          console.error("缺少 gitRepos —— 请传 --git-repos 或在 ~/.config/parking-agents/skill-env.json 中设置");
           process.exit(1);
         }
         gitRepos = cfg.gitRepos;
@@ -1070,7 +1149,7 @@ const COMMANDS = {
       if (!wikiDir || !rawDir) {
         const cfg = loadConfig(args.configPath);
         if (!cfg.knowledgeBase || !cfg.knowledgeBase.wikiDir || !cfg.knowledgeBase.rawDir) {
-          console.error("缺少 knowledgeBase.wikiDir/rawDir —— 请传 --wiki-dir/--raw-dir 或在 skill-env.json 中设置");
+          console.error("缺少 knowledgeBase.wikiDir/rawDir —— 请传 --wiki-dir/--raw-dir 或在 ~/.config/parking-agents/skill-env.json 中设置");
           process.exit(1);
         }
         wikiDir = wikiDir || cfg.knowledgeBase.wikiDir;
@@ -1172,7 +1251,7 @@ const COMMANDS = {
       if (!rawDir) {
         const cfg = loadConfig(args.configPath);
         if (!cfg.knowledgeBase || !cfg.knowledgeBase.rawDir) {
-          console.error("缺少 knowledgeBase.rawDir —— 请传 --raw-dir 或在 skill-env.json 中设置");
+          console.error("缺少 knowledgeBase.rawDir —— 请传 --raw-dir 或在 ~/.config/parking-agents/skill-env.json 中设置");
           process.exit(1);
         }
         rawDir = cfg.knowledgeBase.rawDir;
@@ -1226,7 +1305,7 @@ const COMMANDS = {
 
 function usage() {
   console.error("用法: node UeErrorSolver.mjs <command> [--flags]");
-  console.error("配置: config.json（脚本上级）⊕ $SKILL_ENV 或 ~/.claude/skill-env.json，深合并，环境层优先。");
+  console.error("配置: config.json（脚本上级）⊕ 环境层 $SKILL_ENV > ~/.config/parking-agents/skill-env.json > ~/.claude/skill-env.json（回退），深合并，环境层优先。");
   console.error("子命令:");
   for (const [name, c] of Object.entries(COMMANDS)) {
     console.error(`  ${name.padEnd(24)} ${c.desc}`);
