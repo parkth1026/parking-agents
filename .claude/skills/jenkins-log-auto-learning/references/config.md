@@ -1,10 +1,15 @@
 # 配置与环境
 
-从技能目录读取配置：`config.json`（与 SKILL.md 同目录）。
+配置分两层，深合并（环境层覆盖技能层）：
+
+- **技能固有默认** `config.json`（与 SKILL.md 同目录，随仓库版本化）：本技能当前无固有项。
+- **环境层** `~/.claude/skill-env.json`（不进任何仓库）：下列字段的真实值都在这里；可用 `SKILL_ENV` 环境变量覆盖路径。schema 示例见 `config.example.json`。
+
+下列字段指合并后的有效配置。
 
 ## 关键字段
 
-- `jenkins.baseUrl` —— Jenkins 服务器 URL（例如 `http://10.66.12.40`）
+- `jenkins.baseUrl` —— Jenkins 服务器 URL（实际值在环境层 `~/.claude/skill-env.json`）
 - `gitRepos` —— 非浅克隆 git 仓库目录的路径（用于获取实际代码差异）
 - `jobs[]` —— 要扫描的任务列表（只处理 `"enabled": true` 的条目）
 - `tmpDir` —— 仅存放临时工作文件（下载的日志、中间数据）
@@ -13,7 +18,9 @@
   - `details/` —— 高质量知识文件（评分 >= 8）
   - `scratch/` —— 部分知识文件（评分 5-7）
   - `{trackFile}` —— 学习进度跟踪 JSON
-- `trackFile` —— 跟踪 JSON 的完整相对路径（例如 `./wiki-raw/jenkins-learnings/analyzed-builds.json`）；直接在 `{trackFile}` 路径读写
+- `trackFile` —— 跟踪 JSON 的完整路径（例如 `~/memory/jenkins-learnings-raw/analyzed-builds.json`，支持 `~/` 前缀）；由 session.mjs 统一写入。`scan-pairs.mjs` 生成的 `pending-pairs.json` 与其同目录
+- `workflowFile` —— 工作流会话状态（可选，缺省 `{trackFile} 同目录/workflow.json`）：领取锁、阶段门禁、断点续跑指针。唯一写入者是 `scripts/session.mjs`
+- 所有路径字段（`trackFile`、`workflowFile`、`tmpDir`、`knowledgeBase.*`、`gitRepos`）均支持 `~/` 前缀，脚本会展开到用户主目录
 
 > **重要**：本技能只**写入** `knowledgeBase.rawDir`。`knowledgeBase.wikiDir` 是精选/已验证的知识库——本技能从中读取以检查已有知识（避免重复），但绝不向其写入。人工审核负责将 raw 文件提升至 wiki。
 
@@ -45,10 +52,10 @@ config 中的 `job.path` 字段已包含 `job/` 前缀及完整 `/job/` 分隔�
 {baseUrl}/{job.path}/{buildNumber}/consoleText
 ```
 
-这将生成类似 `http://10.66.12.40/job/wdp-ue/job/Earth/job/twe-ue5.5-ci/api/json?tree=...` 的 URL。
+这将生成类似 `{baseUrl}/job/wdp-ue/job/Earth/job/twe-ue5.5-ci/api/json?tree=...` 的 URL。
 
 ## 单实例规则
 
-同一跟踪文件同一时间只允许运行一个本技能的实例。并行运行多个实例会导致 `analyzed-builds.json` 的竞态条件——构建会被重复处理，跟踪条目被覆盖，知识文件出现重复编号。
+同一跟踪文件同一时间只允许运行一个本技能的实例。这由 `session.mjs next` 的领取锁**机械保证**：workflow.json 中存在未终结会话时，next 拒绝领取并打印续跑指针。并行运行多个实例会导致 `analyzed-builds.json` 的竞态条件——构建被重复处理，跟踪条目被覆盖，知识文件出现重复编号。
 
-如果要求你运行多轮，请**串行**执行（等每一轮完成后再开始下一轮）。
+如果要求你运行多轮，请**串行**执行（等每一轮 finish 后再开始下一轮）。

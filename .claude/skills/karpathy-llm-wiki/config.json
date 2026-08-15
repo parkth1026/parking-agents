@@ -1,5 +1,5 @@
-﻿{
-  "rawDir": "C:/Users/Administrator/.openclaw-autoclaw/workspace/wiki-raw/jenkins-learnings",
+{
+  "_README": "技能固有默认（随仓库版本化）。wikiDir/rawDir 为环境相关，真实值见 ~/.claude/skill-env.json；二者深合并，环境层优先。",
   "scoring": {
     "minScore": 9.0,
     "weights": {
@@ -16,6 +16,5 @@
   "page": {
     "minOutboundLinks": 2,
     "maxLines": 200
-  },
-  "wikiDir": "C:/Users/Administrator/memory/jenkins-learnings"
+  }
 }

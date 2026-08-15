@@ -1,5 +1,0 @@
-interface:
-  display_name: "aes-grilling"
-  short_description: "aes-grilling"
-policy:
-  allow_implicit_invocation: false

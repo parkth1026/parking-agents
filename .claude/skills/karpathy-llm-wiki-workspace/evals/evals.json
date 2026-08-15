@@ -37,9 +37,9 @@
     {
       "id": 3,
       "prompt": "Run a quality check on my LLM wiki. I think there might be some broken links and pages that are missing proper metadata. Give me a full report and fix any issues you find.",
-      "expected_output": "Should run the Lint operation: execute validate-wiki.ps1, report all issues across 8 dimensions, fix broken links and missing frontmatter, and re-run until score >= 9.0",
+      "expected_output": "Should run the Lint operation: execute validate-wiki.mjs, report all issues across 8 dimensions, fix broken links and missing frontmatter, and re-run until score >= 9.0",
       "assertions": [
-        {"text": "validate-wiki.ps1 script executed", "type": "process_check"},
+        {"text": "validate-wiki.mjs script executed", "type": "process_check"},
         {"text": "Report includes all 8 validation dimensions", "type": "content_check"},
         {"text": "Broken links identified and fixed", "type": "content_check"},
         {"text": "Missing frontmatter identified and added", "type": "content_check"},

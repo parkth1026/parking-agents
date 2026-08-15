@@ -1,0 +1,8 @@
+{
+  "api": {
+    "baseUrl": "https://dev.epicgames.com/community/api",
+    "origin": "https://dev.epicgames.com",
+    "referer": "https://dev.epicgames.com/community/assistant/unreal-engine",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+  }
+}

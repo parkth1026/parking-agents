@@ -1,0 +1,17 @@
+{
+  "_README": "示例 schema（仅文档，不被加载）。真实环境值写入 ~/.claude/skill-env.json；可用 $SKILL_ENV 环境变量覆盖路径。与 skill 的 config.json 深合并，环境层优先。",
+  "jenkins": {
+    "baseUrl": "http://your-jenkins-host"
+  },
+  "gitRepos": "D:/Git",
+  "knowledgeBase": {
+    "rawDir": "~/memory/jenkins-learnings-raw",
+    "wikiDir": "~/memory/jenkins-learnings"
+  },
+  "trackFile": "~/memory/jenkins-learnings-raw/analyzed-builds.json",
+  "workflowFile": "~/memory/jenkins-learnings-raw/workflow.json",
+  "tmpDir": "~/memory/jenkins-learnings-raw/tmp/ue-error",
+  "jobs": [
+    { "enabled": true, "name": "your-job-ci", "path": "job/team/job/your-job-ci" }
+  ]
+}

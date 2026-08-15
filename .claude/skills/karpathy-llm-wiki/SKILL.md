@@ -10,7 +10,6 @@ description: |
   (2) Ingest articles, papers, transcripts, or notes into the wiki
   (3) Validate wikilinks, lint pages, fix broken references, or check wiki quality
   (4) User mentions "wiki", "knowledge base", "Karpathy", "整理到wiki", or "ingest"
-disable-model-invocation: true
 ---
 
 # Karpathy LLM Wiki
@@ -22,28 +21,33 @@ a web of understanding that grows more valuable over time.
 
 ## Configuration
 
-Read config from the skill directory: `config.json` (right next to this SKILL.md).
+Configuration is layered (deep-merged; environment overrides skill defaults):
 
-Key fields:
-- `wikiDir` — **the wiki knowledge base** — all wiki pages (`entities/`, `concepts/`, `SCHEMA.md`, `index.md`, `log.md`) and all output go here. Uses `~/memory/...` so it persists across conversations.
-- `rawDir` — raw source materials storage (original articles, papers, transcripts that get ingested). These can be large files, so they stay in the workspace directory `./wiki-raw/...` rather than in `~/memory/`.
+- **Skill defaults** `config.json` (next to this SKILL.md, versioned): holds `scoring` and `page` rules.
+- **Environment** `~/.claude/skill-env.json` (never committed): holds the real `knowledgeBase.wikiDir` / `knowledgeBase.rawDir` for this machine. Override the path with the `SKILL_ENV` env var.
+
+The `knowledgeBase` namespace is **shared with other skills** on this machine (e.g. jenkins-log-auto-learning) — both point at the same physical wiki/raw directories, so the values live in exactly one place.
+
+Key fields (after merge):
+- `knowledgeBase.wikiDir` — **the wiki knowledge base** — all wiki pages (`entities/`, `concepts/`, `SCHEMA.md`, `index.md`, `log.md`) and all output go here.
+- `knowledgeBase.rawDir` — raw source materials storage (original articles, papers, transcripts that get ingested).
 - `scoring.minScore` — minimum quality score to pass validation (default: 9.0)
 - `page.maxLines` — maximum lines per page before splitting (default: 200)
 - `page.minOutboundLinks` — minimum `[[wikilinks]]` per page (default: 2)
 
-Do NOT hardcode paths — always read them from config.
+Do NOT hardcode paths — always read them from the merged config.
 
 ### Path Resolution (Phase 0)
 
 After reading config.json, **normalize ALL path values** before using them anywhere. Config paths may use three styles:
 
-1. **`~/...`** (tilde prefix) — expand `~` to the user's home directory. In PowerShell: `$resolvedPath = $configPath -replace '^~', $HOME`. Example: `~/memory/jenkins-learnings` → `C:\Users\Administrator\memory\jenkins-learnings`
-2. **`./...`** (dot-slash relative) — resolve relative to the **current working directory** (NOT the skill directory). In PowerShell: `$resolvedPath = [System.IO.Path]::GetFullPath($configPath)`. Example: `./wiki-raw/jenkins-learnings` → `D:\Claude_skills\wiki-raw\jenkins-learnings` (if CWD is `D:\Claude_skills`)
-3. **Absolute paths** (e.g., `D:/Wiki`) — use as-is. Forward slashes work on Windows.
+1. **`~/...`** (tilde prefix) — expand `~` to the user's home directory. In Node: `path.join(os.homedir(), configPath.replace(/^~[\\/]/, ''))`. Example: `~/memory/jenkins-learnings` → `<home>/memory/jenkins-learnings`
+2. **`./...`** (dot-slash relative) — resolve relative to the **current working directory** (NOT the skill directory). In Node: `path.resolve(configPath)`. Example: `./wiki-raw/jenkins-learnings` → `<cwd>/wiki-raw/jenkins-learnings`
+3. **Absolute paths** — use as-is. Forward slashes work on Windows.
 
-**Apply this resolution to**: `wikiDir`, `rawDir`.
+**Apply this resolution to**: `knowledgeBase.wikiDir`, `knowledgeBase.rawDir`.
 
-After resolving, verify each directory exists with `Test-Path`. If any directory does not exist, create it with `New-Item -ItemType Directory -Force`.
+After resolving, verify each directory exists with `fs.existsSync`. If any directory does not exist, create it with `fs.mkdirSync(dir, { recursive: true })`.
 
 ---
 
@@ -157,7 +161,7 @@ Transform raw source material into compiled wiki knowledge.
 7. **Update log.md** — append a timestamped entry describing what was ingested and
    what pages were created/updated.
 
-8. **Run validation** — execute `validate-wiki.ps1` to check for broken links,
+8. **Run validation** — execute `validate-wiki.mjs` to check for broken links,
    missing frontmatter, etc. Fix any issues found.
 
 #### Page Creation Threshold
@@ -206,7 +210,7 @@ Validate wiki consistency and quality.
 
 #### Steps
 
-1. **Run `validate-wiki.ps1`** — this covers the quantitative checks:
+1. **Run `validate-wiki.mjs`** — this covers the quantitative checks:
    - Broken `[[wikilinks]]` (links to non-existent pages)
    - Self-references (page linking to itself)
    - Orphan pages (pages with zero inbound links)
@@ -436,13 +440,13 @@ LLMs, deep learning, AI research, ML systems, and related topics.
 
 ## Validation Script
 
-The `scripts/validate-wiki.ps1` script performs comprehensive quality checks.
+The `scripts/validate-wiki.mjs` script performs comprehensive quality checks.
 
 ### Usage
 
-```powershell
-$skillDir = "D:\Claude_skills\.claude\skills\karpathy-llm-wiki"
-& "$skillDir\scripts\validate-wiki.ps1" -WikiPath "{wikiDir}" -ConfigPath "$skillDir\config.json"
+```bash
+# {skill-dir} 是包含此 SKILL.md 的目录；{wikiDir} 来自 config.json
+node {skill-dir}/scripts/validate-wiki.mjs --wiki "{wikiDir}" --config "{skill-dir}/config.json"
 ```
 
 ### What It Checks (8 dimensions)
