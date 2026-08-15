@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "slug": "2026-08-16-jenkins-learning-nas-scope",
+  "created_at": "2026-08-15T16:13:30Z",
+  "updated_at": "2026-08-15T17:19:14Z",
+  "original_request": "我期望 jenkins-log-auto-learning 输出配置 \\nas.51vr.local\\PaaS\\UE5\\ue-llm-wiki\\raw，学习 jenkins 范围：aes6-ue-runtime-ci / twe-ue5.5-installed / twe-ue5.5-linux-ci（均 under http://10.66.12.40/job/wdp-ue/job/Earth/）",
+  "goal_oneline": "把本机 jenkins-log-auto-learning 的知识库与运行时状态整体迁到 NAS ue-llm-wiki（raw/wiki/账本/tmp 全上 NAS，raw 拷 2 份旧 scratch、wiki 整体拷既有内容、账本空起步），扫描范围收窄到 Earth 下 3 个 job；同时把技能环境配置迁到工具中立的 ~/.config/parking-agents/skill-env.json（保留 SKILL_ENV 覆盖与旧路径回退），仓库模板填真实 NAS 值，并给 NAS 不可达加 fail-fast 现状报告",
+  "target": null,
+  "stage": "3-contract",
+  "next_action": "契约就绪待交接：用 finalize 生成的 /goal 指令启动执行 Agent；有阻塞项才不启动",
+  "stage_gates": {
+    "1-interview": {
+      "status": "done",
+      "closed_at": "2026-08-15T17:10:30Z",
+      "self_assessment": {
+        "意图": "已定",
+        "结果": "已定",
+        "边界": "已定",
+        "约束": "已定",
+        "现状": "已定"
+      }
+    },
+    "2-prototype": {
+      "status": "done",
+      "reason": "Q5 并入使已确认对照物过时，需更新影响面并重出行为/示例对照物",
+      "closed_at": "2026-08-15T17:15:46Z",
+      "artifacts_confirmed": [
+        "behavior",
+        "example-run"
+      ]
+    },
+    "3-contract": {
+      "status": "done",
+      "reason": "契约摘要处用户提出 skill-env.json 放 NAS 需重议——疑为误读（文件留本地、仅路径值指 NAS）或重议 Q1，回访谈澄清",
+      "closed_at": "2026-08-15T17:19:14Z"
+    }
+  },
+  "validation": {
+    "status": "valid",
+    "ac_count": 7,
+    "warnings": [],
+    "ran_at": "2026-08-15T17:19:00Z",
+    "verify_tiers": {
+      "A": 5,
+      "B": 0,
+      "C": 2,
+      "D": 0
+    }
+  },
+  "blocked": [],
+  "residual_risk": null,
+  "status": "ready"
+}
