@@ -14,8 +14,9 @@
 //                                    子技能收尾写回。done 必须 --result "<结论串>"；
 //                                    error 必须 --reason。可选 --knowledge <文件>、
 //                                    --success "success:w={N}"（fixBuild 的警告计数）。
-//                                    done 的产物有机械门禁：--knowledge 必须存在、
-//                                    位于 rawDir 内、含一级标题且内容含错误码 token
+//                                    done 的产物有机械门禁（validate-raw.mjs v2）：
+//                                    --knowledge 必须存在、位于 rawDir 内、frontmatter
+//                                    完整且与文件名/结论串三方一致、内容含错误码 token
 //                                    （否则 search-kb 检索不到）；:see= 必须指向存在
 //                                    的知识文件；score 限定 0-10。
 //   finish                           终结会话：结论串落账 analyzed{} + runHistory，会话置 done。
@@ -34,6 +35,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join, isAbsolute, relative, resolve } from "node:path";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { readJson, readJsonOrDie, expandHome, loadConfig, resolveEnvLayer, writeJsonAtomicCRLF, localTimestamp } from "./config.mjs";
+import { RESULT_PATTERNS, validateKnowledgeFile } from "./validate-raw.mjs";
 
 const SCHEMA_VERSION = 1;
 const STAGES = ["1-analyze", "2-track"];
@@ -118,16 +120,7 @@ function countRemaining(pendingFile, analyzed) {
 
 // ---------- 结论串校验 ----------
 
-const RESULT_PATTERNS = [
-  /^failure:score=(?:10|[0-9]):(.+?):fix=#\d+(:see=.+)?$/, // failure:score=8:C2061:fix=#1231[:see=...]，score 0-10
-  /^failure:infra:.+$/,
-  /^failure:no-fix-found$/,
-  /^failure:log-unavailable$/,
-  /^failure:error:.+$/,
-  /^skip:[A-Za-z_]+$/,
-  /^success:w=\d+$/, // 仅用于 --success（fixBuild 警告计数）
-];
-
+// RESULT_PATTERNS 自 validate-raw.mjs 导入（唯一 grammar 来源，防两份漂移）
 function validateResult(result) {
   return RESULT_PATTERNS.some((re) => re.test(result));
 }
@@ -143,18 +136,9 @@ function isInside(child, parent) {
   return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
 }
 
-// 结论串里承载"可检索错误码"的字段：score 型取 ErrorCode，infra 型取 reason；
-// 其余终态（no-fix/log-unavailable/error/skip）没有 token 约束
-function errorCodeToken(result) {
-  let m = result.match(/^failure:score=(?:10|[0-9]):(.+?):fix=#\d+/);
-  if (m) return m[1];
-  m = result.match(/^failure:infra:(.+)$/);
-  if (m) return m[1];
-  return null;
-}
-
-// 知识文件三重校验：存在 + 在 rawDir 内 + 内容可被 search-kb 检索到。
-// search-kb 只 grep 内容行——文件里没有错误码 token 就等于沉底（曾实测发生）。
+// 知识文件 v2 校验：存在 + 在 rawDir 内 + validate-raw 单文件验收全绿
+// （frontmatter 完整、文件名↔frontmatter↔结论串三方一致、错误码 token 在正文等，
+//  全部规则见 validate-raw.mjs 与 references/knowledge-format.md）。
 function validateKnowledge(knowledge, result, config) {
   const abs = resolvePath(knowledge);
   if (!existsSync(abs)) die(`--knowledge 文件不存在: ${knowledge}`, 1);
@@ -162,15 +146,11 @@ function validateKnowledge(knowledge, result, config) {
   if (!isInside(abs, rawDir)) {
     die(`--knowledge 必须位于 knowledgeBase.rawDir（${rawDir || "未配置"}）内，收到: ${knowledge}`, 1);
   }
-  const content = readFileSync(abs, "utf8");
-  const firstLine = content.split(/\r?\n/).find((l) => l.trim());
-  if (!firstLine || !/^# \S/.test(firstLine)) {
-    die(`知识文件缺一级标题（格式 "# {ErrorCode}: {简述}"，见 knowledge-format.md）: ${knowledge}`, 1);
+  const { errs, warns } = validateKnowledgeFile(abs, config, { expectedResult: result });
+  if (errs.length > 0) {
+    die(`知识文件未过 v2 验收（规范见 jenkins-pair-analyze/references/knowledge-format.md）:\n  - ${errs.join("\n  - ")}`, 1);
   }
-  const token = errorCodeToken(result);
-  if (token && !content.toLowerCase().includes(token.toLowerCase())) {
-    die(`知识文件内容不含错误码 token "${token}"——search-kb 按内容检索，该文件将永远搜不到（标题需含 ErrorCode，见 knowledge-format.md）`, 1);
-  }
+  for (const w of warns) console.warn(`[WARN] 知识文件: ${w}`);
 }
 
 // ---------- workflow.json 读写（唯一入口） ----------

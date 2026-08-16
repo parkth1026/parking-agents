@@ -114,8 +114,9 @@ $log = curl.exe -s "{baseUrl}/job/{job.path}/{fixBuild}/consoleText" --globoff -
 $warnings = ($log -split "`n" | Where-Object { $_ -match 'warning C\d+:|warning CS\d+:' }).Count
 ```
 
-- 警告数比同一任务上一个 SUCCESS 增加超过 30% → 在 `scratch/` 写一条简短的警告趋势说明
-- 显著下降（> 50%）→ 同样在 `scratch/` 记为正面趋势
+- 警告数比同一任务上一个 SUCCESS 增加超过 30% → 在**当轮知识文件**追加 `## Warning Trend` 节（节名固定，给出前后构建号、警告数与集中文件；评分 <5 无知识文件时只在收尾报告里说明）。
+  **不要为警告趋势另写独立 .md**——v2 验收要求 rawDir 下所有文件携带完整 frontmatter 与 token，独立警告文件无法合规。
+- 显著下降（> 50%）→ 同样记入 `## Warning Trend` 节为正面趋势
 - 否则仅计数，随收尾附带即可
 
 ## 连续 FAILURE 构建

@@ -1,3 +1,13 @@
 {
-  "_README": "技能固有默认（随仓库版本化）。本技能所有字段均为环境相关，真实值见 ~/.config/parking-agents/skill-env.json（解析链: $SKILL_ENV > 该路径 > ~/.claude/skill-env.json 旧位置回退）；二者深合并，环境层优先。模板见 config.example.json（默认指向 NAS 知识库）。"
+  "_README": "技能固有默认（随仓库版本化）。本技能所有环境相关字段（baseUrl/rawDir/trackFile/jobs 等）真实值见 ~/.config/parking-agents/skill-env.json（解析链: $SKILL_ENV > 该路径 > ~/.claude/skill-env.json 旧位置回退）；二者深合并，环境层优先。模板见 config.example.json（默认指向 NAS 知识库）。",
+  "jobCodes": {
+    "aes6-ue-runtime-ci": "aes6",
+    "twe-ue5.5-installed": "twe-inst",
+    "twe-ue5.5-linux-ci": "twe-linux",
+    "twe-ue5.5": "twe",
+    "wdp5-ue5.5-runtime-ci": "wdp5-rt",
+    "wdp5-runtime-ue5.5-linux-ci": "wdp5-linux",
+    "wdp5-plugins-ue5.5": "wdp5-plug"
+  },
+  "_jobCodes_README": "知识文件名前缀的唯一合法来源（防串台：一个码只对应一个 Jenkins jobPath）。文件名必须 ^{code}-{failBuild}...，缺码即 die 引导补注册表，绝不猜。新增任务时先在此登记码再扫描。"
 }

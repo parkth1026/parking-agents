@@ -60,8 +60,8 @@ node <orchestrator>/scripts/session.mjs stage 1-analyze done \
   --knowledge "{知识文件绝对路径}"
 ```
 
-`--knowledge` 与 `:see=` 有**机械门禁**（不满足 exit 1，按报错修正后重新收尾即可，不算流程失败）：
-文件必须真实存在且位于 rawDir 内；知识文件必须有一级标题且内容含错误码 token（infra 型为 reason）——否则 search-kb 永远搜不到该文件。
+`--knowledge` 与 `:see=` 有**机械门禁**（validate-raw.mjs v2，不满足 exit 1，按报错修正后重新收尾即可，不算流程失败）：
+文件必须真实存在且位于 rawDir 内；文件名 `{jobCode}-{fail}[-{end}]-{ErrorCode}-{ShortDesc}.md`（jobCode 来自编排器 config.json 注册表）；文件头必须有完整 frontmatter（schema/base_url/job/job_code/job_path/fail_builds/fix_build/error_code/score/result/recorded_at，与文件名、结论串三方一致）；正文（frontmatter 之外）须含错误码 token（infra 型为 reason）——否则 search-kb 永远搜不到该文件。规范全文见 [references/knowledge-format.md](references/knowledge-format.md)。
 
 其他终态，`--result` 换成对应结论串（grammar 与跟踪账本既有条目一致）：
 

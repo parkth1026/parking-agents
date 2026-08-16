@@ -72,12 +72,14 @@ description: |
 | 阶段 0 扫描与领取 | [references/phase0-scan.md](references/phase0-scan.md) |
 | 跟踪账本结构 | [references/tracking.md](references/tracking.md) |
 | 阶段 1 分析方法论 | `../jenkins-pair-analyze/SKILL.md` |
+| RAW 知识文件 v2 验收 | `scripts/validate-raw.mjs` 与 `../jenkins-pair-analyze/references/knowledge-format.md` |
 
 ## 核心约束
 
 1. **每次调用处理一个构建对**：处理完成或出错后停止，用户再次调用处理下一个
 2. **单实例**：由 `session.mjs next` 的领取锁机械保证——已有进行中的会话时拒绝领取，不得绕过
 3. **只写 rawDir**：绝不修改 wikiDir。评分公式与落点：≥8 → `details/`；5-7 → `scratch/`；<5 → 仅跟踪（详见子技能 references/scoring.md）
-4. **配置驱动**：所有路径和 URL 来自合并后的配置（`config.json` + `skill-env.json`），不硬编码
-5. **技能目录零写入**：所有运行时产物（pending-pairs.json、workflow.json、下载日志、知识文件）只写入配置指定的 rawDir/tmpDir，两个技能目录保持纯静态文件
-6. **UTF-8 without BOM**：所有输出文件
+4. **知识文件 v2 验收**：文件名用 `{jobCode}-{fail}[-{end}]-{ErrorCode}-{ShortDesc}.md`（jobCode 唯一合法来源是本技能 config.json 的 `jobCodes` 注册表，防三任务串台）；文件头必须有 frontmatter（base_url + job_path + 构建号三重身份锚）。`scripts/validate-raw.mjs` 随时可独立全库验收，`stage done` 门禁逐文件强制
+5. **配置驱动**：所有路径和 URL 来自合并后的配置（`config.json` + `skill-env.json`），不硬编码
+6. **技能目录零写入**：所有运行时产物（pending-pairs.json、workflow.json、下载日志、知识文件）只写入配置指定的 rawDir/tmpDir，两个技能目录保持纯静态文件
+7. **UTF-8 without BOM**：所有输出文件

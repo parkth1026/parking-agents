@@ -25,14 +25,13 @@
 
 ## File Naming
 
-Auto-numbered per directory: `{NNN}-{ErrorCode}-{ShortDesc}.md`
+以 FAILURE 构建号为主标识符：`{jobCode}-{failBuild}[-{failEnd}]-{ErrorCode}-{ShortDesc}.md`，
+jobCode 取自编排器技能 config.json 的 jobCodes 注册表。命名语法、frontmatter 与验收规则
+统一见 [knowledge-format.md](knowledge-format.md)（v2），由 validate-raw.mjs 机械校验。
 
 Examples:
-- `086-C2061-FZoneGraphBuildData.md`
-- `087-LNK2019-MissingImplementation.md`
-- `088-UBT-PrecompiledManifest.md`
-
-Use `Get-ChildItem {dir} -Filter "*.md" | Measure-Object` to find the next number.
+- `twe-inst-898-903-LNK1120-TiffJpegUnresolved.md`
+- `aes6-3746-C2061-FZoneGraphBuildData.md`
 
 ## Notes
 

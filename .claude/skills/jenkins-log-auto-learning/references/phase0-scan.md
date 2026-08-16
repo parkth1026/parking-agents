@@ -23,15 +23,19 @@
 ## 扫描脚本说明
 
 扫描脚本（`scripts/scan-pairs.mjs`）一次性完成繁重工作：
-- 通过 Jenkins API 拉取所有启用任务的所有构建
-- 立即在跟踪中记录 SUCCESS/ABORTED/NOT_BUILT 等**终态事实**（无需下载日志）
+- 通过 Jenkins API **全量分页**拉取所有启用任务的完整构建历史（`{from,to}` 是
+  subList 式闭开切片，页大小 500，返回不足一页即到底；`--window N` 可退回只取最新 N 个）
 - 识别所有 FAILURE→SUCCESS 对，并将连续的具有相同修复的 FAILURE 合并
 - 写入 `pending-pairs.json`（{trackFile} 同目录；`--output` 可覆盖）
+
+**scan 不写占位账**：账本只承载 session 落的真实分析结论（旧版 scan 预写
+`success:w=?` / `skip:ABORTED` 的行为已废除——全量历史下会灌入数千个弱语义键）。
+入队判定与 `session.mjs next` 的领取判定严格对称：组内任一构建号未落账即待处理。
 
 **瞬态不落账**（定时持续积累的关键约束）：
 - BUILDING（进行中）不落账，下轮重扫重判
 - 尾部失败组（后面还没有 SUCCESS）不预写 `no-fix-found`——修复到来后下轮扫描自然配对
-- 自愈旧版账本：旧版预写的 `failure:no-fix-found`（其组如今已有 SUCCESS 修复）删键回炉入队，`healed_no_fix{}` 记录一次性自愈；旧版冻结的 `skip:BUILDING` 删除后按真实结果重判
+- 自愈旧版账本：旧版预写的 `failure:no-fix-found`（其组如今已有 SUCCESS 修复）删键回炉入队，`healed_no_fix{}` 记录一次性自愈
 
 **失败语义**：
 - 全部启用任务不可达 → exit 1 且**不生成** pending-pairs.json（Jenkins 挂了 ≠ 没有新失败；上面的"报告错误并停止"守卫由此触发）
