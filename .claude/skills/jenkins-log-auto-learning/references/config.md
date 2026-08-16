@@ -3,7 +3,7 @@
 配置分两层，深合并（环境层覆盖技能层）：
 
 - **技能固有默认** `config.json`（与 SKILL.md 同目录，随仓库版本化）：本技能当前无固有项。
-- **环境层** `~/.config/parking-agents/skill-env.json`（工具中立位置，不进任何仓库）：下列字段的真实值都在这里（本机指向 NAS 知识库 `//nas.51vr.local/x.public/UE5/ue-llm-wiki/`）。解析链：`$SKILL_ENV` > 该路径 > `~/.claude/skill-env.json`（旧位置回退）。模板见 `config.example.json`（默认已指向 NAS，拷贝后按机器改 `gitRepos` 即可用）；三层都无配置时脚本打印三步配置引导后退出。
+- **环境层** `~/.config/parking-agents/skill-env.json`（工具中立位置，不进任何仓库）：下列字段的真实值都在这里（本机指向 NAS 知识库 `//nas.51vr.local/x.public/UE5/ue-llm-wiki/`）。解析链：`$SKILL_ENV` > 该路径。模板见 `config.example.json`（默认已指向 NAS，拷贝后按机器改 `gitRepos` 即可用）；两层都无配置时脚本打印三步配置引导后退出。
 
 下列字段指合并后的有效配置。
 
@@ -39,9 +39,9 @@ git show <commitHash> --unified=5
 
 要查找提交属于哪个仓库，遍历 `{gitRepos}` 下的每个子目录。仓库名通常与控制台日志中的插件名匹配（例如 `AesWorld`、`SkyCreatorPlugin`）。
 
-如果 `git show` 在 `git fetch` 后仍然失败（提交因 force-push 或 rebase 而不复存在），将该提交记录为不可用，Diff 评分维度计 0 分，并在知识文件中注明："Commit {hash} no longer available in repository — likely force-pushed."
+如果 `git show` 在 `git fetch` 后仍然失败（提交因 force-push 或 rebase 而不复存在），将该提交记录为不可用，并在知识文件中注明："Commit {hash} no longer available in repository — likely force-pushed."。此时 Reuse 第 1 分按子技能 [scoring.md](../../jenkins-pair-analyze/references/scoring.md) 的唯一定义判定：真实 diff 不可得时改验**等效强归因链**三条件（pin 唯一变化 + 同名对应 + 错误消失），链不成立则该分记 0。
 
-没有实际 diff 的知识文件是不完整的——读者无法准确知道遇到同样错误时该改什么。Reuse 评分维度要求实际 diff，而非推断。
+没有实际 diff 的知识文件是不完整的——读者无法准确知道遇到同样错误时该改什么。diff 是否计分、计在哪一维，**唯一口径见子技能 [scoring.md](../../jenkins-pair-analyze/references/scoring.md)（真实 diff 或等效强归因链）**，本文件不另设标准。
 
 ## URL 构造
 

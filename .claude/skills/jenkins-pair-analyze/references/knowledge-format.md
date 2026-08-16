@@ -44,7 +44,7 @@ RAW 知识文件的唯一使命是被将来检索到且**绝不认错对象**。
 示例：
 - `twe-inst-898-903-LNK1120-TiffJpegUnresolved.md`（连续失败组 #898~#903）
 - `aes6-3746-CookFail-UassetVersionTooNew.md`
-- `twe-linux-114-DiskSpaceExhausted.md`（infra 型，ErrorCode = reason）
+- `twe-linux-114-DiskSpaceExhausted-agent-disk-full.md`（infra 型，ErrorCode = reason，四段齐全）
 
 `recurrence-` 前缀专属 wikiDir 重复模式文件（见下文），除此不得使用任何其他前缀。
 
@@ -85,6 +85,28 @@ recorded_at: 2026-08-16T15:04:00
 - 评分 5-7 → `{knowledgeBase.rawDir}/scratch/{filename}`
 - 评分 < 5 → 不写入（仅在跟踪中记录）
 
+## `## Warning Trend` 节（新文件必填）
+
+`recorded_at` ≥ 生效时刻（**2026-08-17T01:30**，规则原子落地的提交时刻）的知识文件，
+正文**必须**包含 `## Warning Trend` 节（节名固定；它是正文节，不是 frontmatter 字段）。
+`validate-raw.mjs` 机械校验：生效后的文件缺该节即 ERROR，生效前的存量文件放行（向后兼容）。
+
+```markdown
+## Warning Trend
+
+| Build | Warnings |
+|-------|----------|
+| #328 (fail) | 41 |
+| #330 (fix)  | 12 |
+趋势：改善（-29）。
+```
+
+- 内容下限：fail 构建与 fix 构建各自的警告计数 + 趋势一句话（改善/恶化/持平，带差值）。
+- **必填节只收录计数**，是独立验证信号，**不进 10 分总分**；何时展开分析（增幅 >30%
+  写集中文件、降幅 >50% 记正面趋势）由 analyze.md「SUCCESS 构建警告检查」的条件式规则
+  决定——必填与条件式并存不矛盾。
+- **details/ 档（≥8）趋势恶化（fix 警告数 > fail）必须在节内附解释段，否则降 `scratch/`**。
+
 ## 写入前检查已有文件
 
 在 `{knowledgeBase.wikiDir}/details/` 和 `{rawDir}/details/`（以及它们的 `scratch/` 对应目录）中搜索包含相同构建号或错误模式的文件。如果在 rawDir 中找到，更新现有文件而不是创建新文件。如果在 wikiDir 中找到，按重复模式处理（见下文）——绝不直接修改 wikiDir 文件。
@@ -103,6 +125,11 @@ recorded_at: 2026-08-16T15:04:00
    ```
    如果已有文件在 **wikiDir** 中（只读）：在 `{rawDir}/details/` 中创建新文件 `recurrence-{existingFileName}`，frontmatter 照常填写（job/builds/error_code 以**本轮实际分析的对**为准），正文包含 Recurrences 表格和指向 wikiDir 原始文件的引用。绝不修改 wikiDir 文件。
 3. 在跟踪中记录新构建为 `"failure:score={N}:{ErrorCode}:fix=#{successBuild}:see={existingFile}"` —— `:see=` 后缀告诉读者哪个知识文件涵盖了此问题
+
+**强制落账纪律**：命中重复模式（同错误码 + 同根因）时，`:see=` 指针与 Recurrences 追加
+是**必做动作**，不是可选项——第 2 步与第 3 步必须都发生。session.mjs 的机械门禁只能兜底
+「:see= 指向的文件必须存在」，落不落 :see= 本身靠本纪律：知道是重复却不落指针 = 效用反馈
+归零，权重校准永远没有数据起点。
 4. 对重复模式跳过 Epic 查询——原始文件已包含此错误类型的 Epic 指导
 
 ## details/ 的必需内容（评分 >= 8）
@@ -139,6 +166,9 @@ If the Epic query failed or returned no useful information, write: "Epic query u
 
 ## Prevention
 (how to avoid this in future — 1-3 bullet points)
+
+## Warning Trend
+(recorded_at ≥ 生效时刻的新文件必填：fail/fix 构建警告计数 + 趋势一句话，见上节规范)
 
 ## Group Context（可选，节名固定：同对其它失败模式）
 
