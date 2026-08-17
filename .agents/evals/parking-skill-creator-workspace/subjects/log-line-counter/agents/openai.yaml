@@ -1,0 +1,7 @@
+interface:
+  display_name: "Log Line Counter"
+  short_description: "Count total, empty, and non-empty text lines"
+  default_prompt: "Use $log-line-counter to count lines in this log and return Markdown."
+
+policy:
+  allow_implicit_invocation: true

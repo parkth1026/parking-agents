@@ -1,0 +1,65 @@
+{
+  "iteration": "iteration-1",
+  "skill_name": "parking-skill-creator",
+  "configs": {
+    "with_skill": {
+      "runs": 1,
+      "pass_rate": {
+        "mean": 1,
+        "stddev": 0,
+        "min": 1,
+        "max": 1
+      },
+      "time_ms": {
+        "mean": 0,
+        "stddev": 0,
+        "min": 0,
+        "max": 0
+      },
+      "tokens": {
+        "mean": 0,
+        "stddev": 0,
+        "min": 0,
+        "max": 0
+      },
+      "skipped": {
+        "time_ms": 1,
+        "tokens": 1
+      }
+    },
+    "without_skill": {
+      "runs": 1,
+      "pass_rate": {
+        "mean": 0.3333,
+        "stddev": 0,
+        "min": 0.3333,
+        "max": 0.3333
+      },
+      "time_ms": {
+        "mean": 0,
+        "stddev": 0,
+        "min": 0,
+        "max": 0
+      },
+      "tokens": {
+        "mean": 0,
+        "stddev": 0,
+        "min": 0,
+        "max": 0
+      },
+      "skipped": {
+        "time_ms": 1,
+        "tokens": 1
+      }
+    }
+  },
+  "delta": {
+    "pass_rate": 0.6667,
+    "time_ms": 0,
+    "tokens": 0
+  },
+  "evals": [
+    "eval-1-create-log-line-counter"
+  ],
+  "warnings": []
+}

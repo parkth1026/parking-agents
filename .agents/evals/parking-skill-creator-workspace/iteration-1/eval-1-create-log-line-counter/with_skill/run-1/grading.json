@@ -1,0 +1,23 @@
+{
+  "results": [
+    {
+      "name": "生成完整技能骨架",
+      "text": "with_skill 输出的 7 条目包包含 SKILL.md、run-tests.mjs、references/design.md 和 agents/openai.yaml。",
+      "passed": true,
+      "evidence": "verification.md 的包内容清单逐项列出这四类文件；输出包已独立列出 7 条目。"
+    },
+    {
+      "name": "校验、自测和打包均有证据",
+      "text": "quick-validate、修正后的自测和 package 均退出码 0；首次自测失败也被保留记录。",
+      "passed": true,
+      "evidence": "verification.md 记录 quick-validate=0、自测首次=1（6 passed/1 failed）、修正后=0（7/7）、package=0。"
+    },
+    {
+      "name": "最终分发包可读取",
+      "text": "最终 .skill 可通过 zip 完整性检查，条目均带技能目录前缀。",
+      "passed": true,
+      "evidence": "verification.md 记录 python zipfile -t=0、7 个条目和 SHA-256；包文件存在于 outputs。"
+    }
+  ],
+  "eval_feedback": "断言覆盖了技能骨架、质量门禁和分发包三条主链；with_skill 额外保留了首次失败证据，未将修正过程伪装成一次性全绿。"
+}

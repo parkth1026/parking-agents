@@ -1,0 +1,18 @@
+{"query_id":"q1","probe":1,"first_line":"SKILL: parking-skill-creator","triggered":true,"reason":"覆盖脚手架、测试、校验和打包"}
+{"query_id":"q1","probe":2,"first_line":"SKILL: parking-skill-creator","triggered":true,"reason":"覆盖脚手架、测试与打包"}
+{"query_id":"q1","probe":3,"first_line":"SKILL: parking-skill-creator","triggered":true,"reason":"覆盖脚手架、测试、校验和打包"}
+{"query_id":"q2","probe":1,"first_line":"SKILL: parking-skill-creator","triggered":true,"reason":"覆盖技能评测与触发测试"}
+{"query_id":"q2","probe":2,"first_line":"SKILL: parking-skill-creator","triggered":true,"reason":"覆盖benchmark与触发评测"}
+{"query_id":"q2","probe":3,"first_line":"SKILL: parking-skill-creator","triggered":true,"reason":"包含 benchmark 与触发评测"}
+{"query_id":"q3","probe":1,"first_line":"SKILL: parking-skill-creator","triggered":true,"reason":"覆盖技能迭代与浏览器评测页"}
+{"query_id":"q3","probe":2,"first_line":"SKILL: parking-skill-creator","triggered":true,"reason":"覆盖技能迭代与浏览器评审"}
+{"query_id":"q3","probe":3,"first_line":"SKILL: parking-skill-creator","triggered":true,"reason":"覆盖技能迭代与浏览器评审"}
+{"query_id":"q4","probe":1,"first_line":"SKILL: writing-for-agents","triggered":false,"reason":"用于润色技能文档措辞"}
+{"query_id":"q4","probe":2,"first_line":"SKILL: writing-for-agents","triggered":false,"reason":"用于润色技能文档措辞"}
+{"query_id":"q4","probe":3,"first_line":"SKILL: writing-for-agents","triggered":false,"reason":"用于审查技能文档措辞"}
+{"query_id":"q5","probe":1,"first_line":"SKILL: parking-skills:log-error-summary","triggered":false,"reason":"正是日志错误频次统计技能"}
+{"query_id":"q5","probe":2,"first_line":"SKILL: parking-skills:log-error-summary","triggered":false,"reason":"专门统计日志错误频次"}
+{"query_id":"q5","probe":3,"first_line":"SKILL: parking-skills:log-error-summary","triggered":false,"reason":"专门统计日志错误频次"}
+{"query_id":"q6","probe":1,"first_line":"SKILL: none","triggered":false,"reason":"普通 React 开发无需专用技能"}
+{"query_id":"q6","probe":2,"first_line":"SKILL: none","triggered":false,"reason":"普通 React 开发无需专用技能"}
+{"query_id":"q6","probe":3,"first_line":"SKILL: none","triggered":false,"reason":"普通 React 开发，无需专用技能"}

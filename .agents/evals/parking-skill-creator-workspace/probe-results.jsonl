@@ -1,0 +1,12 @@
+{"query_id":"q1","probe":1,"first_line":"SKILL: parking-skill-creator","triggered":true,"reason":"创建并打包技能"}
+{"query_id":"q1","probe":2,"first_line":"SKILL: parking-skill-creator","triggered":true,"reason":"创建并打包技能"}
+{"query_id":"q1","probe":3,"first_line":"SKILL: parking-skill-creator","triggered":true,"reason":"创建并打包技能"}
+{"query_id":"q2","probe":1,"first_line":"SKILL: parking-skill-creator","triggered":true,"reason":"评测技能"}
+{"query_id":"q2","probe":2,"first_line":"SKILL: parking-skill-creator","triggered":true,"reason":"评测技能"}
+{"query_id":"q2","probe":3,"first_line":"SKILL: parking-skill-creator","triggered":true,"reason":"评测技能"}
+{"query_id":"q3","probe":1,"first_line":"SKILL: none","triggered":false,"reason":"普通翻译"}
+{"query_id":"q3","probe":2,"first_line":"SKILL: none","triggered":false,"reason":"普通翻译"}
+{"query_id":"q3","probe":3,"first_line":"SKILL: none","triggered":false,"reason":"普通翻译"}
+{"query_id":"q4","probe":1,"first_line":"SKILL: none","triggered":false,"reason":"普通前端修复"}
+{"query_id":"q4","probe":2,"first_line":"SKILL: none","triggered":false,"reason":"普通前端修复"}
+{"query_id":"q4","probe":3,"first_line":"SKILL: none","triggered":false,"reason":"普通前端修复"}

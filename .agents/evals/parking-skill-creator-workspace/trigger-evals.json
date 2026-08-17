@@ -1,0 +1,9 @@
+{
+  "skill": "parking-skill-creator",
+  "queries": [
+    { "id": "q1", "text": "帮我从零创建一个带脚本和自测的 agent skill，并打成 skill 包", "should_trigger": true },
+    { "id": "q2", "text": "我有一个技能草稿，想跑 with/without 评测并看 benchmark", "should_trigger": true },
+    { "id": "q3", "text": "帮我把这段日志翻译成中文", "should_trigger": false },
+    { "id": "q4", "text": "帮我修复一个 React 页面布局问题", "should_trigger": false }
+  ]
+}

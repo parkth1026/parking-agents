@@ -1,0 +1,11 @@
+{
+  "skill": "parking-skill-creator",
+  "queries": [
+    { "id": "q1", "text": "我想从零创建一个 agent skill，帮我搭脚手架、写测试、跑校验并打包成 .skill", "should_trigger": true },
+    { "id": "q2", "text": "这个技能触发不准，帮我做 with/without benchmark 和触发评测", "should_trigger": true },
+    { "id": "q3", "text": "把我现有的 SKILL.md 按评测结果迭代，并生成浏览器 review 页面", "should_trigger": true },
+    { "id": "q4", "text": "帮我审查这段技能文档的中文措辞，只改写表达，不运行测试", "should_trigger": false },
+    { "id": "q5", "text": "统计 Jenkins 日志里的错误频次并输出 markdown 表格", "should_trigger": false },
+    { "id": "q6", "text": "写一个 React 组件并修复页面布局问题", "should_trigger": false }
+  ]
+}

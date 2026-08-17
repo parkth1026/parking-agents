@@ -1,0 +1,5 @@
+{
+  "total_tokens": null,
+  "duration_ms": null,
+  "note": "subagent completion metadata was not exposed to the orchestrator"
+}
