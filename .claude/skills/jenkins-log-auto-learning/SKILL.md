@@ -24,7 +24,7 @@ description: |
 配置分两层（深合并，环境层覆盖技能层）：
 
 1. **技能固有默认** `config.json`（与 SKILL.md 同目录，随仓库版本化）：本技能当前无固有项。
-2. **环境层** `~/.config/parking-agents/skill-env.json`（工具中立位置，不进任何仓库）：`jenkins.baseUrl`、`gitRepos`、`tmpDir`、`trackFile`、`jobs[]`、`knowledgeBase.{rawDir,wikiDir}` 的真实值都在这里（本机指向 NAS 知识库 `//nas.51vr.local/x.public/UE5/ue-llm-wiki/`）。解析链：`$SKILL_ENV` > 该路径 > `~/.claude/skill-env.json`（旧位置回退）；技能固有默认可用 `--config` 参数指定。
+2. **环境层** `~/.config/parking-agents/skill-env.json`（工具中立位置，不进任何仓库）：`jenkins.baseUrl`、`gitRepos`、`tmpDir`、`trackFile`、`jobs[]`、`knowledgeBase.{rawDir,wikiDir}` 的真实值都在这里（本机指向 NAS 知识库 `//nas.51vr.local/x.public/UE5/ue-llm-wiki/`）。解析链：`$SKILL_ENV` > 该路径；技能固有默认可用 `--config` 参数指定。
 
 若合并后缺必要字段，脚本会报错并停止；不要用临时值硬编码。schema 示例见 `config.example.json`，详见 [references/config.md](references/config.md)。
 

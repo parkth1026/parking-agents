@@ -2,8 +2,8 @@
 //
 // 配置 = 技能固有默认（config.json，默认取脚本上级）⊕ 环境层，二者深合并，环境层优先。
 // 环境层解析链（只查本地文件，不依赖网络）:
-//   $SKILL_ENV > ~/.config/parking-agents/skill-env.json > ~/.claude/skill-env.json（旧位置回退）
-//   第一个存在的文件生效；三层都无 → 打印配置引导（已查路径 + 三步引导）后 exit 1。
+//   $SKILL_ENV > ~/.config/parking-agents/skill-env.json
+//   第一个存在的文件生效；两层都无 → 打印配置引导（已查路径 + 三步引导）后 exit 1。
 // 配置加载成功后首步对 UNC（NAS）路径做 fail-fast 连通检查，不可达时打印现状报告
 // （不可达路径/受影响操作/建议检查）后 exit 1，替代深处裸露的 ENOENT 堆栈。
 // 所有路径字段支持 ~/ 前缀展开；脚本内无绝对路径。
@@ -13,7 +13,7 @@
 //   readJsonOrDie(path,label,hint)  读长期 JSON 文件；损坏即报错退出并给恢复指引
 //   deepMerge(base, over)     深合并；数组整体替换（不拼接）
 //   expandHome(p)             展开 ~ / ~/ 前缀到用户主目录
-//   resolveEnvLayer()         按解析链返回 { path, via }（via: SKILL_ENV|new|fallback）；无文件返回 null
+//   resolveEnvLayer()         按解析链返回 { path, via }（via: SKILL_ENV|new）；无文件返回 null
 //   loadConfig(configPath)    合并并校验必要字段 + NAS 连通检查，缺失/不可达即 exit(1)
 //   writeJsonCRLF(path, obj)  UTF-8 无 BOM + CRLF 写入（与 ps1 时代输出格式一致）
 //   writeJsonAtomicCRLF(path, obj)  同上格式，但 tmp+rename 原子替换（防崩溃截断）
@@ -61,22 +61,20 @@ export function expandHome(p) {
 // ---------- 环境层解析链 ----------
 
 const envPathNew = () => join(homedir(), ".config", "parking-agents", "skill-env.json");
-const envPathOld = () => join(homedir(), ".claude", "skill-env.json");
 
-// $SKILL_ENV > 新路径 > 旧路径回退；第一个存在的文件生效
+// $SKILL_ENV > 新路径；第一个存在的文件生效
 export function resolveEnvLayer() {
   const candidates = [];
   if (process.env.SKILL_ENV) candidates.push({ path: process.env.SKILL_ENV, via: "SKILL_ENV" });
   candidates.push({ path: envPathNew(), via: "new" });
-  candidates.push({ path: envPathOld(), via: "fallback" });
   for (const c of candidates) if (existsSync(c.path)) return c;
   return null;
 }
 
-// 三层都无配置文件：给可照做的三步引导，而不是裸报缺失字段
+// 两层都无配置文件：给可照做的三步引导，而不是裸报缺失字段
 function guideOnMissingConfig() {
   const template = join(scriptDir, "..", "config.example.json");
-  console.error(`未找到配置文件（已查: $SKILL_ENV${process.env.SKILL_ENV ? `=${process.env.SKILL_ENV}` : "（未设置）"}、${envPathNew()}、${envPathOld()}）`);
+  console.error(`未找到配置文件（已查: $SKILL_ENV${process.env.SKILL_ENV ? `=${process.env.SKILL_ENV}` : "（未设置）"}、${envPathNew()}）`);
   console.error("配置引导:");
   console.error(`  1. 拷贝模板: ${template}（默认已指向 NAS 知识库）`);
   console.error(`  2. 放到:     ${envPathNew()}`);

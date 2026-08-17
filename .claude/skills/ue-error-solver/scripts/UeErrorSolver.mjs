@@ -7,8 +7,8 @@
 //
 // 配置 = 技能固有默认（config.json，默认取脚本上级）⊕ 环境层，深合并，环境层优先。
 //        环境层解析链（只查本地文件，不依赖网络）:
-//        $SKILL_ENV > ~/.config/parking-agents/skill-env.json > ~/.claude/skill-env.json（旧位置回退）
-//        三层都无 → 打印配置引导后 exit 1；配置加载成功后首步对 UNC（NAS）路径
+//        $SKILL_ENV > ~/.config/parking-agents/skill-env.json
+//        两层都无 → 打印配置引导后 exit 1；配置加载成功后首步对 UNC（NAS）路径
 //        做 fail-fast 连通检查，不可达时打印现状报告后 exit 1。
 // 临时文件一律写入 config.tmpDir 或 os.tmpdir()，绝不写入 skill 目录。
 // HTTP 请求统一走 curl.exe（Cloudflare/部分 Jenkins 会拦截非 curl 客户端）。
@@ -44,22 +44,20 @@ function deepMerge(base, over) {
   return out;
 }
 
-// 环境层解析链: $SKILL_ENV > ~/.config/parking-agents/skill-env.json > ~/.claude/skill-env.json（回退）
+// 环境层解析链: $SKILL_ENV > ~/.config/parking-agents/skill-env.json
 function resolveEnvLayer() {
   const candidates = [];
   if (process.env.SKILL_ENV) candidates.push({ path: process.env.SKILL_ENV, via: "SKILL_ENV" });
   candidates.push({ path: join(homedir(), ".config", "parking-agents", "skill-env.json"), via: "new" });
-  candidates.push({ path: join(homedir(), ".claude", "skill-env.json"), via: "fallback" });
   for (const c of candidates) if (existsSync(c.path)) return c;
   return null;
 }
 
-// 三层都无配置文件：给可照做的三步引导，而不是裸报缺失字段
+// 两层都无配置文件：给可照做的三步引导，而不是裸报缺失字段
 function guideOnMissingConfig() {
   const template = join(scriptDir, "..", "config.example.json");
   const newPath = join(homedir(), ".config", "parking-agents", "skill-env.json");
-  const oldPath = join(homedir(), ".claude", "skill-env.json");
-  console.error(`未找到配置文件（已查: $SKILL_ENV${process.env.SKILL_ENV ? `=${process.env.SKILL_ENV}` : "（未设置）"}、${newPath}、${oldPath}）`);
+  console.error(`未找到配置文件（已查: $SKILL_ENV${process.env.SKILL_ENV ? `=${process.env.SKILL_ENV}` : "（未设置）"}、${newPath}）`);
   console.error("配置引导:");
   console.error(`  1. 拷贝模板: ${template}（默认已指向 NAS 知识库）`);
   console.error(`  2. 放到:     ${newPath}`);
@@ -387,8 +385,9 @@ function extractRepoCheckouts(log) {
 function normalizeJobPath(p) {
   if (!p) return p;
   let s = String(p).replace(/\\/g, "/");
+  // 相对规范形式 "job/a/job/b" 本身就是路径前缀，不得截断；只剥离 /job/ 前的杂项前缀（如 /view/... 或完整 URL）
   const idx = s.indexOf("/job/");
-  if (idx > 0) s = s.slice(idx);
+  if (idx > 0 && !s.startsWith("job/")) s = s.slice(idx);
   if (!s.startsWith("/")) s = "/" + s;
   return s;
 }
@@ -1305,7 +1304,7 @@ const COMMANDS = {
 
 function usage() {
   console.error("用法: node UeErrorSolver.mjs <command> [--flags]");
-  console.error("配置: config.json（脚本上级）⊕ 环境层 $SKILL_ENV > ~/.config/parking-agents/skill-env.json > ~/.claude/skill-env.json（回退），深合并，环境层优先。");
+  console.error("配置: config.json（脚本上级）⊕ 环境层 $SKILL_ENV > ~/.config/parking-agents/skill-env.json，深合并，环境层优先。");
   console.error("子命令:");
   for (const [name, c] of Object.entries(COMMANDS)) {
     console.error(`  ${name.padEnd(24)} ${c.desc}`);

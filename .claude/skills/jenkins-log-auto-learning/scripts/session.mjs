@@ -196,7 +196,7 @@ function cmdStatus(argv) {
   const track = readTrack(trackFile);
 
   const layer = resolveEnvLayer();
-  const viaTag = layer.via === "SKILL_ENV" ? " (SKILL_ENV)" : layer.via === "fallback" ? " (fallback)" : "";
+  const viaTag = layer.via === "SKILL_ENV" ? " (SKILL_ENV)" : "";
   console.log(`配置来源: ${layer.path}${viaTag}`);
 
   console.log(`会话: ${session ? (session.status === "done" ? "已终结(上一轮)" : "进行中") : "无"}`);

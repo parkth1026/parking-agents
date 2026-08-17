@@ -1,5 +1,5 @@
 {
-  "_README": "技能固有默认（随仓库版本化）。本技能所有环境相关字段（baseUrl/rawDir/trackFile/jobs 等）真实值见 ~/.config/parking-agents/skill-env.json（解析链: $SKILL_ENV > 该路径 > ~/.claude/skill-env.json 旧位置回退）；二者深合并，环境层优先。模板见 config.example.json（默认指向 NAS 知识库）。",
+  "_README": "技能固有默认（随仓库版本化）。本技能所有环境相关字段（baseUrl/rawDir/trackFile/jobs 等）真实值见 ~/.config/parking-agents/skill-env.json（解析链: $SKILL_ENV > 该路径）；二者深合并，环境层优先。模板见 config.example.json（默认指向 NAS 知识库）。",
   "jobCodes": {
     "aes6-ue-runtime-ci": "aes6",
     "twe-ue5.5-installed": "twe-inst",

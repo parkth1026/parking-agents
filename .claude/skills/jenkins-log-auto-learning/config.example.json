@@ -1,5 +1,5 @@
 {
-  "_README": "环境层模板（工具中立位置，所有 skill 共享）。默认值即团队 NAS 知识库与 3 个 Earth 下目标 job——拷到 ~/.config/parking-agents/skill-env.json 即可用；仅需按机器改 gitRepos（如 D:/Git）。解析链: $SKILL_ENV > ~/.config/parking-agents/skill-env.json > ~/.claude/skill-env.json（旧位置回退）。与 skill 的 config.json 深合并，环境层优先。范围外 job 需要时自行加条目并置 enabled:true/false。",
+  "_README": "环境层模板（工具中立位置，所有 skill 共享）。默认值即团队 NAS 知识库与 3 个 Earth 下目标 job——拷到 ~/.config/parking-agents/skill-env.json 即可用；仅需按机器改 gitRepos（如 D:/Git）。解析链: $SKILL_ENV > ~/.config/parking-agents/skill-env.json。与 skill 的 config.json 深合并，环境层优先。范围外 job 需要时自行加条目并置 enabled:true/false。",
   "jenkins": {
     "baseUrl": "http://10.66.12.40"
   },

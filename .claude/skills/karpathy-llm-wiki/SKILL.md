@@ -24,7 +24,7 @@ a web of understanding that grows more valuable over time.
 Configuration is layered (deep-merged; environment overrides skill defaults):
 
 - **Skill defaults** `config.json` (next to this SKILL.md, versioned): holds `scoring` and `page` rules.
-- **Environment** `~/.config/parking-agents/skill-env.json` (tool-neutral, never committed): holds the real `knowledgeBase.wikiDir` / `knowledgeBase.rawDir` for this machine (NAS-backed). Resolution chain: `SKILL_ENV` env var > this path > legacy `~/.claude/skill-env.json` fallback.
+- **Environment** `~/.config/parking-agents/skill-env.json` (tool-neutral, never committed): holds the real `knowledgeBase.wikiDir` / `knowledgeBase.rawDir` for this machine (NAS-backed). Resolution chain: `SKILL_ENV` env var > this path.
 
 The `knowledgeBase` namespace is **shared with other skills** on this machine (e.g. jenkins-log-auto-learning) — both point at the same physical wiki/raw directories, so the values live in exactly one place.
 
