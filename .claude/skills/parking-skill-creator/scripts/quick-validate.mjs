@@ -120,6 +120,9 @@ if (isMain) {
     if (!existsSync(join(dir, "references", "design.md"))) {
       console.log("  警告: 无 references/design.md——设计依据不可考(新技能必须,老技能升级时补)");
     }
+    if (readFileSync(join(dir, "SKILL.md"), "utf8").includes("[TODO")) {
+      console.log("  提示: SKILL.md 仍含 TODO 占位（完成占位再分发）");
+    }
     process.exit(0);
   } else {
     console.log(`FAIL ${dir}`);

@@ -99,13 +99,13 @@ Append-only eval score ledger. Located at `<skill-dir>/history.json`, distribute
 - `skill`: Skill name
 - `runs[]`: One entry per `--history` aggregation, append-only
   - `date`: Local-timezone ISO timestamp of the aggregation
-  - `iteration_ref`: Absolute path of the aggregated iteration dir (the source of this run's data)
+  - `iteration_ref`: Absolute path of the aggregated iteration dir (the source of this run's data). Local-machine only — for cross-machine consumers it is just a round identifier, not a readable path
   - `gates`: Key = config directory name (gate name), open set — `with_skill` / `without_skill` / `old_skill` / any custom name. Values: `pass_rate` (mean), `mean_ms` / `mean_tokens` (`null` when all timing values were null)
-  - `vs_previous`: Comparison against the previous run, matched by exact eval name with pass-boolean flips; `null` for the first run (or when the previous iteration's data on disk is unreadable). New-this-round evals count in `evals_total` but not in won/lost (`detail` marks them `new`); evals present last round but absent this round are marked `dropped` in `detail`, never silently dropped
+  - `vs_previous`: Comparison against the previous run, matched by exact eval name with pass-boolean flips; `null` for the first run, when the previous iteration's data on disk is unreadable, when re-aggregating the same iteration (no self-comparison), or when the two runs' primary gates are discontinuous (renamed/pure-experimental gates — never recorded as `lost`). New-this-round evals count in `evals_total` but not in won/lost (`detail` marks them `new`); evals present last round but absent this round are marked `dropped` in `detail`, never silently dropped; evals lacking data under the comparison gate on either side count as `tie` (no flip derivable)
   - `current_best`: Snapshot flag written at append time when this run was the best; the authoritative pointer is the top-level `current_best`
-- `current_best` (top level): `"runs[N]"`. Advances only when the primary gate (`with_skill`, else first gate name alphabetically) pass_rate is **strictly** higher — ties never advance (anti-jitter)
+- `current_best` (top level): `"runs[N]"`. The **primary gate** is `with_skill`, or the alphabetically-first gate name when absent. The pointer advances only when the primary-gate pass_rate is **strictly** higher — ties never advance (anti-jitter). Two guards against dirty data: rounds whose primary gate name differs from the incumbent best's (pure experimental gates) never advance the pointer; re-aggregating the same `iteration_ref` counts as a correction — a new entry is appended (with a stdout notice) and only the latest entry per `iteration_ref` is a best-candidate, so an early partial aggregate cannot lock the ceiling
 
-**Boundary behavior:** corrupt JSON (parse failure or shape mismatch) is backed up as `history.json.corrupt-<YYYYMMDD-HHmmss>` then rebuilt from the current run (evidence kept, never silently overwritten). `--history` pointing at a non-directory / unwritable target: the run is refused with exit code 1, benchmark outputs already written are not rolled back. Without `--history`, output is byte-identical to the flagless behavior and no history.json is created.
+**Boundary behavior:** corrupt JSON is backed up as `history.json.corrupt-<YYYYMMDD-HHmmss>` then rebuilt (parse failure / broken top level → rebuild from empty; individual malformed runs → backup, keep the valid ones). `history.json` being a directory, or `--history` pointing at a non-directory / unwritable target: the run is refused with exit code 1, benchmark outputs already written are not rolled back. Writes go through temp-file + atomic rename. Without `--history`, output is byte-identical to the flagless behavior and no history.json is created.
 
 ---
 
@@ -128,9 +128,9 @@ Product of the structure-review step (SKILL.md 6.5). Located at `<iteration-dir>
 
 **Fields:**
 - `signals[]`: The four-signal checklist, one entry per signal, verdicts recorded honestly (write the file even when nothing hits)
-  - `signal` / `hit` / `evidence`: Signal name / whether it hit / one-sentence evidence
+  - `signal` / `hit` / `evidence`: Signal name / whether it hit / one-sentence evidence. `hit` is `true` / `false` / `null` — `null` means "no data to judge" (e.g. signal 4 before any trigger eval ran); the viewer renders it as 「无数据」
 - `recommendation`: The split suggestion shown in the card; empty or 「无需拆分」 when no signal hits
-- `conclusion`: Where the suggestion landed (dialog + design.md iteration record) and that execution stays with the user
+- `conclusion`: Where the suggestion landed (dialog at review time; design.md iteration record at wrap-up, after the user's verdict) and that execution stays with the user. Rendered even when no benchmark.json exists
 
 ---
 
@@ -312,6 +312,7 @@ Output from `scripts/aggregate-benchmark.mjs`. Located at `<iteration-dir>/bench
 - `delta`: First config minus second config (alphabetical order puts with_skill before without_skill); numeric, not strings
 - `evals`: Eval directory names in order
 - `warnings`: Non-fatal scan issues (missing grading.json etc.)
+- `notes`: Optional string array appended by the analyst pass (SKILL.md 6.4 step 3); the viewer renders it as Analysis Notes. Absent when no analyst pass ran — consumers must not require it
 
 `benchmark.md` is a human-readable rendering of the same data, field for field.
 

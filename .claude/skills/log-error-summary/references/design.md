@@ -33,5 +33,5 @@
 
 | 日期 | 改了什么 | 轮次结果 | 拆分建议 |
 | --- | --- | --- | --- |
-| 2026-08-17 | iteration-1 收尾：未改动技能；评测暴露 v1 大小写缺口（AC-2 挂，with_skill 2/6 计入） | with_skill 75% vs without_skill 100%（2 evals） | 结构审查四信号均未命中，无需拆分 |
-| 2026-08-17 | v2：错误行判定 `\bERROR\b` → `\berror\b/i`（大小写不敏感）补齐 AC-2；回归测试补混合大小写用例（10 项全过） | iteration-2 vs iteration-1：won 1 / lost 0 / tie 1；with_skill 100% | 结构审查四信号均未命中，无需拆分 |
+| 2026-08-17 | iteration-1 收尾：未改动技能；评测暴露 v1 大小写缺口（AC-2 挂，with_skill 2/6 计入） | with_skill 75% vs without_skill 100%（2 evals） | 结构审查：信号 1-3 未命中、信号 4 无数据（未跑触发评测），无需拆分 |
+| 2026-08-17 | v2：错误行判定 `\bERROR\b` → `\berror\b/i`（大小写不敏感）补齐 AC-2；回归测试补混合大小写用例（10 项全过） | iteration-2 vs iteration-1：won 1 / lost 0 / tie 1；with_skill 100% | 结构审查：信号 1-3 未命中、信号 4 无数据（未跑触发评测），无需拆分 |

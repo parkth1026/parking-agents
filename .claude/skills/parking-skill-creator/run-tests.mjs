@@ -3,7 +3,7 @@
 // 惯例：check() 计数器 + 黑盒执行（execFileSync 跑脚本再比对输出），退出码 0=全过/1=有失败；
 //       夹具全部建在系统临时目录——本测试自身不能在技能扫描根下留下任何 SKILL.md。
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -90,6 +90,7 @@ try {
 
   const qv = runFile("quick-validate.mjs", [genDir]);
   check("脚手架过 quick-validate 且无缺测试警告", qv.code === 0 && !qv.stdout.includes("警告"));
+  check("SKILL.md 含 TODO 占位时给提示(不挡退出码)", qv.code === 0 && qv.stdout.includes("提示: SKILL.md 仍含 TODO 占位"));
 
   const bare = join(root3, "bare-skill");
   mkdirSync(bare, { recursive: true });
@@ -229,6 +230,10 @@ try {
   // iteration-1: eval-a 过 / eval-b 挂；iteration-2: eval-b 翻正(won) + eval-c 新增，eval-a 缺席(dropped)
   for (const [ev, pass] of [["eval-a", true], ["eval-b", false]]) { mkRun("iteration-1", ev, "with_skill", pass); mkRun("iteration-1", ev, "without_skill", false); }
   for (const [ev, pass] of [["eval-b", true], ["eval-c", true]]) { mkRun("iteration-2", ev, "with_skill", pass); mkRun("iteration-2", ev, "without_skill", false); }
+  // iteration-3: 与 iteration-2 同通过率（防抖用，独立 ref）
+  for (const [ev, pass] of [["eval-b", true], ["eval-c", true]]) { mkRun("iteration-3", ev, "with_skill", pass); mkRun("iteration-3", ev, "without_skill", false); }
+  // iteration-4: 同样全过，但 gate 改名 my_skill（gate 不连续场景）
+  for (const [ev, pass] of [["eval-b", true], ["eval-c", true]]) { mkRun("iteration-4", ev, "my_skill", pass); mkRun("iteration-4", ev, "without_skill", false); }
 
   const skillDir = join(root6, "skill");
   mkdirSync(skillDir);
@@ -254,26 +259,76 @@ try {
   check("次轮: 缺席 eval-a 标 dropped", vs.detail.some((d) => d.eval === "eval-a" && d.result === "dropped"));
   check("次轮: current_best 严格推进", h2.current_best === "runs[1]");
 
-  aggH("iteration-2");
+  const r3 = aggH("iteration-3");
   const h3 = JSON.parse(readFileSync(join(skillDir, "history.json"), "utf8"));
-  check("防抖: 持平不推进 current_best", h3.runs.length === 3 && h3.current_best === "runs[1]");
+  check("防抖: 独立轮持平不推进 current_best", r3.code === 0 && h3.runs.length === 3 && h3.current_best === "runs[1]");
+
+  // gate 改名：绝不产生幻影 lost，实验 gate 不抢星标
+  const r4 = aggH("iteration-4");
+  const h4 = JSON.parse(readFileSync(join(skillDir, "history.json"), "utf8"));
+  check("gate 改名: 不产生幻影 lost", r4.code === 0 && h4.runs[3].vs_previous === null
+    && !JSON.stringify(h4.runs[3].vs_previous).includes('"lost"'));
+  check("gate 改名: stdout 明示 gate 不连续", r4.stdout.includes("gate 不连续"));
+  check("gate 改名: 实验轮不参与 current_best", h4.current_best === "runs[1]");
+
+  // 重复聚合同一 iteration：预警 + 不自比 + 以最新一条为该轮有效成绩
+  const r5 = aggH("iteration-2");
+  const h5 = JSON.parse(readFileSync(join(skillDir, "history.json"), "utf8"));
+  check("重复聚合: stdout 预警此前已记录", r5.stdout.includes("此前已记录"));
+  check("重复聚合: 不与自己比(vs_previous null)", h5.runs[4].vs_previous === null);
+  check("重复聚合: 星标以各轮最新有效成绩为准", h5.current_best === "runs[2]");
 
   writeFileSync(join(skillDir, "history.json"), "{broken", "utf8");
-  const r4 = aggH("iteration-2");
+  const r6 = aggH("iteration-2");
   const backups = readdirSync(skillDir).filter((f) => f.startsWith("history.json.corrupt-"));
-  const h4 = JSON.parse(readFileSync(join(skillDir, "history.json"), "utf8"));
-  check("损坏: 先备份 .corrupt-<ts> 再重建", r4.code === 0 && backups.length === 1 && h4.runs.length === 1 && h4.current_best === "runs[0]");
-  check("损坏: stdout 明示备份不静默", r4.stdout.includes("已备份为 history.json.corrupt-"));
+  const h6 = JSON.parse(readFileSync(join(skillDir, "history.json"), "utf8"));
+  check("损坏: 先备份 .corrupt-<ts> 再重建", r6.code === 0 && backups.length >= 1 && h6.runs.length === 1 && h6.current_best === "runs[0]");
+  check("损坏: stdout 明示备份不静默", r6.stdout.includes("已备份为 history.json.corrupt-"));
 
-  const skillDir2 = join(root6, "skill-clean");
-  mkdirSync(skillDir2);
-  const r5 = agg("iteration-1");
-  check("无参数: 不产 history 行不建 history.json", r5.code === 0 && !r5.stdout.includes("history:")
-    && !exists(join(skillDir2, "history.json")));
+  // 部分损坏：个别 run 形状不合法 → 备份并保留合法 run，好数据不陪葬
+  const skillDirP = join(root6, "skill-partial");
+  mkdirSync(skillDirP);
+  const aggP = (iter) => runFile("aggregate-benchmark.mjs", [join(root6, "ws", iter), "--skill-name", "hist-demo", "--history", skillDirP]);
+  aggP("iteration-1");
+  aggP("iteration-2");
+  const hp = JSON.parse(readFileSync(join(skillDirP, "history.json"), "utf8"));
+  hp.runs.push({ date: "bad", iteration_ref: "x" }); // 无 gates 的坏条目
+  writeFileSync(join(skillDirP, "history.json"), JSON.stringify(hp), "utf8");
+  const rp = aggP("iteration-3");
+  const hp2 = JSON.parse(readFileSync(join(skillDirP, "history.json"), "utf8"));
+  check("部分损坏: 忽略坏条目保留合法 run", rp.code === 0 && rp.stdout.includes("形状不合法")
+    && hp2.runs.length === 3 && readdirSync(skillDirP).some((f) => f.startsWith("history.json.corrupt-")));
 
-  const r6 = agg("iteration-1", ["--history", join(root6, "no-such")]);
-  check("拒绝: 目标不可写退出 1 且 benchmark 照常产出", r6.code === 1 && r6.stdout.includes("拒绝")
+  // 锁死防护：半程高估被同 iteration 修正取代，后续真进步仍可推进
+  const skillDirL = join(root6, "skill-lock");
+  mkdirSync(skillDirL);
+  const aggL = (iter) => runFile("aggregate-benchmark.mjs", [join(root6, "ws", iter), "--skill-name", "hist-demo", "--history", skillDirL]);
+  aggL("iteration-1");
+  const halfFix = JSON.parse(readFileSync(join(skillDirL, "history.json"), "utf8"));
+  halfFix.runs[0].gates.with_skill.pass_rate = 1; // 模拟半程聚合高估
+  writeFileSync(join(skillDirL, "history.json"), JSON.stringify(halfFix), "utf8");
+  aggL("iteration-1"); // 同 iteration 完整重聚(0.5)取代高估
+  const hl = JSON.parse(readFileSync(join(skillDirL, "history.json"), "utf8"));
+  const corrected = hl.runs[1].gates.with_skill.pass_rate;
+  aggL("iteration-2"); // 下轮真到 1.0
+  const hl2 = JSON.parse(readFileSync(join(skillDirL, "history.json"), "utf8"));
+  check("防锁死: 修正轮取代高估,下轮 1.0 仍可推进", corrected === 0.5 && hl2.current_best === "runs[2]"
+    && hl2.runs[2].gates.with_skill.pass_rate === 1);
+
+  const r7 = agg("iteration-1");
+  check("无参数: 不产 history 行不在 iteration 目录建 history", r7.code === 0 && !r7.stdout.includes("history:")
+    && !exists(join(root6, "ws", "iteration-1", "history.json")));
+
+  const r8 = agg("iteration-1", ["--history", join(root6, "no-such")]);
+  check("拒绝: 目标不可写退出 1 且 benchmark 照常产出", r8.code === 1 && r8.stdout.includes("拒绝")
     && exists(join(root6, "ws", "iteration-1", "benchmark.json")));
+
+  const skillDirD = join(root6, "skill-dir-case");
+  mkdirSync(skillDirD, { recursive: true });
+  mkdirSync(join(skillDirD, "history.json")); // history.json 本身是目录
+  const r9 = agg("iteration-1", ["--history", skillDirD]);
+  check("拒绝: history.json 是目录时不 rename 不追加", r9.code === 1 && r9.stdout.includes("是目录")
+    && statSync(join(skillDirD, "history.json")).isDirectory());
 } finally {
   rmSync(root6, { recursive: true, force: true });
 }
@@ -320,10 +375,25 @@ try {
   check("带 --history 静态评审页生成成功", st.code === 0);
   const html = readFileSync(join(root8, "review.html"), "utf8");
   check("评审页嵌入 history 数据", html.includes('"history"') && html.includes("view-demo"));
+  check("技能名优先取 history 的 skill 字段", html.includes('"skill_name":"view-demo"'));
   check("评审页含建议卡片与仅建议标记", html.includes("结构审查建议") && html.includes("仅建议 · 未执行"));
   const st2 = viewer([join(root8, "iteration-1"), "--skill-name", "view-demo", "--static", join(root8, "review2.html"), "--no-open"]);
   const html2 = readFileSync(join(root8, "review2.html"), "utf8");
   check("无 --history 时不嵌历史数据(旧行为不变)", st2.code === 0 && !html2.includes('"history"'));
+
+  // $-注入防护：嵌入数据含 $& / $' 时不得被当替换模式展开（页面不被截断、原文保留）
+  const d9 = join(root8, "iteration-9", "eval-dollar", "with_skill", "run-1");
+  mkdirSync(join(d9, "outputs"), { recursive: true });
+  writeFileSync(join(d9, "grading.json"), JSON.stringify({ results: [{ name: "a", passed: true }] }));
+  writeFileSync(join(root8, "iteration-9", "eval-dollar", "eval_metadata.json"),
+    JSON.stringify({ prompt: "价格是 5$& 和 8$' 哦", assertions: [] }));
+  const st3 = viewer([join(root8, "iteration-9"), "--static", join(root8, "review3.html"), "--no-open"]);
+  const html3 = readFileSync(join(root8, "review3.html"), "utf8");
+  const tpl = readFileSync(join(SCRIPTS, "..", "eval-viewer", "viewer.html"), "utf8");
+  check("嵌入数据 $&/$' 不展开(页面完整)", st3.code === 0
+    && (html3.match(/<\/script>/g) || []).length === (tpl.match(/<\/script>/g) || []).length
+    && (html3.match(/EMBEDDED_DATA/g) || []).length === (tpl.match(/EMBEDDED_DATA/g) || []).length
+    && html3.includes("5$&"));
 } finally {
   rmSync(root8, { recursive: true, force: true });
 }

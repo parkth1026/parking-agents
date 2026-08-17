@@ -218,23 +218,32 @@ function buildGatesSummary(benchmark) {
   return gates;
 }
 
-/** eval 名 → 该 gate 下是否全过（多 run 取均值 ===1）；gate 缺该 eval 数据按未通过计 */
+/** eval 名 → 该 gate 下是否全过（多 run 取均值 ===1）；该 gate 无数据记 null（未知，绝不当失败） */
 function evalPassMap(evals, gate) {
   const map = {};
   for (const ev of evals) {
-    const runs = (ev.configs[gate] ?? []);
-    map[ev.name] = runs.length > 0 && runs.reduce((s, r) => s + r.pass_rate, 0) / runs.length === 1;
+    const runs = ev.configs[gate] ?? [];
+    map[ev.name] = runs.length > 0 ? runs.reduce((s, r) => s + r.pass_rate, 0) / runs.length === 1 : null;
   }
   return map;
 }
 
 /**
- * 与上一 run 比逐 eval 胜负：同 eval 名精确匹配、pass 布尔翻转；
- * 本轮新增 eval 计入 total 不计入 won/lost（detail 标 new）；上轮存在本轮缺席标 dropped。
- * 上一轮逐 eval 数据从其 iteration_ref 目录现算（数据只在聚合时齐备）；不可读返回 { error }。
+ * 与上一 run 比逐 eval 胜负：同 eval 名精确匹配、pass 布尔翻转。
+ * 比对 gate 取两轮主 gate；主 gate 名不同（换 gate 名/纯实验 gate 轮）时，若两轮同有 with_skill
+ * 则退回 with_skill，否则判「gate 不连续」不可比——绝不把「本轮没有上轮那个 gate」当失败记 lost（假回归）。
+ * 本轮新增 eval 计入 total 不计入 won/lost（detail 标 new）；上轮存在本轮缺席标 dropped；
+ * 某侧该 gate 无数据的 eval 按无翻转计 tie。上一轮逐 eval 数据从其 iteration_ref 目录现算。
  */
-export function computeVsPrevious(curEvals, prevRun) {
-  const gate = primaryGate(prevRun.gates ?? {});
+export function computeVsPrevious(curEvals, curGates, prevRun) {
+  const prevPrimary = primaryGate(prevRun.gates ?? {});
+  const curPrimary = primaryGate(curGates ?? {});
+  let gate = curPrimary;
+  if (curPrimary !== prevPrimary) {
+    const common = Object.keys(curGates ?? {}).filter((g) => prevRun.gates && g in prevRun.gates);
+    gate = common.includes("with_skill") ? "with_skill" : null;
+  }
+  if (!gate) return { error: "gate 不连续（两轮无可比 gate）" };
   const prevLoaded = loadIteration(prevRun.iteration_ref, []);
   if (prevLoaded.error) return { error: prevLoaded.error };
   const prevMap = evalPassMap(prevLoaded.evals, gate);
@@ -254,32 +263,43 @@ export function computeVsPrevious(curEvals, prevRun) {
   return { vs_previous: { evals_total: curEvals.length, won, lost, tie, detail } };
 }
 
-/** 读入现有 history；损坏（解析失败/形状不对）先备份 .corrupt-<ts> 再从空重建，不静默覆盖 */
+const RUN_SHAPE_OK = (r) => r && typeof r === "object" && !Array.isArray(r) && r.gates && typeof r.gates === "object";
+
+/**
+ * 读入现有 history。整文件损坏（解析失败/顶层结构不对）→ 备份 .corrupt-<ts> 后从空重建；
+ * 仅个别 run 形状不合法 → 同样备份原文件，但保留合法 run 继续追加（好数据不陪葬）。均不静默覆盖。
+ */
 function loadHistoryForAppend(historyPath) {
   if (!existsSync(historyPath)) return { history: null };
   let parsed;
   try {
     parsed = JSON.parse(readFileSync(historyPath, "utf8"));
   } catch (err) {
-    return corrupt(historyPath, `history.json 解析失败: ${err.message}`);
+    return corrupt(historyPath, `history.json 解析失败: ${err.message}`, null);
   }
-  const shapeOk = parsed && typeof parsed === "object" && !Array.isArray(parsed)
-    && Array.isArray(parsed.runs)
-    && parsed.runs.every((r) => r && typeof r === "object" && r.gates && typeof r.gates === "object");
-  if (!shapeOk) return corrupt(historyPath, "history.json 结构不符契约(runs/gates)");
+  const topOk = parsed && typeof parsed === "object" && !Array.isArray(parsed) && Array.isArray(parsed.runs);
+  if (!topOk) return corrupt(historyPath, "history.json 结构不符契约(runs/gates)", null);
+  const badCount = parsed.runs.filter((r) => !RUN_SHAPE_OK(r)).length;
+  if (badCount > 0) {
+    parsed.runs = parsed.runs.filter(RUN_SHAPE_OK);
+    return corrupt(historyPath, `history.json 有 ${badCount} 条 run 形状不合法（已忽略，保留 ${parsed.runs.length} 条合法 run）`, parsed);
+  }
   return { history: parsed };
-  function corrupt(p, reason) {
+  function corrupt(p, reason, keep) {
     const ts = new Date();
     const pad = (n) => String(n).padStart(2, "0");
     const stamp = `${ts.getFullYear()}${pad(ts.getMonth() + 1)}${pad(ts.getDate())}-${pad(ts.getHours())}${pad(ts.getMinutes())}${pad(ts.getSeconds())}`;
     renameSync(p, `${p}.corrupt-${stamp}`);
-    console.log(`拒绝：${reason}——已备份为 history.json.corrupt-${stamp} 后重建`);
-    return { history: null, rebuilt: true };
+    console.log(`拒绝：${reason}——已备份为 history.json.corrupt-${stamp} 后继续`);
+    return keep ? { history: keep, rebuilt: true } : { history: null, rebuilt: true };
   }
 }
 
 /**
  * 组装本轮 run 记录并追加进 history（只追加：既有 runs 任何字段不回改；顶层 current_best 为权威指针）。
+ * current_best 口径：主 gate（with_skill 优先，否则字典序首个）pass_rate 严格更高才推进，平局不推进（防抖）；
+ *   ① 每个 iteration_ref 只认最新一条（重复聚合=修正，旧条不再当候选，防早期脏数据锁死上限）；
+ *   ② 主 gate 名不同的轮次（实验 gate/换名）不参与推进——星标只在同名主 gate 的成绩间移动。
  * 返回 { history, summary } 供 CLI 打印趋势；写入由调用方决定（失败不吞 benchmark 产出）。
  */
 export function appendHistoryRun({ result, iterDir, skillName, historyPath }) {
@@ -287,39 +307,82 @@ export function appendHistoryRun({ result, iterDir, skillName, historyPath }) {
   const history = loaded.history ?? { skill: skillName || result.benchmark.skill_name || "", runs: [] };
   const prevRun = history.runs.length > 0 ? history.runs[history.runs.length - 1] : null;
   const gates = buildGatesSummary(result.benchmark);
+  const newRef = resolve(iterDir);
 
   let vsPrevious = null;
   let vsNote = "首轮无对比";
+  let duplicateOf = history.runs.findIndex((r) => r.iteration_ref === newRef); // 任意历史同 ref 即算重复记录
   if (prevRun) {
-    const cmp = computeVsPrevious(result.evals, prevRun);
-    if (cmp.error) {
-      vsNote = `上一轮 iteration 数据不可读(${cmp.error})`;
+    if (prevRun.iteration_ref === newRef) {
+      vsNote = "同 iteration 重复聚合，无对比";
     } else {
-      vsPrevious = cmp.vs_previous;
-      vsNote = `won ${vsPrevious.won} / lost ${vsPrevious.lost} / tie ${vsPrevious.tie}`;
+      const cmp = computeVsPrevious(result.evals, gates, prevRun);
+      if (cmp.error) {
+        vsNote = `${cmp.error}，本轮无逐 eval 对比`;
+      } else {
+        vsPrevious = cmp.vs_previous;
+        vsNote = `won ${vsPrevious.won} / lost ${vsPrevious.lost} / tie ${vsPrevious.tie}`;
+      }
     }
   }
 
-  // current_best：主 gate pass_rate 严格更高才推进，平局不推进（防抖）
-  const bestIdxBefore = (() => {
-    const m = typeof history.current_best === "string" ? history.current_best.match(/^runs\[(\d+)\]$/) : null;
-    return m && Number(m[1]) < history.runs.length ? Number(m[1]) : (history.runs.length > 0 ? 0 : -1);
-  })();
-  const newRate = gates[primaryGate(gates)]?.pass_rate ?? 0;
-  const bestRateBefore = bestIdxBefore >= 0
-    ? (history.runs[bestIdxBefore].gates[primaryGate(history.runs[bestIdxBefore].gates)]?.pass_rate ?? 0)
-    : null;
-  const advance = bestIdxBefore < 0 || newRate > bestRateBefore;
-  const bestIdxAfter = advance ? history.runs.length : bestIdxBefore;
-
   const run = {
     date: localIsoDate(),
-    iteration_ref: resolve(iterDir),
+    iteration_ref: newRef,
     gates,
     vs_previous: vsPrevious,
   };
-  if (advance) run.current_best = true;
   history.runs.push(run);
+  const newRunIdx = history.runs.length - 1;
+
+  const curBestIdx = (() => {
+    const m = typeof history.current_best === "string" ? history.current_best.match(/^runs\[(\d+)\]$/) : null;
+    return m && Number(m[1]) < newRunIdx ? Number(m[1]) : (newRunIdx > 0 ? 0 : -1);
+  })();
+  const newPrimary = primaryGate(gates);
+  const rateOf = (r) => r.gates[primaryGate(r.gates)]?.pass_rate ?? 0;
+  const reaggregated = history.runs.slice(0, newRunIdx).some((r) => r.iteration_ref === newRef);
+
+  // 候选 = 其他 iteration_ref 各自的最新一条、且主 gate 名与本轮一致；
+  // 本轮 ref 的旧条目已被本轮取代（delete），不当候选——重复聚合=修正，防早期脏数据锁死上限
+  const lastIdxPerRef = new Map();
+  history.runs.forEach((r, i) => { if (i !== newRunIdx) lastIdxPerRef.set(r.iteration_ref, i); });
+  lastIdxPerRef.delete(run.iteration_ref);
+  const candidates = [...lastIdxPerRef.values()]
+    .filter((i) => primaryGate(history.runs[i].gates) === newPrimary);
+
+  let advance, bestIdxAfter, reason;
+  if (candidates.length === 0 && newRunIdx > 0 && !reaggregated) {
+    advance = false;
+    bestIdxAfter = curBestIdx >= 0 ? curBestIdx : 0;
+    reason = `主 gate 不连续（本轮 ${newPrimary} 无同名历史轮），不参与 current_best`;
+  } else if (candidates.length === 0) {
+    advance = true;
+    bestIdxAfter = newRunIdx;
+    reason = newRunIdx === 0 ? "首轮即最佳" : "同 iteration 重复聚合，最新成绩为该轮有效成绩";
+  } else {
+    let best = candidates[0];
+    for (const i of candidates) {
+      if (rateOf(history.runs[i]) > rateOf(history.runs[best])
+        || (rateOf(history.runs[i]) === rateOf(history.runs[best]) && i === curBestIdx)) best = i;
+    }
+    const newRate = rateOf(run);
+    const bestRate = rateOf(history.runs[best]);
+    if (newRate > bestRate) {
+      advance = true;
+      bestIdxAfter = newRunIdx;
+      reason = reaggregated
+        ? `同 iteration 重复聚合修正后 pass_rate ${newRate} > ${bestRate}，星标移至最新一条`
+        : `pass_rate ${newRate} > ${bestRate} 推进`;
+    } else {
+      advance = false;
+      bestIdxAfter = best;
+      reason = best !== curBestIdx
+        ? `星标回落至 runs[${best}]（pass_rate ${bestRate}，以各轮最新成绩的最高者为最佳）`
+        : `pass_rate ${newRate} 未严格超过 ${bestRate}，持平不推进`;
+    }
+  }
+  if (advance) run.current_best = true;
   history.current_best = `runs[${bestIdxAfter}]`;
 
   const summary = {
@@ -327,9 +390,8 @@ export function appendHistoryRun({ result, iterDir, skillName, historyPath }) {
     vsNote,
     advance,
     bestIdxAfter,
-    reason: bestIdxBefore < 0 ? "首轮即最佳" : advance
-      ? `pass_rate ${newRate} > ${bestRateBefore} 推进`
-      : `pass_rate ${newRate} 未严格超过 ${bestRateBefore}，持平不推进`,
+    reason,
+    duplicateOf,
     rebuilt: loaded.rebuilt ?? false,
   };
   return { history, summary };
@@ -387,6 +449,10 @@ if (historyDir) {
     process.exit(1);
   }
   const historyPath = join(historyDir, "history.json");
+  if (existsSync(historyPath) && statSync(historyPath).isDirectory()) {
+    console.log(`拒绝：history.json 是目录，不是历史文件: ${historyPath}（本次不追加历史，聚合结果照常产出）`);
+    process.exit(1);
+  }
   let appended;
   try {
     appended = appendHistoryRun({ result, iterDir: iterDirArg, skillName, historyPath });
@@ -396,6 +462,9 @@ if (historyDir) {
     process.exit(1);
   }
   const s = appended.summary;
+  if (s.duplicateOf >= 0) {
+    console.log(`history: 注意: 该 iteration 此前已记录(runs[${s.duplicateOf}])，本条为重复聚合记录；对比与 current_best 以本条(最新)为准`);
+  }
   console.log(`history: 追加 1 条 run（第 ${s.index} 条）→ ${s.vsNote}${s.vsNote.startsWith("won") ? "（vs 上一条，按 eval 名匹配）" : ""}`);
   console.log(`history: current_best ${s.advance ? `推进至 runs[${s.bestIdxAfter}]` : `保持 runs[${s.bestIdxAfter}]`}（${s.reason}）`);
   console.log(`history: → ${historyPath}（runs 共 ${appended.history.runs.length} 条，只追加）`);

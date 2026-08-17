@@ -40,6 +40,8 @@ For each expectation:
    - **FAIL**: No evidence, or evidence contradicts the expectation, or the evidence is superficial (e.g., correct filename but empty/wrong content)
 3. **Cite the evidence**: Quote the specific text or describe what you found
 
+An assertion may carry an optional `ac` field (e.g. `AC-2`) referencing an acceptance condition in the evaluated skill's `references/design.md` — when an assertion's intent is unclear, read that entry to understand what it was designed to verify. Absence of `ac` is normal (legacy skills); never reject or down-weight an assertion for lacking it.
+
 ### Step 4: Extract and Verify Claims
 
 Beyond the predefined expectations, extract implicit claims from the outputs and verify them:
