@@ -50,6 +50,26 @@
         {"text": "问到了某个 facet 没数据时下拉框如何表现这一点", "type": "judgment"},
         {"text": "界面相关 AC 的 Verify 档位默认标 [C]，不是编不出证据链的 [A]（仓库没有视觉回归基建）", "type": "programmatic"}
       ]
+    },
+    {
+      "id": 4,
+      "name": "architecture-split-diagram",
+      "prompt": "jenkins-log-auto-learning 的 scan 现在既管扫描又管写知识库，揉在一个入口里。我想把写入拆成独立的 writer 模块，scan 以后只读不写，依赖方向反过来：scan 调 writer 的接口，不再直接碰知识库文件。帮我走一遍访谈，把这份改动的契约定下来。",
+      "persona": "你是 jenkins-log-auto-learning 的维护者，看拓扑比看文字快。\n- 动机：上次 review 一段文字版依赖描述，你漏看了一条反向依赖，返工了半天。这次模块拆分你要求先看图再谈行为。\n- 想要：浏览器双击能开的架构图（公司内网经常断外网），改动的地方一眼可见，你能逐处指着问「这条边为什么变了」。\n- 如果 Agent 只给了 behavior.md 不出图：第一次反馈要求补 diagram.html（「架构与依赖」这面判「有」就必须有架构视图）；第二次看图提两条意见——新依赖边要用橙色标出来、被删掉的「scan 直写知识库」那条边进页脚删除清单，不占图面；改完后确认，不再提新意见。\n- 如果 Agent 问图的形态：单文件、零 JS、零外链、系统字体，断网也要能看。\n- 不变的（你依赖的）：表格仍是契约源，behavior.md 的变化行/不变清单照旧要写，不要把表并进 HTML；流程视图对应 behavior.md 的变化行就行，不用另立一套。\n- 验收方式：架构改动有测试基建就写可跑的断言（比如 grep 断言 scan 不再 import 写入路径），跟着仓库惯例走，Agent 推荐什么就是什么。\n- 其他任何未覆盖的问题：选 Agent 推荐项。",
+      "expected_output": "识别出第七面「架构与依赖」判「有」，产出自包含 diagram.html：改后态单视图、改动节点/连线带 .changed（accent）标注、删除边进页脚删除清单、页脚带 fidelity ledger（Detail/Merged/Collapsed/Dropped/Kept）；架构视图的每处标注变化进契约（强约束不变式或 [A] 依赖断言），流程视图对应 behavior.md 变化行、不另立例子；契约「读什么」节引用 diagram.html；表格契约源地位不变。",
+      "files": [],
+      "assertions": [
+        {"text": "2-prototype/diagram.html 存在", "type": "programmatic"},
+        {"text": "diagram.html 自包含：无 <script>、无外链 http(s) 的 src/href、无网络字体引用（Google Fonts 等）", "type": "programmatic"},
+        {"text": "diagram.html 是改后态单视图：改动节点/连线带 .changed 或 accent 标注，删除项在页脚清单而非图面", "type": "programmatic"},
+        {"text": "diagram.html 页脚含 fidelity ledger（Detail/Merged/Collapsed/Dropped/Kept 五项齐全）", "type": "programmatic"},
+        {"text": "契约「读什么」节引用了 diagram.html 路径", "type": "programmatic"},
+        {"text": "impact-surface.md 逐面扫了七面，含「架构与依赖」的有/无判定", "type": "programmatic"},
+        {"text": "架构与依赖判「有」时，manifest 的 artifacts_confirmed 含 diagram 且 2-prototype/diagram.html 在盘（闸门联动）", "type": "programmatic"},
+        {"text": "首轮 impact-surface 即判「架构与依赖：有」并直接出图，--artifacts 非事后补列", "type": "judgment"},
+        {"text": "架构标注变化进了契约强约束不变式或 [A] 依赖断言，流程视图未在例子池另立条目", "type": "judgment"},
+        {"text": "表格契约源地位未动：behavior.md 变化行/不变清单仍在，未并入 HTML", "type": "judgment"}
+      ]
     }
   ]
 }

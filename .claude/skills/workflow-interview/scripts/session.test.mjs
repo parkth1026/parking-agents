@@ -55,13 +55,26 @@ function expect(name, res, code, needle) {
 
 const CONTEXT = ['任务陈述', '用户提出的方案', '意图假设', '已查事实', '验证基建候选池', '四分类']
   .map((s) => `## ${s}\n\n占位内容。`).join('\n\n');
-const IMPACT = `# 影响面\n\n${['用户可见界面', '可观察行为', '可运行输出', '对外接口报文', '用户配置', '历史兼容性']
-  .map((s) => `- ${s}：无`).join('\n')}\n`;
+const SURFACES = ['用户可见界面', '可观察行为', '可运行输出', '对外接口报文', '用户配置', '历史兼容性', '架构与依赖'];
+// IMPACT_LEGACY 靠「架构与依赖」是最后一面来派生；往中间插面时这行会先炸，逼着同步改。
+if (SURFACES[SURFACES.length - 1] !== '架构与依赖') {
+  rmSync(ROOT, { recursive: true, force: true });
+  throw new Error('IMPACT_LEGACY 依赖「架构与依赖」是 SURFACES 最后一面，调整面序请同步改测试。');
+}
+const impactOf = (surfaces) => `# 影响面\n\n${surfaces.map((s) => `- ${s}：无`).join('\n')}\n`;
+const IMPACT = impactOf(SURFACES);
+// 七面闸门之前的存量写法：缺「架构与依赖」，用来验新增的第七面拒收/降级行为。
+const IMPACT_LEGACY = impactOf(SURFACES.slice(0, -1));
+// 第七面判「有」的在野写法：bullet、表格（加粗单元格）、判「有」措辞、面名加粗。
+const IMPACT_ARCH_YES = `# 影响面\n\n${SURFACES.slice(0, -1).map((s) => `- ${s}：无`).join('\n')}\n- 架构与依赖：有\n`;
+const IMPACT_ARCH_YES_TABLE = `# 影响面\n\n| 影响面 | 判 |\n| --- | --- |\n${SURFACES.map((s) => `| ${s} | ${s === '架构与依赖' ? '**有**' : '无'} |`).join('\n')}\n`;
+const IMPACT_ARCH_YES_VERDICT = `# 影响面\n\n${SURFACES.slice(0, -1).map((s) => `- ${s}：无`).join('\n')}\n- 架构与依赖：判「有」\n`;
+const IMPACT_ARCH_YES_BOLD = `# 影响面\n\n${SURFACES.slice(0, -1).map((s) => `- ${s}：无`).join('\n')}\n- **架构与依赖**：有\n`;
 const ROUND_OK = JSON.stringify({ stage: '1-interview', round: 1, tier: 'default', item: '占位决定' });
 const ASSESS = JSON.stringify({ 意图: '已定', 结果: '已定', 边界: '已定', 约束: '已定', 现状: '已定' });
 
 let seq = 0;
-function mkIssue({ interview = false, impact = false, artifacts = [] } = {}) {
+function mkIssue({ interview = false, impact = false, legacyImpact = false, artifacts = [] } = {}) {
   const slug = `t${String(++seq).padStart(2, '0')}`;
   const r = run('init', slug);
   if (r.status !== 0) throw new Error(`init ${slug} 失败：${r.stderr}`);
@@ -70,7 +83,9 @@ function mkIssue({ interview = false, impact = false, artifacts = [] } = {}) {
     writeFileSync(join(dir, '1-interview', 'context.md'), CONTEXT, 'utf8');
     writeFileSync(join(dir, '1-interview', 'rounds.jsonl'), `${ROUND_OK}\n`, 'utf8');
   }
-  if (impact) writeFileSync(join(dir, '2-prototype', 'impact-surface.md'), IMPACT, 'utf8');
+  // impact 传 true 用七面全「无」的默认 fixture，传字符串用指定版本（判「有」等变体）。
+  if (impact) writeFileSync(join(dir, '2-prototype', 'impact-surface.md'), impact === true ? IMPACT : impact, 'utf8');
+  if (legacyImpact) writeFileSync(join(dir, '2-prototype', 'impact-surface.md'), IMPACT_LEGACY, 'utf8');
   for (const f of artifacts) writeFileSync(join(dir, '2-prototype', f), '对照物占位。\n', 'utf8');
   return dir;
 }
@@ -161,8 +176,48 @@ const askRow = (pcts) => JSON.stringify({
   const dir = mkIssue({ impact: true, artifacts: ['custom-view.md'] });
   expect('gate2/自定义命名对照物放行', run('stage', dir, '2-prototype', 'done', '--artifacts', 'custom-view'), 0);
 }
+{
+  const dir = mkIssue({ legacyImpact: true, artifacts: ['behavior.md'] });
+  expect('gate2/缺第七面「架构与依赖」done 拒收', run('stage', dir, '2-prototype', 'done', '--artifacts', 'behavior'), 1, '架构与依赖');
+  check('gate2/第七面拒收后 manifest 未被写入', manifest(dir).stage_gates['2-prototype'].status === 'pending',
+    `status=${manifest(dir).stage_gates['2-prototype'].status}`);
+}
+{
+  const dir = mkIssue({ impact: true, artifacts: ['diagram.html'] });
+  expect('gate2/--artifacts diagram 命中 .html 候选', run('stage', dir, '2-prototype', 'done', '--artifacts', 'diagram'), 0);
+}
+{
+  const dir = mkIssue({ impact: IMPACT_ARCH_YES, artifacts: ['behavior.md'] });
+  expect('gate2/判「有」缺 diagram 拒收', run('stage', dir, '2-prototype', 'done', '--artifacts', 'behavior'), 1, '必须包含 diagram');
+}
+{
+  // 拿 diagram.md 文本文件顶名不算图——联动锚定 diagram.html 本尊在盘。
+  const dir = mkIssue({ impact: IMPACT_ARCH_YES, artifacts: ['behavior.md', 'diagram.md'] });
+  expect('gate2/判「有」用 diagram.md 顶名仍拒收', run('stage', dir, '2-prototype', 'done', '--artifacts', 'behavior,diagram'), 1, '必须包含 diagram');
+}
+{
+  const dir = mkIssue({ impact: IMPACT_ARCH_YES, artifacts: ['behavior.md', 'diagram.html'] });
+  expect('gate2/判「有」+ diagram 放行', run('stage', dir, '2-prototype', 'done', '--artifacts', 'behavior,diagram'), 0);
+}
+{
+  // missingArtifacts 认可带扩展名写法（第三候选=原名），联动按去扩展名比较，同口径放行。
+  const dir = mkIssue({ impact: IMPACT_ARCH_YES, artifacts: ['behavior.md', 'diagram.html'] });
+  expect('gate2/判「有」diagram.html 带扩展名写法放行', run('stage', dir, '2-prototype', 'done', '--artifacts', 'behavior,diagram.html'), 0);
+}
+{
+  const dir = mkIssue({ impact: IMPACT_ARCH_YES_TABLE, artifacts: ['behavior.md'] });
+  expect('gate2/表格格式判「有」同样触发联动', run('stage', dir, '2-prototype', 'done', '--artifacts', 'behavior'), 1, '必须包含 diagram');
+}
+{
+  const dir = mkIssue({ impact: IMPACT_ARCH_YES_VERDICT, artifacts: ['behavior.md'] });
+  expect('gate2/「判『有』」措辞同样触发联动', run('stage', dir, '2-prototype', 'done', '--artifacts', 'behavior'), 1, '必须包含 diagram');
+}
+{
+  const dir = mkIssue({ impact: IMPACT_ARCH_YES_BOLD, artifacts: ['behavior.md'] });
+  expect('gate2/面名加粗写法同样触发联动', run('stage', dir, '2-prototype', 'done', '--artifacts', 'behavior'), 1, '必须包含 diagram');
+}
 
-// ─────────────────────────────── skipped：只许 2-prototype，且六面在盘 ───────────────────────────────
+// ─────────────────────────────── skipped：只许 2-prototype，且七面在盘 ───────────────────────────────
 
 {
   const dir = mkIssue({ interview: true, impact: true });
@@ -172,12 +227,16 @@ const askRow = (pcts) => JSON.stringify({
 }
 {
   const dir = mkIssue({ interview: true });
-  expect('skip/无 impact-surface 拒收', run('stage', dir, '2-prototype', 'skipped', '--reason', '差异极小'), 1, '不豁免六面扫描');
+  expect('skip/无 impact-surface 拒收', run('stage', dir, '2-prototype', 'skipped', '--reason', '差异极小'), 1, '不豁免七面扫描');
+}
+{
+  const dir = mkIssue({ interview: true, legacyImpact: true });
+  expect('skip/缺第七面「架构与依赖」拒收', run('stage', dir, '2-prototype', 'skipped', '--reason', '差异极小'), 1, '架构与依赖');
 }
 {
   const dir = mkIssue({ interview: true, impact: true });
   doneInterview(dir);
-  expect('skip/六面在盘 + reason 放行', run('stage', dir, '2-prototype', 'skipped', '--reason', '差异极小'), 0);
+  expect('skip/七面在盘 + reason 放行', run('stage', dir, '2-prototype', 'skipped', '--reason', '差异极小'), 0);
   const m = manifest(dir);
   check('skip/放行后推进到 3-contract 而非 ready', m.stage === '3-contract' && m.status === 'in_progress',
     `stage=${m.stage} status=${m.status}`);
@@ -203,6 +262,48 @@ const askRow = (pcts) => JSON.stringify({
   check('rebuild/自定义命名对照物恢复为 done',
     m.stage_gates['2-prototype'].status === 'done' && m.stage_gates['2-prototype'].artifacts_confirmed.includes('custom-view'),
     JSON.stringify(m.stage_gates['2-prototype']));
+}
+{
+  const dir = mkIssue({ impact: true, artifacts: ['behavior.md', 'diagram.html'] });
+  run('stage', dir, '2-prototype', 'done', '--artifacts', 'behavior,diagram');
+  // 换回缺第七面的存量 impact-surface：rebuild 与 done 闸门同口径，应降级
+  writeFileSync(join(dir, '2-prototype', 'impact-surface.md'), IMPACT_LEGACY, 'utf8');
+  expect('rebuild/缺第七面「架构与依赖」时 2-prototype 降级', run('rebuild', dir), 0);
+  const m = manifest(dir);
+  check('rebuild/降级后 issue 不再 ready',
+    m.stage_gates['2-prototype'].status === 'in_progress' && m.status === 'in_progress',
+    JSON.stringify({ gate: m.stage_gates['2-prototype'].status, stage: m.stage, status: m.status }));
+  check('rebuild/降级保留已确认对照物清单',
+    (m.stage_gates['2-prototype'].artifacts_confirmed || []).includes('diagram'),
+    JSON.stringify(m.stage_gates['2-prototype']));
+}
+{
+  const dir = mkIssue({ impact: IMPACT_ARCH_YES_TABLE, artifacts: ['behavior.md'] });
+  unlinkSync(join(dir, 'manifest.json'));
+  // manifest 损坏重建：扫描到 behavior 一份对照物，判「有」缺 diagram → 与 done 闸门同口径不判 done
+  expect('rebuild/判「有」缺 diagram 不判 done', run('rebuild', dir), 0);
+  check('rebuild/联动降级后 gate 为 in_progress',
+    manifest(dir).stage_gates['2-prototype'].status === 'in_progress',
+    JSON.stringify(manifest(dir).stage_gates['2-prototype']));
+}
+{
+  const dir = mkIssue({ interview: true, impact: IMPACT_ARCH_YES, artifacts: ['behavior.md', 'diagram.html'] });
+  doneInterview(dir);
+  run('stage', dir, '2-prototype', 'done', '--artifacts', 'behavior,diagram');
+  // 手工把 manifest 推到 ready（模拟三阶段全闭的存量 issue），再删掉 diagram.html：
+  // rebuild 降级 2-prototype 的同时，ready 这个推论必须跟着回落，不许残留。
+  const mp = join(dir, 'manifest.json');
+  const m = JSON.parse(readFileSync(mp, 'utf8'));
+  m.stage_gates['3-contract'] = { status: 'done' };
+  m.stage = '3-contract';
+  m.status = 'ready';
+  writeFileSync(mp, JSON.stringify(m), 'utf8');
+  unlinkSync(join(dir, '2-prototype', 'diagram.html'));
+  expect('rebuild/联动降级时 ready 随之回落', run('rebuild', dir), 0);
+  const after = manifest(dir);
+  check('rebuild/降级后 status 不再残留 ready',
+    after.stage_gates['2-prototype'].status === 'in_progress' && after.status === 'in_progress',
+    JSON.stringify({ gate: after.stage_gates['2-prototype'].status, status: after.status }));
 }
 {
   const dir = mkIssue({ interview: true, impact: true });

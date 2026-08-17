@@ -1,6 +1,6 @@
 ---
 name: aes-prototype
-description: 锁定对照物：扫描改动的影响面（界面、行为、可运行输出、接口报文、用户配置、历史兼容性），产出用户能逐处质疑的确认版对照物——界面 mock、行为对照表、接口报文对、可执行示例。通常由 workflow-interview 编排调用。
+description: 锁定对照物：扫描改动的影响面（界面、行为、可运行输出、接口报文、用户配置、历史兼容性、架构与依赖），产出用户能逐处质疑的确认版对照物——界面 mock、行为对照表、接口报文对、可执行示例、架构与流程图。通常由 workflow-interview 编排调用。
 ---
 
 # 锁定对照物
@@ -40,15 +40,16 @@ node <workflow-interview>/scripts/session.mjs init <date>-<任务词组>
 | 对外接口报文 | 请求或响应的结构变了、新增了吗 | `api-mock.md` |
 | 用户配置 | 配置文件、环境变量、命令行选项变了吗 | `behavior.md` 的配置差异节 |
 | 历史兼容性 | 现有调用方、现有数据、现有脚本会受影响吗 | `behavior.md` 的不变清单 |
+| 架构与依赖 | 依赖方向、模块归属、组件间边界变了吗 | `diagram.html` 的架构视图 |
 
-后四面是这份清单存在的理由。只判「有界面还是有行为」会把接口兼容性、配置变更、
-历史数据兼容整片漏掉，而它们恰恰是返工代价最高的那几种。
+后五面是这份清单存在的理由。只判「有界面还是有行为」会把接口兼容性、配置变更、
+历史数据兼容、依赖归属整片漏掉，而它们恰恰是返工代价最高的那几种。
 
 结果写成 `2-prototype/impact-surface.md`，逐面给出「有/无」、具体差异、谁受影响、
 出哪份对照物。**判为「无」的那几面也要写出来**，写下「无」这个动作本身就是记录，
 它证明这一面被扫过而不是被忘了。
 
-### 六面全为否
+### 七面全为否
 
 这不是「跳过」，是信号：
 
@@ -66,7 +67,7 @@ node <workflow-interview>/scripts/session.mjs stage <issue-dir> 2-prototype need
 
 真正的 `skipped` 只留给一种情况：差异确实存在但极小，且用户已经在需求阶段用文字确认过
 它的具体形态。理由必须写进 `impact-surface.md`——`stage` 命令收到 skipped 时会当场验
-六面扫描在盘，`impact-surface.md` 不齐就跳不了。
+七面扫描在盘，`impact-surface.md` 不齐就跳不了。
 
 ## 2. 出对照物
 
@@ -123,6 +124,9 @@ Mock 定的是结构、信息与关键交互方向，**不是像素规范**；�
 不变清单不是凑数：用户既要确认「变的是他要的」，也要确认「不变的是他依赖的」。
 后者往往是需求阶段问不出来的那部分——他不觉得那算个要求。
 
+流程类变化行可以再配一张 `diagram.html` 流程视图，让用户对着流向逐处质疑——
+**行是源，图是行的一面**（图怎么做见下文 `diagram.html` 节）。
+
 ### `api-mock.md` — 接口报文对
 
 定**报文结构**：字段名、类型、有没有、错误形态。每种结局给一对具体报文，含成功、
@@ -139,6 +143,27 @@ Mock 定的是结构、信息与关键交互方向，**不是像素规范**；�
 
 必须保持不变的现有用法也要单独成一个场景，写明「这条现在能跑，改完之后必须逐字节
 一样能跑」。
+
+### `diagram.html` — 架构与流程视图
+
+单文件自包含：内联 SVG 与 CSS，零 JS、零外链、系统字体——断网双击可开，与
+mock.html 同一等级的硬规则。画**改后态**单视图，不做 before/after 双图：改动的
+节点与连线用 `.changed`（accent 描边 + tint 填充）标注，删除项不占图面、进页脚
+「删除清单」；图例固定两行——橙 = 本次新增/变更，灰 = 既有（不动）。
+
+两种视图，事实源地位不同：
+
+- **架构视图**是拓扑事实源：模块、依赖方向、本次动的是哪条边。它的每处标注变化
+  都要经得起质疑，并作为例子进下一节的例子池。
+- **流程视图**是 `behavior.md` 变化行的视图：同一批变化行换个画法，不另立例子；
+  行是源，图是面。
+
+每张图页脚必带 fidelity ledger：Detail/Merged/Collapsed/Dropped/Kept 逐条申报，
+合并与删减绝不静默。色板、4px 网格、圆角正交连线、复杂度预算（≤9 节点、
+≤12 箭头、≤2 accent，超了拆 overview + detail）、流程视图语法等绘图内核见
+[diagram.md](references/diagram.md)。架构视图与流程视图默认同住一个
+`diagram.html`（两张 SVG、预算各算）；只有超预算才拆出 `diagram-detail.html`，
+`--artifacts` 里把两个都列上。
 
 ## 3. 迭代到确认
 
@@ -166,6 +191,8 @@ node <workflow-interview>/scripts/session.mjs round <issue-dir> \
 - `api-mock.md` 的每对报文 = 一个例子
 - `example-run.md` 的每个场景 = 一个例子
 - `mock.html` 的每个关键状态与交互 = 一个例子
+- `diagram.html` 架构视图的每处改动标注 = 一个例子（依赖断言进契约「强约束」或
+  `[A]`；流程视图不另立——它就是 behavior.md 的变化行）
 
 `aes-goal-contract` 直接读这几份文件，不重新问一遍。
 
@@ -173,11 +200,13 @@ node <workflow-interview>/scripts/session.mjs round <issue-dir> \
 
 ```bash
 node <workflow-interview>/scripts/session.mjs stage <issue-dir> 2-prototype done \
-  --artifacts "behavior,api-mock,example-run" --next "<下一步一句话>"
+  --artifacts "behavior,api-mock,example-run,diagram" --next "<下一步一句话>"
 ```
 
-`--artifacts` 只列实际产出的确认版。`done` 不是自报的：命令会当场校验
-impact-surface.md 六面都被扫过、`--artifacts` 至少一份且列的文件真的在
+`--artifacts` 只列实际产出的确认版；第七面判「有」时**必须**包含 `diagram`
+（diagram.html 架构视图）——这不是自觉，`done` 闸门会当场拦下缺图的清单。`done`
+不是自报的：命令会当场校验
+impact-surface.md 七面都被扫过、`--artifacts` 至少一份且列的文件真的在
 `2-prototype/` 下，不过就拒收。挡的是结构不是质量——对照物像不像，由用户确认负责。
 
 然后交回 `workflow-interview` 继续流转。

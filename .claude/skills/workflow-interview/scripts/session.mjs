@@ -146,7 +146,7 @@ function resolveIssueDir(arg) {
 const ROUND_TIERS = ['default', 'confirm', 'ask'];
 const ASSESS_DIMS = ['意图', '结果', '边界', '约束', '现状'];
 const CONTEXT_SECTIONS = ['任务陈述', '用户提出的方案', '意图假设', '已查事实', '验证基建候选池', '四分类'];
-const IMPACT_SURFACES = ['用户可见界面', '可观察行为', '可运行输出', '对外接口报文', '用户配置', '历史兼容性'];
+const IMPACT_SURFACES = ['用户可见界面', '可观察行为', '可运行输出', '对外接口报文', '用户配置', '历史兼容性', '架构与依赖'];
 
 function validateRoundObj(obj) {
   const errs = [];
@@ -236,10 +236,27 @@ function validateImpactSurfaceFile(dir) {
   const errs = [];
   for (const s of IMPACT_SURFACES) {
     if (!content.includes(s)) {
-      errs.push(`impact-surface.md 没提到影响面「${s}」。六面逐面扫，判「无」也要写下来。`);
+      errs.push(`impact-surface.md 没提到影响面「${s}」。七面逐面扫，判「无」也要写下来。`);
     }
   }
   return errs;
+}
+
+/**
+ * 架构与依赖是否判了「有」。判读取该面名后第一个 有/无（表格单元格或冒号后，
+ * 兼容 **有** 加粗、面名加粗、判「有」写法）。判不出（只写字没写判定）不算
+ * 「有」——闸门挡结构不挡判读质量。
+ */
+function architectureJudgedPresent(dir) {
+  const p = join(dir, '2-prototype', 'impact-surface.md');
+  if (!existsSync(p)) return false;
+  const re = /架构与依赖\*{0,2}(?:\s*\|+\s*|\s*[：:]\s*)\*{0,2}(?:判\s*[「'\[]?\s*)?\*{0,2}(有|无)/;
+  for (const line of readFileSync(p, 'utf8').split(/\r?\n/)) {
+    if (!line.includes('架构与依赖')) continue;
+    const m = line.match(re);
+    if (m && m[1] === '有') return true;
+  }
+  return false;
 }
 
 /** artifacts 名到确认版文件的映射；未知名字按 2-prototype/<name>[.md|.html] 找。 */
@@ -283,9 +300,16 @@ function gateDone(dir, stage, gate, m) {
       }
     }
     if (artifacts.length === 0) {
-      errs.push('done 至少要用 --artifacts 列一份确认版对照物。六面全「无」该报 needs_reinterview；差异极小且用户文字确认过才是 skipped。');
+      errs.push('done 至少要用 --artifacts 列一份确认版对照物。七面全「无」该报 needs_reinterview；差异极小且用户文字确认过才是 skipped。');
     } else {
       errs.push(...missingArtifacts(dir, artifacts));
+    }
+    // 判「有」必出架构视图——这条承诺不靠自觉：判了「有」而清单没有 diagram.html，当场拦。
+    // 名字按去扩展名比较（diagram / diagram.html 都认）；锚定 .html 本尊在盘，
+    // 拿 diagram.md 顶名不算图（mock 特例同款思路，不动开放命名本体）。
+    const diagramListed = artifacts.some((n) => n.replace(/\.(md|html)$/i, '').toLowerCase() === 'diagram');
+    if (architectureJudgedPresent(dir) && !(diagramListed && existsSync(join(dir, '2-prototype', 'diagram.html')))) {
+      errs.push('架构与依赖判「有」，--artifacts 必须包含 diagram（diagram.html 架构视图，diagram.md 顶名不算图）。确无拓扑变化就回 impact-surface.md 改判「无」，判「无」也要写下来。');
     }
     return errs;
   }
@@ -400,11 +424,11 @@ function cmdStage(argv) {
     if (typeof gate.reason !== 'string' || !gate.reason.trim()) {
       die('skipped 必须带 --reason 写清为什么跳、赌的是什么。', 1);
     }
-    // skipped 的前提是六面扫过了、只是差异极小——扫过的证据就是 impact-surface.md 在盘。
+    // skipped 的前提是七面扫过了、只是差异极小——扫过的证据就是 impact-surface.md 在盘。
     const skipErrs = validateImpactSurfaceFile(dir);
     if (skipErrs.length > 0) {
       for (const e of skipErrs) console.error(`gate: ${e}`);
-      die('skipped 不豁免六面扫描。理由写进 impact-surface.md（见 aes-prototype 的 SKILL.md），再来跳。', 1);
+      die('skipped 不豁免七面扫描。理由写进 impact-surface.md（见 aes-prototype 的 SKILL.md），再来跳。', 1);
     }
   }
 
@@ -570,9 +594,16 @@ function cmdRebuild(argv) {
   const confirmed = recorded.length > 0 && missingArtifacts(dir, recorded).length === 0
     ? recorded
     : scanArtifacts(dir);
-  if (validateImpactSurfaceFile(dir).length === 0 && confirmed.length > 0) {
+  // 与 done 闸门同口径：判「有」而对照物缺 diagram.html 本尊，rebuild 同样不判 done。
+  const archNeedsDiagram = architectureJudgedPresent(dir)
+    && !(confirmed.some((n) => n.replace(/\.(md|html)$/i, '').toLowerCase() === 'diagram')
+      && existsSync(join(dir, '2-prototype', 'diagram.html')));
+  if (validateImpactSurfaceFile(dir).length === 0 && confirmed.length > 0 && !archNeedsDiagram) {
     gates['2-prototype'] = { ...(gates['2-prototype'] || {}), status: keep('2-prototype', 'done'), artifacts_confirmed: confirmed };
   } else {
+    if (archNeedsDiagram) {
+      console.log('2-prototype：架构与依赖判「有」但对照物缺 diagram.html，不判 done（与 done 闸门同口径）。');
+    }
     gates['2-prototype'] = {
       ...(gates['2-prototype'] || {}),
       status: keep('2-prototype', has('2-prototype', 'impact-surface.md') ? 'in_progress' : 'pending'),
@@ -588,6 +619,11 @@ function cmdRebuild(argv) {
   m.slug = slug;
   m.stage_gates = gates;
   m.stage = STAGES.find((s) => !['done', 'skipped'].includes(gates[s].status)) || STAGES[STAGES.length - 1];
+  // ready 是「三阶段全闭」的推论，rebuild 重算 gates 后必须跟着回落——闸门被降级时
+  // 它若残留，list 会拿着 ready 的旧结论误导续跑判断。
+  if (m.status === 'ready' && STAGES.some((s) => !['done', 'skipped'].includes(gates[s].status))) {
+    m.status = 'in_progress';
+  }
 
   const rounds = existsSync(roundsPath(dir))
     ? readFileSync(roundsPath(dir), 'utf8').split(/\r?\n/).filter(Boolean).length

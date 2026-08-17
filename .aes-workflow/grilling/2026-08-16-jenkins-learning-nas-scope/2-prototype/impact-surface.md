@@ -24,3 +24,10 @@ behavior.md 与 example-run.md 两份确认版对照物需按扩大后范围重�
 
 - Q3：本地既有 wiki 迁不迁 NAS → A 整目录拷贝（已裁决）。
 - Q4/Q5：skill-env.json 位置与解析机制 → B' 并入本次（已裁决）。
+
+## 第七面补扫（2026-08-17）
+
+- 架构与依赖：**无**（补扫）。本 issue 只改配置位置、数据落点与脚本默认行为——
+  config.mjs 与 UeErrorSolver.mjs 仍是各自技能内部改动，模块归属与依赖方向零变化，
+  不新增跨模块依赖边，无需回溯出图。2026-08-17-diagram-artifact 契约裁定：存量
+  issue 补扫此行即豁免第七面闸门（rebuild 不降级）。

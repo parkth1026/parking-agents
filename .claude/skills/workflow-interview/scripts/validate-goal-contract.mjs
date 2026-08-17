@@ -12,7 +12,7 @@
  *   4. [A] 和 [B] 的 Verify 没写反引号命令或路径时给 WARNING。
  *   5. 「要落盘的东西」出现时，编号必须是连续唯一的 D-01、D-02。
  *   6. 有 [B] 却没有「要落盘的东西」时给 WARNING，fixture 可能已经在磁盘上了。
- *   7. 引用了 mock.html 却没有「读什么」时给 WARNING。
+ *   7. 引用了 mock.html / diagram.html 却没有「读什么」时给 WARNING。
  *   8. 模板占位符 <name> 和没解决的 TODO、TBD、FIXME 直接拒。
  *   9. 交接指令模板已经接管的章节还留着就拒（Agent Mandate / Iteration Strategy /
  *      Completion 等，见 handoff-prompt.md）——避免每份契约重复抄一遍。
@@ -234,11 +234,11 @@ if (readFirst !== null && bulletLines(readFirst).length < 1) {
   errors.push('「读什么」写了就至少给一条指路。');
 }
 
-// 确认版对照物应该从「读什么」指路。引用了 mock 却没有这一节时，执行 Agent 只能从
-// Verify 行反推对照物是什么。对照物是条件产物，不涉界面改动的任务没有它完全合法，
-// 所以只降级为 WARNING。
-if (/[\w./\\-]*mock[\w-]*\.html/i.test(content) && readFirst === null) {
-  warnings.push('正文引用了 mock.html，但没有「读什么」这一节指向它。');
+// 确认版对照物应该从「读什么」指路。引用了 HTML 对照物（mock / diagram）却没有这一节时，
+// 执行 Agent 只能从 Verify 行反推对照物是什么。对照物是条件产物，不涉界面或架构改动的
+// 任务没有它完全合法，所以只降级为 WARNING。
+if (/[\w./\\-]*(?:mock|diagram)[\w-]*\.html/i.test(content) && readFirst === null) {
+  warnings.push('正文引用了 mock.html / diagram.html，但没有「读什么」这一节指向它。');
 }
 
 // 契约落在 issue 目录里（<issue>/3-contract/contract.md）时，同级该有 manifest.json。

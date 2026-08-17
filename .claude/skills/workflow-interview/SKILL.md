@@ -62,7 +62,7 @@ subagent 都不许用 Edit/Write 直接改它。
 
 `done` 不是自报的：`session.mjs` 收到 done 时跑该阶段的结构闸门，不过就拒收；
 `skipped` 只有 2-prototype 能用（差异极小且用户文字确认过），必须带 `--reason`
-且六面扫描已落盘，`finalize` 拿 reason 跟契约「残留风险」对账——访谈和契约没有
+且七面扫描已落盘，`finalize` 拿 reason 跟契约「残留风险」对账——访谈和契约没有
 「跳过」，走不下去用 `needs_reinterview` 打回。闸门挡结构不挡质量——问得好不好、
 对照物像不像，仍由自评与用户确认负责。
 
