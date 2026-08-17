@@ -1,0 +1,18 @@
+# verify @ 2026-08-16T18:52:06Z
+# cwd: G:\GIT\AI_WorkFlow\parking-agents-dev
+
+[FAIL] AC-001  exit=1  $ bash -c 'node .claude/skills/workflow-interview/scripts/session.test.mjs && grep -q 架构与依赖 .claude/skills/workflow-interview/scripts/session.test.mjs'
+         ok   reinterview/回到 1-interview 且 next_action 更新
+         44/44 通过
+[FAIL] AC-002  exit=1  $ bash -c '! grep -rn 六面 .claude/skills/workflow-interview .claude/skills/aes-interview .claude/skills/aes-prototype .claude/skills/aes-goal-contract'
+         .claude/skills/aes-prototype/SKILL.md:54:### 六面全为否
+         .claude/skills/aes-prototype/SKILL.md:72:六面扫描在盘，`impact-surface.md` 不齐就跳不了。
+         .claude/skills/aes-prototype/SKILL.md:183:impact-surface.md 六面都被扫过、`--artifacts` 至少一份且列的文件真的在
+[FAIL] AC-003  exit=1  $ bash -c 'grep -q diagram.html .claude/skills/aes-prototype/SKILL.md && grep -q diagram.html .claude/skills/aes-goal-contract/SKILL.md && grep -q "mock|diagram" .claude/skills/workflow-interview/scripts/validate-goal-contract.mjs'
+[FAIL] AC-004  exit=2  $ bash -c 'grep -q 色板 .claude/skills/aes-prototype/references/diagram.md && grep -q 复杂度预算 .claude/skills/aes-prototype/references/diagram.md && grep -q fidelity .claude/skills/aes-prototype/references/diagram.md && grep -q .changed .claude/skills/aes-prototype/references/diagram.md && grep -q 提取 .claude/skills/aes-prototype/references/diagram.md && grep -q MIT .claude/skills/aes-prototype/references/diagram.md'
+         grep: .claude/skills/aes-prototype/references/diagram.md: No such file or directory
+[FAIL] AC-005  exit=1  $ bash -c 'grep -rq 架构与依赖 .aes-workflow/grilling/2026-08-16-jenkins-learning-nas-scope/2-prototype/'
+[FAIL] AC-006  exit=1  $ bash -c 'grep -q 2026-08-17 "../parking-agents/docs/research/diagram-design-能力分析与workflow-interview优化机会.md"'
+[FAIL] AC-007  exit=1  $ bash -c 'grep -q diagram .claude/skills/workflow-interview/evals/evals.json'
+
+绿 0 / 红 7 / 跑不起来 0
