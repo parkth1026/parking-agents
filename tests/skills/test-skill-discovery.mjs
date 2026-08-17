@@ -134,29 +134,14 @@ for (const name of skillDirs) {
 	}
 }
 
-// --- 5. The bootstrap skill and its reference files exist ---------------------
+// --- 5. The bootstrap source exists -------------------------------------------
 
-// Claude Code / Cursor / Copilot CLI deliberately have NO reference file: skill
-// bodies name actions, and those harnesses expose a tool for every action, so
-// there is nothing to translate. OpenCode and Kimi carry their mapping inline at
-// their integration point instead (see tests/harnesses/).
-const BOOTSTRAP = "using-parking-skills";
-const REQUIRED_REFERENCES = [
-	"codex-tools.md",
-	"pi-tools.md",
-	"gemini-tools.md",
-	"antigravity-tools.md",
-];
-
-if (!skillDirs.includes(BOOTSTRAP)) {
-	fail(`skills/${BOOTSTRAP}/ missing — without it no platform gets a bootstrap`);
-} else {
-	for (const ref of REQUIRED_REFERENCES) {
-		const p = join(skillsDir, BOOTSTRAP, "references", ref);
-		if (!existsSync(p)) {
-			fail(`skills/${BOOTSTRAP}/references/${ref} missing`);
-		}
-	}
+// Bootstrap moved from a skill (skills/using-parking-skills/, removed) to plain
+// AGENTS.md injection: hooks/session-start reads the repo-root AGENTS.md on every
+// session. AGENTS.md content conventions are gated by test-artifact-hygiene.mjs;
+// here we only pin that the file the hook depends on actually exists.
+if (!existsSync(join(repoRoot, "AGENTS.md"))) {
+	fail("AGENTS.md missing at repo root — hooks/session-start has nothing to inject");
 }
 
 // --- Report -------------------------------------------------------------------

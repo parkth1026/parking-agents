@@ -42,20 +42,19 @@ function runHook(env) {
 	return JSON.parse(out);
 }
 
-function assertBootstrapContent(ctx, label) {
+function assertInjectedContent(ctx, label) {
 	check(ctx.includes("<EXTREMELY_IMPORTANT>"), `${label}: missing <EXTREMELY_IMPORTANT> wrapper`);
-	check(ctx.includes("You have the parking skills."), `${label}: missing bootstrap preamble`);
 	check(
-		ctx.includes("Skills speak in actions, not tool names"),
-		`${label}: missing the action-vocabulary declaration — the model would expect literal tool names`
+		ctx.includes("You are working in the parking-agents repo."),
+		`${label}: missing conventions preamble`
 	);
 	check(
-		ctx.includes("Subagent (general-purpose):"),
-		`${label}: missing the subagent dispatch template — skills that fan out would have nothing to translate`
+		ctx.includes("AGENTS.md — 本仓库 Agent 约定"),
+		`${label}: missing the AGENTS.md title — the conventions file failed to load`
 	);
 	check(
-		ctx.includes("Platform Adaptation"),
-		`${label}: missing the Platform Adaptation pointer list`
+		ctx.includes("docs/reports/"),
+		`${label}: missing the artifact-location table — agents would default to the repo root`
 	);
 	// No mapping file is appended on this code path: these harnesses expose a
 	// tool for every action skills describe.
@@ -86,7 +85,7 @@ function assertBootstrapContent(ctx, label) {
 		!("additional_context" in j),
 		"Claude Code: must NOT also emit additional_context (Claude reads both without dedup)"
 	);
-	assertBootstrapContent(j.hookSpecificOutput?.additionalContext ?? "", "Claude Code");
+	assertInjectedContent(j.hookSpecificOutput?.additionalContext ?? "", "Claude Code");
 }
 
 // --- Cursor: top-level additional_context (snake_case) -----------------------
@@ -100,7 +99,7 @@ function assertBootstrapContent(ctx, label) {
 		keys.length === 1 && keys[0] === "additional_context",
 		`Cursor: expected only 'additional_context', got ${JSON.stringify(keys)}`
 	);
-	assertBootstrapContent(j.additional_context ?? "", "Cursor");
+	assertInjectedContent(j.additional_context ?? "", "Cursor");
 }
 
 // --- Copilot CLI / unknown: top-level additionalContext ----------------------
@@ -112,7 +111,7 @@ function assertBootstrapContent(ctx, label) {
 		keys.length === 1 && keys[0] === "additionalContext",
 		`Copilot CLI: expected only 'additionalContext', got ${JSON.stringify(keys)}`
 	);
-	assertBootstrapContent(j.additionalContext ?? "", "Copilot CLI");
+	assertInjectedContent(j.additionalContext ?? "", "Copilot CLI");
 }
 
 // --- Report -------------------------------------------------------------------
