@@ -54,7 +54,7 @@
 ## 关键观察
 
 - **46 个 skill 里只有 6 个是纯通用**（analyze、ai-slop-cleaner、best-practice-research、design、skill、tdd），可直接移植到任何 agent（包括 parking-agents / ZCode 环境）。
-- **约 20 个活跃技能深度绑定 OMX 运行时**——其中 `team`/`worker`/`cancel`/`hud`/`omx-setup`/`doctor` 这类是纯 OMX 基础设施技能，移植没有意义；但 `deep-interview`、`plan --consensus`、`ultragoal`、`ultraqa`、`code-review`、`autopilot` 这一批的**方法论内核非常优秀**，只是状态层写死了 `omx` CLI / `.omx/` / Codex goal mode，移植时需要把状态管理换成自己的机制。
+- **25 个活跃技能深度绑定 OMX 运行时**（另有 ecomode、web-clone 两个已废弃的深度绑定技能）——其中 `team`/`worker`/`cancel`/`hud`/`omx-setup`/`doctor` 这类是纯 OMX 基础设施技能，移植没有意义；但 `deep-interview`、`plan --consensus`、`ultragoal`、`ultraqa`、`code-review`、`autopilot` 这一批的**方法论内核非常优秀**，只是状态层写死了 `omx` CLI / `.omx/` / Codex goal mode，移植时需要把状态管理换成自己的机制。
 - **16 个是废弃垫片**（占 1/3），这是 OMX 近期大整合的结果——大量独立技能被合并进 `$plan`、`$code-review`、`$visual-ralph`、`$ask` 等幸存者，引用旧名时会重定向。参考时以本表的"活跃"技能为准。
 
 ## 核对记录（2026-08-16）
@@ -65,3 +65,28 @@
 2. **`autopilot`（已修正）**：初版写"评审或 QA 不干净就退回 `$ralplan` 重规划"。实际逻辑：`$code-review` 不干净先进入 `rework` 阶段做范围内的实现修复再回到 code-review；只有评审判定**计划/需求本身有误**、或 `$ultraqa` 失败，才退回 `$ralplan`。
 
 以下关键事实点均已核实无误：autopilot 五阶段链路原文、ultraqa 的 9 类敌对场景清单与"最多 5 轮 / 同一失败 3 次止损"、visual-ralph 的 `score >= 90` 阈值、web-clone 的 `score >= 85` 阈值与 Playwright 依赖、code-review 的 CRITICAL~LOW 分级与 CLEAR/WATCH/BLOCK 合成规则、team 的 `omx team 3:executor` 启动示例、cancel 的两遍协议（shutdown inbox → 15 秒 → kill-session）与 `--all` 拒绝、ralplan 锁死的四个 Codex 版本号、plan 吸收 `/planner` `/ralplan` `/review` 的原文声明、deep-interview 四个挑战模式名（Contrarian/Terminologist/Simplifier/Ontologist，第 330–333 行）、prometheus-strict 的最少 2 轮 / 最多 5 轮、wiki 的 8 个类别与"无向量嵌入"、ultrawork 的"组件而非持久模式"定位、ask 的 `omx ask` 命令与 `.omx/artifacts/` 工件路径、worker 的 `OMX_TEAM_WORKER`/ACK 协议、skill 的子命令清单，以及全部废弃壳的重定向目标。
+
+## 第二轮复核记录（2026-08-16，文件迁入本仓库后）
+
+对本报告全部陈述做了第二轮逐项实证核验（直接 grep 源 SKILL.md 原文），共补验 27 个此前采信调研笔记的细节点，**全部属实**，包括：
+
+- `skill` 的 `/skill scan` 子命令确实存在（skill/SKILL.md 第 478–480 行），子命令清单 list/add/remove/edit/search/info/sync/setup/scan 完整无误；
+- `prometheus-strict` 三个专属子代理实名在列：`prometheus-strict-metis`/`-momus`/`-oracle`（第 94/110/118 行）；
+- `ralplan` 的 `omx ralplan preflight --json` 与 fail-closed 版本列表（第 52、37 行）；
+- `ultragoal` 最终门强制跑 ai-slop-cleaner（第 119 行）、`goals.json` + `ledger.jsonl` 双工件（第 12、16 行）；
+- `ralph` 的强制 deslop pass（第 84–90 行，`--no-deslop` 可跳过）、completion audit 完成审计（第 114/119/132 行）、architect 验证（第 3/29 行）；
+- `worker` 的 `omx team api claim-task` / `transition-task-status` claim-safe 生命周期（第 65/67 行）；
+- `pipeline` 的 `PipelineStage` 接口（第 33–36 行）、`.omx/state/pipeline-state.json`（第 57 行）、"Autopilot 执行引擎 (v0.8+)"原文（第 92 行）；
+- `autoresearch-goal` 四个子命令 create/handoff/verdict/complete（第 25–32 行）；
+- `hud` 第一层"model, git branch, and context usage"逐字吻合（第 12 行）、minimal/focused/full 预设（第 23–25 行）；
+- `omx-setup` 的 `--plugin`/`--legacy`/`--install-mode` 双交付模式与 `omx agents-init` AGENTS.md 脚手架（第 13–26 行）、`.omx/setup-scope.json` 持久化（第 34 行）；
+- `doctor` 的旧 hook 脚本检查（keyword-detector.sh 等，第 60–61 行）与 "Legacy Curl-Installed Content" 专项步骤（第 107/216 行）；
+- `configure-notifications` 的 verbosity/idleCooldownSeconds/profiles 横切设置（第 50–51/72 行）与 OpenClaw 集成；
+- `ecomode` "prefer cheaper tiers"档位修饰器定位（第 12/28/38 行）；ecomode 与 ultrawork 均带 `references/agent-tiers.md` 附件（目录实查）；
+- `ai-slop-cleaner` 的坏味道分批（fallback→dead code→duplication，第 48–59 行）、韩文正文 ≥14px 与 #3B82F6 默认蓝紫 UI slop 规则（第 63/66 行）、"AI SLOP CLEANUP REPORT"证据报告（第 89/101 行）；
+- `tdd` 的 Red-Green-Refactor 三段结构（第 16–28 行）；
+- `team` 的 leader 命令 status/resume/shutdown（第 227/232 行）与 mailbox/dispatch 协调（第 15 行）；
+- `code-review` 完整四级 CRITICAL/HIGH/MEDIUM/LOW（第 112 行）；
+- `visual-ralph` 的"approved visual reference"用户批准门（第 8/14 行）与 design token 沉淀要求（第 26 行）。
+
+本轮修正 1 处表述（非事实错误）：「关键观察」中"约 20 个活跃技能深度绑定 OMX 运行时"按表格逐行清点实为 **25 个**，已改为精确数字。
