@@ -71,6 +71,14 @@ description: [TODO: 写清楚这个技能做什么、何时触发。包含具体
 
 [TODO: 补充内容。技术技能给代码样例；复杂流程给决策树；给出含真实用户请求的具体例子；按需引用 scripts/references/assets。]
 
+## 测试
+
+技能自带回归测试。每次升级、改动后必跑，确认没改坏既有行为：
+
+    node run-tests.mjs
+
+[TODO: 把测试用例固化在这里——scripts/ 里每个脚本至少一条真实用例（黑盒执行、比对输出）；fixtures/ 放黄金输入与 expected。测试随技能一起分发，是后续反复升级校验的依据。]
+
 ## Resources（可选）
 
 只保留本技能实际需要的资源目录，不需要时删除本节。
@@ -114,8 +122,33 @@ const RESOURCE_README = {
 `,
 };
 
-function parseArgs(argv) {
-  const args = { name: null, structure: "task", path: null };
+/** 技能根回归测试骨架：零依赖 Node，check() 计数器，退出码 0=全过/1=有失败 */
+const RUN_TESTS_TEMPLATE = (name) => `#!/usr/bin/env node
+// run-tests.mjs — ${name} 的回归测试（升级/改动后必跑）
+// 惯例：check() 计数器 + 黑盒执行（execFileSync 跑脚本/命令再比对输出），退出码 0=全过/1=有失败；
+//       fixtures/ 放黄金输入与 expected，逐字段比对。测试固化在技能里，随技能分发。
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const SKILL_DIR = dirname(fileURLToPath(import.meta.url));
+
+let pass = 0;
+let fail = 0;
+function check(name, cond) {
+  if (cond) { pass++; console.log(\`  ok  \${name}\`); }
+  else { fail++; console.log(\`FAIL  \${name}\`); }
+}
+
+// TODO: 逐条固化用例——scripts/ 每个脚本至少一条真实用例（黑盒跑 + 比对输出），别只测存在性
+check("SKILL.md 存在且声明 name", existsSync(join(SKILL_DIR, "SKILL.md"))
+  && readFileSync(join(SKILL_DIR, "SKILL.md"), "utf8").includes("name:"));
+
+console.log(\`\\n\${pass} passed, \${fail} failed\`);
+process.exit(fail ? 1 : 0);
+`;
+
+function parseArgs(argv) {  const args = { name: null, structure: "task", path: null };
   const rest = [...argv];
   if (rest.length === 0 || rest[0].startsWith("-")) return { args, error: "missing-name" };
   args.name = rest.shift();
@@ -174,7 +207,9 @@ if (existsSync(skillDir) && readdirSync(skillDir).length > 0) {
 mkdirSync(skillDir, { recursive: true });
 writeFileSync(join(skillDir, "SKILL.md"), SKILL_TEMPLATE(skillName), "utf8");
 console.log(`init ${skillName} → ${skillDir}`);
-console.log("  SKILL.md            (含待办占位与结构选择指南节)");
+console.log("  SKILL.md            (含待办占位、结构选择指南节与测试节)");
+writeFileSync(join(skillDir, "run-tests.mjs"), RUN_TESTS_TEMPLATE(skillName), "utf8");
+console.log("  run-tests.mjs       (回归测试骨架，升级校验的依据)");
 
 const resources = STRUCTURES[args.structure].resources;
 for (const res of resources) {
@@ -183,5 +218,5 @@ for (const res of resources) {
   console.log(`  ${res}/README.md     (占位说明，语言无关)`);
 }
 console.log(`模板通用，不带本仓库假设；结构模式: ${args.structure} = ${STRUCTURES[args.structure].label}`);
-console.log("下一步: 完成 SKILL.md 的 TODO 项 → 删除「结构选择指南」节 → 运行 quick-validate.mjs 校验");
+console.log("下一步: 完成 SKILL.md 的 TODO 项 → 把测试用例固化进 run-tests.mjs → 删除「结构选择指南」节 → 运行 quick-validate.mjs 与 run-tests.mjs");
 process.exit(0);

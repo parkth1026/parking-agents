@@ -3,6 +3,7 @@
 // 用法: node quick-validate.mjs <技能目录>
 // 退出码: 0 合法 / 1 校验失败 / 2 用法错
 import { readFileSync, existsSync, statSync } from "node:fs";
+import { join } from "node:path";
 import { parseSkillMdFile } from "./lib/frontmatter.mjs";
 
 const ALLOWED_KEYS = ["name", "description", "license", "allowed-tools", "metadata", "compatibility"];
@@ -106,6 +107,9 @@ if (isMain) {
     console.log(`  name: ${summary.name || "(空)"} (${summary.nameLen}/64)`);
     console.log(`  description: ${summary.descLen}/1024, 无尖括号`);
     console.log(`  键: ${summary.keys.join(", ")} ✓`);
+    if (!existsSync(join(dir, "run-tests.mjs"))) {
+      console.log("  警告: 无 run-tests.mjs——新技能必须固化测试(init 脚手架自带)；旧技能升级时补上");
+    }
     process.exit(0);
   } else {
     console.log(`FAIL ${dir}`);
