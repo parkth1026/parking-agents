@@ -455,6 +455,30 @@
       padding: 3rem;
     }
 
+    /* ---- 历史轨迹 + 结构审查建议（新增区，结构对齐 2-prototype/mock.html） ---- */
+    .track-badge {
+      display: inline-block;
+      font-size: 0.6875rem;
+      font-weight: 400;
+      border: 1px solid #d97706;
+      color: #92400e;
+      border-radius: 4px;
+      padding: 1px 6px;
+      margin-left: 8px;
+      vertical-align: middle;
+    }
+    .track-hint {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin: 0.5rem 0 0;
+      line-height: 1.6;
+    }
+    .track-won { color: var(--green); font-weight: 600; }
+    .track-lost { color: var(--red); font-weight: 600; }
+    .track-tie { color: #92400e; }
+    .track-star { color: #d97706; font-weight: 600; margin-left: 4px; }
+    .track-text { font-size: 0.8125rem; line-height: 1.6; margin: 0.75rem 0 0; }
+
     /* ---- Navigation ---- */
     .nav {
       display: flex;
@@ -577,6 +601,18 @@
     <!-- Outputs panel (qualitative review) -->
     <div class="view-panel active" id="panel-outputs">
     <div class="main">
+      <!-- 历史轨迹（新增：读技能目录 history.json；仅 generate-review 带 --history 时出现） -->
+      <div class="section" id="history-section" style="display:none;">
+        <div class="section-header">
+          <div class="grades-toggle" onclick="toggleHistory()">
+            <span class="arrow open" id="history-arrow">&#9660;</span>
+            历史轨迹
+            <span class="track-badge">读技能目录 history.json</span>
+          </div>
+        </div>
+        <div class="grades-content open" id="history-content"></div>
+      </div>
+
       <!-- Prompt -->
       <div class="section">
         <div class="section-header">Prompt
@@ -1004,6 +1040,89 @@
       arrow.classList.toggle("open");
     }
 
+    // ---- 历史轨迹（新增：读技能目录 history.json 跨轮对比；无 --history 旗标时整区隐藏） ----
+    function toggleHistory() {
+      const content = document.getElementById("history-content");
+      const arrow = document.getElementById("history-arrow");
+      content.classList.toggle("open");
+      arrow.classList.toggle("open");
+    }
+
+    function fmtTrackNum(v) {
+      if (v == null || typeof v !== "number") return "—";
+      if (Math.abs(v) >= 10000) return Math.round(v / 1000) + "k";
+      if (Math.abs(v) >= 1000) return (v / 1000).toFixed(1) + "k";
+      return String(Math.round(v));
+    }
+
+    function renderHistory() {
+      const section = document.getElementById("history-section");
+      const content = document.getElementById("history-content");
+      const hist = EMBEDDED_DATA.history;
+      if (hist === undefined) { section.style.display = "none"; return; } // generate-review 未带 --history
+      section.style.display = "block";
+      if (!hist || !Array.isArray(hist.runs) || hist.runs.length === 0) {
+        content.innerHTML = '<p class="track-hint">无历史轨迹（首次评测）</p>';
+        return;
+      }
+
+      const m = typeof hist.current_best === "string" ? hist.current_best.match(/^runs\[(\d+)\]$/) : null;
+      const bestIdx = m ? Number(m[1]) : 0;
+
+      let html = '<div style="padding: 1rem;">';
+      html += '<table class="benchmark-table"><thead><tr><th>轮次</th><th>日期</th><th>gate</th><th>pass_rate</th><th>mean_ms</th><th>mean_tokens</th><th>vs 上轮</th></tr></thead><tbody>';
+
+      const runsDesc = hist.runs.map((r, i) => ({ r, i })).reverse(); // 新的在上
+      for (const { r, i } of runsDesc) {
+        const iterName = String(r.iteration_ref || "").split(/[\\/]/).pop() || "runs[" + i + "]";
+        const date = typeof r.date === "string" && r.date.length >= 16 ? r.date.slice(5, 16).replace("T", " ") : String(r.date || "");
+        const gateNames = Object.keys(r.gates || {});
+        const primary = gateNames.includes("with_skill") ? "with_skill" : [...gateNames].sort()[0];
+        const ordered = [primary, ...gateNames.filter((g) => g !== primary)];
+        const vs = r.vs_previous;
+        const vsCell = i === 0
+          ? '<span class="track-hint">首轮无对比</span>'
+          : vs && typeof vs.won === "number"
+            ? '<span class="track-won">won ' + vs.won + "</span> / <span class=\"track-lost\">lost " + vs.lost + "</span> / <span class=\"track-tie\">tie " + vs.tie + "</span>"
+            : '<span class="track-hint">—（上轮数据不可比）</span>';
+
+        ordered.forEach((g, gi) => {
+          const s = (r.gates || {})[g] || {};
+          html += "<tr>";
+          if (gi === 0) {
+            html += '<td rowspan="' + ordered.length + '"><strong>' + escapeHtml(iterName) + "</strong>" + (i === bestIdx ? '<span class="track-star">★current_best</span>' : "") + "</td>";
+            html += '<td rowspan="' + ordered.length + '">' + escapeHtml(date) + "</td>";
+          }
+          html += "<td>" + escapeHtml(g) + "</td>";
+          html += "<td>" + (s.pass_rate != null ? Math.round(s.pass_rate * 100) + "%" : "—") + "</td>";
+          html += "<td>" + fmtTrackNum(s.mean_ms) + "</td>";
+          html += "<td>" + fmtTrackNum(s.mean_tokens) + "</td>";
+          if (gi === 0) html += '<td rowspan="' + ordered.length + '">' + vsCell + "</td>";
+          html += "</tr>";
+        });
+      }
+      html += "</tbody></table>";
+
+      // 脚注：最新一轮的逐 eval 胜负 + dropped + 数据源说明
+      const lvs = runsDesc.length > 0 ? runsDesc[0].r.vs_previous : null;
+      let foot = "逐 eval 胜负：";
+      if (lvs && Array.isArray(lvs.detail) && lvs.detail.length > 0) {
+        foot += lvs.detail.map((d) => {
+          const cls = d.result === "won" ? "track-won" : d.result === "lost" ? "track-lost" : "track-tie";
+          return '<span class="' + cls + '">' + escapeHtml(String(d.eval || "").replace(/^eval-/, "")) + " " + escapeHtml(String(d.result)) + "</span>";
+        }).join(" · ");
+      } else {
+        foot += "（首轮或上轮数据不可比）";
+      }
+      const dropped = lvs && Array.isArray(lvs.detail)
+        ? lvs.detail.filter((d) => d.result === "dropped").map((d) => String(d.eval || "").replace(/^eval-/, "")) : [];
+      foot += " ｜ 上轮存在本轮缺席：" + (dropped.length > 0 ? escapeHtml(dropped.join("、")) : "(无)");
+      foot += " ｜ 数据源：技能目录 history.json（只追加）";
+      html += '<p class="track-hint">' + foot + "</p></div>";
+
+      content.innerHTML = html;
+    }
+
     // ---- Feedback (saved to server -> feedback.json，v2 键 = eval/config/run) ----
     function saveCurrentFeedback() {
       const run = RUNS[currentIndex];
@@ -1137,6 +1256,24 @@
       const notes = data.notes || [];
 
       let html = "";
+
+      // 结构审查建议卡片（新增：评测循环结构审查步的产物；仅建议，未执行）
+      const sr = EMBEDDED_DATA.structure_review;
+      if (sr) {
+        html += '<div class="benchmark-notes" style="margin-bottom: 1.5rem;">';
+        html += "<h3>结构审查建议 <span class=\"track-badge\">仅建议 · 未执行</span></h3>";
+        if (Array.isArray(sr.signals) && sr.signals.length > 0) {
+          html += '<table class="benchmark-table" style="margin-bottom: 0;">';
+          html += "<thead><tr><th>信号</th><th>命中</th><th>证据</th></tr></thead><tbody>";
+          for (const s of sr.signals) {
+            html += "<tr><td>" + escapeHtml(s.signal || "") + "</td><td>" + (s.hit ? "\u2713" : "—") + "</td><td>" + escapeHtml(s.evidence || "") + "</td></tr>";
+          }
+          html += "</tbody></table>";
+        }
+        if (sr.recommendation) html += '<p class="track-text">建议：' + escapeHtml(sr.recommendation) + "</p>";
+        if (sr.conclusion) html += '<p class="track-hint">' + escapeHtml(sr.conclusion) + "</p>";
+        html += "</div>";
+      }
 
       // Header
       html += "<h2 style='font-family: Poppins, sans-serif; margin-bottom: 0.5rem;'>Benchmark Results</h2>";
@@ -1316,6 +1453,7 @@
     // ---- Start ----
     init();
     renderBenchmark();
+    renderHistory();
   </script>
 </body>
 </html>

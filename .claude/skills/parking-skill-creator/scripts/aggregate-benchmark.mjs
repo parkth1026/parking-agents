@@ -4,15 +4,17 @@
 // 输出 benchmark.json（configs 统计 + delta）与 benchmark.md。
 // 统计口径: pass_rate/time_ms/tokens 的 mean/stddev(样本 n-1)/min/max；delta = with − baseline。
 // timing 数值为 null 时跳过该 run 对应统计并计入 skipped，不报错。
-// 用法: node aggregate-benchmark.mjs <iter-dir> [--skill-name <名>] [--output <benchmark.json 路径>]
-// 退出码: 0 成功 / 1 无数据或目录不存在 / 2 用法错
-import { existsSync, readdirSync, statSync } from "node:fs";
+// --history <技能目录>: 另把本轮各 gate 指标追加进 <技能目录>/history.json（只追加不覆盖），
+//   与上一 run 按同 eval 名比 won/lost/tie；不带该参数时行为与旧版逐字节一致。
+// 用法: node aggregate-benchmark.mjs <iter-dir> [--skill-name <名>] [--output <路径>] [--history <技能目录>]
+// 退出码: 0 成功 / 1 无数据或目录不存在（含 --history 目标不可写，聚合产出不回滚）/ 2 用法错
+import { existsSync, readdirSync, statSync, renameSync, readFileSync } from "node:fs";
 import { join, basename, dirname, resolve } from "node:path";
 import { readJson, writeJson, writeText } from "./lib/jsonio.mjs";
 import { calcStats, round4 } from "./lib/stats.mjs";
 
 function usage() {
-  console.log("用法: node aggregate-benchmark.mjs <iteration目录> [--skill-name <名>] [--output <路径>]");
+  console.log("用法: node aggregate-benchmark.mjs <iteration目录> [--skill-name <名>] [--output <路径>] [--history <技能目录>]");
   console.log("示例: node aggregate-benchmark.mjs ../my-skill-workspace/iteration-1");
   process.exit(2);
 }
@@ -184,6 +186,155 @@ export function renderMarkdown(benchmark) {
   return lines.join("\n") + "\n";
 }
 
+// ---- history.json（技能目录，只追加） ----
+
+/** 主 gate：with_skill 优先，否则按字典序首个（current_best 与 vs_previous 同口径） */
+export function primaryGate(gates) {
+  const names = Object.keys(gates).sort();
+  return names.includes("with_skill") ? "with_skill" : names[0];
+}
+
+/** 本地时区 ISO 时间（对齐 api-mock 报文样例的 +08:00 形态） */
+export function localIsoDate(d = new Date()) {
+  const pad = (n) => String(n).padStart(2, "0");
+  const off = d.getTimezoneOffset();
+  const sign = off <= 0 ? "+" : "-";
+  const abs = Math.abs(off);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+    `T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}` +
+    `${sign}${pad(Math.floor(abs / 60))}:${pad(abs % 60)}`;
+}
+
+/** 本轮各 gate 摘要进 run 记录；timing 全缺时 mean 为 null（区别于 0） */
+function buildGatesSummary(benchmark) {
+  const gates = {};
+  for (const [cfg, s] of Object.entries(benchmark.configs)) {
+    gates[cfg] = {
+      pass_rate: s.pass_rate.mean,
+      mean_ms: s.runs - s.skipped.time_ms > 0 ? s.time_ms.mean : null,
+      mean_tokens: s.runs - s.skipped.tokens > 0 ? s.tokens.mean : null,
+    };
+  }
+  return gates;
+}
+
+/** eval 名 → 该 gate 下是否全过（多 run 取均值 ===1）；gate 缺该 eval 数据按未通过计 */
+function evalPassMap(evals, gate) {
+  const map = {};
+  for (const ev of evals) {
+    const runs = (ev.configs[gate] ?? []);
+    map[ev.name] = runs.length > 0 && runs.reduce((s, r) => s + r.pass_rate, 0) / runs.length === 1;
+  }
+  return map;
+}
+
+/**
+ * 与上一 run 比逐 eval 胜负：同 eval 名精确匹配、pass 布尔翻转；
+ * 本轮新增 eval 计入 total 不计入 won/lost（detail 标 new）；上轮存在本轮缺席标 dropped。
+ * 上一轮逐 eval 数据从其 iteration_ref 目录现算（数据只在聚合时齐备）；不可读返回 { error }。
+ */
+export function computeVsPrevious(curEvals, prevRun) {
+  const gate = primaryGate(prevRun.gates ?? {});
+  const prevLoaded = loadIteration(prevRun.iteration_ref, []);
+  if (prevLoaded.error) return { error: prevLoaded.error };
+  const prevMap = evalPassMap(prevLoaded.evals, gate);
+  const curMap = evalPassMap(curEvals, gate);
+
+  const detail = [];
+  let won = 0, lost = 0, tie = 0;
+  for (const ev of curEvals) {
+    if (!(ev.name in prevMap)) { detail.push({ eval: ev.name, result: "new" }); continue; }
+    if (prevMap[ev.name] === false && curMap[ev.name] === true) { detail.push({ eval: ev.name, result: "won" }); won++; }
+    else if (prevMap[ev.name] === true && curMap[ev.name] === false) { detail.push({ eval: ev.name, result: "lost" }); lost++; }
+    else { detail.push({ eval: ev.name, result: "tie" }); tie++; }
+  }
+  for (const name of Object.keys(prevMap).sort()) {
+    if (!(name in curMap)) detail.push({ eval: name, result: "dropped" });
+  }
+  return { vs_previous: { evals_total: curEvals.length, won, lost, tie, detail } };
+}
+
+/** 读入现有 history；损坏（解析失败/形状不对）先备份 .corrupt-<ts> 再从空重建，不静默覆盖 */
+function loadHistoryForAppend(historyPath) {
+  if (!existsSync(historyPath)) return { history: null };
+  let parsed;
+  try {
+    parsed = JSON.parse(readFileSync(historyPath, "utf8"));
+  } catch (err) {
+    return corrupt(historyPath, `history.json 解析失败: ${err.message}`);
+  }
+  const shapeOk = parsed && typeof parsed === "object" && !Array.isArray(parsed)
+    && Array.isArray(parsed.runs)
+    && parsed.runs.every((r) => r && typeof r === "object" && r.gates && typeof r.gates === "object");
+  if (!shapeOk) return corrupt(historyPath, "history.json 结构不符契约(runs/gates)");
+  return { history: parsed };
+  function corrupt(p, reason) {
+    const ts = new Date();
+    const pad = (n) => String(n).padStart(2, "0");
+    const stamp = `${ts.getFullYear()}${pad(ts.getMonth() + 1)}${pad(ts.getDate())}-${pad(ts.getHours())}${pad(ts.getMinutes())}${pad(ts.getSeconds())}`;
+    renameSync(p, `${p}.corrupt-${stamp}`);
+    console.log(`拒绝：${reason}——已备份为 history.json.corrupt-${stamp} 后重建`);
+    return { history: null, rebuilt: true };
+  }
+}
+
+/**
+ * 组装本轮 run 记录并追加进 history（只追加：既有 runs 任何字段不回改；顶层 current_best 为权威指针）。
+ * 返回 { history, summary } 供 CLI 打印趋势；写入由调用方决定（失败不吞 benchmark 产出）。
+ */
+export function appendHistoryRun({ result, iterDir, skillName, historyPath }) {
+  const loaded = loadHistoryForAppend(historyPath);
+  const history = loaded.history ?? { skill: skillName || result.benchmark.skill_name || "", runs: [] };
+  const prevRun = history.runs.length > 0 ? history.runs[history.runs.length - 1] : null;
+  const gates = buildGatesSummary(result.benchmark);
+
+  let vsPrevious = null;
+  let vsNote = "首轮无对比";
+  if (prevRun) {
+    const cmp = computeVsPrevious(result.evals, prevRun);
+    if (cmp.error) {
+      vsNote = `上一轮 iteration 数据不可读(${cmp.error})`;
+    } else {
+      vsPrevious = cmp.vs_previous;
+      vsNote = `won ${vsPrevious.won} / lost ${vsPrevious.lost} / tie ${vsPrevious.tie}`;
+    }
+  }
+
+  // current_best：主 gate pass_rate 严格更高才推进，平局不推进（防抖）
+  const bestIdxBefore = (() => {
+    const m = typeof history.current_best === "string" ? history.current_best.match(/^runs\[(\d+)\]$/) : null;
+    return m && Number(m[1]) < history.runs.length ? Number(m[1]) : (history.runs.length > 0 ? 0 : -1);
+  })();
+  const newRate = gates[primaryGate(gates)]?.pass_rate ?? 0;
+  const bestRateBefore = bestIdxBefore >= 0
+    ? (history.runs[bestIdxBefore].gates[primaryGate(history.runs[bestIdxBefore].gates)]?.pass_rate ?? 0)
+    : null;
+  const advance = bestIdxBefore < 0 || newRate > bestRateBefore;
+  const bestIdxAfter = advance ? history.runs.length : bestIdxBefore;
+
+  const run = {
+    date: localIsoDate(),
+    iteration_ref: resolve(iterDir),
+    gates,
+    vs_previous: vsPrevious,
+  };
+  if (advance) run.current_best = true;
+  history.runs.push(run);
+  history.current_best = `runs[${bestIdxAfter}]`;
+
+  const summary = {
+    index: history.runs.length,
+    vsNote,
+    advance,
+    bestIdxAfter,
+    reason: bestIdxBefore < 0 ? "首轮即最佳" : advance
+      ? `pass_rate ${newRate} > ${bestRateBefore} 推进`
+      : `pass_rate ${newRate} 未严格超过 ${bestRateBefore}，持平不推进`,
+    rebuilt: loaded.rebuilt ?? false,
+  };
+  return { history, summary };
+}
+
 // --- CLI ---
 const argv = process.argv.slice(2);
 const iterDirArg = argv.find((a) => !a.startsWith("--"));
@@ -191,7 +342,10 @@ if (!iterDirArg || argv.includes("--help")) usage();
 
 const skillNameIdx = argv.indexOf("--skill-name");
 const outputIdx = argv.indexOf("--output");
+const historyIdx = argv.indexOf("--history");
+if (historyIdx !== -1 && !argv[historyIdx + 1]) usage();
 const skillName = skillNameIdx !== -1 ? argv[skillNameIdx + 1] : "";
+const historyDir = historyIdx !== -1 ? resolve(argv[historyIdx + 1]) : null;
 
 const result = buildBenchmark(resolve(iterDirArg), skillName || "");
 if (result.error) {
@@ -225,4 +379,25 @@ if (cfgNames.length >= 2) {
   );
 }
 console.log(`→ ${outJson}, ${outJson.replace(/\.json$/, ".md")}`);
+
+// --history：评测数据反向沉淀进技能目录（唯一写入通道，须显式传参；失败不吞 benchmark 产出）
+if (historyDir) {
+  if (!existsSync(historyDir) || !statSync(historyDir).isDirectory()) {
+    console.log(`拒绝：--history 目标不是可写目录: ${historyDir}（本次不追加历史，聚合结果照常产出）`);
+    process.exit(1);
+  }
+  const historyPath = join(historyDir, "history.json");
+  let appended;
+  try {
+    appended = appendHistoryRun({ result, iterDir: iterDirArg, skillName, historyPath });
+    writeJson(historyPath, appended.history);
+  } catch (err) {
+    console.log(`拒绝：history.json 写入失败: ${err.message}（本次不追加历史，聚合结果照常产出）`);
+    process.exit(1);
+  }
+  const s = appended.summary;
+  console.log(`history: 追加 1 条 run（第 ${s.index} 条）→ ${s.vsNote}${s.vsNote.startsWith("won") ? "（vs 上一条，按 eval 名匹配）" : ""}`);
+  console.log(`history: current_best ${s.advance ? `推进至 runs[${s.bestIdxAfter}]` : `保持 runs[${s.bestIdxAfter}]`}（${s.reason}）`);
+  console.log(`history: → ${historyPath}（runs 共 ${appended.history.runs.length} 条，只追加）`);
+}
 process.exit(0);

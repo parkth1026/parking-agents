@@ -36,9 +36,107 @@ Defines the evals for a skill. Located at `evals/evals.json` within the skill di
 
 ---
 
-## history.json
+## eval_metadata.json
 
-Tracks version progression in Improve mode. Located at workspace root.
+Per-eval metadata written by the orchestrating agent. Located at `<iteration-dir>/eval-<name>/eval_metadata.json`.
+
+```json
+{
+  "prompt": "把 D:/logs/ 下的失败日志按错误模式归类成表格",
+  "assertions": [
+    { "name": "表格覆盖全部日志文件", "type": "manual", "ac": "AC-1" },
+    { "name": "计数与 grep 结果一致", "type": "script" }
+  ]
+}
+```
+
+**Fields:**
+- `prompt`: The user's task verbatim
+- `assertions[]`: Objectively checkable statements
+  - `name`: Short assertion name shown on the review page
+  - `type`: `manual` or `script`
+  - `ac`: **Optional** — references an acceptance-condition id (`AC-1`, `AC-2`, …) from this skill's `references/design.md`, tying the assertion back to its design rationale. Format-checked only (`AC-<n>`), reference existence is not validated. Assertions without `ac` remain fully valid (legacy skills need zero migration); graders never reject on a missing `ac`.
+
+---
+
+## history.json（技能目录，已实现）
+
+Append-only eval score ledger. Located at `<skill-dir>/history.json`, distributed with the .skill package. Written **only** by `scripts/aggregate-benchmark.mjs` when invoked with `--history <技能目录>` (the single explicit channel through which the eval loop writes into the skill directory; aggregation without the flag never touches the skill dir). Runs are appended — no existing field is ever rewritten; the top-level `current_best` pointer is the authoritative best-run indicator.
+
+```json
+{
+  "skill": "feishu-doc-qa",
+  "runs": [
+    {
+      "date": "2026-08-17T14:00:00+08:00",
+      "iteration_ref": "C:/x/.claude/skill-workspaces/feishu-doc-qa-workspace/iteration-1",
+      "gates": {
+        "with_skill":     { "pass_rate": 1.00, "mean_ms": 137000, "mean_tokens": 48213 },
+        "without_skill":  { "pass_rate": 0.50, "mean_ms": 155000, "mean_tokens": 62000 }
+      },
+      "vs_previous": null
+    },
+    {
+      "date": "2026-08-17T18:00:00+08:00",
+      "iteration_ref": "C:/x/.claude/skill-workspaces/feishu-doc-qa-workspace/iteration-2",
+      "gates": {
+        "with_skill":     { "pass_rate": 1.00, "mean_ms": 121000, "mean_tokens": 44100 },
+        "without_skill":  { "pass_rate": 0.50, "mean_ms": 158000, "mean_tokens": 63500 }
+      },
+      "vs_previous": {
+        "evals_total": 2, "won": 1, "lost": 0, "tie": 1,
+        "detail": [ { "eval": "eval-贴URL直问", "result": "tie" },
+                    { "eval": "eval-例会最新一期", "result": "won" } ]
+      },
+      "current_best": true
+    }
+  ],
+  "current_best": "runs[1]"
+}
+```
+
+**Fields:**
+- `skill`: Skill name
+- `runs[]`: One entry per `--history` aggregation, append-only
+  - `date`: Local-timezone ISO timestamp of the aggregation
+  - `iteration_ref`: Absolute path of the aggregated iteration dir (the source of this run's data)
+  - `gates`: Key = config directory name (gate name), open set — `with_skill` / `without_skill` / `old_skill` / any custom name. Values: `pass_rate` (mean), `mean_ms` / `mean_tokens` (`null` when all timing values were null)
+  - `vs_previous`: Comparison against the previous run, matched by exact eval name with pass-boolean flips; `null` for the first run (or when the previous iteration's data on disk is unreadable). New-this-round evals count in `evals_total` but not in won/lost (`detail` marks them `new`); evals present last round but absent this round are marked `dropped` in `detail`, never silently dropped
+  - `current_best`: Snapshot flag written at append time when this run was the best; the authoritative pointer is the top-level `current_best`
+- `current_best` (top level): `"runs[N]"`. Advances only when the primary gate (`with_skill`, else first gate name alphabetically) pass_rate is **strictly** higher — ties never advance (anti-jitter)
+
+**Boundary behavior:** corrupt JSON (parse failure or shape mismatch) is backed up as `history.json.corrupt-<YYYYMMDD-HHmmss>` then rebuilt from the current run (evidence kept, never silently overwritten). `--history` pointing at a non-directory / unwritable target: the run is refused with exit code 1, benchmark outputs already written are not rolled back. Without `--history`, output is byte-identical to the flagless behavior and no history.json is created.
+
+---
+
+## structure-review.json
+
+Product of the structure-review step (SKILL.md 6.5). Located at `<iteration-dir>/structure-review.json`; auto-discovered by the eval viewer, which renders the suggestion card above the Benchmark table. **Suggestions only — never executed.**
+
+```json
+{
+  "signals": [
+    { "signal": "1 原子能力可复用", "hit": true,  "evidence": "日志解析例程被 ue-error-solver 重复实现" },
+    { "signal": "2 多类不相干意图", "hit": false, "evidence": "无" },
+    { "signal": "3 编排逻辑内嵌",   "hit": false, "evidence": "无" },
+    { "signal": "4 near-miss 误触发集中", "hit": true, "evidence": "q5/q9 误触发集中于「翻译」类" }
+  ],
+  "recommendation": "把「日志解析」抽成独立原子技能，本技能改为编排层调度（样板：grill-with-docs 之于 grilling）",
+  "conclusion": "只建议不执行；结论已记入 design.md 迭代记录，是否拆分由用户裁定"
+}
+```
+
+**Fields:**
+- `signals[]`: The four-signal checklist, one entry per signal, verdicts recorded honestly (write the file even when nothing hits)
+  - `signal` / `hit` / `evidence`: Signal name / whether it hit / one-sentence evidence
+- `recommendation`: The split suggestion shown in the card; empty or 「无需拆分」 when no signal hits
+- `conclusion`: Where the suggestion landed (dialog + design.md iteration record) and that execution stays with the user
+
+---
+
+## history.json（fork 纸面契约，未实现）
+
+Tracks version progression in Improve mode. Located at workspace root. **纸面契约**（fork 自官方文档，当前未实现）；与本仓库已实现的技能目录 `history.json`（见上节）同名不同物——已实现的那个在 `<技能目录>/history.json`，记录跨轮评测成绩。
 
 ```json
 {

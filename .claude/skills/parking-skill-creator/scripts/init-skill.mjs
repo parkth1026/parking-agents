@@ -122,6 +122,25 @@ const RESOURCE_README = {
 `,
 };
 
+/** 设计文档骨架：四节固定（Round2 默认区），验收条件必须编号 AC-N，eval 断言以 ac 字段引用 */
+const DESIGN_TEMPLATE = (name) => `# design: ${name}
+
+## 意图与触发场景
+[TODO: 为什么有这个技能;用户会说什么话、什么上下文触发;期望产出形态]
+
+## 设计取舍
+[TODO: 关键决定与自由度分级;每条一句话「为什么没选别的」]
+
+## 验收条件
+| 编号 | 条件 | 类型 |
+| --- | --- | --- |
+| AC-1 | [TODO: 可客观验证的一条] | manual/script |
+
+## 迭代记录
+| 日期 | 改了什么 | 轮次结果 | 拆分建议 |
+| --- | --- | --- | --- |
+`;
+
 /** 技能根回归测试骨架：零依赖 Node，check() 计数器，退出码 0=全过/1=有失败 */
 const RUN_TESTS_TEMPLATE = (name) => `#!/usr/bin/env node
 // run-tests.mjs — ${name} 的回归测试（升级/改动后必跑）
@@ -225,6 +244,9 @@ console.log(`init ${skillName} → ${skillDir}`);
 console.log("  SKILL.md            (含待办占位、结构选择指南节与测试节)");
 writeFileSync(join(skillDir, "run-tests.mjs"), RUN_TESTS_TEMPLATE(skillName), "utf8");
 console.log("  run-tests.mjs       (回归测试骨架，升级校验的依据)");
+mkdirSync(join(skillDir, "references"), { recursive: true });
+writeFileSync(join(skillDir, "references", "design.md"), DESIGN_TEMPLATE(skillName), "utf8");
+console.log("  references/design.md  (设计文档骨架,验收条件编号 AC-N,eval 断言引用 ac 字段)");
 
 const resources = STRUCTURES[args.structure].resources;
 for (const res of resources) {
