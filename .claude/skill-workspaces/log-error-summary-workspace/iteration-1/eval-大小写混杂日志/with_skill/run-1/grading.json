@@ -1,0 +1,19 @@
+{
+  "results": [
+    {
+      "name": "错误总数与日志实际错误行数一致（大小写混杂共 6 条）",
+      "text": "outputs/errors.md 汇总为「共 2 条错误，1 类」，仅计入 2 条大写 ERROR 行，与日志实际 6 条错误行不符",
+      "passed": false,
+      "evidence": "outputs/errors.md 末行「共 2 条错误，1 类。」；本人独立核对 input/mixed-case.log：grep -ic error 得 6 条（ERROR×2、Error:×2、error×2），表格仅 1 行 payment-sync 模式次数 2，漏计 Error:/error 共 4 行。另重新运行技能脚本 summarize-errors.mjs 复现出完全相同的 2 条/1 类输出，确认产物真实但计数口径只认大写 \\bERROR\\b。transcript 亦自认「按技能 v1 实际口径为 2 条、1 类」vs 期望 6 条。"
+    },
+    {
+      "name": "输出为 markdown 表格且含「次数」列",
+      "text": "outputs/errors.md 是 markdown 表格，表头含「次数」列",
+      "passed": true,
+      "evidence": "outputs/errors.md 第 3-5 行：表头「| 错误模式 | 次数 | 代表样例 |」+ 分隔行 + 1 条数据行；本人重跑脚本生成的表格与产物逐字一致，非伪造。"
+    }
+  ],
+  "eval_feedback": "断言 1 区分度良好，精准暴露了技能 v1 只认大写 ERROR 的已知缺口。但断言 2（markdown 表格含「次数」列）过于宽松：本 run 表格内容漏计 2/3 的错误仍 PASS，任何含表头的空壳表格都能通过；建议与断言 1 联动（如要求表格各行次数之和=6 且类数=3），或要求逐类计数与输入分布（payment-sync×2/config×2/timeout×2）一致。另外 prompt 要求「按次数降序」，无断言覆盖排序。",
+  "claims": [],
+  "user_notes_summary": null
+}

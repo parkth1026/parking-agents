@@ -1,0 +1,57 @@
+{
+  "skill": "log-error-summary",
+  "runs": [
+    {
+      "date": "2026-08-17T14:33:49+08:00",
+      "iteration_ref": "G:\\GIT\\AI_WorkFlow\\parking-agents\\.claude\\skill-workspaces\\log-error-summary-workspace\\iteration-1",
+      "gates": {
+        "with_skill": {
+          "pass_rate": 0.75,
+          "mean_ms": 106682,
+          "mean_tokens": 77201
+        },
+        "without_skill": {
+          "pass_rate": 1,
+          "mean_ms": 67497,
+          "mean_tokens": 62668.5
+        }
+      },
+      "vs_previous": null,
+      "current_best": true
+    },
+    {
+      "date": "2026-08-17T14:39:36+08:00",
+      "iteration_ref": "G:\\GIT\\AI_WorkFlow\\parking-agents\\.claude\\skill-workspaces\\log-error-summary-workspace\\iteration-2",
+      "gates": {
+        "with_skill": {
+          "pass_rate": 1,
+          "mean_ms": 45268.5,
+          "mean_tokens": 63386
+        },
+        "without_skill": {
+          "pass_rate": 1,
+          "mean_ms": 44957.5,
+          "mean_tokens": 59625
+        }
+      },
+      "vs_previous": {
+        "evals_total": 2,
+        "won": 1,
+        "lost": 0,
+        "tie": 1,
+        "detail": [
+          {
+            "eval": "eval-大小写混杂日志",
+            "result": "won"
+          },
+          {
+            "eval": "eval-纯大写日志",
+            "result": "tie"
+          }
+        ]
+      },
+      "current_best": true
+    }
+  ],
+  "current_best": "runs[1]"
+}

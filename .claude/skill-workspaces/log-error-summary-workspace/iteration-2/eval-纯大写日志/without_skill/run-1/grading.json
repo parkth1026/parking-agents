@@ -1,0 +1,31 @@
+{
+  "results": [
+    {
+      "name": "错误总数与日志实际错误行数一致（共 5 条）",
+      "text": "outputs/errors.md 报告 ERROR 记录总数 5 条，表格次数列 2+2+1=5，与输入日志 5 条 ERROR 行一致",
+      "passed": true,
+      "evidence": "outputs/errors.md 第 4 行「ERROR 记录总数：5 条，归并为 3 种错误模式」；独立核对 input/build-errors.log：grep -c ERROR = 5（第 2/3/5/7/9 行）；transcript 第 2 步逐条列出 5 条 ERROR 记录，与输入行号一一对应"
+    },
+    {
+      "name": "同型错误归并为一行（exit code 1 与 137 同计一类）",
+      "text": "exit code 1 与 exit code 137 两条 npm install 失败归并为同一行、计 2 次，表格中 npm install 模式仅占 1 行",
+      "passed": true,
+      "evidence": "outputs/errors.md 仅 1 行 npm install 模式：「npm install failed with exit code `<N>` | 2」；归并说明明确写「exit code 1 与 exit code 137 属于同一命令失败的同一错误类型，仅退出码不同，归并计数；样例取首次出现（03:12:44，exit code 1）」；程序化解析确认 npm-install 行数 = 1、次数 = 2，样例逐字存在于输入第 2 行"
+    }
+  ],
+  "eval_feedback": "两条断言均有区分度：逐行不去重会使 exit code 1/137 分成两行各计 1 次，断言 2 即 FAIL。可再补一条断言要求表格恰好 3 行且代表样例逐字来自输入，堵住「类别数对但样例编造」的漏洞（本次已核对三行样例均逐字存在于输入）。",
+  "claims": [
+    {
+      "claim": "输入共 10 行、其中 5 条 ERROR、归并为 3 种模式（2/2/1）",
+      "type": "factual",
+      "verified": true,
+      "evidence": "wc -l input/build-errors.log = 10；grep -c ERROR = 5（第 2/3/5/7/9 行）；npm×2 + connection refused×2 + unit test×1 = 5，与产物表格一致"
+    },
+    {
+      "claim": "connection refused 两条完全相同、对应日志中 retry 1 of 3 的两次重试",
+      "type": "factual",
+      "verified": true,
+      "evidence": "输入第 5、7 行内容完全一致（registry.example.com:443），第 6 行为「INFO retry 1 of 3」，时间线相符"
+    }
+  ]
+}

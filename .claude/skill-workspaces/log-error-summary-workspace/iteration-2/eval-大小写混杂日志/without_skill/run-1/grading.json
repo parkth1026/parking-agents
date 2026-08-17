@@ -1,0 +1,31 @@
+{
+  "results": [
+    {
+      "name": "错误总数与日志实际错误行数一致（大小写混杂共 6 条）",
+      "text": "outputs/errors.md 报告错误行 6 行，表格次数列 2+2+2=6，与输入日志大小写不敏感统计的 6 条错误行一致",
+      "passed": true,
+      "evidence": "outputs/errors.md 第 3 行「共 7 行，其中错误行 6 行，非错误行 1 行为 INFO」；三类模式各计 2 次（job \"payment-sync\" failed ×2、cannot read config ×2、connection timeout ×2）；独立核对 input/mixed-case.log：grep -c -i error = 6（第 1/2/3/5/6/7 行），第 4 行 INFO 未计入；transcript 第 2 步明确按大小写不敏感口径筛选"
+    },
+    {
+      "name": "输出为 markdown 表格且含「次数」列",
+      "text": "outputs/errors.md 为合法 markdown 表格，表头含「次数」列（错误模式/次数/代表样例三列）",
+      "passed": true,
+      "evidence": "outputs/errors.md 第 7-8 行为表头与分隔行「| 错误模式 | 次数 | 代表样例 |」/「| --- | ---: | --- |」，其后 3 行数据；程序化解析确认为合法 markdown 表格（右对齐分隔行亦为合法语法），代表样例均逐字存在于输入日志"
+    }
+  ],
+  "eval_feedback": "断言 1 只要求「总数」一致，若产物在正文写 6 而表格次数列相加不等于 6 也能通过；建议明确要求次数列合计 = 陈述总数 = 输入实际错误行数（本次已额外核对合计一致）。断言 2 为纯格式断言，区分度有限，与断言 1 组合使用尚可。",
+  "claims": [
+    {
+      "claim": "transcript 称第 4 行「INFO retry scheduled」非错误行、不计入",
+      "type": "factual",
+      "verified": true,
+      "evidence": "input/mixed-case.log 第 4 行确为 INFO 级别且不含 error 字样，总数 7-1=6 与产物一致"
+    },
+    {
+      "claim": "三种错误模式次数相同（各 2 次），按首次出现顺序排列",
+      "type": "factual",
+      "verified": true,
+      "evidence": "表格三行次数均为 2，行序（payment-sync → cannot read config → connection timeout）与输入中各模式首次出现的行号 1/2/3 一致"
+    }
+  ]
+}

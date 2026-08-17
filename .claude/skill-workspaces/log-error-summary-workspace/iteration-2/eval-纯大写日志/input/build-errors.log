@@ -1,0 +1,10 @@
+2026-08-16 03:12:01 INFO pipeline started (build 4127)
+2026-08-16 03:12:44 ERROR npm install failed with exit code 1
+2026-08-16 03:12:45 ERROR npm install failed with exit code 137
+2026-08-16 03:13:02 WARN retrying artifact download
+2026-08-16 03:13:40 ERROR connection refused: registry.example.com:443
+2026-08-16 03:14:11 INFO retry 1 of 3
+2026-08-16 03:15:02 ERROR connection refused: registry.example.com:443
+2026-08-16 03:15:44 INFO gathering test results
+2026-08-16 03:16:20 ERROR unit test "AuthSpec" timed out after 30000ms
+2026-08-16 03:16:21 INFO pipeline finished (build 4127)

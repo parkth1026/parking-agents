@@ -1,0 +1,19 @@
+{
+  "results": [
+    {
+      "name": "错误总数与日志实际错误行数一致（大小写混杂共 6 条）",
+      "text": "outputs/errors.md 合计 6 次（3 类各 2 次），与日志实际 6 条错误行一致",
+      "passed": true,
+      "evidence": "outputs/errors.md 第 6 行「合计：3 类错误模式，共 6 次」；表格三行次数 2+2+2=6。本人独立核对 input/mixed-case.log：grep -ic error 得 6，且三类分布与输出一致（payment-sync failed×2、cannot read config×2、connection timeout×2），代表样例保留原始大小写（ERROR/Error/error 各 2 条）均可回溯到原文行。"
+    },
+    {
+      "name": "输出为 markdown 表格且含「次数」列",
+      "text": "outputs/errors.md 是 markdown 表格，表头含「次数」列",
+      "passed": true,
+      "evidence": "outputs/errors.md 第 8-12 行：表头「| 错误模式 | 次数 | 代表样例（原始行） |」+ 3 条数据行（次数 2/2/2），为真实含数表格而非空壳。"
+    }
+  ],
+  "eval_feedback": "断言 1 只校验总数，未校验分类分布：若输出总数凑成 6 但归类错误（如把 6 条全归一类、或归并口径混乱）仍会 PASS；建议补一条「3 类模式各自次数为 2/2/2 且与输入逐类对应」的断言。prompt 要求的代表样例列与降序排列亦无断言覆盖。",
+  "claims": [],
+  "user_notes_summary": null
+}

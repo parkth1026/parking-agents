@@ -1,0 +1,19 @@
+{
+  "results": [
+    {
+      "name": "错误总数与日志实际错误行数一致（共 5 条）",
+      "text": "outputs/errors.md 声明 ERROR 行共 5 条，表格次数 2+2+1=5，与日志实际一致",
+      "passed": true,
+      "evidence": "outputs/errors.md 第 4 行「ERROR 行共 **5** 条」；表格三行次数 2/2/1。本人独立核对 input/build-errors.log：grep -c ERROR 得 5，逐类分布（npm install×2、connection refused×2、unit test×1）与输出一致，transcript 中管道命令（grep|sed|sort|uniq -c）可复现该统计。"
+    },
+    {
+      "name": "同型错误归并为一行（exit code 1 与 137 同计一类）",
+      "text": "两种退出码的 npm install 失败归并为一行「npm install 失败（exit code 变化）」，计数 2",
+      "passed": true,
+      "evidence": "outputs/errors.md 表格第 1 行「| npm install 失败（exit code 变化） | 2 | `npm install failed with exit code 1`（另一次为 exit code 137，常提示 OOM 被杀） |」——单行计数 2 且样例明示另一条为 exit code 137，与输入 build-errors.log 第 2-3 行一一对应；补充说明亦确认「两次失败退出码不同…归并为同型错误」。"
+    }
+  ],
+  "eval_feedback": "断言 2 依赖「单行计数 2」推断归并，但若把两条不相关错误硬塞进一行也会 PASS；建议补充要求该行模式能同时匹配 exit code 1 与 137 两行原文（如样例列或归并说明需点名两个退出码——本 run 的产物实际已做到，但断言未强制）。断言 1 同样只查总数不查分布，2+2+1 的逐类计数未被锁定。",
+  "claims": [],
+  "user_notes_summary": null
+}

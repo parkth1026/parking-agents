@@ -1,0 +1,66 @@
+{
+  "iteration": "iteration-2",
+  "skill_name": "log-error-summary",
+  "configs": {
+    "with_skill": {
+      "runs": 2,
+      "pass_rate": {
+        "mean": 1,
+        "stddev": 0,
+        "min": 1,
+        "max": 1
+      },
+      "time_ms": {
+        "mean": 45268.5,
+        "stddev": 7282.4927,
+        "min": 40119,
+        "max": 50418
+      },
+      "tokens": {
+        "mean": 63386,
+        "stddev": 11815.7543,
+        "min": 55031,
+        "max": 71741
+      },
+      "skipped": {
+        "time_ms": 0,
+        "tokens": 0
+      }
+    },
+    "without_skill": {
+      "runs": 2,
+      "pass_rate": {
+        "mean": 1,
+        "stddev": 0,
+        "min": 1,
+        "max": 1
+      },
+      "time_ms": {
+        "mean": 44957.5,
+        "stddev": 11561.903,
+        "min": 36782,
+        "max": 53133
+      },
+      "tokens": {
+        "mean": 59625,
+        "stddev": 8287.2915,
+        "min": 53765,
+        "max": 65485
+      },
+      "skipped": {
+        "time_ms": 0,
+        "tokens": 0
+      }
+    }
+  },
+  "delta": {
+    "pass_rate": 0,
+    "time_ms": 311,
+    "tokens": 3761
+  },
+  "evals": [
+    "eval-大小写混杂日志",
+    "eval-纯大写日志"
+  ],
+  "warnings": []
+}

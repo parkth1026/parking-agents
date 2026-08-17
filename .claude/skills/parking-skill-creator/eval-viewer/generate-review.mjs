@@ -29,6 +29,7 @@ function usage() {
   console.log("  --skill-name 名        标题里的技能名（默认从目录名推断）");
   console.log("  --previous-workspace 目录  上一轮 iteration（显示上轮输出与留言）");
   console.log("  --benchmark 路径       benchmark.json（默认 <iteration>/benchmark.json 若存在）");
+  console.log("  --history 技能目录     读 <技能目录>/history.json，评审页顶部显示历史轨迹（读不到显示「首次评测」）");
   console.log("  --static 输出.html     写单文件 HTML 而不起服务器");
   console.log("  --no-open              不自动开浏览器");
   process.exit(2);
@@ -170,6 +171,14 @@ const benchmarkArg = flag("--benchmark");
 const benchmarkPath = benchmarkArg ? resolve(benchmarkArg) : join(iterDir, "benchmark.json");
 const benchmark = existsSync(benchmarkPath) ? readJson(benchmarkPath) : null;
 
+// --history：读技能目录 history.json（只读不写）。有旗标但读不到 → history: null（viewer 显示首次评测）
+const historyArg = flag("--history");
+const historySkillDir = historyArg ? resolve(historyArg) : null;
+const historyData = historySkillDir ? readJson(join(historySkillDir, "history.json")) : undefined;
+
+// 结构审查步产物自动发现：<iteration>/structure-review.json（有才渲染建议卡片）
+const structureReview = readJson(join(iterDir, "structure-review.json"));
+
 const data = {
   skill_name: skillName,
   iteration: basename(iterDir),
@@ -178,6 +187,8 @@ const data = {
   previous_outputs: previous.previousOutputs,
 };
 if (benchmark) data.benchmark = benchmark;
+if (historySkillDir) data.history = historyData;
+if (structureReview) data.structure_review = structureReview;
 
 // --static 降级模式
 if (staticPath) {
@@ -197,7 +208,10 @@ const server = http.createServer((req, res) => {
     try {
       const freshEvals = scanIteration(iterDir);
       const freshBench = existsSync(benchmarkPath) ? readJson(benchmarkPath) : benchmark;
-      html = generateHtml({ ...data, evals: freshEvals.length > 0 ? freshEvals : evals, benchmark: freshBench });
+      const freshHist = historySkillDir ? readJson(join(historySkillDir, "history.json")) : data.history;
+      const freshSR = readJson(join(iterDir, "structure-review.json")) ?? data.structure_review;
+      html = generateHtml({ ...data, evals: freshEvals.length > 0 ? freshEvals : evals,
+        benchmark: freshBench, history: freshHist, structure_review: freshSR });
     } catch {
       html = generateHtml(data);
     }
@@ -255,6 +269,7 @@ console.log(`  Workspace: ${iterDir}`);
 console.log(`  Feedback:  ${feedbackPath}`);
 if (prevArg) console.log(`  Previous:  ${prevArg}`);
 if (benchmark) console.log(`  Benchmark: ${benchmarkPath}`);
+if (historySkillDir) console.log(`  History:   ${join(historySkillDir, "history.json")}${historyData ? "" : "（读不到，页面显示「无历史轨迹」）"}`);
 console.log(`  （Ctrl+C 停止）`);
 
 if (!noOpen) openBrowser(url);

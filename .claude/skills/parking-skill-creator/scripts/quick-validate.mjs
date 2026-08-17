@@ -117,6 +117,9 @@ if (isMain) {
     if (!existsSync(join(dir, "run-tests.mjs"))) {
       console.log("  警告: 无 run-tests.mjs——新技能必须固化测试(init 脚手架自带)；旧技能升级时补上");
     }
+    if (!existsSync(join(dir, "references", "design.md"))) {
+      console.log("  警告: 无 references/design.md——设计依据不可考(新技能必须,老技能升级时补)");
+    }
     process.exit(0);
   } else {
     console.log(`FAIL ${dir}`);

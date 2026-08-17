@@ -1,0 +1,10 @@
+{
+  "signals": [
+    { "signal": "1 原子能力可复用", "hit": false, "evidence": "全技能根仍无其他技能重复实现错误频次统计例程（iteration-1 后无新增同类）" },
+    { "signal": "2 多类不相干意图", "hit": false, "evidence": "v2 只改了判定口径（大小写不敏感），意图面未扩大，仍单意图" },
+    { "signal": "3 编排逻辑内嵌", "hit": false, "evidence": "仍为单脚本原子能力，无编排" },
+    { "signal": "4 near-miss 误触发集中", "hit": false, "evidence": "仍未跑触发评测（技能定稿后按流程提议），无 near-miss 数据" }
+  ],
+  "recommendation": "",
+  "conclusion": "四信号均未命中，无需拆分。仅建议不执行；结论记入 design.md 迭代记录。"
+}
