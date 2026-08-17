@@ -26,7 +26,7 @@ node <orchestrator>/scripts/session.mjs status
 2. **生效配置**：baseUrl、gitRepos、rawDir、tmpDir、trackFile
 3. **下一步**：会话处于什么门禁
 
-以这份输出为准，不要凭记忆转抄路径。配置分层（config.json ⊕ skill-env.json）的完整说明见编排器的 `references/config.md`。
+以这份输出为准，不要凭记忆转抄路径。配置分层（config.json ⊕ 环境层域文件 `jenkins-log-auto-learning.json`）的完整说明见编排器的 `references/config.md`。
 
 独立调用（用户直接点名某构建对）时：先用 `status` 确认会话，没有进行中的会话就按用户给的任务/构建号工作，配置仍从 `status` 输出取。
 

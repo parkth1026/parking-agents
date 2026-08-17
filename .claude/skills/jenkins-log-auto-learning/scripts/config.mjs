@@ -1,9 +1,11 @@
 // config.mjs — jenkins-log-auto-learning 共享配置加载
 //
 // 配置 = 技能固有默认（config.json，默认取脚本上级）⊕ 环境层，二者深合并，环境层优先。
-// 环境层解析链（只查本地文件，不依赖网络）:
-//   $SKILL_ENV > ~/.config/parking-agents/skill-env.json > ~/.claude/skill-env.json（旧位置回退）
-//   第一个存在的文件生效；三层都无 → 打印配置引导（已查路径 + 三步引导）后 exit 1。
+// 环境层一域一文件（文件名即归属），解析链（只查本地文件，不依赖网络）:
+//   $SKILL_ENV（目录→<目录>/jenkins-log-auto-learning.json；指向文件则该文件即本域配置）
+//   > ~/.config/parking-agents/jenkins-log-auto-learning.json
+//   > 旧单文件 skill-env.json（~/.config/parking-agents/ 与 ~/.claude/，整文件即本技能配置，兼容回退）
+//   第一个存在的文件生效；都无 → 打印配置引导（已查路径 + 三步引导）后 exit 1。
 // 配置加载成功后首步对 UNC（NAS）路径做 fail-fast 连通检查，不可达时打印现状报告
 // （不可达路径/受影响操作/建议检查）后 exit 1，替代深处裸露的 ENOENT 堆栈。
 // 所有路径字段支持 ~/ 前缀展开；脚本内无绝对路径。
@@ -19,7 +21,7 @@
 //   writeJsonAtomicCRLF(path, obj)  同上格式，但 tmp+rename 原子替换（防崩溃截断）
 //   localTimestamp()          本地时间 yyyy-MM-ddTHH:mm:ss
 
-import { existsSync, readFileSync, writeFileSync, renameSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, renameSync, statSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -58,25 +60,33 @@ export function expandHome(p) {
   return p;
 }
 
-// ---------- 环境层解析链 ----------
+// ---------- 环境层解析链（一域一文件，文件名即归属） ----------
 
-const envPathNew = () => join(homedir(), ".config", "parking-agents", "skill-env.json");
+const DOMAIN = "jenkins-log-auto-learning";
+const envPathNew = () => join(homedir(), ".config", "parking-agents", `${DOMAIN}.json`);
+const envPathLegacy = () => join(homedir(), ".config", "parking-agents", "skill-env.json");
 const envPathOld = () => join(homedir(), ".claude", "skill-env.json");
+const isFile = (p) => { try { return existsSync(p) && statSync(p).isFile(); } catch { return false; } };
 
-// $SKILL_ENV > 新路径 > 旧路径回退；第一个存在的文件生效
+// $SKILL_ENV（目录→<目录>/<域>.json；指向文件则该文件即本域配置，兼容旧语义）
+// > 域文件 > 旧单文件 skill-env.json（两处，整文件即本技能配置）——第一个存在的文件生效
 export function resolveEnvLayer() {
   const candidates = [];
-  if (process.env.SKILL_ENV) candidates.push({ path: process.env.SKILL_ENV, via: "SKILL_ENV" });
+  if (process.env.SKILL_ENV) {
+    candidates.push({ path: process.env.SKILL_ENV, via: "SKILL_ENV" });
+    candidates.push({ path: join(process.env.SKILL_ENV, `${DOMAIN}.json`), via: "SKILL_ENV" });
+  }
   candidates.push({ path: envPathNew(), via: "new" });
+  candidates.push({ path: envPathLegacy(), via: "legacy" });
   candidates.push({ path: envPathOld(), via: "fallback" });
-  for (const c of candidates) if (existsSync(c.path)) return c;
+  for (const c of candidates) if (isFile(c.path)) return c;
   return null;
 }
 
 // 三层都无配置文件：给可照做的三步引导，而不是裸报缺失字段
 function guideOnMissingConfig() {
   const template = join(scriptDir, "..", "config.example.json");
-  console.error(`未找到配置文件（已查: $SKILL_ENV${process.env.SKILL_ENV ? `=${process.env.SKILL_ENV}` : "（未设置）"}、${envPathNew()}、${envPathOld()}）`);
+  console.error(`未找到配置文件（已查: $SKILL_ENV${process.env.SKILL_ENV ? `=${process.env.SKILL_ENV}` : "（未设置）"}、${envPathNew()}、兼容回退 ${envPathLegacy()} / ${envPathOld()}）`);
   console.error("配置引导:");
   console.error(`  1. 拷贝模板: ${template}（默认已指向 NAS 知识库）`);
   console.error(`  2. 放到:     ${envPathNew()}`);
