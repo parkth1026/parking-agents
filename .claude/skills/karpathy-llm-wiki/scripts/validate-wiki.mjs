@@ -1,9 +1,17 @@
 #!/usr/bin/env node
-// validate-wiki.mjs — Wiki 校验 v4：8 维度综合检查
+// validate-wiki.mjs — Wiki 校验 v5：8 维度综合检查
 // （唯一入口；原 validate-wiki.ps1 已按仓库脚本标准移除）
 //
 // 用法: node validate-wiki.mjs --wiki <path/to/wiki> [--config <path/to/config.json>]
 // 退出码: 0 = PASS（总分 >= minScore 且断链为 0），1 = FAIL
+//
+// v5 变更（2026-08-17 对抗审查后修复，见 docs/reports/wiki-lint-adversarial-review-2026-08-16）:
+//   1. SCHEMA 标签过滤正则允许点号（ue5.5 等版本号标签不再误杀）
+//   2. 断链维度分母不再双重计数（旧版 broken+totalLinkSum，而 totalLinkSum 已含断链）
+//   3. 自引用不计入断链分母
+//   4. index.md 的目录链接纳入断链检查（此前处于校验盲区）
+//   5. index.md 目录链接计入入链（孤儿页口径，可用 scoring.indexCountsAsInbound 关闭）
+//   6. EXCLUDED_NAMES / index 完整性匹配大小写不敏感
 
 import { fileURLToPath } from "node:url";
 import { dirname, join, basename, extname } from "node:path";
@@ -55,7 +63,7 @@ function lineCount(content) {
 // ---- 入口 ----
 const { wiki: wikiPath, config: configPath } = parseArgs(process.argv.slice(2));
 
-console.log(C.cyan("=== Wiki Validation Script v4 ==="));
+console.log(C.cyan("=== Wiki Validation Script v5 ==="));
 if (!existsSync(wikiPath)) {
   console.error(`Wiki path does not exist: ${wikiPath}`);
   process.exit(1);
@@ -65,6 +73,7 @@ if (!existsSync(wikiPath)) {
 let maxLines = 200;
 let minOutboundLinks = 2;
 let minScore = 9.0;
+let indexCountsAsInbound = true;
 const weights = {
   brokenLinks: 0.25, selfReferences: 0.10, orphanPages: 0.10,
   indexCompleteness: 0.15, frontmatter: 0.15, pageSize: 0.10,
@@ -78,11 +87,12 @@ if (configPath && existsSync(configPath)) {
   if (config.page?.minOutboundLinks) minOutboundLinks = config.page.minOutboundLinks;
   if (config.scoring?.minScore) minScore = config.scoring.minScore;
   if (config.scoring?.weights) Object.assign(weights, config.scoring.weights);
+  if (typeof config.scoring?.indexCountsAsInbound === "boolean") indexCountsAsInbound = config.scoring.indexCountsAsInbound;
 }
 
-// 收集所有 .md（排除 SCHEMA.md / index.md / log.md / raw 目录）
-const EXCLUDED_NAMES = new Set(["SCHEMA.md", "index.md", "log.md"]);
-const allFiles = walkMd(wikiPath).filter((p) => !EXCLUDED_NAMES.has(basename(p)));
+// 收集所有 .md（排除 SCHEMA.md / index.md / log.md / raw 目录；basename 大小写不敏感）
+const EXCLUDED_LOWER = new Set(["schema.md", "index.md", "log.md"]);
+const allFiles = walkMd(wikiPath).filter((p) => !EXCLUDED_LOWER.has(basename(p).toLowerCase()));
 const totalPages = allFiles.length;
 console.log(C.green(`Found ${totalPages} wiki pages`));
 
@@ -96,13 +106,14 @@ const baseName = (p) => basename(p, extname(p));
 // 否则带 BOM 的页面 ^--- 匹配失败，frontmatter/tags 维度误判
 const read = (p) => readFileSync(p, "utf8").replace(/^\uFEFF/, "");
 
-// SCHEMA.md 提取标签分类
+// SCHEMA.md 提取标签分类（允许点号：ue5.5 等版本号标签；仍要求小写 kebab 风格，
+// 大写条目如 Conventions 节的 Page/Tags/Dates 依旧被过滤）
 const validTags = [];
 const schemaPath = join(wikiPath, "SCHEMA.md");
 if (existsSync(schemaPath)) {
   for (const m of read(schemaPath).matchAll(/^[ \t]*-[ \t]+(\S+)/gm)) {
     const tag = m[1].trim();
-    if (/^[a-z][a-z0-9-]+$/.test(tag)) validTags.push(tag);
+    if (/^[a-z][a-z0-9.-]+$/.test(tag)) validTags.push(tag);
   }
 }
 
@@ -131,17 +142,17 @@ let totalLinkSum = 0;
 for (const file of allFiles) {
   const content = read(file);
   const links = [...content.matchAll(/\[\[([^\]]+)\]\]/g)];
-  totalLinkSum += links.length;
   let outbound = 0;
 
   for (const link of links) {
     const linkText = link[1];
 
-    // 维度 2: 自引用
+    // 维度 2: 自引用（不计出链、不计断链分母）
     if (linkText === baseName(file)) {
       selfReferences.push({ File: basename(file), Link: linkText });
       continue;
     }
+    totalLinkSum++;
     outbound++;
 
     // 检查链接目标是否存在
@@ -160,16 +171,36 @@ for (const file of allFiles) {
   outboundCount.set(baseName(file), outbound);
 }
 
+// index.md 的目录链接：纳入断链检查（消除校验盲区）；按配置计入入链
+// （index 是 catalog of all pages，目录行视为官方入链；关闭开关可回退旧行为）
+if (existsSync(indexPath)) {
+  for (const target of indexedPages) {
+    let found = false;
+    for (const dir of SEARCH_DIRS) {
+      if (existsSync(join(wikiPath, dir, `${target}.md`))) { found = true; break; }
+    }
+    totalLinkSum++;
+    if (found) {
+      if (indexCountsAsInbound && inboundCount.has(target)) {
+        inboundCount.set(target, inboundCount.get(target) + 1);
+      }
+    } else {
+      brokenLinks.push({ File: "index.md", Link: target });
+    }
+  }
+}
+
 // === 维度 3: 孤儿页 ===
 const orphanPages = [];
 for (const [page] of allPageNames) {
   if (inboundCount.get(page) === 0) orphanPages.push(page);
 }
 
-// === 维度 4: index 完整性 ===
+// === 维度 4: index 完整性（大小写不敏感）===
 const missingFromIndex = [];
+const indexedLower = new Set(indexedPages.map((s) => s.toLowerCase()));
 for (const [page] of allPageNames) {
-  if (!indexedPages.includes(page)) missingFromIndex.push(page);
+  if (!indexedLower.has(page.toLowerCase())) missingFromIndex.push(page);
 }
 
 // === 维度 5: frontmatter 有效性 ===
@@ -228,10 +259,10 @@ if (validTags.length > 0) {
 // === 评分 ===
 const dimScores = {};
 
-// 断链: 0 个得 10 分，否则按比例扣
+// 断链: 0 个得 10 分，否则按比例扣（分母 totalLinkSum 已含全部非自引用链接
+// 与 index.md 目录链接，不再与 brokenLinks.length 相加——旧版双重计数虚高分）
 dimScores.brokenLinks = brokenLinks.length === 0 ? 10 : (() => {
-  const totalLinks = brokenLinks.length + totalLinkSum;
-  return totalLinks > 0 ? Math.max(0, 10 * (1 - brokenLinks.length / totalLinks)) : 10;
+  return totalLinkSum > 0 ? Math.max(0, 10 * (1 - brokenLinks.length / totalLinkSum)) : 10;
 })();
 
 // 自引用: 0 个得 10 分，否则 0 分

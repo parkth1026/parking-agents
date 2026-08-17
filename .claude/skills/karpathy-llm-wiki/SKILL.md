@@ -32,6 +32,7 @@ Key fields (after merge):
 - `knowledgeBase.wikiDir` — **the wiki knowledge base** — all wiki pages (`entities/`, `concepts/`, `SCHEMA.md`, `index.md`, `log.md`) and all output go here.
 - `knowledgeBase.rawDir` — raw source materials storage (original articles, papers, transcripts that get ingested).
 - `scoring.minScore` — minimum quality score to pass validation (default: 9.0)
+- `scoring.indexCountsAsInbound` — whether `index.md` catalog links count as inbound links for orphan detection (default: `true`; `index.md` is the official catalog per SKILL.md semantics — its links are also checked for breakage regardless of this switch)
 - `page.maxLines` — maximum lines per page before splitting (default: 200)
 - `page.minOutboundLinks` — minimum `[[wikilinks]]` per page (default: 2)
 
@@ -211,14 +212,14 @@ Validate wiki consistency and quality.
 #### Steps
 
 1. **Run `validate-wiki.mjs`** — this covers the quantitative checks:
-   - Broken `[[wikilinks]]` (links to non-existent pages)
+   - Broken `[[wikilinks]]` (links to non-existent pages, **including `index.md` catalog links**)
    - Self-references (page linking to itself)
-   - Orphan pages (pages with zero inbound links)
+   - Orphan pages (pages with zero inbound links; `index.md` catalog links count as inbound unless `scoring.indexCountsAsInbound` is `false`)
    - Index completeness (every page listed in index.md)
    - Frontmatter validity (required fields present)
    - Oversized pages (exceeding `page.maxLines`)
    - Minimum outbound links (below `page.minOutboundLinks`)
-   - Tag compliance (tags exist in SCHEMA.md taxonomy)
+   - Tag compliance (tags exist in SCHEMA.md taxonomy; version-style tags like `ue5.5` are valid — dots allowed, lowercase required)
 
 2. **Review the report** — the script outputs a scored report. If score < 9.0,
    fix issues before declaring the wiki healthy.

@@ -2,6 +2,7 @@
   "_README": "技能固有默认（随仓库版本化）。wikiDir/rawDir 为环境相关，真实值见 ~/.config/parking-agents/skill-env.json（解析链: $SKILL_ENV > 该路径）；二者深合并，环境层优先。",
   "scoring": {
     "minScore": 9.0,
+    "indexCountsAsInbound": true,
     "weights": {
       "outboundLinks": 0.1,
       "orphanPages": 0.1,
