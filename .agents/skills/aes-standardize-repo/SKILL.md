@@ -8,6 +8,9 @@ disable-model-invocation: true
 
 把 run 标准作为第一个独立版本化的标准化阶段落地。后续仓库标准保持增量叠加；本阶段不得超出 run 接口的范围。
 
+`assets/run/run.cmd` 与生成到目标仓库的 `run`/`run.cmd` 是跨平台入口的登记平台例外；
+核心逻辑和校验器仍必须使用 `.mjs`。不要以此例外新增无关的 PowerShell、批处理或 shell 脚本。
+
 ## 选择路径
 
 1. 目标目录已包含项目文件时，走既有仓库路径。

@@ -22,11 +22,18 @@ The skill calls Epic's community assistant API at `dev.epicgames.com`. The API u
 - References to official Epic documentation and learning resources
 - A conversation ID for follow-up questions
 
+Treat assistant text as advisory external evidence, not proof by itself: preserve the returned
+references, label missing/failed responses, and verify code or API claims against the linked
+official documentation before presenting them as confirmed. Never send credentials, private source,
+or unrelated log content in the question.
+
 ## Usage
 
 ### Node CLI
 
 The core logic lives in `scripts/epic-assistant.mjs`. API endpoints are read from `config.json` in the skill directory — no hardcoded URLs in the script.
+`scripts/EpicAssistant.psm1` is an optional Windows PowerShell helper and a registered platform
+exception; the `.mjs` CLI remains the portable source of truth.
 
 ```bash
 # Simple: just get the answer text (markdown, falls back to HTML)

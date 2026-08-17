@@ -1,0 +1,6 @@
+interface:
+  display_name: "UE Error Solver"
+  short_description: "Diagnose and optionally fix Unreal Engine CI build failures"
+  default_prompt: "Use $ue-error-solver to diagnose this Unreal Engine CI build failure."
+policy:
+  allow_implicit_invocation: true

@@ -72,6 +72,9 @@ Expected Behavior 验证：
 
 **杀进程三步走**：
 
+涉及 `Stop-Process -Force` 或 `taskkill /F` 时，先按端口列出 PID、命令行和工作目录，
+确认目标属于当前项目，再向用户展示目标并取得确认；无法归属时停止，不扩大清理范围。
+
 1. **启动时记录 PID**：
    ```powershell
    $proc = Start-Process cargo -PassThru -ArgumentList "run","--release"

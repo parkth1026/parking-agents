@@ -1,2 +1,6 @@
+interface:
+  display_name: "Rust Workflow"
+  short_description: "Use fast and full Rust development workflows with clear checks"
+  default_prompt: "Use $rust-workflow to choose and apply the appropriate Rust development flow."
 policy:
   allow_implicit_invocation: false

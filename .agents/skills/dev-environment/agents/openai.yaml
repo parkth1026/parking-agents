@@ -1,2 +1,6 @@
+interface:
+  display_name: "Dev Environment"
+  short_description: "Set up a .NET backend and Vite frontend development environment"
+  default_prompt: "Use $dev-environment to set up this repository's .NET and Vite development environment."
 policy:
   allow_implicit_invocation: false

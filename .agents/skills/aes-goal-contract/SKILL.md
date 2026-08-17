@@ -1,6 +1,6 @@
 ---
 name: aes-goal-contract
-description: 锁定验收：把确认版对照物聚成验收条件，逐条问清「这条错了会怎样、那就怎么验」，落盘自包含的 Goal Contract，跑结构校验与 [A] 档冒烟，生成交接指令。通常由 workflow-interview 编排调用。
+description: 锁定验收：把确认版对照物聚成验收条件，逐条问清「这条错了会怎样、那就怎么验」，落盘自包含的 Goal Contract，跑结构校验与 [A] 档冒烟，生成交接指令。用户要求把已确认的对照物转成可验收契约，或 workflow-interview 进入契约阶段时使用；单独调用也必须先确认上游材料。
 ---
 
 # 锁定验收

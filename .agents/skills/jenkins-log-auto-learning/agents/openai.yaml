@@ -1,2 +1,6 @@
+interface:
+  display_name: "Jenkins Log Auto-Learning"
+  short_description: "Analyze Jenkins build pairs and record verified learnings"
+  default_prompt: "Use $jenkins-log-auto-learning to analyze one Jenkins failure-to-success build pair."
 policy:
   allow_implicit_invocation: false

@@ -3,7 +3,7 @@
 // 惯例：check() 计数器 + 黑盒执行（execFileSync 跑脚本再比对输出），退出码 0=全过/1=有失败；
 //       夹具全部建在系统临时目录——本测试自身不能在技能扫描根下留下任何 SKILL.md。
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -25,6 +25,14 @@ function runFile(script, args, opts = {}) {
     return { code: e.status ?? 1, stdout: e.stdout?.toString() ?? "", stderr: e.stderr?.toString() ?? "" };
   }
 }
+function runNode(scriptPath, args = [], opts = {}) {
+  try {
+    const stdout = execFileSync("node", [scriptPath, ...args], { encoding: "utf8", ...opts });
+    return { code: 0, stdout, stderr: "" };
+  } catch (e) {
+    return { code: e.status ?? 1, stdout: e.stdout?.toString() ?? "", stderr: e.stderr?.toString() ?? "" };
+  }
+}
 const out = (r) => r.stdout + r.stderr;
 const run = (args) => runFile("snapshot-skill.mjs", args);
 
@@ -34,7 +42,7 @@ function exists(p) {
 
 // ---- snapshot-skill.mjs ----
 const root = mkdtempSync(join(tmpdir(), "snaptest-"));
-const skillsRoot = join(root, "skills"); // 模拟技能扫描根,workspace 缺省必须落在它外面
+const skillsRoot = join(root, "skills"); // 模拟技能扫描根，workspace 缺省必须落在平行 evals 根
 const skill = join(skillsRoot, "demo-skill");
 const workspace = join(root, "demo-skill-workspace");
 mkdirSync(join(skill, "scripts"), { recursive: true });
@@ -64,8 +72,8 @@ try {
 
   console.log("快照·缺省 workspace 在扫描根外：");
   const byDefault = run([skill]);
-  const defaultSnap = join(root, "skill-workspaces", "demo-skill-workspace", "skill-snapshot");
-  check("缺省落到 <根上一级>/skill-workspaces/", byDefault.stdout.includes(`SNAPSHOT ${defaultSnap}`));
+  const defaultSnap = join(root, "evals", "demo-skill-workspace", "skill-snapshot");
+  check("缺省落到与 skills 平行的 evals/", byDefault.stdout.includes(`SNAPSHOT ${defaultSnap}`));
   check("缺省快照同样去识别化", exists(join(defaultSnap, "SKILL.md.bak")) && !exists(join(defaultSnap, "SKILL.md")));
 } finally {
   rmSync(root, { recursive: true, force: true });
@@ -100,9 +108,18 @@ try {
   check("无 design.md 时 PASS 但给警告", qvWarn.code === 0 && qvWarn.stdout.includes("警告: 无 references/design.md"));
 
   check("生成 references/design.md 骨架", exists(join(genDir, "references", "design.md")));
+  check("生成 agents/openai.yaml", exists(join(genDir, "agents", "openai.yaml")));
   const design = readFileSync(join(genDir, "references", "design.md"), "utf8");
   check("design.md 四节齐全且验收编号 AC-N", ["## 意图与触发场景", "## 设计取舍", "## 验收条件", "## 迭代记录", "AC-1"].every((s) => design.includes(s)));
-  check("init stdout 报 design.md 产物行", gen.stdout.includes("references/design.md") && gen.stdout.includes("AC-N"));
+  const interfaceYaml = readFileSync(join(genDir, "agents", "openai.yaml"), "utf8");
+  check("openai.yaml 含三项 interface 元数据", ["display_name:", "short_description:", "default_prompt:", "$demo-gen"].every((s) => interfaceYaml.includes(s)));
+  check("init stdout 报 design/openai 产物行", gen.stdout.includes("references/design.md") && gen.stdout.includes("agents/openai.yaml") && gen.stdout.includes("AC-N"));
+
+  const proseSkill = join(root3, "prose-skill");
+  mkdirSync(proseSkill, { recursive: true });
+  writeFileSync(join(proseSkill, "SKILL.md"), "---\nname: prose-skill\ndescription: d\n---\n规则说明：`[TODO` 是校验器提示文本，不是占位。\n");
+  const qvProse = runFile("quick-validate.mjs", [proseSkill]);
+  check("正文引用 [TODO 不触发误报", qvProse.code === 0 && !qvProse.stdout.includes("提示: SKILL.md 仍含 TODO 占位"));
 } finally {
   rmSync(root3, { recursive: true, force: true });
 }
@@ -134,11 +151,17 @@ try {
 
   check("不存在的根退出码 2", runFile("check-shadow-skills.mjs", [join(root2, "no-such")]).code === 2);
 
-  // 无参数：自动发现 cwd 下的 .claude/skills
-  mkdirSync(join(root2, ".claude", "skills", "only-skill"), { recursive: true });
-  writeFileSync(join(root2, ".claude", "skills", "only-skill", "SKILL.md"), "---\nname: only-skill\ndescription: d\n---\n");
-  const auto = runFile("check-shadow-skills.mjs", [], { cwd: root2 });
-  check("无参数自动发现干净根退出码 0", auto.code === 0 && auto.stdout.includes(join(root2, ".claude", "skills")));
+  // 无参数：从脚本自身位置推导同级扫描根，不依赖宿主目录名
+  const host = join(root2, "skill-host");
+  const hostSkills = join(host, "skills");
+  const copiedChecker = join(hostSkills, "creator", "scripts", "check-shadow-skills.mjs");
+  mkdirSync(join(hostSkills, "creator", "scripts", "lib"), { recursive: true });
+  cpSync(join(SCRIPTS, "check-shadow-skills.mjs"), copiedChecker);
+  cpSync(join(SCRIPTS, "lib", "frontmatter.mjs"), join(hostSkills, "creator", "scripts", "lib", "frontmatter.mjs"));
+  mkdirSync(join(hostSkills, "only-skill"), { recursive: true });
+  writeFileSync(join(hostSkills, "only-skill", "SKILL.md"), "---\nname: only-skill\ndescription: d\n---\n");
+  const auto = runNode(copiedChecker, [], { cwd: root2 });
+  check("无参数从自身位置推导干净根退出码 0", auto.code === 0 && auto.stdout.includes(hostSkills));
 } finally {
   rmSync(root2, { recursive: true, force: true });
 }
@@ -156,10 +179,10 @@ try {
   const wsIsFile = run([advSkill, outFile]);
   check("workspace 参数是文件 → 干净拒绝 1", wsIsFile.code === 1 && out(wsIsFile).includes("拒绝"));
 
-  writeFileSync(join(root4, "skill-workspaces"), "x"); // 占用缺省 workspace 的上级路径名
+  writeFileSync(join(root4, "evals"), "x"); // 占用缺省 workspace 的上级路径名
   const defBlocked = run([advSkill]);
   check("缺省 workspace 被文件占用 → 干净拒绝 1（不吐堆栈）", defBlocked.code === 1 && out(defBlocked).includes("拒绝"));
-  rmSync(join(root4, "skill-workspaces"));
+  rmSync(join(root4, "evals"));
 
   check("snapshot 拦 - 开头参数 → 用法 2", run(["--help"]).code === 2);
 
@@ -208,8 +231,16 @@ try {
   check("打包退出码 0", pkg.code === 0);
   const zip = readFileSync(join(dist, "pkg-demo.skill"));
   check("包内含 references/design.md", zip.includes(Buffer.from("pkg-demo/references/design.md")));
+  check("包内含 agents/openai.yaml", zip.includes(Buffer.from("pkg-demo/agents/openai.yaml")));
   check("包内含 history.json", zip.includes(Buffer.from("pkg-demo/history.json")));
   check("包内含 run-tests.mjs", zip.includes(Buffer.from("pkg-demo/run-tests.mjs")));
+
+  writeFileSync(join(pkgDir, "run-tests.mjs"), "#!/usr/bin/env node\nconsole.log('intentional failure');\nprocess.exit(7);\n", "utf8");
+  const rejectedDist = join(root5, "rejected-dist");
+  const rejected = runFile("package-skill.mjs", [pkgDir, rejectedDist]);
+  check("失败的 run-tests 拒绝打包且不产出包", rejected.code === 1
+    && out(rejected).includes("技能自测未通过")
+    && !exists(join(rejectedDist, "pkg-demo.skill")));
 } finally {
   rmSync(root5, { recursive: true, force: true });
 }

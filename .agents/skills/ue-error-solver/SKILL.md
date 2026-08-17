@@ -57,6 +57,9 @@ node "$SCRIPT" check-env --repos "AesWorld"   # 仓库名从错误日志/用户�
 - **禁止重新 clone 到 tmp 目录**——`$config.gitRepos/<RepoName>` 是唯一的源码工作区
 - 仅当 `$config.gitRepos/<RepoName>` 不存在时，才允许一次性 clone 到该位置
 
+错误分类、主错误与级联错误的分组细则见
+[references/error-classification.md](references/error-classification.md)。
+
 ### Phase 1：下载并解析构建日志
 
 ```bash
@@ -203,6 +206,15 @@ node "$SCRIPT" search-kb --terms "$errorCode,$moduleName"
 - 成功 → 进入 Phase 5
 - 失败且原因可定位 → 回到 Phase 2 修订修复，最多 3 次后停止并报告
 - 失败且原因与本次修复无关（如 OpenCVHelper 缺预编译）→ 标注为无关失败，进入 Phase 5 并在 MR 描述里说明
+
+## 副作用分阶段授权
+
+- Phase 2 只下载、解析和读取证据；不得修改源码、提交、推送或创建 MR。
+- Phase 4 只有用户明确要求修复时才允许改本地文件；先列出文件和预期 diff，
+  每次验证失败都停在本地，不自动进入提交阶段。
+- Phase 5 的提交、推送和 MR 创建是三个独立动作；每个动作前都展示目标分支、
+ 远端、文件清单和将发送的内容，取得对应确认后再执行，不得把示例命令串成自动流程。
+- Phase 6 只在本地验证证据满足门禁后写入 rawDir；不得把推测性诊断或未验证修复写入知识库。
 
 ### Phase 5：提交并创建 MR（可选，仅用户明确要求时）
 

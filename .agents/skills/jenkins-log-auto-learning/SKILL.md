@@ -72,6 +72,7 @@ description: |
 | 阶段 0 扫描与领取 | [references/phase0-scan.md](references/phase0-scan.md) |
 | 跟踪账本结构 | [references/tracking.md](references/tracking.md) |
 | 阶段 1 分析方法论 | `../jenkins-pair-analyze/SKILL.md` |
+| 阶段 1 评分标准 | [../jenkins-pair-analyze/references/scoring.md](../jenkins-pair-analyze/references/scoring.md) |
 | RAW 知识文件 v2 验收 | `scripts/validate-raw.mjs` 与 `../jenkins-pair-analyze/references/knowledge-format.md` |
 
 ## 核心约束

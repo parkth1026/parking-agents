@@ -7,7 +7,7 @@ description: 本机技能生产流水线：创建、评测、迭代与打包 age
 
 把一个想法变成经过评测验证、可分发的技能：创建 → 校验 → 输出评测与评审迭代 → 触发评测 → 打包，全链路在本机（Windows + Node）可跑，零外部依赖。
 
-**fork 基线**：本技能融合两家官方 skill-creator——claude-skill-creator（输出评测管线与评审循环，2026-08 版）与 codex-skill-creator（脚手架与写作方法论，2026-08 版）。原版在 `ref/skill-creator/` 下只读对照；官方语义按本机环境重实现（mjs，替代 Python+PyYAML+无头 CLI）。对照官方升级时以 ref/ 为准做手工合并。
+**基线**：本技能融合两家官方 skill-creator——claude-skill-creator（输出评测管线与评审循环，2026-08 版）与 codex-skill-creator（脚手架与写作方法论，2026-08 版）。运行时只依赖本技能目录内的脚本、references、agents 和 eval-viewer；所有路径从本技能目录解析，不依赖宿主目录名。
 
 ## 你的角色
 
@@ -30,7 +30,17 @@ description: 本机技能生产流水线：创建、评测、迭代与打包 age
 5. **quick-validate + 自带测试** — 规则校验与回归测试，越早发现问题越便宜。
 6. **输出评测循环** — gate 问询与并行对照、评分、聚合并沉淀历史（--history）、结构审查、浏览器评审、迭代。
 
-本文所有 `node scripts/…`、`node eval-viewer/…` 命令都在**本技能目录**下执行；init 缺省输出目录按脚本自身位置解析，与当前工作目录无关。
+本文所有 `node scripts/…`、`node eval-viewer/…` 命令都在**本技能目录**下执行；下文 `<skill-dir>` 指当前技能目录；init 缺省输出目录按脚本自身位置解析，与当前工作目录无关。
+
+## 副作用分层与确认
+
+- 读取、扫描和生成评测计划默认只读；报告写入 `docs/reports/` 或显式指定的 workspace。
+- `init-skill`、评测运行、viewer 启动、快照、history 追加和打包都会写文件；
+  执行前先列出绝对输出路径、将创建的文件和预计覆盖项，取得用户确认后再运行。
+- 评测产物默认落在 `<skill-dir>/../../evals/<技能名>-workspace/` 或用户指定目录，不得写入技能扫描根；
+  发现路径冲突、已有文件或 `SKILL.md` 影子文件时停止并报告，不覆盖、不自动清理。
+- 本技能可调用 subagent，但必须把技能路径、输入工件和产物目录显式传入；
+  不把评测结论预先注入探针上下文，也不把未完成评测标成通过。
 
 ---
 
@@ -97,11 +107,11 @@ frontmatter 只允许 name/description（必需）+ license/allowed-tools/metada
 node scripts/quick-validate.mjs <技能目录>
 ```
 
-官方规则集：name kebab-case ≤64；description ≤1024 且无尖括号；键白名单；compatibility ≤500。合法 → `PASS`（退出码 0）；违规逐条列规则名（退出码 1）；参数缺失出用法（退出码 2）。CRLF 与 LF 同判定。PASS 但缺 `run-tests.mjs` 或 `references/design.md` 时给警告、SKILL.md 仍含 `[TODO` 占位时给提示（都不挡退出码——存量老技能照常工作，升级时补上；新技能必须齐）。修完再跑直到 PASS。PASS 后跑 `node <技能目录>/run-tests.mjs`，自带测试全过才算过本步（主观无测试的技能除外）；此后每次升级改动，先跑它做回归。
+官方规则集：name kebab-case ≤64；description ≤1024 且无尖括号；键白名单；compatibility ≤500。合法 → `PASS`（退出码 0）；违规逐条列规则名（退出码 1）；参数缺失出用法（退出码 2）。CRLF 与 LF 同判定。PASS 但缺 `run-tests.mjs` 或 `references/design.md` 时给警告、SKILL.md 仍含待办占位时给提示（都不挡退出码——存量老技能照常工作，升级时补上；新技能必须齐）。修完再跑直到 PASS。PASS 后跑 `node <技能目录>/run-tests.mjs`，自带测试全过才算过本步（主观无测试的技能除外）；此后每次升级改动，先跑它做回归。
 
 ## 第 6 步：输出评测循环
 
-评测结果放**扫描根上一级**的 `skill-workspaces/<技能名>-workspace/`——扫描根指 `.claude/skills/`、`.agents/skills/` 这类技能目录，落点即如 `.claude/skill-workspaces/<技能名>-workspace/`，在扫描根**之外**：评测产物/夹具里出现再多的 `SKILL.md` 也不会被宿主识别成技能。既有技能的同级旧 workspace 本身就在扫描根内，显式传路径沿用时，跑完 iteration 要用 check-shadow-skills 复查产物有没有冒充技能。按迭代组织（`iteration-1/`、`iteration-2/`…），每个测试用例一个 `eval-<描述性名>/` 目录。目录随用随建，不要预先全铺。
+评测结果默认放 `<skill-dir>/../../evals/<技能名>-workspace/`——其中 `<skill-dir>` 指本技能目录，`evals/` 与 `skills/` 平行；workspace 在技能扫描根之外，评测产物/夹具里出现再多的 `SKILL.md` 也不会被宿主识别成技能。若显式沿用扫描根内的旧 workspace，跑完 iteration 要用 `check-shadow-skills` 复查产物有没有冒充技能。按迭代组织（`iteration-1/`、`iteration-2/`…），每个测试用例一个 `eval-<描述性名>/` 目录。目录随用随建，不要预先全铺。
 
 ### 6.1 起跑前问 gate 集，同一 turn 并行 spawn 全部 run
 
@@ -128,7 +138,7 @@ node scripts/quick-validate.mjs <技能目录>
 
 目录布局对齐聚合器口径：`<config>/run-<K>/outputs/`（run 序号从 1 起，同一 eval 重跑多个 run 时递增）——聚合器只认 `run-<数字>` 子目录，产物直接放 `<config>/outputs/` 会收不到。
 
-不带技能的 gate（如 `without_skill`）：同 prompt 去掉「技能路径」一行，产物存对应 gate 目录。改进既有技能的 `old_skill` gate 用改动前快照：`node scripts/snapshot-skill.mjs <技能目录> [<workspace>]`（workspace 缺省为扫描根上一级的 `skill-workspaces/<技能名>-workspace`；快照目录 `skill-snapshot`，已占用自动递增 `-v2`、`-v3`）。脚本会把快照里的 `SKILL.md` 改名 `SKILL.md.bak`——技能扫描器按 `SKILL.md` 文件名认技能，若 workspace 沿用扫描根内的旧同级位置，快照里留活的 `SKILL.md` 会冒出同名双技能、污染触发评测的技能清单；新缺省位置虽在扫描根外，改名仍是双保险。别徒手 `cp -r` 造快照。old_skill run 的「技能路径」填快照目录，prompt 注明技能文档读 `SKILL.md.bak`，产物存 `old_skill/run-1/outputs/`。怀疑技能清单混进了快照/评测产物冒充的技能时，随时跑 `node scripts/check-shadow-skills.mjs [<扫描根>…]` 复查（缺省查当前目录的 .claude/skills 与 .agents/skills）。
+不带技能的 gate（如 `without_skill`）：同 prompt 去掉「技能路径」一行，产物存对应 gate 目录。改进既有技能的 `old_skill` gate 用改动前快照：`node scripts/snapshot-skill.mjs <技能目录> [<workspace>]`（workspace 缺省为 `<skill-dir>/../../evals/<技能名>-workspace`；快照目录 `skill-snapshot`，已占用自动递增 `-v2`、`-v3`）。脚本会把快照里的 `SKILL.md` 改名 `SKILL.md.bak`——技能扫描器按 `SKILL.md` 文件名认技能，若 workspace 沿用扫描根内的旧同级位置，快照里留活的 `SKILL.md` 会冒出同名双技能、污染触发评测的技能清单；新缺省位置虽在扫描根外，改名仍是双保险。别徒手复制目录造快照。old_skill run 的「技能路径」填快照目录，prompt 注明技能文档读 `SKILL.md.bak`，产物存 `old_skill/run-1/outputs/`。怀疑技能清单混进了快照/评测产物冒充的技能时，运行 `node scripts/check-shadow-skills.mjs <扫描根>` 复查。
 
 每个 eval 目录写 `eval_metadata.json`（断言可先空，见 6.2）：
 
@@ -298,22 +308,24 @@ subagent 前向测试是把技能当评测面：验证泛化，不是验证另�
 node scripts/package-skill.mjs <技能目录> [输出目录]
 ```
 
-打包前自动跑同一校验器，违规目录拒绝打包（退出码 1）。分发前先跑技能自带 `run-tests.mjs`——带着失败测试的技能不许打包（主观无测试的技能除外）；`run-tests.mjs`、`references/design.md`（设计依据）与 `history.json`（成绩沉淀）都随技能进包（评测产物不进），包消费者可追溯设计到验收的完整证据链。产出 `<技能名>.skill`——标准 zip 格式（STORE 不压缩），条目路径含技能目录名前缀，排除 `evals/`（技能目录根下）、`__pycache__/`、`node_modules/`、`*.pyc`、`.DS_Store`。可用任意 zip 工具或标准库核验内容。
+打包前自动跑同一校验器，违规目录拒绝打包（退出码 1）；存在 `run-tests.mjs` 时还会自动执行技能自测，失败即拒绝打包（主观无测试的技能可省略该文件）。`run-tests.mjs`、`references/design.md`（设计依据）与 `history.json`（成绩沉淀）都随技能进包（评测产物不进），包消费者可追溯设计到验收的完整证据链。产出 `<技能名>.skill`——标准 zip 格式（STORE 不压缩），条目路径含技能目录名前缀，排除 `evals/`（技能目录根下）、`__pycache__/`、`node_modules/`、`*.pyc`、`.DS_Store`。可用任意 zip 工具或标准库核验内容。
 
 ## 本仓库使用提示
 
 （仓库惯例不进 init 模板，建本仓库技能时在此口径下自行接线。）
 
 - **运行时**：本机 Windows + Node v24，Git Bash 终端。技能脚本一律 `.mjs` + kebab-case，放 `scripts/`，共享代码进 `scripts/lib/`；只用 Node 内置模块，零 npm 依赖、零 python 运行时依赖。
-- **测试**：固化在技能根 `run-tests.mjs`——`check()` 计数器 + `execFileSync` 黑盒跑子命令，退出码 0=全过/1=有失败；fixtures 进 `fixtures/`，黄金输入配 expected 输出逐字段比对。测试随技能分发、每次升级必跑；评测沙箱在 `.claude/skill-workspaces/<技能名>-workspace/`（技能扫描根外，workspace 里出现 SKILL.md 产物也不会冒充技能）。
+- **测试**：固化在技能根 `run-tests.mjs`——`check()` 计数器 + `execFileSync` 黑盒跑子命令，退出码 0=全过/1=有失败；fixtures 进 `fixtures/`，黄金输入配 expected 输出逐字段比对。测试随技能分发、每次升级必跑；评测沙箱默认在 `<skill-dir>/../../evals/<技能名>-workspace/`（与 `skills/` 平行，workspace 里出现 `SKILL.md` 产物也不会冒充技能）。
 - **配置**：本技能零配置——不读 config 文件、不依赖 skill-env 命名空间，全部经 CLI 参数与目录约定。
 - **git**：本仓库提交信息用中文、面向用户解释「为什么」，关键参数修正与行业知识修改要点名，不写改动流水账。
-- **技能目录**：新技能放 `.claude/skills/`（git 跟踪）；`.agents/skills/` 是宿主侧镜像，不要手动改。
+- **技能目录**：由宿主配置技能扫描根；本技能内部只使用 `<skill-dir>`、`scripts/`、`references/` 等相对路径，不把宿主扫描根名称写进文档或脚本。
 
 ## 参考文件
 
 - `references/writing-guide.md` — 技能写作方法论（渐进披露、自由度分级、description 写法、防泄漏纪律）
 - `references/schemas.md` — 全部 JSON 契约（eval_metadata 含 ac 字段/grading/timing/benchmark/feedback/history.json/structure-review/触发评测三契约/comparison/analysis）
+- `references/design.md` — 本技能的意图、设计取舍和 AC-1…AC-6 验收依据
+- `agents/openai.yaml` — 技能列表 UI 元数据，字段值不含宿主路径
 - `agents/grader.md` — grader subagent 指令（评分哲学与 grading.json 契约）
 - `agents/comparator.md` — 盲比较指令（A/B 不知情评审）
 - `agents/analyzer.md` — 基准分析指令（找聚合看不见的模式）

@@ -1,6 +1,6 @@
 ---
 name: best-practice-research
-description: "[OMX] Bounded best-practice research wrapper using official/upstream evidence first"
+description: "[OMX] Bounded best-practice research grounded in official and upstream evidence. Use when the user asks to research a technology, API, design decision, implementation practice, or standards question; stop at evidence-backed guidance and do not implement changes."
 argument-hint: "<technology|decision|practice question>"
 ---
 

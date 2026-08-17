@@ -1,7 +1,7 @@
 ---
 name: workflow-interview
 description: 三阶段需求访谈编排器：问清需求（aes-interview）→ 出对照物（aes-prototype）→ 落盘 Goal Contract（aes-goal-contract）。仅在用户显式调用 /workflow-interview 或明确要求走完整需求访谈流程时使用；普通需求讨论、代码修改任务不要自动触发。
-disable-model-invocation: false
+disable-model-invocation: true
 ---
 
 # 问清楚要做什么，以及怎么算做完

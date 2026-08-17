@@ -1,0 +1,6 @@
+interface:
+  display_name: "Log Error Summary"
+  short_description: "Group build and service log errors into a frequency table"
+  default_prompt: "Use $log-error-summary to group the errors in this build or service log."
+policy:
+  allow_implicit_invocation: true

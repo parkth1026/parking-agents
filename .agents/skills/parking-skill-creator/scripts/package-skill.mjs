@@ -3,6 +3,7 @@
 // 用法: node package-skill.mjs <技能目录> [输出目录]
 // 退出码: 0 成功 / 1 校验失败或拒绝 / 2 用法错
 // 交叉验证: python -m zipfile -l <name>.skill
+import { execFileSync } from "node:child_process";
 import { existsSync, statSync, readdirSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { join, resolve, basename, relative, sep } from "node:path";
 import { validateSkill } from "./quick-validate.mjs";
@@ -42,6 +43,32 @@ function usage() {
   process.exit(2);
 }
 
+function runSkillTests(skillPath) {
+  const testPath = join(skillPath, "run-tests.mjs");
+  if (!existsSync(testPath)) {
+    console.log("警告: 无 run-tests.mjs，跳过技能自测（旧技能兼容）");
+    return true;
+  }
+
+  try {
+    const output = execFileSync(process.execPath, [testPath], {
+      cwd: skillPath,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    console.log("技能自测 PASS");
+    if (output.trim()) console.log(output.trim());
+    return true;
+  } catch (err) {
+    const stdout = err.stdout?.toString().trim();
+    const stderr = err.stderr?.toString().trim();
+    console.log(`技能自测未通过，拒绝打包（退出码 ${err.status ?? 1}）:`);
+    if (stdout) console.log(stdout);
+    if (stderr) console.log(stderr);
+    return false;
+  }
+}
+
 const [skillPathArg, outputDirArg] = process.argv.slice(2);
 if (!skillPathArg || skillPathArg.startsWith("-")) usage();
 
@@ -60,6 +87,8 @@ if (!valid) {
   process.exit(1);
 }
 console.log("校验 PASS\n");
+if (!runSkillTests(skillPath)) process.exit(1);
+console.log();
 
 const skillParent = resolve(skillPath, "..");
 const files = collectFiles(skillPath).sort();

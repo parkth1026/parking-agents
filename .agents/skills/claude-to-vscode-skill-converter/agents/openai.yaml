@@ -1,2 +1,6 @@
+interface:
+  display_name: "Claude to VS Code Skill Converter"
+  short_description: "Convert Claude Code skills to VS Code Copilot format"
+  default_prompt: "Use $claude-to-vscode-skill-converter to convert this Claude Code skill to VS Code Copilot format."
 policy:
   allow_implicit_invocation: false

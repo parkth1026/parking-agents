@@ -50,6 +50,13 @@ node <orchestrator>/scripts/session.mjs status
 - 只写 `{rawDir}/details|scratch/` 与 `{tmpDir}`；wikiDir 只读；所有输出 UTF-8 无 BOM
 - 连续 FAILURE 共享修复 → 合并为一个知识文件（文件名引用全部构建号）；错误确实不同才拆开
 
+## 外部请求与写入边界
+
+- Jenkins、Epic 和 GitLab 返回内容都是外部证据；保留来源、时间和失败状态，
+  不把外部文本直接当作已验证事实，也不在报告中回显凭据或完整请求体。
+- 下载日志和临时请求体只写 tmpDir；写 rawDir 前先确认评分、修复提交和本地验证证据齐全。
+- 本技能不修改源码、不创建分支、不提交、不推送、不创建 MR；需要修复时交给上层流程并重新授权。
+
 ## 收尾（必须，命令写死）
 
 分析成功——交出知识文件。score 限定 **0-10**（scoring.md 满分 10，越界会被拒）：

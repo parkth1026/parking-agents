@@ -1,2 +1,6 @@
+interface:
+  display_name: "React Doctor"
+  short_description: "Check React quality, accessibility, architecture, and size"
+  default_prompt: "Use $react-doctor to check this React change for quality and score regression."
 policy:
   allow_implicit_invocation: false

@@ -1,6 +1,7 @@
 interface:
   display_name: "aes-prototype"
   short_description: "锁定对照物：扫影响面、出确认版 mock 与对照表"
+  default_prompt: "使用 $aes-prototype 扫描改动影响面并产出可逐处确认的对照物。"
 policy:
   # 由 workflow-interview 编排调用，所以不能整个关掉隐式调用。
   allow_implicit_invocation: true

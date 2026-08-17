@@ -1,16 +1,15 @@
 ---
 name: simplify
-description: Review changed code for reuse, quality, and efficiency, then fix any issues found.
+description: Review the user-specified changed code for reuse, quality, and efficiency, then apply narrowly scoped fixes when requested. Use when the user asks to simplify or review a current diff before committing; do not infer a target from unrelated recent files.
 ---
 
   # Simplify: Code Review and Cleanup
 
-  Review all changed files for reuse, quality, and efficiency. Fix any issues found.
+  Review the user-specified diff or file set for reuse, quality, and efficiency. Do not select unrelated files from session history. Apply only narrowly scoped fixes that the current request authorizes.
 
   ## Phase 1: Identify Changes
 
-  Run `git diff` (or `git diff HEAD` if there are staged changes) to see what changed. If there are no git changes, review the most recently modified files that the user mentioned or that you edited earlier in
-   this conversation.
+  Run `git diff` (or `git diff HEAD` if there are staged changes) to see what changed. If there are no git changes and the user did not name files, stop and ask for an explicit scope instead of selecting recent files implicitly.
 
   ## Phase 2: Launch three review subagents one by one.
 

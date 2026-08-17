@@ -57,6 +57,9 @@ node scripts/top-threads.mjs --seconds 15 --top 20
 
 ### 3. wmi-diag.ps1(WmiPrvSE 异常诊断)
 
+仅对技能目录内这个已审查的本地脚本使用 `-ExecutionPolicy Bypass`；先确认路径未被替换，
+不要把该选项扩展到未知或下载的脚本。
+
 ```bash
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/wmi-diag.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/wmi-diag.ps1 -Window 10
@@ -96,6 +99,9 @@ A 路径漏算中断/DPC/未注册内核时间,Windows 计数器固有特性。*
 3. 重启服务:`Restart-Service Winmgmt`
 
 **需要管理员权限**。不影响用户代码/项目,只动 `C:\Windows\System32\wbem\Repository\`。
+`salvagerepository`/`resetrepository` 会修改系统 WMI 状态，不得作为自动诊断步骤执行；
+先展示验证结果和待执行命令，取得用户明确确认后再执行，并记录执行前后的结果。
+用户未确认时只输出诊断结论。
 
 详见 [references/wmi-troubleshooting.md](references/wmi-troubleshooting.md)。
 
@@ -107,6 +113,9 @@ A 路径漏算中断/DPC/未注册内核时间,Windows 计数器固有特性。*
 - 非管理员可用(但拿不到系统/受保护进程的路径,Top 进程名会缺)
 - **管理员权限推荐**(拿全进程路径 + WMI 仓库修复)
 
+本技能是 Windows-only 工具集；`scripts/*.ps1` 是为 Win32/WMI 访问登记的宿主平台例外，
+`.mjs` 负责编排和输出。不要把这些 PowerShell 文件当作通用跨平台入口。
+
 ## 文件清单
 
 ```
@@ -115,7 +124,8 @@ scripts/
 ├── thread-snapshot.ps1  # 线程快照助手(Win32 API,Node 调用)
 ├── top-cpu.mjs          # 进程级 Top-N 主程序
 ├── top-threads.mjs      # 线程级 Top-N 主程序
-└── wmi-diag.ps1         # WMI/WmiPrvSE 诊断(独立)
+├── wmi-diag.ps1         # WMI/WmiPrvSE 诊断(独立)
+└── .sys-snapshot.ps1    # 内部系统快照辅助脚本
 references/
 └── wmi-troubleshooting.md  # WMI 高 CPU 根因分析与修复
 ```

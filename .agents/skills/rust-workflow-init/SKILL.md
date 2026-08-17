@@ -1,6 +1,6 @@
 ---
 name: rust-workflow-init
-description: 为当前 Rust 项目初始化双流开发工作流（Fast Flow + Full Flow），创建 CLAUDE.md、AGENTS.md、VS Code 配置、pre-commit hook 等
+description: 为当前 Rust 项目初始化双流开发工作流（Fast Flow + Full Flow），创建 CLAUDE.md、AGENTS.md、VS Code 配置、pre-commit hook 等。用户明确要求搭建或重新生成 Rust AI 开发环境时使用；执行前检查现有配置并说明将要写入的文件。
 disable-model-invocation: true
 argument-hint: "[rust最佳AI开发环境搭建]"
 ---
@@ -19,8 +19,14 @@ argument-hint: "[rust最佳AI开发环境搭建]"
 3. 检查是否为 workspace（`[workspace]` 存在）
 4. 检查已有的配置文件，避免覆盖用户自定义内容
 5. 检查工具链是否就绪：
-   - 运行 `cargo nextest --version`，如果命令不存在，运行 `cargo install cargo-nextest --locked`
-   - 运行 `rustup component list --installed`，确认包含 `rustfmt`，如果缺失运行 `rustup component add rustfmt`
+   - 运行 `cargo nextest --version`；缺失时先报告将安装的版本和范围，取得确认后再运行 `cargo install cargo-nextest --locked`
+   - 运行 `rustup component list --installed`；缺失时先报告组件和目标 toolchain，取得确认后再运行 `rustup component add rustfmt`
+
+## 写入与安装边界
+
+先列出将创建或修改的文件，以及将安装或补齐的工具；取得用户确认后再写入。
+发现已有配置冲突时不得覆盖，先展示差异并等待决定。工具链安装属于用户级副作用，
+需要单独确认；安装或写入失败时保留诊断，不得声称项目初始化完成。
 
 ## 创建/更新以下文件
 

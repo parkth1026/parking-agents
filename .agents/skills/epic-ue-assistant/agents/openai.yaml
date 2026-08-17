@@ -1,0 +1,6 @@
+interface:
+  display_name: "Epic UE Assistant"
+  short_description: "Query Epic's official UE assistant with evidence boundaries"
+  default_prompt: "Use $epic-ue-assistant to ask Epic's official UE assistant about this error or API."
+policy:
+  allow_implicit_invocation: true

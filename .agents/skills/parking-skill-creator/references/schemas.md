@@ -6,7 +6,7 @@ This document defines the JSON schemas used by skill-creator.
 
 ## evals.json
 
-Defines the evals for a skill. Located at `evals/evals.json` within the skill directory.
+Defines the evals for a skill. Located at `<skill-dir>/../../evals/<skill-name>-workspace/evals/evals.json` in the default workspace.
 
 ```json
 {
@@ -31,7 +31,7 @@ Defines the evals for a skill. Located at `evals/evals.json` within the skill di
 - `evals[].id`: Unique integer identifier
 - `evals[].prompt`: The task to execute
 - `evals[].expected_output`: Human-readable description of success
-- `evals[].files`: Optional list of input file paths (relative to skill root)
+- `evals[].files`: Optional list of input file paths (relative to the workspace root)
 - `evals[].expectations`: List of verifiable statements
 
 ---
@@ -69,7 +69,7 @@ Append-only eval score ledger. Located at `<skill-dir>/history.json`, distribute
   "runs": [
     {
       "date": "2026-08-17T14:00:00+08:00",
-      "iteration_ref": "C:/x/.claude/skill-workspaces/feishu-doc-qa-workspace/iteration-1",
+      "iteration_ref": "<skill-dir>/../../evals/feishu-doc-qa-workspace/iteration-1",
       "gates": {
         "with_skill":     { "pass_rate": 1.00, "mean_ms": 137000, "mean_tokens": 48213 },
         "without_skill":  { "pass_rate": 0.50, "mean_ms": 155000, "mean_tokens": 62000 }
@@ -78,7 +78,7 @@ Append-only eval score ledger. Located at `<skill-dir>/history.json`, distribute
     },
     {
       "date": "2026-08-17T18:00:00+08:00",
-      "iteration_ref": "C:/x/.claude/skill-workspaces/feishu-doc-qa-workspace/iteration-2",
+      "iteration_ref": "<skill-dir>/../../evals/feishu-doc-qa-workspace/iteration-2",
       "gates": {
         "with_skill":     { "pass_rate": 1.00, "mean_ms": 121000, "mean_tokens": 44100 },
         "without_skill":  { "pass_rate": 0.50, "mean_ms": 158000, "mean_tokens": 63500 }
@@ -131,53 +131,6 @@ Product of the structure-review step (SKILL.md 6.5). Located at `<iteration-dir>
   - `signal` / `hit` / `evidence`: Signal name / whether it hit / one-sentence evidence. `hit` is `true` / `false` / `null` — `null` means "no data to judge" (e.g. signal 4 before any trigger eval ran); the viewer renders it as 「无数据」
 - `recommendation`: The split suggestion shown in the card; empty or 「无需拆分」 when no signal hits
 - `conclusion`: Where the suggestion landed (dialog at review time; design.md iteration record at wrap-up, after the user's verdict) and that execution stays with the user. Rendered even when no benchmark.json exists
-
----
-
-## history.json（fork 纸面契约，未实现）
-
-Tracks version progression in Improve mode. Located at workspace root. **纸面契约**（fork 自官方文档，当前未实现）；与本仓库已实现的技能目录 `history.json`（见上节）同名不同物——已实现的那个在 `<技能目录>/history.json`，记录跨轮评测成绩。
-
-```json
-{
-  "started_at": "2026-01-15T10:30:00Z",
-  "skill_name": "pdf",
-  "current_best": "v2",
-  "iterations": [
-    {
-      "version": "v0",
-      "parent": null,
-      "expectation_pass_rate": 0.65,
-      "grading_result": "baseline",
-      "is_current_best": false
-    },
-    {
-      "version": "v1",
-      "parent": "v0",
-      "expectation_pass_rate": 0.75,
-      "grading_result": "won",
-      "is_current_best": false
-    },
-    {
-      "version": "v2",
-      "parent": "v1",
-      "expectation_pass_rate": 0.85,
-      "grading_result": "won",
-      "is_current_best": true
-    }
-  ]
-}
-```
-
-**Fields:**
-- `started_at`: ISO timestamp of when improvement started
-- `skill_name`: Name of the skill being improved
-- `current_best`: Version identifier of the best performer
-- `iterations[].version`: Version identifier (v0, v1, ...)
-- `iterations[].parent`: Parent version this was derived from
-- `iterations[].expectation_pass_rate`: Pass rate from grading
-- `iterations[].grading_result`: "baseline", "won", "lost", or "tie"
-- `iterations[].is_current_best`: Whether this is the current best version
 
 ---
 
@@ -320,7 +273,7 @@ Output from `scripts/aggregate-benchmark.mjs`. Located at `<iteration-dir>/bench
 
 ## trigger-evals.json
 
-Trigger-eval query set (subagent probe mechanism). Located at the workspace root (`<skill-name>-workspace/trigger-evals.json`).
+Trigger-eval query set (subagent probe mechanism). Located at the default workspace root (`<skill-dir>/../../evals/<skill-name>-workspace/trigger-evals.json`).
 
 ```json
 {

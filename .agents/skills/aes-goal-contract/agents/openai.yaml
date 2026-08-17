@@ -1,6 +1,7 @@
 interface:
   display_name: "aes-goal-contract"
-  short_description: "锁定验收：聚 AC、落盘契约、校验与交接"
+  short_description: "锁定验收：聚合 AC、落盘契约、结构校验与交接指令"
+  default_prompt: "使用 $aes-goal-contract 把已确认的对照物整理成可验收的 Goal Contract。"
 policy:
   # 由 workflow-interview 编排调用，所以不能整个关掉隐式调用。
   allow_implicit_invocation: true

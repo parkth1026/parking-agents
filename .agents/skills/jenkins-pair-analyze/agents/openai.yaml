@@ -1,0 +1,6 @@
+interface:
+  display_name: "Jenkins Pair Analysis"
+  short_description: "Analyze one Jenkins failure-to-success build pair with evidence"
+  default_prompt: "Use $jenkins-pair-analyze to analyze this Jenkins failure-to-success build pair."
+policy:
+  allow_implicit_invocation: true

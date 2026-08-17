@@ -1,5 +1,6 @@
 interface:
   display_name: "Making Skills Cross-Platform"
-  short_description: "Port a skills repo to many harnesses via native plugin mechanisms"
+  short_description: "Port a skills repo across harnesses via native plugin mechanisms"
+  default_prompt: "Use $making-skills-cross-platform to audit or port this skills repository across harnesses."
 policy:
   allow_implicit_invocation: false

@@ -17,7 +17,8 @@ const STRUCTURES = {
 function usage() {
   console.log("用法: node init-skill.mjs <name> [--structure workflow|task|reference|capabilities] [--path <输出目录>]");
   console.log(`  --structure 结构模式（默认 task）: ${Object.keys(STRUCTURES).join(" | ")}`);
-  console.log("  --path     输出目录（默认: 本技能所在技能目录的同级，即 .claude/skills/）");
+  console.log("  --path     输出目录（默认: 本技能目录的同级技能目录）");
+  console.log("  --interface key=value  覆盖 agents/openai.yaml 的 display_name、short_description 或 default_prompt（可重复）");
   console.log("示例: node init-skill.mjs log-classifier --structure task");
   process.exit(2);
 }
@@ -142,6 +143,20 @@ const DESIGN_TEMPLATE = (name) => `# design: ${name}
 | --- | --- | --- | --- |
 `;
 
+const OPENAI_INTERFACE_KEYS = new Set(["display_name", "short_description", "default_prompt"]);
+function yamlString(value) {
+  return JSON.stringify(String(value));
+}
+function openaiYaml(name, overrides) {
+  const title = titleCase(name);
+  const values = {
+    display_name: overrides.display_name ?? title,
+    short_description: overrides.short_description ?? `Create and use the ${title} skill`,
+    default_prompt: overrides.default_prompt ?? `Use $${name} to handle a ${title} task.`,
+  };
+  return `interface:\n  display_name: ${yamlString(values.display_name)}\n  short_description: ${yamlString(values.short_description)}\n  default_prompt: ${yamlString(values.default_prompt)}\n\npolicy:\n  allow_implicit_invocation: true\n`;
+}
+
 /** 技能根回归测试骨架：零依赖 Node，check() 计数器，退出码 0=全过/1=有失败 */
 const RUN_TESTS_TEMPLATE = (name) => `#!/usr/bin/env node
 // run-tests.mjs — ${name} 的回归测试（升级/改动后必跑）
@@ -168,7 +183,7 @@ console.log(\`\\n\${pass} passed, \${fail} failed\`);
 process.exit(fail ? 1 : 0);
 `;
 
-function parseArgs(argv) {  const args = { name: null, structure: "task", path: null };
+function parseArgs(argv) {  const args = { name: null, structure: "task", path: null, interface: {} };
   const rest = [...argv];
   if (rest.length === 0 || rest[0].startsWith("-")) return { args, error: "missing-name" };
   args.name = rest.shift();
@@ -182,6 +197,14 @@ function parseArgs(argv) {  const args = { name: null, structure: "task", path: 
       const v = rest.shift();
       if (!v) return { args, error: "bad-path" };
       args.path = v;
+    } else if (a === "--interface") {
+      const pair = rest.shift();
+      const equal = pair?.indexOf("=") ?? -1;
+      if (equal <= 0) return { args, error: "bad-interface" };
+      const key = pair.slice(0, equal);
+      const value = pair.slice(equal + 1);
+      if (!OPENAI_INTERFACE_KEYS.has(key) || !value) return { args, error: `bad-interface:${key}` };
+      args.interface[key] = value;
     } else {
       return { args, error: `unknown-arg:${a}` };
     }
@@ -195,9 +218,12 @@ if (error) {
   const hint = {
     "missing-name": "缺少技能名",
     "bad-path": "--path 需要一个目录参数",
+    "bad-interface": "--interface 需要 key=value",
   };
   console.log(hint[error] ?? (error.startsWith("bad-structure")
     ? `未知结构模式: ${error.slice("bad-structure:".length)}（允许: ${Object.keys(STRUCTURES).join(" | ")}）`
+    : error.startsWith("bad-interface")
+      ? `未知或空的 interface 字段: ${error.slice("bad-interface:".length)}（允许: ${[...OPENAI_INTERFACE_KEYS].join(", ")}）`
     : `未知参数: ${error.slice("unknown-arg:".length)}`));
   usage();
 }
@@ -215,7 +241,7 @@ if (skillName !== args.name.trim()) {
   console.log(`归一化 → ${skillName}`);
 }
 
-const skillRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..", ".."); // .claude/skills/
+const skillRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..", ".."); // 本技能目录的同级技能根
 const outBase = args.path ? resolve(args.path) : skillRoot;
 if (existsSync(outBase) && !statSync(outBase).isDirectory()) {
   console.log(`--path 指向的不是目录: ${outBase}（退出码 2）`);
@@ -248,6 +274,9 @@ console.log("  run-tests.mjs       (回归测试骨架，升级校验的依据)"
 mkdirSync(join(skillDir, "references"), { recursive: true });
 writeFileSync(join(skillDir, "references", "design.md"), DESIGN_TEMPLATE(skillName), "utf8");
 console.log("  references/design.md  (设计文档骨架,验收条件编号 AC-N,eval 断言引用 ac 字段)");
+mkdirSync(join(skillDir, "agents"), { recursive: true });
+writeFileSync(join(skillDir, "agents", "openai.yaml"), openaiYaml(skillName, args.interface), "utf8");
+console.log("  agents/openai.yaml  (技能列表 UI 元数据)");
 
 const resources = STRUCTURES[args.structure].resources;
 for (const res of resources) {
@@ -256,5 +285,5 @@ for (const res of resources) {
   console.log(`  ${res}/README.md     (占位说明，语言无关)`);
 }
 console.log(`模板通用，不带本仓库假设；结构模式: ${args.structure} = ${STRUCTURES[args.structure].label}`);
-console.log("下一步: 完成 SKILL.md 的 TODO 项 → 把测试用例固化进 run-tests.mjs → 删除「结构选择指南」节 → 运行 quick-validate.mjs 与 run-tests.mjs");
+console.log("下一步: 完成 SKILL.md 的待办占位 → 把测试用例固化进 run-tests.mjs → 删除「结构选择指南」节 → 运行 quick-validate.mjs 与 run-tests.mjs");
 process.exit(0);

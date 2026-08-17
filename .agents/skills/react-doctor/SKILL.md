@@ -10,18 +10,18 @@ Scans React codebases for security, performance, correctness, and architecture i
 
 ## After making React code changes:
 
-Run `npx react-doctor@latest --verbose --diff` and check the score did not regress.
+Run the repository-locked command `npx --no-install react-doctor --verbose --diff` and check the score did not regress. Only use `npx react-doctor@latest` after the user explicitly allows network download and an unpinned package.
 
 If the score dropped, fix the regressions before committing.
 
 ## For general cleanup or code improvement:
 
-Run `npx react-doctor@latest --verbose` (without `--diff`) to scan the full codebase. Fix issues by severity — errors first, then warnings.
+Run `npx --no-install react-doctor --verbose` (without `--diff`) to scan the full codebase. Fix issues by severity — errors first, then warnings. If the locked package is unavailable, report that fact instead of silently downloading a latest version.
 
 ## Command
 
 ```bash
-npx react-doctor@latest --verbose --diff
+npx --no-install react-doctor --verbose --diff
 ```
 
 | Flag        | Purpose                                       |

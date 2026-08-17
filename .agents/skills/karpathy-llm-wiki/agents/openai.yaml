@@ -1,2 +1,6 @@
+interface:
+  display_name: "Karpathy LLM Wiki"
+  short_description: "Ingest, query, and validate a structured LLM knowledge wiki"
+  default_prompt: "Use $karpathy-llm-wiki to ingest or query this LLM knowledge wiki."
 policy:
   allow_implicit_invocation: false

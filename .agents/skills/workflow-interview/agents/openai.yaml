@@ -1,5 +1,6 @@
 interface:
   display_name: "workflow-interview"
   short_description: "三阶段需求访谈编排器：问清需求 → 出对照物 → 落盘 Goal Contract。仅在显式调用时使用。"
+  default_prompt: "使用 $workflow-interview 走完整的需求访谈、对照物和 Goal Contract 流程。"
 policy:
   allow_implicit_invocation: false

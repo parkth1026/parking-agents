@@ -1,6 +1,7 @@
 interface:
   display_name: "aes-interview"
-  short_description: "锁定需求：调查事实、分诊、批量问清歧义"
+  short_description: "锁定需求：调查事实、分诊未知项、批量澄清边界并记录结果"
+  default_prompt: "使用 $aes-interview 调查仓库事实并澄清会改变需求边界的未知项。"
 policy:
   # 由 workflow-interview 编排调用，所以不能整个关掉隐式调用。
   allow_implicit_invocation: true

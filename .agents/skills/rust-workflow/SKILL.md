@@ -30,6 +30,8 @@ disable-model-invocation: true
 
 ### rust-analyzer 自动检查
 IDE 已配置 `check.command: "clippy"`，保存时自动检查，无需手动运行 clippy。
+这只是配置声明，不是运行证据；交付前要检查实际 IDE 配置和 hook 是否存在，
+并以命令输出证明检查通过，不得仅凭配置文件声称已验证。
 
 ---
 

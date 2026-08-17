@@ -254,8 +254,8 @@ Kept in full: .changed 节点与 accent 连线的完整样式参数——这是�
 - 移植源：diagram-design v2.4.0（本地参考仓库 `G:\GIT\AI_WorkFlow_ref\diagram-design`，
   作者 Cathryn Lavery，**MIT License**）。
 - 移植映射：SKILL.md §6 连线六则、§7 网格与复杂度预算、§12 可访问 SVG 契约 →
-  本文 §4/§3+§6/§0；references/style-guide.md 语义角色 → §2；
-  references/type-architecture.md 肘线公式与跨线桥 → §4。
+  本文 §4/§3+§6/§0；源技能 `references/style-guide.md` 的语义角色 → §2；
+  源技能 `references/type-architecture.md` 的肘线公式与跨线桥 → §4。
   本文新增（非源技能内容）：引言的管辖权段、§5 流程视图语法、§6 的拆分落盘与
   双视图同文件语义、§7 改动标注、§8 的页脚化 ledger——这些是本家族的约定。
 - 本地化改动：Google Fonts → 系统字体（零外链硬规则）；砍暗色/终端皮肤、动画、

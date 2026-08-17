@@ -1,30 +1,33 @@
 #!/usr/bin/env node
 // check-shadow-skills.mjs — 技能扫描根「影子技能」检测(随时可跑的漏网之鱼复查)
-// 规则:技能扫描根(.claude/skills、.agents/skills 等)只认一级目录下的 SKILL.md;
+// 规则:技能扫描根只认一级目录下的 SKILL.md;
 // 更深层出现的任何 SKILL.md(workspace 快照、评测产物、夹具)都可能被递归扫描器
 // 识别成第二个技能,挤进技能清单、污染触发评测。快照请走 snapshot-skill.mjs
 // (SKILL.md 已改名 .bak),本脚本负责揪出所有违反这条规则的活体 SKILL.md。
 // 用法: node check-shadow-skills.mjs [技能根1 技能根2 ...]
-//   不带参数时自动检查当前目录下的 .claude/skills 与 .agents/skills(存在才查)。
+//   不带参数时自动检查本技能目录的同级扫描根(存在才查)。
 // 退出码: 0 干净 / 1 发现影子技能 / 2 用法错(没有可查的根)
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { dirname, join, relative, resolve } from "node:path";
 import { parseFrontmatter } from "./lib/frontmatter.mjs";
 
 const SKIP_DIRS = new Set([".git", "node_modules", "__pycache__"]);
+const SKILL_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const DEFAULT_SCAN_ROOT = resolve(SKILL_DIR, "..");
 
 function usage() {
   console.log("用法: node check-shadow-skills.mjs [技能根1 技能根2 ...]");
-  console.log("  不带参数时自动检查当前目录下的 .claude/skills 与 .agents/skills(存在才查)。");
+  console.log("  不带参数时自动检查本技能目录的同级扫描根(存在才查)。");
   console.log("  影子技能 = 技能根下非一级目录里的 SKILL.md(快照/评测产物/夹具冒充的技能)。");
-  console.log("示例: node check-shadow-skills.mjs ../../.claude/skills ../../.agents/skills");
+  console.log("示例: node check-shadow-skills.mjs <扫描根>");
   process.exit(2);
 }
 
 const argRoots = process.argv.slice(2);
 const roots = argRoots.length
   ? argRoots.map((r) => resolve(r))
-  : [".claude/skills", ".agents/skills"].map((r) => resolve(r)).filter((r) => {
+  : [DEFAULT_SCAN_ROOT].filter((r) => {
       try { return statSync(r).isDirectory(); } catch { return false; }
     });
 if (!roots.length) usage();

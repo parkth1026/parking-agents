@@ -6,6 +6,9 @@ disable-model-invocation: true
 
 # Claude Code → VS Code Copilot Skill Converter
 
+转换结果必须人工复核：先生成或展示 diff，再写回目标文件；未知工具名、平台专用字段、
+权限边界和无法一一映射的语义必须保留并标为待确认，不得静默删除或宣称等价。
+
 ## 工具名映射表
 
 | Claude Code | VS Code Copilot | 类别 | 备注 |
