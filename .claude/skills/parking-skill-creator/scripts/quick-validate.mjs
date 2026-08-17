@@ -21,13 +21,16 @@ function usage() {
 export function validateSkill(skillDir) {
   const errors = [];
 
-  if (!existsSync(skillDir) || !statSync(skillDir).isDirectory()) {
+  if (!existsSync(skillDir)) {
     return { valid: false, errors: [`目录不存在: ${skillDir}`], summary: null };
+  }
+  if (!statSync(skillDir).isDirectory()) {
+    return { valid: false, errors: [`不是目录: ${skillDir}`], summary: null };
   }
 
   const { name, description, keys, values, error } = parseSkillMdFile(skillDir, readFileSync);
-  if (error === "SKILL.md not found") {
-    return { valid: false, errors: ["SKILL.md not found"], summary: null };
+  if (error === "SKILL.md not found" || error === "SKILL.md is a directory") {
+    return { valid: false, errors: [error], summary: null };
   }
   if (error) {
     return { valid: false, errors: [`frontmatter 结构错误: ${error}`], summary: null };
@@ -49,7 +52,9 @@ export function validateSkill(skillDir) {
       errors.push("name 必须是字符串");
     } else {
       const n = name.trim();
-      if (n) {
+      if (!n) {
+        errors.push("name 不能为空");
+      } else {
         if (!/^[a-z0-9-]+$/.test(n)) {
           errors.push(`name '${n}' 必须是 kebab-case（仅小写字母、数字、连字符）`);
         }
@@ -69,7 +74,9 @@ export function validateSkill(skillDir) {
       errors.push("description 必须是字符串");
     } else {
       const d = description.trim();
-      if (d) {
+      if (!d) {
+        errors.push("description 不能为空");
+      } else {
         if (d.includes("<") || d.includes(">")) {
           errors.push("description 不得含尖括号（< 或 >）");
         }

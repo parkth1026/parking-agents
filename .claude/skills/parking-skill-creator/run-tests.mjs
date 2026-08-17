@@ -20,11 +20,12 @@ function check(name, cond) {
 function runFile(script, args, opts = {}) {
   try {
     const stdout = execFileSync("node", [join(SCRIPTS, script), ...args], { encoding: "utf8", ...opts });
-    return { code: 0, stdout };
+    return { code: 0, stdout, stderr: "" };
   } catch (e) {
-    return { code: e.status ?? 1, stdout: e.stdout?.toString() ?? "" };
+    return { code: e.status ?? 1, stdout: e.stdout?.toString() ?? "", stderr: e.stderr?.toString() ?? "" };
   }
 }
+const out = (r) => r.stdout + r.stderr;
 const run = (args) => runFile("snapshot-skill.mjs", args);
 
 function exists(p) {
@@ -133,6 +134,58 @@ try {
   check("无参数自动发现干净根退出码 0", auto.code === 0 && auto.stdout.includes(join(root2, ".claude", "skills")));
 } finally {
   rmSync(root2, { recursive: true, force: true });
+}
+
+// ---- 对抗回归：路径占用/参数护栏/空必填键（2026-08-17 对抗测试修复） ----
+console.log("对抗·崩溃与判定修复：");
+const root4 = mkdtempSync(join(tmpdir(), "advtest-"));
+try {
+  const advSkill = join(root4, "sk", "demo");
+  mkdirSync(advSkill, { recursive: true });
+  writeFileSync(join(advSkill, "SKILL.md"), "---\nname: demo\ndescription: d\n---\n");
+  const outFile = join(root4, "占用文件");
+  writeFileSync(outFile, "x");
+
+  const wsIsFile = run([advSkill, outFile]);
+  check("workspace 参数是文件 → 干净拒绝 1", wsIsFile.code === 1 && out(wsIsFile).includes("拒绝"));
+
+  writeFileSync(join(root4, "skill-workspaces"), "x"); // 占用缺省 workspace 的上级路径名
+  const defBlocked = run([advSkill]);
+  check("缺省 workspace 被文件占用 → 干净拒绝 1（不吐堆栈）", defBlocked.code === 1 && out(defBlocked).includes("拒绝"));
+  rmSync(join(root4, "skill-workspaces"));
+
+  check("snapshot 拦 - 开头参数 → 用法 2", run(["--help"]).code === 2);
+
+  const badSkill = join(root4, "sk2", "bad");
+  mkdirSync(join(badSkill, "SKILL.md"), { recursive: true }); // SKILL.md 是目录
+  check("SKILL.md 是目录 → 干净拒绝 1", run([badSkill]).code === 1);
+
+  check("init --path 指向文件 → 用法 2", runFile("init-skill.mjs", ["x1", "--path", outFile]).code === 2);
+
+  const outDir = join(root4, "out");
+  mkdirSync(outDir);
+  writeFileSync(join(outDir, "occupied"), "x");
+  check("init 目标被同名文件占用 → 拒绝 1", runFile("init-skill.mjs", ["occupied", "--path", outDir]).code === 1);
+
+  const qvFile = runFile("quick-validate.mjs", [outFile]);
+  check("quick-validate 参数是文件 → 报「不是目录」", qvFile.code === 1 && out(qvFile).includes("不是目录"));
+
+  const emptyName = join(root4, "qv1");
+  mkdirSync(emptyName);
+  writeFileSync(join(emptyName, "SKILL.md"), '---\nname: ""\ndescription: d\n---\n');
+  check("空 name 判 FAIL", runFile("quick-validate.mjs", [emptyName]).code === 1);
+
+  const emptyDesc = join(root4, "qv2");
+  mkdirSync(emptyDesc);
+  writeFileSync(join(emptyDesc, "SKILL.md"), "---\nname: ok-skill\ndescription: >\n---\n");
+  check("空 description 判 FAIL", runFile("quick-validate.mjs", [emptyDesc]).code === 1);
+
+  const dirSkillMd = join(root4, "qv3");
+  mkdirSync(join(dirSkillMd, "SKILL.md"), { recursive: true });
+  const r3 = runFile("quick-validate.mjs", [dirSkillMd]);
+  check("SKILL.md 是目录 → FAIL 且如实报错", r3.code === 1 && out(r3).includes("is a directory"));
+} finally {
+  rmSync(root4, { recursive: true, force: true });
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

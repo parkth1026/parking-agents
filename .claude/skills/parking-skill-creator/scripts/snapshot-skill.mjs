@@ -9,7 +9,7 @@
 //       workspace 缺省为 <技能根上一级>/skill-workspaces/<技能名>-workspace（扫描根外，
 //       既有同级旧 workspace 可显式传参沿用）。
 // 退出码: 0 成功 / 1 拒绝（不是技能目录、无可用快照名、复制失败）/ 2 用法错
-import { cpSync, existsSync, mkdirSync, renameSync, rmSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, renameSync, rmSync, statSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -22,20 +22,30 @@ function usage() {
 }
 
 const [skillDirRaw, workspaceRaw] = process.argv.slice(2);
-if (!skillDirRaw) usage();
+if (!skillDirRaw || skillDirRaw.startsWith("-")) usage();
 
 const skillDir = resolve(skillDirRaw);
-if (!existsSync(join(skillDir, "SKILL.md"))) {
-  console.error(`拒绝：${skillDir} 下没有 SKILL.md，不是技能目录`);
+const marker = join(skillDir, "SKILL.md");
+if (!existsSync(marker) || !statSync(marker).isFile()) {
+  console.error(`拒绝：${marker} 不存在或不是文件，不是技能目录`);
   process.exit(1);
 }
 
-// 缺省 workspace 落在技能扫描根之外（技能根上一级/skill-workspaces/），
+// 缺省 workspace 落在技能扫描根之外（扫描根上一级/skill-workspaces/），
 // 快照与评测产物里的 SKILL.md 永远不会被技能扫描器看到
 const workspace = workspaceRaw
   ? resolve(workspaceRaw)
   : join(dirname(dirname(skillDir)), "skill-workspaces", `${basename(skillDir)}-workspace`);
-mkdirSync(workspace, { recursive: true });
+if (existsSync(workspace) && !statSync(workspace).isDirectory()) {
+  console.error(`拒绝：workspace 路径被文件占用：${workspace}`);
+  process.exit(1);
+}
+try {
+  mkdirSync(workspace, { recursive: true });
+} catch (err) {
+  console.error(`拒绝：workspace 无法创建（${err.code ?? err.message}）：${workspace}`);
+  process.exit(1);
+}
 
 // skill-snapshot → skill-snapshot-v2 → skill-snapshot-v3 … 取第一个不存在的
 let snapDir = null;

@@ -2,7 +2,7 @@
 // init-skill.mjs — 通用技能脚手架（codex init_skill.py 移植，模板语言无关、不带本仓库假设）
 // 用法: node init-skill.mjs <name> [--structure workflow|task|reference|capabilities] [--path <目录>]
 // 退出码: 0 成功 / 1 拒绝（目录已存在且非空）/ 2 用法错（名字非法/超限）
-import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -197,14 +197,29 @@ if (skillName !== args.name.trim()) {
 
 const skillRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..", ".."); // .claude/skills/
 const outBase = args.path ? resolve(args.path) : skillRoot;
+if (existsSync(outBase) && !statSync(outBase).isDirectory()) {
+  console.log(`--path 指向的不是目录: ${outBase}（退出码 2）`);
+  process.exit(2);
+}
 const skillDir = join(outBase, skillName);
 
-if (existsSync(skillDir) && readdirSync(skillDir).length > 0) {
-  console.log(`已存在且非空: ${skillDir}（不覆盖，退出码 1）`);
-  process.exit(1);
+if (existsSync(skillDir)) {
+  if (!statSync(skillDir).isDirectory()) {
+    console.log(`已存在同名文件（不覆盖，退出码 1）: ${skillDir}`);
+    process.exit(1);
+  }
+  if (readdirSync(skillDir).length > 0) {
+    console.log(`已存在且非空: ${skillDir}（不覆盖，退出码 1）`);
+    process.exit(1);
+  }
 }
 
-mkdirSync(skillDir, { recursive: true });
+try {
+  mkdirSync(skillDir, { recursive: true });
+} catch (err) {
+  console.log(`目录创建失败（${err.code ?? err.message}，退出码 1）: ${skillDir}`);
+  process.exit(1);
+}
 writeFileSync(join(skillDir, "SKILL.md"), SKILL_TEMPLATE(skillName), "utf8");
 console.log(`init ${skillName} → ${skillDir}`);
 console.log("  SKILL.md            (含待办占位、结构选择指南节与测试节)");
