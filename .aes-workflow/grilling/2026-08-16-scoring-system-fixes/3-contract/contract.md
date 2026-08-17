@@ -26,7 +26,7 @@
 - analyze.md / learning references/config.md：删除与 scoring.md 冲突的表述，改为一处引用；analyze.md 检查清单加 :see= 强制项与 Warning Trend 项。
 - knowledge-format.md：自例文件名补 ShortDesc 段；Warning Trend 必填节规范（recorded_at ≥ 生效时刻）；Recurrences/:see= 纪律强化。
 - validate-raw.mjs：生效分界校验（recorded_at ≥ 生效时刻的文件必须有 Warning Trend 节；存量放行）。
-- 盲评包与流程：`scoring-audit-2026-08-16/blind-review/{set/,scoring-sheet.md,procedure.md}`（对当前库全量生成去分副本）+ `jenkins-pair-analyze/references/blind-review.md`（可复用流程）；用户盲评后指标落 `blind-review/results.md`。
+- 盲评包与流程：`docs/reports/scoring-audit-2026-08-16/blind-review/{set/,scoring-sheet.md,procedure.md}`（对当前库全量生成去分副本）+ `jenkins-pair-analyze/references/blind-review.md`（可复用流程）；用户盲评后指标落 `blind-review/results.md`。
 
 不做：
 - 不改四维权重数值与 8/5 阈值；不改结论串 grammar 与 frontmatter schema 字段集；不改文件命名规则。
@@ -39,7 +39,7 @@
 - 确认版对照物 `../2-prototype/behavior.md`、`../2-prototype/example-run.md` 不可修改。
 - **向后兼容判据**：对存量 14 份按新规则重算，分档（details/scratch）与结论串必须逐一不变——aes6-329 合法化为 8、EnvironmentStateLag 保持 7 是两条验收锚点。
 - 10 分制四维权重数值、8/5 阈值、结论串 grammar 本轮冻结。
-- 存量文件、既有账本条目、NAS wiki 零写入；盲评去分副本只落在 `scoring-audit-2026-08-16/blind-review/`。
+- 存量文件、既有账本条目、NAS wiki 零写入；盲评去分副本只落在 `docs/reports/scoring-audit-2026-08-16/blind-review/`。
 - 外部驱动无法暂停：规则文档必须原子落地（一次提交），validate-raw 的生效时刻取该提交时刻，容忍下一轮自动用新规。
 - 文本 UTF-8 without BOM；脚本（若触）一律 .mjs。
 
@@ -59,7 +59,7 @@
 
 - `../2-prototype/behavior.md` — 9 行变化行与不变清单（本契约全部行为来源）。
 - `../2-prototype/example-run.md` — 7 场景与关键断言（[C] 档照此复现）。
-- `D:/GIT_dev/parking-agents/scoring-audit-2026-08-16/verdict.md` — 需求底稿（缺陷清单与证据出处）。
+- `D:/GIT_dev/parking-agents/docs/reports/scoring-audit-2026-08-16/verdict.md` — 需求底稿（缺陷清单与证据出处）。
 
 ## 验收条件
 
@@ -73,8 +73,8 @@
   - Verify: [A] `node D:/GIT_dev/parking-agents/.claude/skills/jenkins-log-auto-learning/scripts/validate-raw.mjs` → 退出码 0；[C] 负例按 example-run 场景 1 手工复现（构造生效后缺节文件报 ERROR，验后删除）
 - AC-005: :see= 强制纪律与校准触发条件成文：analyze.md 检查清单新增 :see= 强制项（当前 0 处）；knowledge-format.md 含 Warning Trend 必填规范（当前为无条件式规范）。
   - Verify: [A] `node -e "const fs=require('fs');const A=fs.readFileSync('D:/GIT_dev/parking-agents/.claude/skills/jenkins-pair-analyze/references/analyze.md','utf8');const K=fs.readFileSync('D:/GIT_dev/parking-agents/.claude/skills/jenkins-pair-analyze/references/knowledge-format.md','utf8');process.exit(/- \[ \].*see=/.test(A)&&K.includes('Warning Trend')&&K.includes('必填')?0:1)"` → 退出码 0
-- AC-006: 盲评包就绪：`scoring-audit-2026-08-16/blind-review/{set/,scoring-sheet.md,procedure.md}` 存在；set/ 去分副本数量 = 当前库知识文件数（details+scratch）；副本不含分值泄露（score:/Score/Scoring 标记）；`references/blind-review.md` 流程文档存在。
-  - Verify: [A] `node -e "const fs=require('fs'),path=require('path');const B='D:/GIT_dev/parking-agents/scoring-audit-2026-08-16/blind-review/';const N='//nas.51vr.local/x.public/UE5/ue-llm-wiki/raw/';if(!fs.existsSync(B+'set')||!fs.existsSync(B+'scoring-sheet.md')||!fs.existsSync(B+'procedure.md')||!fs.existsSync('D:/GIT_dev/parking-agents/.claude/skills/jenkins-pair-analyze/references/blind-review.md'))process.exit(1);const set=fs.readdirSync(B+'set').filter(f=>f.endsWith('.md'));const count=['details','scratch'].reduce((n,d)=>n+fs.readdirSync(N+d).filter(f=>f.endsWith('.md')).length,0);const leaked=set.some(f=>/(^score:|\*\*Score\*\*|\*\*Scoring\*\*)/m.test(fs.readFileSync(path.join(B+'set',f),'utf8')));process.exit(set.length===count&&!leaked?0:1)"` → 退出码 0
+- AC-006: 盲评包就绪：`docs/reports/scoring-audit-2026-08-16/blind-review/{set/,key.md,scoring-sheet.md,procedure.md}` 存在；set/ 去分副本数量 = key.md 快照映射行数（生成时刻语料全量，外部驱动后续新增不计）；副本不含分值泄露（score:/Score/Scoring 标记）；`references/blind-review.md` 流程文档存在。
+  - Verify: [A] `node -e "const fs=require('fs'),path=require('path');const B='D:/GIT_dev/parking-agents/docs/reports/scoring-audit-2026-08-16/blind-review/';if(!fs.existsSync(B+'set')||!fs.existsSync(B+'scoring-sheet.md')||!fs.existsSync(B+'procedure.md')||!fs.existsSync(B+'key.md')||!fs.existsSync('D:/GIT_dev/parking-agents/.claude/skills/jenkins-pair-analyze/references/blind-review.md'))process.exit(1);const set=fs.readdirSync(B+'set').filter(f=>f.endsWith('.md'));const keyRows=(fs.readFileSync(B+'key.md','utf8').match(/^\| BR-/gm)||[]).length;const leaked=set.some(f=>/(^score:|\*\*Score\*\*|\*\*Scoring\*\*)/m.test(fs.readFileSync(path.join(B+'set',f),'utf8')));console.log('set:',set.length,'| key rows:',keyRows,'| leaked:',leaked);process.exit(set.length===keyRows&&keyRows>0&&!leaked?0:1)"` → 退出码 0（2026-08-17 更正：数量对齐基准从活语料改为 key.md 快照行数——外部驱动每小时新增文件，原判据存在永不可过的竞态；意图不变）
 - AC-007: 盲评执行与信度基线落盘：用户按 procedure.md 完成盲评，results.md 含逐文件 |Δ总分|、|Δ|≤1 占比、四维差异表。
   - Verify: [C] 照 example-run 场景 6 操作（操作者=用户，约半天；执行 Agent 负责包生成与指标计算，不代填）
 
