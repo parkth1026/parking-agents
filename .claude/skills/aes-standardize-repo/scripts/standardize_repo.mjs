@@ -19,6 +19,9 @@ const skillRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const templateRoot = join(skillRoot, "assets", "run");
 const integrationSentence = "本仓库标准操作：`.\\run` 发现，`.\\run <id> -n` 预览，`.\\run <id>` 执行，`--json` 机器可读。";
 const reserved = new Set(["list", "show", "doctor", "help", "run"]);
+// 动词域的单一事实源；references/action-naming.md 的表格由这份清单派生，保持两处同步。
+const verbDomain = ["setup", "dev", "start", "serve", "preview", "build", "dist", "check", "lint", "typecheck", "test", "gate"];
+const acceptedScripts = new RegExp(`^(?:${verbDomain.join("|")})(?::|-|$)`, "iu");
 
 function fail(message, code = 64, asJson = false) {
   if (asJson) process.stdout.write(`${JSON.stringify({ status: "error", exitCode: code, error: message })}\n`);
@@ -76,20 +79,22 @@ function packageManager(target) {
 }
 
 function actionKind(id) {
-  if (id === "dev" || id.startsWith("dev.") || id === "start" || id.startsWith("start.")) return "open";
-  if (id === "test" || id.startsWith("test.")) return "test";
-  if (id === "gate" || id.startsWith("gate.")) return "gate";
+  if (/^(?:dev|start|serve|preview)(?:\.|$)/u.test(id)) return "open";
+  if (/^test(?:\.|$)/u.test(id)) return "test";
+  if (/^gate(?:\.|$)/u.test(id)) return "gate";
   return "task";
 }
 
+// 机械映射：`test:gate-review-fixes` -> `test.gate.review.fixes`。id 始终可由脚本名推导；
+// 映射不了的脚本必须报告，绝不静默丢弃。
 function actionId(script) {
-  const id = script.toLowerCase().replace(/:/gu, ".");
+  const id = script.toLowerCase().replaceAll(":", ".").replaceAll("-", ".");
   return /^[a-z][a-z0-9]*(?:\.[a-z][a-z0-9]*)*$/u.test(id) && !reserved.has(id) ? id : null;
 }
 
 function inferActions(target, pkg) {
   if (!pkg) {
-    return [{ id: "check", name: "Validate the run interface", kind: "task", run: ["node", "--check", "scripts/run.mjs"] }];
+    return { actions: [{ id: "check", name: "Validate the run interface", kind: "task", run: ["node", "--check", "scripts/run.mjs"] }], skipped: [] };
   }
   const manager = packageManager(target);
   const actions = [{
@@ -98,15 +103,22 @@ function inferActions(target, pkg) {
     kind: "task",
     run: manager === "npm" ? ["npm", "install"] : [manager, "install"],
   }];
+  const skipped = [];
   const scripts = pkg.scripts && typeof pkg.scripts === "object" ? Object.keys(pkg.scripts) : [];
-  const accepted = /^(dev|start|build|check|typecheck|test|gate|dist)(?::|$)/iu;
-  for (const script of scripts.filter((candidate) => accepted.test(candidate)).sort()) {
+  for (const script of scripts.filter((candidate) => acceptedScripts.test(candidate)).sort()) {
     const id = actionId(script);
-    if (!id || actions.some((action) => action.id === id)) continue;
+    if (!id) {
+      skipped.push({ script, reason: "does not map to a valid action id" });
+      continue;
+    }
+    if (actions.some((action) => action.id === id)) {
+      skipped.push({ script, reason: `collides with already-mapped id '${id}'` });
+      continue;
+    }
     actions.push({ id, name: script, kind: actionKind(id), run: [manager, "run", script] });
   }
   if (actions.length === 1) actions.push({ id: "check", name: "Validate package metadata", kind: "task", run: ["node", "-e", "JSON.parse(require('node:fs').readFileSync('package.json','utf8'))"] });
-  return actions;
+  return { actions, skipped };
 }
 
 function copyTree(source, destination, asJson = false) {
@@ -125,11 +137,16 @@ function tomlString(value) {
 }
 
 function renderConfig(projectId, actions) {
+  const header = [
+    "# run/v1 — id 遵循动词域命名规范；扩展动词域必须在此登记。",
+    `# 动词域：${verbDomain.join(" ")}`,
+    "",
+  ].join("\n");
   const blocks = [`[project]\nid = ${tomlString(projectId)}`];
   for (const action of actions) {
     blocks.push(`[[actions]]\nid = ${tomlString(action.id)}\nname = ${tomlString(action.name)}\nkind = ${tomlString(action.kind)}\nrun = ${tomlString(action.run)}`);
   }
-  return `${blocks.join("\n\n")}\n`;
+  return `${header}${blocks.join("\n\n")}\n`;
 }
 
 function scannedInputs(target) {
@@ -170,27 +187,29 @@ function main() {
     if (result.status !== 0) fail(`git init failed: ${(result.stderr || result.error?.message || "unknown error").trim()}`, 70, options.json);
   }
 
-  const destinations = ["run.cmd", "run", "run.toml", join("scripts", "run.mjs"), join("scripts", "vendor", "toml")];
+  const destinations = ["run.cmd", "run", "run.toml", "run.schema.json", join("scripts", "run.mjs"), join("scripts", "vendor", "toml")];
   const collisions = destinations.filter((relative) => existsSync(join(options.target, relative)));
   if (collisions.length > 0 && !options.force) fail(`run interface already exists (${collisions.join(", ")}); review it or explicitly use --force`, 64, options.json);
 
   const pkg = readPackageJson(options.target, options.json);
   const projectId = options.projectId ?? inferProjectId(options.target, pkg);
   if (!/^[a-z0-9][a-z0-9.-]*\/[a-z0-9][a-z0-9.-]*$/u.test(projectId)) fail(`project id must have lowercase namespace/name form: ${projectId}`, 65, options.json);
-  const actions = inferActions(options.target, pkg);
+  const { actions, skipped } = inferActions(options.target, pkg);
   mkdirSync(join(options.target, "scripts"), { recursive: true });
   copyFileSync(join(templateRoot, "run.cmd"), join(options.target, "run.cmd"));
   copyFileSync(join(templateRoot, "run"), join(options.target, "run"));
+  copyFileSync(join(templateRoot, "run.schema.json"), join(options.target, "run.schema.json"));
   copyFileSync(join(templateRoot, "scripts", "run.mjs"), join(options.target, "scripts", "run.mjs"));
   copyTree(join(templateRoot, "scripts", "vendor"), join(options.target, "scripts", "vendor"), options.json);
   chmodSync(join(options.target, "run"), 0o755);
   writeFileSync(join(options.target, "run.toml"), renderConfig(projectId, actions), "utf8");
   const agents = appendIntegration(options.target);
-  const result = { status: "ok", target: options.target, createdRepository: options.create, project: projectId, actions: actions.map((action) => action.id), scanned: scannedInputs(options.target), agents };
+  const result = { status: "ok", target: options.target, createdRepository: options.create, project: projectId, actions: actions.map((action) => action.id), skipped, scanned: scannedInputs(options.target), agents };
   if (options.json) process.stdout.write(`${JSON.stringify(result)}\n`);
   else {
-    process.stdout.write(`[aes-standardize-repo] generated run.cmd, run, run.toml, scripts/run.mjs, and the vendored TOML parser\n`);
+    process.stdout.write(`[aes-standardize-repo] generated run.cmd, run, run.toml, run.schema.json, scripts/run.mjs, and the vendored TOML parser\n`);
     process.stdout.write(`[aes-standardize-repo] project ${projectId}; actions: ${result.actions.join(", ")}\n`);
+    for (const entry of skipped) process.stdout.write(`[aes-standardize-repo] skipped script '${entry.script}': ${entry.reason}\n`);
     process.stdout.write(`[aes-standardize-repo] AGENTS.md: ${agents}\n`);
   }
 }

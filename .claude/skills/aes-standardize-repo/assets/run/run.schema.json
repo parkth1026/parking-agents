@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:run:v1",
+  "title": "run/v1 动作目录",
+  "description": "run.toml 解析之后的严格 schema。映射关系：[project] 变成 project 对象，[[actions]] 条目变成 actions 数组元素，TOML 字符串保持字符串。下游软件必须先按 TOML 1.0 解析，再拿解析结果对照本 schema 校验。有一条约束 JSON Schema 表达不了，由 runner 兜底：动作 id 在整个目录内必须唯一。",
+  "type": "object",
+  "properties": {
+    "project": {
+      "type": "object",
+      "description": "项目身份；恰好一个 id，小写 namespace/name 形式。",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9.-]*\\/[a-z0-9][a-z0-9.-]*$"
+        }
+      },
+      "required": ["id"],
+      "additionalProperties": false
+    },
+    "actions": {
+      "type": "array",
+      "description": "至少一个动作；每条命令都是显式 argv 数组，以禁用 shell 的方式执行。",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "小写点分词；动词域见动作命名规范。",
+            "pattern": "^[a-z][a-z0-9]*(\\.[a-z][a-z0-9]*)*$",
+            "not": {
+              "enum": ["list", "show", "doctor", "help", "run"]
+            }
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "enum": ["task", "open", "test", "gate"]
+          },
+          "run": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "required": ["id", "name", "kind", "run"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["project", "actions"],
+  "additionalProperties": false
+}

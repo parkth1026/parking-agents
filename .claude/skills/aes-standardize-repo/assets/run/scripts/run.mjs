@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 const require = createRequire(import.meta.url);
 const toml = require("./vendor/toml/index.cjs");
 
-const RUNNER_VERSION = "1.0.0";
+const RUNNER_VERSION = "1.1.0";
 const SCHEMA = "run/v1";
 const RESERVED = new Set(["list", "show", "doctor", "help", "run"]);
 const KINDS = new Set(["task", "open", "test", "gate"]);
@@ -109,6 +109,29 @@ function commandAvailable(command) {
 
 function decorateAction(action) {
   return { ...action, available: commandAvailable(action.run[0]) };
+}
+
+function quoteForCmd(part) {
+  return /[\s"]/.test(part) ? `"${part.replace(/"/gu, '\\"')}"` : part;
+}
+
+// Windows 上 npm/npx 实为 .cmd 脚本，而 Node 18.20+/20.12+ 禁止无 shell 直接 spawn
+// .cmd/.bat（CVE-2024-27980），于是 doctor 报可用、执行却失败。与 cross-spawn 同法：
+// 仅当解析到的可执行文件确实是 .cmd/.bat 时经 cmd.exe 中转，argv 语义不变。
+function resolveSpawnTarget(argv) {
+  if (process.platform !== "win32") return { file: argv[0], args: argv.slice(1) };
+  const resolved = executableCandidates(argv[0]).find((candidate) => {
+    try {
+      accessSync(candidate, constants.F_OK);
+      return true;
+    } catch {
+      return false;
+    }
+  });
+  if (resolved && /\.(cmd|bat)$/iu.test(resolved)) {
+    return { file: "cmd.exe", args: ["/d", "/s", "/c", argv.map(quoteForCmd).join(" ")] };
+  }
+  return { file: resolved ?? argv[0], args: argv.slice(1) };
 }
 
 function parseCli(argv) {
@@ -217,8 +240,9 @@ async function executeAction(config, requested, dryRun, asJson) {
   if (!action.available) throw new RunError(`action '${action.id}' is unavailable because '${action.run[0]}' was not found`, EXIT.UNAVAILABLE, { action: action.id, executable: action.run[0] });
 
   if (!asJson) process.stderr.write(`[run] ${action.id} -> ${commandText(action.run)}\n`);
+  const target = resolveSpawnTarget(action.run);
   const exitCode = await new Promise((resolveExit, reject) => {
-    const child = spawn(action.run[0], action.run.slice(1), { cwd: root, env: process.env, shell: false, stdio: asJson ? ["inherit", "pipe", "pipe"] : "inherit" });
+    const child = spawn(target.file, target.args, { cwd: root, env: process.env, shell: false, stdio: asJson ? ["inherit", "pipe", "pipe"] : "inherit" });
     if (asJson) {
       child.stdout.on("data", (chunk) => process.stderr.write(chunk));
       child.stderr.on("data", (chunk) => process.stderr.write(chunk));
