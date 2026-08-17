@@ -18,10 +18,12 @@
 ## 目录结构
 
 ```
-skills/                  # ★ 跨平台技能真源（一层扁平，33 个）
-├── using-parking-skills/    # bootstrap 技能 + references/ 平台工具映射表
-└── <name>/SKILL.md          # 其余 32 个
+skills/                  # ★ 跨平台技能真源（dev/ 未发布组 + pub/ 已发布组）
+├── dev/<name>/SKILL.md
+└── pub/<name>/SKILL.md
 
+AGENTS.md                # ★ 仓库 Agent 约定（产物落盘位置等；CLAUDE.md/GEMINI.md @-include 它）
+CLAUDE.md                # Claude Code 指令文件（@-include AGENTS.md）
 .claude-plugin/          # Claude Code 插件清单 + dev marketplace
 .cursor-plugin/          # Cursor 插件清单
 .codex-plugin/           # Codex 插件清单
@@ -30,11 +32,12 @@ skills/                  # ★ 跨平台技能真源（一层扁平，33 个）
 .opencode/plugins/       # OpenCode 进程内插件（映射内联在 .js）
 .agents/plugins/         # 跨运行时 marketplace 入口
 gemini-extension.json    # Gemini CLI 扩展清单
-GEMINI.md                # Gemini 的指令文件（两行 @-include）
-hooks/                   # SessionStart 注入器（Claude Code / Cursor / Copilot CLI 共用）
-tests/                   # 结构断言 + 工具名 lint + 各平台契约测试
+GEMINI.md                # Gemini 的指令文件（@-include AGENTS.md）
+hooks/                   # SessionStart 注入器（注入 AGENTS.md；Claude Code / Cursor / Copilot CLI 共用）
+tests/                   # 结构断言 + 工具名 lint + 产物卫生门禁 + 各平台契约测试
 scripts/bump-version.mjs # 跨 manifest 版本锁步
 docs/                    # 移植文档 + 测试文档
+docs/reports/            # 运行生成的报告/审计产物（gitignored，见 AGENTS.md）
 
 .copilot/agents/         # 另一半：VS Code Copilot agent
 ├── eval/                # 行为评估脚本

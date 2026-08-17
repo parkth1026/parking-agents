@@ -10,6 +10,7 @@
 //   - 文件名语法 ^{jobCode}-{fail}[-{end}]-{ErrorCode}-{ShortDesc}.md，jobCode ∈ jobCodes 注册表
 //   - frontmatter 各字段与文件名/注册表/config 真值一致；score 与目录分档一致
 //   - result 串过 grammar；error_code token 在正文中（search-kb 可检索性）
+//   - Warning Trend 生效分界: recorded_at ≥ 生效时刻的文件必须有 `## Warning Trend` 节（存量放行）
 //   - 全库模式: 同 job+fail 构建唯一性（非 recurrence 文件不得重复认领）、账本交叉核对
 //
 // 退出码: 0 通过 / 1 有 ERROR / 2 用法或路径错
@@ -37,6 +38,10 @@ const FM_REQUIRED = [
 ];
 
 const ERROR_CODE_RE = /^[A-Za-z][A-Za-z0-9_]*$/; // 禁连字符：连字符是文件名段分隔符，含它会导致解析歧义
+
+// Warning Trend 生效分界（规则原子落地提交时刻，ISO 本地时间，分钟精度与 recorded_at 可比）：
+// recorded_at ≥ 该时刻的新知识文件必须携带 `## Warning Trend` 必填节；早于该时刻的存量文件放行。
+export const WARNING_TREND_EFFECTIVE_AT = "2026-08-17T01:30";
 
 // ---------- frontmatter 解析（扁平 key: value，值内可含冒号，首个冒号分隔） ----------
 export function parseFrontmatter(content) {
@@ -229,6 +234,18 @@ export function validateKnowledgeFile(absPath, config, opts = {}) {
   }
   if (fm.recorded_at !== undefined && !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(fm.recorded_at)) {
     warns.push(`recorded_at 非本地时间格式 YYYY-MM-DDTHH:mm(:ss): ${fm.recorded_at}`);
+  }
+
+  // Warning Trend 生效分界（ISO 字符串字典序与时间序一致，分钟/秒精度可直接比较）
+  if (
+    fm.recorded_at !== undefined &&
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(fm.recorded_at) &&
+    String(fm.recorded_at) >= WARNING_TREND_EFFECTIVE_AT &&
+    !/^##\s+Warning Trend\s*$/m.test(body)
+  ) {
+    errs.push(
+      `缺 "## Warning Trend" 必填节（recorded_at ${fm.recorded_at} ≥ 生效时刻 ${WARNING_TREND_EFFECTIVE_AT} 的新文件必须携带：fail/fix 构建警告计数 + 趋势一句话，见 knowledge-format.md）`
+    );
   }
 
   return { errs, warns, fm, range, isRecurrence };

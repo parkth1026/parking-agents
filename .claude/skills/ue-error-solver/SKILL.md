@@ -24,7 +24,7 @@ node "$SCRIPT" <command> [--flags]     # 输出 JSON 到 stdout；业务失败 e
 node "$SCRIPT" --help                  # 查看全部子命令
 ```
 
-**配置**：`config.json`（技能默认）⊕ 环境层（优先），深合并。环境层解析链：`$SKILL_ENV` > `~/.config/parking-agents/skill-env.json` > `~/.claude/skill-env.json`（旧位置回退）；本机知识库路径指向 NAS。`node "$SCRIPT" config` 输出合并并解析后的配置（含 `gitRepos`、`knowledgeBase.*`、`tmpDir`，`_configSource` 标注配置来源）。
+**配置**：`config.json`（技能默认）⊕ 环境层（优先），深合并。环境层解析链：`$SKILL_ENV` > `~/.config/parking-agents/skill-env.json`；本机知识库路径指向 NAS。`node "$SCRIPT" config` 输出合并并解析后的配置（含 `gitRepos`、`knowledgeBase.*`、`tmpDir`，`_configSource` 标注配置来源）。
 
 **临时文件**：日志等临时输出一律写入 `config.tmpDir`（或 `os.tmpdir()`），**绝不写入 skill 目录**。
 

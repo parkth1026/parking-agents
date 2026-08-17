@@ -1,5 +1,5 @@
 {
-  "_README": "环境层模板（工具中立位置，与 jenkins-log-auto-learning 等技能共享同一份）。默认值即团队 NAS 知识库——拷到 ~/.config/parking-agents/skill-env.json 即可用；仅需按机器改 gitRepos（如 D:/Git）。解析链: $SKILL_ENV > ~/.config/parking-agents/skill-env.json > ~/.claude/skill-env.json（旧位置回退）。与 skill 的 config.json 深合并，环境层优先。node scripts/UeErrorSolver.mjs config 会自动完成合并与路径解析（_configSource 标注来源）。tmpDir 是日志等临时文件的落盘位置（默认退回 os.tmpdir()/ue-error-solver），绝不写入 skill 目录。",
+  "_README": "环境层模板（工具中立位置，与 jenkins-log-auto-learning 等技能共享同一份）。默认值即团队 NAS 知识库——拷到 ~/.config/parking-agents/skill-env.json 即可用；仅需按机器改 gitRepos（如 D:/Git）。解析链: $SKILL_ENV > ~/.config/parking-agents/skill-env.json。与 skill 的 config.json 深合并，环境层优先。node scripts/UeErrorSolver.mjs config 会自动完成合并与路径解析（_configSource 标注来源）。tmpDir 是日志等临时文件的落盘位置（默认退回 os.tmpdir()/ue-error-solver），绝不写入 skill 目录。",
   "jenkins": {
     "baseUrl": "http://10.66.12.40"
   },
