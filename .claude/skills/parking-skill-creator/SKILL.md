@@ -27,7 +27,7 @@ description: 本机技能生产流水线：创建、评测、迭代与打包 age
 2. **规划三类资源与自由度分级** — 从例子反推 scripts/references/assets 清单。
 3. **init 脚手架** — 确定性生成骨架，不徒手写 boilerplate。
 4. **写资源再写 SKILL.md** — 先实现可复用资源，再写主文档。
-5. **quick-validate** — 规则校验，越早发现问题越便宜。
+5. **quick-validate + 自带测试** — 规则校验与回归测试，越早发现问题越便宜。
 6. **输出评测循环** — with/without 并行对照、评分、聚合、浏览器评审、迭代。
 
 ---
@@ -39,7 +39,7 @@ description: 本机技能生产流水线：创建、评测、迭代与打包 age
 1. 这个技能让 agent 能做什么？
 2. 什么情况下触发？（用户会说什么话、什么上下文）
 3. 期望的输出形态？
-4. 要不要建测试用例？产出客观可验的技能（文件转换、数据抽取、固定流程）收益大；产出主观的技能（文风、设计）通常不需要。给建议，让用户定。
+4. 测试用例：产出客观可验的技能（文件转换、数据抽取、固定流程）**必须**把测试固化进技能（第 4 步写进 `run-tests.mjs`，升级校验全靠它）；产出主观的技能（文风、设计）通常不需要，向用户说明后跳过。
 
 一次别问太多——先问最重要的，逐步补。避免臆想例子：请用户给出真实用法例子（「能举两个你会这么用的说法吗？」），或你生成例子后请用户确认。使用模式已经清楚时（改既有技能且用户说得具体）可跳过本步。
 
@@ -57,10 +57,11 @@ description: 本机技能生产流水线：创建、评测、迭代与打包 age
 | 同一段代码每次重写（如 PDF 旋转、格式转换） | `scripts/` |
 | 每次重新查 schema/API/领域知识 | `references/` |
 | 每次重画同样的 boilerplate/模板/字体 | `assets/` |
+| 同一段验证步骤每次手工重跑 | `run-tests.mjs`（技能根） |
 
 同时给每个部分定**自由度分级**（低自由度=具体脚本固定参数，给脆弱操作上护栏；高自由度=文字指令，留给 agent 判断）。详见 `references/writing-guide.md`。
 
-产出：一份「资源清单 + 每项自由度」的计划，向用户过一遍再动手。
+产出：一份「资源清单 + 每项自由度 + 要固化的测试用例」的计划，向用户过一遍再动手。
 
 ## 第 3 步：init 脚手架
 
@@ -76,7 +77,7 @@ node scripts/init-skill.mjs <技能名> --structure <workflow|task|reference|cap
 
 ## 第 4 步：写资源再写 SKILL.md
 
-先实现第 2 步清单里的资源（这步常需要用户提供材料：品牌资产、模板、文档），再写 SKILL.md 把它们串起来。加入的脚本必须真实跑过至少一个代表性用例，不许「应该能跑」。
+先实现第 2 步清单里的资源（这步常需要用户提供材料：品牌资产、模板、文档），再写 SKILL.md 把它们串起来。加入的脚本必须真实跑过至少一个代表性用例，不许「应该能跑」；跑通的用例当场固化进技能根的 `run-tests.mjs`（init 已生成骨架：check() 计数器 + 黑盒执行，fixtures/ 放黄金输入与 expected）——测试随技能分发，是后续反复升级校验的依据。
 
 写 SKILL.md 的完整方法论见 `references/writing-guide.md`，核心：
 
@@ -92,11 +93,11 @@ frontmatter 只允许 name/description（必需）+ license/allowed-tools/metada
 node scripts/quick-validate.mjs <技能目录>
 ```
 
-官方规则集：name kebab-case ≤64；description ≤1024 且无尖括号；键白名单；compatibility ≤500。合法 → `PASS`（退出码 0）；违规逐条列规则名（退出码 1）；参数缺失出用法（退出码 2）。CRLF 与 LF 同判定。修完再跑直到 PASS。
+官方规则集：name kebab-case ≤64；description ≤1024 且无尖括号；键白名单；compatibility ≤500。合法 → `PASS`（退出码 0）；违规逐条列规则名（退出码 1）；参数缺失出用法（退出码 2）。CRLF 与 LF 同判定。修完再跑直到 PASS。PASS 后跑 `node <技能目录>/run-tests.mjs`，自带测试全过才算过本步（主观无测试的技能除外）；此后每次升级改动，先跑它做回归。
 
 ## 第 6 步：输出评测循环
 
-评测结果放技能同级的 `<技能名>-workspace/`，按迭代组织（`iteration-1/`、`iteration-2/`…），每个测试用例一个 `eval-<描述性名>/` 目录。目录随用随建，不要预先全铺。
+评测结果放 `<技能根上一级>/skill-workspaces/<技能名>-workspace/`（如 `.claude/skill-workspaces/`）——**技能扫描根之外**，评测产物/夹具里出现再多的 `SKILL.md` 也不会被宿主识别成技能；既有技能的同级旧 workspace 可显式传路径沿用。按迭代组织（`iteration-1/`、`iteration-2/`…），每个测试用例一个 `eval-<描述性名>/` 目录。目录随用随建，不要预先全铺。
 
 ### 6.1 同一 turn 并行 spawn 全部 run（with-skill 与 baseline 一起）
 
@@ -118,7 +119,7 @@ node scripts/quick-validate.mjs <技能目录>
 基线 run（同 prompt）：
 
 - **新建技能**：不给技能，存到 `without_skill/run-1/outputs/`。
-- **改进既有技能**：改动前先快照：`node scripts/snapshot-skill.mjs <技能目录> [<workspace>]`（workspace 缺省为技能同级 `<技能名>-workspace`；快照目录 `skill-snapshot`，已占用自动递增 `-v2`、`-v3`）。脚本会把快照里的 `SKILL.md` 改名 `SKILL.md.bak`——技能扫描器按 `SKILL.md` 文件名认技能，workspace 就在技能扫描根下，快照里留活的 `SKILL.md` 会冒出同名双技能、污染触发评测的技能清单；别徒手 `cp -r` 造快照。基线 run 的「技能路径」填快照目录，prompt 注明技能文档读 `SKILL.md.bak`，产物存 `old_skill/run-1/outputs/`。怀疑技能清单混进了快照/评测产物冒充的技能时，随时跑 `node scripts/check-shadow-skills.mjs [<技能根>…]` 复查（缺省查当前目录的 .claude/skills 与 .agents/skills）。
+- **改进既有技能**：改动前先快照：`node scripts/snapshot-skill.mjs <技能目录> [<workspace>]`（workspace 缺省为 `<技能根上一级>/skill-workspaces/<技能名>-workspace`，在技能扫描根外；快照目录 `skill-snapshot`，已占用自动递增 `-v2`、`-v3`）。脚本会把快照里的 `SKILL.md` 改名 `SKILL.md.bak`——技能扫描器按 `SKILL.md` 文件名认技能，workspace 就在技能扫描根下，快照里留活的 `SKILL.md` 会冒出同名双技能、污染触发评测的技能清单；别徒手 `cp -r` 造快照。基线 run 的「技能路径」填快照目录，prompt 注明技能文档读 `SKILL.md.bak`，产物存 `old_skill/run-1/outputs/`。怀疑技能清单混进了快照/评测产物冒充的技能时，随时跑 `node scripts/check-shadow-skills.mjs [<技能根>…]` 复查（缺省查当前目录的 .claude/skills 与 .agents/skills）。
 
 每个 eval 目录写 `eval_metadata.json`（断言可先空，见 6.2）：
 
@@ -178,7 +179,7 @@ node eval-viewer/generate-review.mjs <workspace>/iteration-<N>
 3. **解释为什么**：反馈再简短也去理解用户真正要什么，把这份理解传进指令；满屏 ALWAYS 是黄旗。
 4. **识别重复劳动**：几个测试的 subagent 各自写了相似脚本 = 该进 `scripts/` 的最强信号。
 
-改进后跑 `iteration-<N+1>/`（含 baseline），viewer 带 `--previous-workspace`，循环直到用户满意/反馈全空/不再有实质进展。
+改进后先跑 `node <技能目录>/run-tests.mjs` 确认自带测试全过（回归门），再跑 `iteration-<N+1>/`（含 baseline），viewer 带 `--previous-workspace`，循环直到用户满意/反馈全空/不再有实质进展。
 
 ---
 
@@ -260,14 +261,14 @@ subagent 前向测试是把技能当评测面：验证泛化，不是验证另�
 node scripts/package-skill.mjs <技能目录> [输出目录]
 ```
 
-打包前自动跑同一校验器，违规目录拒绝打包（退出码 1）。产出 `<技能名>.skill`——标准 zip 格式（STORE 不压缩），条目路径含技能目录名前缀，排除 `evals/`（技能根下）、`__pycache__/`、`node_modules/`、`*.pyc`、`.DS_Store`。可用任意 zip 工具或标准库核验内容。
+打包前自动跑同一校验器，违规目录拒绝打包（退出码 1）。分发前先跑技能自带 `run-tests.mjs`——带着失败测试的技能不许打包；`run-tests.mjs` 随技能进包（评测产物不进）。产出 `<技能名>.skill`——标准 zip 格式（STORE 不压缩），条目路径含技能目录名前缀，排除 `evals/`（技能根下）、`__pycache__/`、`node_modules/`、`*.pyc`、`.DS_Store`。可用任意 zip 工具或标准库核验内容。
 
 ## 本仓库使用提示
 
 （仓库惯例不进 init 模板，建本仓库技能时在此口径下自行接线。）
 
 - **运行时**：本机 Windows + Node v24，Git Bash 终端。技能脚本一律 `.mjs` + kebab-case，放 `scripts/`，共享代码进 `scripts/lib/`；只用 Node 内置模块，零 npm 依赖、零 python 运行时依赖。
-- **测试**：技能配套 `<技能名>-workspace/` 沙箱，`run-tests.mjs` 用 `check()` 计数器 + `execFileSync` 黑盒跑子命令，退出码 0=全过/1=有失败；fixtures 进 `fixtures/`，黄金输入配 expected 输出逐字段比对。
+- **测试**：固化在技能根 `run-tests.mjs`——`check()` 计数器 + `execFileSync` 黑盒跑子命令，退出码 0=全过/1=有失败；fixtures 进 `fixtures/`，黄金输入配 expected 输出逐字段比对。测试随技能分发、每次升级必跑；评测沙箱在 `.claude/skill-workspaces/<技能名>-workspace/`（技能扫描根外，workspace 里出现 SKILL.md 产物也不会冒充技能）。
 - **配置**：本技能零配置——不读 config 文件、不依赖 skill-env 命名空间，全部经 CLI 参数与目录约定。
 - **git**：本仓库提交信息用中文、面向用户解释「为什么」，关键参数修正与行业知识修改要点名，不写改动流水账。
 - **技能目录**：新技能放 `.claude/skills/`（git 跟踪）；`.agents/skills/` 是宿主侧镜像，不要手动改。
