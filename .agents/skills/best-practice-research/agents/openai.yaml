@@ -1,5 +1,5 @@
 interface:
-  display_name: "Best-Practice Research"
+  display_name: "best-practice-research"
   short_description: "Bounded research grounded in official and upstream evidence"
   default_prompt: "Use $best-practice-research to research this technology or design decision from primary sources."
 policy:

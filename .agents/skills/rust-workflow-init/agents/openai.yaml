@@ -1,5 +1,5 @@
 interface:
-  display_name: "Rust Workflow Init"
+  display_name: "rust-workflow-init"
   short_description: "Initialize a Rust project with Fast Flow and Full Flow"
   default_prompt: "Use $rust-workflow-init to initialize this Rust project's dual development workflow."
 policy:

@@ -1,5 +1,5 @@
 interface:
-  display_name: "Karpathy LLM Wiki"
+  display_name: "karpathy-llm-wiki"
   short_description: "Ingest, query, and validate a structured LLM knowledge wiki"
   default_prompt: "Use $karpathy-llm-wiki to ingest or query this LLM knowledge wiki."
 policy:

@@ -1,5 +1,5 @@
 interface:
-  display_name: "React Doctor"
+  display_name: "react-doctor"
   short_description: "Check React quality, accessibility, architecture, and size"
   default_prompt: "Use $react-doctor to check this React change for quality and score regression."
 policy:

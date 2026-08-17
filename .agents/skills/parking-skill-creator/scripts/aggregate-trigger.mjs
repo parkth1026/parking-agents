@@ -5,7 +5,7 @@
 //   - train/test 60/40 按 should_trigger 分层切分（每组洗牌后取前 max(1, floor(n*0.4)) 进 test）
 //   - 每 query 默认 3 探针取严格多数（有效探针中 triggered > 半数才算触发）
 //   - 首行 `SKILL: <名或 none>` 是唯一判定源；解析失败记 invalid 不猜
-//   - best_description 按 test 分数选出（防过拟合）：correct ↓ → 应触发率 ↓ → 误触发率 ↑，全平取先出现轮
+//   - best_description 按 test 分数选出（防过拟合）：correct ↑ → 应触发率 ↑ → 误触发率 ↓，全平取先出现有效轮
 // 用法: node aggregate-trigger.mjs <workspace目录> [--eval-set <路径>] [--probes <路径>] [--output <路径>]
 // 退出码: 0 成功 / 1 数据缺失或无有效结果 / 2 用法错
 import { existsSync, readFileSync } from "node:fs";
@@ -66,11 +66,59 @@ export function splitEvalSet(queries, holdout = HOLDOUT, seed = SPLIT_SEED) {
  */
 export function parseFirstLine(firstLine, skillName) {
   if (typeof firstLine !== "string") return { status: "invalid", triggered: null };
+  if (firstLine.includes("\n") || firstLine.includes("\r")) return { status: "invalid", triggered: null };
   const m = firstLine.match(/^SKILL:\s*(\S.*)$/);
   if (!m) return { status: "invalid", triggered: null };
   const value = m[1].trim();
   if (value === skillName) return { status: "hit", triggered: true };
   return { status: "miss", triggered: false }; // none 或其他技能名
+}
+
+/** 校验 trigger-evals.json，避免把缺字段静默当成 should-not-trigger。 */
+export function validateEvalSet(evalSet) {
+  const errors = [];
+  if (!evalSet || typeof evalSet !== "object" || Array.isArray(evalSet)) {
+    return ["顶层必须是 JSON 对象"];
+  }
+  if (typeof evalSet.skill !== "string" || !evalSet.skill.trim()) {
+    errors.push("skill 必须是非空字符串");
+  }
+  if (!Array.isArray(evalSet.queries) || evalSet.queries.length === 0) {
+    errors.push("queries 必须是非空数组");
+    return errors;
+  }
+
+  const ids = new Set();
+  let triggerCount = 0;
+  let noTriggerCount = 0;
+  evalSet.queries.forEach((query, index) => {
+    const label = `queries[${index}]`;
+    if (!query || typeof query !== "object" || Array.isArray(query)) {
+      errors.push(`${label} 必须是对象`);
+      return;
+    }
+    if ((typeof query.id !== "string" && typeof query.id !== "number") || String(query.id).trim() === "") {
+      errors.push(`${label}.id 必须是非空字符串或数字`);
+    } else if (ids.has(query.id)) {
+      errors.push(`${label}.id 重复: ${String(query.id)}`);
+    } else {
+      ids.add(query.id);
+    }
+    if (typeof query.text !== "string" || !query.text.trim()) {
+      errors.push(`${label}.text 必须是非空字符串`);
+    }
+    if (typeof query.should_trigger !== "boolean") {
+      errors.push(`${label}.should_trigger 必须是布尔值`);
+    } else if (query.should_trigger) {
+      triggerCount++;
+    } else {
+      noTriggerCount++;
+    }
+  });
+  if (triggerCount === 0 || noTriggerCount === 0) {
+    errors.push("queries 必须同时包含 should_trigger=true 和 false，才能计算两类触发率");
+  }
+  return errors;
 }
 
 /** 读 jsonl（跳过空行与坏行并计数） */
@@ -98,10 +146,21 @@ export function aggregateTrigger(evalSet, probeRows) {
   const byId = new Map(evalSet.queries.map((q) => [q.id, q]));
   const split = splitEvalSet(evalSet.queries);
 
+  let invalidProbes = 0;
+  // 结构无法关联到评测 query 的行不能创建一个假的 null 轮次。
+  const usableRows = [];
+  for (const row of probeRows) {
+    if (!row || typeof row !== "object" || Array.isArray(row) || !byId.has(row.query_id)) {
+      invalidProbes++;
+      continue;
+    }
+    usableRows.push(row);
+  }
+
   // 按 description 分轮（保序：首次出现顺序）
   const roundOrder = [];
   const rounds = new Map();
-  for (const row of probeRows) {
+  for (const row of usableRows) {
     const key = Object.prototype.hasOwnProperty.call(row, "description") ? row.description : null;
     if (!rounds.has(key)) {
       rounds.set(key, []);
@@ -110,7 +169,7 @@ export function aggregateTrigger(evalSet, probeRows) {
     rounds.get(key).push(row);
   }
 
-  let invalidProbes = 0;
+  let validProbes = 0;
   const roundStats = [];
   for (const key of roundOrder) {
     // query_id → 首行判定列表
@@ -121,6 +180,7 @@ export function aggregateTrigger(evalSet, probeRows) {
         invalidProbes++;
         continue; // invalid 探针不参与判定，不猜
       }
+      validProbes++;
       const list = perQuery.get(row.query_id) ?? [];
       list.push(parsed.triggered);
       perQuery.set(row.query_id, list);
@@ -159,6 +219,7 @@ export function aggregateTrigger(evalSet, probeRows) {
 
     roundStats.push({
       description: key,
+      valid_probes: [...perQuery.values()].reduce((sum, probes) => sum + probes.length, 0),
       train: splitStats(split.train),
       test: splitStats(split.test),
     });
@@ -179,6 +240,7 @@ export function aggregateTrigger(evalSet, probeRows) {
   }
   let best = null;
   for (const r of roundStats) {
+    if (r.valid_probes === 0) continue;
     if (best === null || beats(r, best)) best = r;
   }
 
@@ -187,6 +249,7 @@ export function aggregateTrigger(evalSet, probeRows) {
     split: { train: split.train, test: split.test, seed: SPLIT_SEED, holdout: HOLDOUT },
     rounds: roundStats,
     best_description: best ? best.description : null,
+    valid_probes: validProbes,
     invalid_probes: invalidProbes,
   };
 }
@@ -211,8 +274,10 @@ const probesPath = flag("--probes") ?? join(ws, "probe-results.jsonl");
 const outPath = flag("--output") ?? join(ws, "trigger-benchmark.json");
 
 const evalSet = readJson(evalSetPath);
-if (!evalSet || !Array.isArray(evalSet.queries) || typeof evalSet.skill !== "string") {
-  console.log(`评测集缺失或结构不符: ${evalSetPath}（需要 { skill, queries: [{id, text, should_trigger}] }）`);
+const evalErrors = validateEvalSet(evalSet);
+if (evalErrors.length > 0) {
+  console.log(`评测集缺失或结构不符: ${evalSetPath}`);
+  for (const error of evalErrors) console.log(`  - ${error}`);
   process.exit(1);
 }
 if (!existsSync(probesPath)) {
@@ -226,7 +291,8 @@ if (bad.length > 0) {
 }
 
 const result = aggregateTrigger(evalSet, rows);
-if (result.rounds.length === 0) {
+result.invalid_probes += bad.length;
+if (result.rounds.length === 0 || result.valid_probes === 0) {
   console.log("无有效探针结果");
   process.exit(1);
 }
@@ -245,6 +311,7 @@ result.rounds.forEach((r, i) => {
 });
 const bestRound = result.rounds.find((r) => r.description === result.best_description);
 console.log(`best_description: 按 test 分数选出（correct=${bestRound?.test.correct ?? "?"}/${bestRound?.test.queries ?? "?"}, 触发率=${bestRound?.test.trigger_rate_on_should.toFixed(2) ?? "?"}，平局比率细分，防过拟合）`);
+console.log(`valid 探针: ${result.valid_probes}`);
 console.log(`invalid 探针: ${result.invalid_probes}`);
 console.log(`→ ${outPath}`);
 process.exit(0);

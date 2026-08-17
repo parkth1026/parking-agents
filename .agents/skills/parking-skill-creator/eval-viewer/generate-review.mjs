@@ -167,8 +167,15 @@ const historyData = historySkillDir ? readJson(join(historySkillDir, "history.js
 const skillName = flag("--skill-name")
   || (historyData && typeof historyData.skill === "string" && historyData.skill ? historyData.skill : null)
   || inferSkillName(iterDir);
+const hasPortFlag = argv.includes("--port");
 const portArg = flag("--port");
-const startPort = portArg ? parseInt(portArg, 10) : 3117;
+const startPort = !hasPortFlag
+  ? 3117
+  : (/^\d+$/.test(portArg ?? "") && Number(portArg) >= 1 && Number(portArg) <= 65535 ? Number(portArg) : null);
+if (startPort === null) {
+  console.log(`端口无效: ${String(portArg)}（必须是 1~65535 的整数）`);
+  process.exit(2);
+}
 const staticPath = flag("--static");
 const noOpen = argv.includes("--no-open");
 
@@ -251,7 +258,8 @@ const server = http.createServer((req, res) => {
 
 /** 端口探测：从 startPort 起找第一个空闲端口（Windows 无 lsof，用 bind 试探法） */
 async function findFreePort(start) {
-  for (let port = start; port < start + 100; port++) {
+  const end = Math.min(65535, start + 99);
+  for (let port = start; port <= end; port++) {
     const ok = await new Promise((resolvePromise) => {
       const probe = net.createServer();
       probe.once("error", () => resolvePromise(false));

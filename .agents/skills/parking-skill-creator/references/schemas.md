@@ -325,11 +325,13 @@ Output from `scripts/aggregate-trigger.mjs`. Located at the workspace root.
   "rounds": [
     {
       "description": "分类 Jenkins 失败日志…",
+      "valid_probes": 6,
       "train": { "queries": 4, "trigger_rate_on_should": 0.9, "false_trigger_rate_on_should_not": 0.1, "correct": 3, "invalid_queries": 0 },
       "test":  { "queries": 2, "trigger_rate_on_should": 0.8, "false_trigger_rate_on_should_not": 0.1, "correct": 2, "invalid_queries": 0 }
     }
   ],
   "best_description": "分类 Jenkins 失败日志…",
+  "valid_probes": 6,
   "invalid_probes": 1
 }
 ```
@@ -337,12 +339,16 @@ Output from `scripts/aggregate-trigger.mjs`. Located at the workspace root.
 **Fields:**
 - `split`: train/test 60/40 stratified by should_trigger (official run_loop caliber; deterministic shuffle with the recorded seed), test gets at least one query per stratum
 - `rounds[]`: One entry per description tested; within each split:
+  - `valid_probes`: Number of protocol-valid, known-query probe rows in this round; rounds with zero valid probes cannot become `best_description`
   - `trigger_rate_on_should`: Fraction of should-trigger queries where the majority of valid probes triggered (strict majority, default 3 probes per query)
   - `false_trigger_rate_on_should_not`: Fraction of should-not-trigger queries that (wrongly) triggered
   - `correct`: test/train correctness count (should→triggered + should-not→quiet)
   - `invalid_queries`: Queries with zero valid probes (excluded from rate denominators)
-- `best_description`: Picked by test `correct` count (anti-overfitting); ties go to the earlier round
-- `invalid_probes`: Total probe lines whose first line did not match the protocol
+- `best_description`: Picked by test `correct` count, then trigger/false-trigger rates (anti-overfitting); a complete tie keeps the earlier valid round
+- `valid_probes`: Total protocol-valid, known-query probe rows across all rounds
+- `invalid_probes`: Total malformed JSON lines, non-object/unknown-query rows, or probe lines whose first line did not match the protocol
+
+**Boundary behavior:** `trigger-evals.json` must contain a non-empty skill, unique ids, non-empty text, boolean `should_trigger`, and both positive and negative queries. Invalid evaluation data exits 1. If no probe row is valid, aggregation exits 1 and does not write a benchmark file.
 
 ---
 

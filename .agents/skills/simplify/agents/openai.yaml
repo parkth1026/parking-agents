@@ -1,5 +1,5 @@
 interface:
-  display_name: "Simplify"
+  display_name: "simplify"
   short_description: "Review changed code for reuse, quality, and efficiency"
   default_prompt: "Use $simplify to review this current diff for reuse, quality, and efficiency."
 policy:

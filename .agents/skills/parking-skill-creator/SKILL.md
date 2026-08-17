@@ -85,7 +85,7 @@ node scripts/init-skill.mjs <技能名> --structure <workflow|task|reference|cap
 
 - 名字自动归一化 kebab-case（`Log Classifier` → `log-classifier`），超 64 字符退出码 2。
 - 默认输出到本技能同级的技能目录；目标已存在且非空时拒绝（退出码 1，不覆盖）。
-- 产出：含待办占位与「结构选择指南」节的 SKILL.md + 技能目录根部 `run-tests.mjs` 回归测试骨架 + `references/design.md` 设计文档骨架（四节：意图与触发场景/设计取舍/验收条件 AC-N/迭代记录）+ 按结构生成的 scripts/references/assets 占位 README。模板是**通用**的，不带本仓库假设——本仓库惯例见文末「本仓库使用提示」。
+- 产出：含待办占位与「结构选择指南」节的 SKILL.md + 技能目录根部 `run-tests.mjs` 回归测试骨架 + `references/design.md` 设计文档骨架（四节：意图与触发场景/设计取舍/验收条件 AC-N/迭代记录）+ `agents/openai.yaml`（`display_name` 使用技能名标识，default prompt 引用 `$<技能名>`）+ 按结构生成的 scripts/references/assets 占位 README。模板是**通用**的，不带本仓库假设——本仓库惯例见文末「本仓库使用提示」。
 
 ## 第 4 步：写资源再写 SKILL.md
 
@@ -210,6 +210,7 @@ node eval-viewer/generate-review.mjs <workspace>/iteration-<N> [--history <技�
 ```
 
 - 默认起 `http://127.0.0.1:3117`，端口被占自动换下一个空闲端口，Windows 下用 start 开浏览器，Ctrl+C 停。
+- `--port` 必须是 1~65535 的整数；非法端口退出码 2，避免 NaN 或越界端口把服务器变成未处理异常。
 - 迭代 ≥2 加 `--previous-workspace <workspace>/iteration-<N-1>`，页面会出现上轮输出与留言的折叠对照。
 - 加 `--history <技能目录>` 读 `history.json`：评审页顶部出现**历史轨迹**折叠区——历次评测 pass_rate/mean_ms/mean_tokens 表 + 本轮 vs 上轮 won/lost/tie + 逐 eval 明细（含 dropped），跨轮对比在评审页直接看。读不到 history.json 时显示「无历史轨迹（首次评测）」，不报错；不带该旗标则整个历史区不出现。标题技能名的优先级：`--skill-name` 显式 > history.json 的 skill 字段 > 目录名推断。
 - 本轮做过结构审查（6.5）时，Benchmark 页上方自动出现**结构审查建议卡片**（读 `<iteration>/structure-review.json`，带「仅建议 · 未执行」标记）。
@@ -290,7 +291,9 @@ description 决定技能会不会被调用。技能做完（或触发不准）�
 node scripts/aggregate-trigger.mjs <workspace>
 ```
 
-输出 `trigger-benchmark.json`：train/test 60/40 按 should_trigger 分层切分（官方 run_loop 口径），每 query 3 探针取严格多数，各层触发率/误触发率/invalid 计数；多轮（改写 description 后再跑探针，jsonl 行带 `description` 字段）时按 **test 正确数**选 best_description，防过拟合。
+先校验 `skill`、query id/text/should_trigger 和正负两类样本；探针协议不完整、JSONL 坏行、未知 query 或含换行的 `first_line` 都记 invalid，不猜答案。全无有效探针时退出码 1 且不写 `trigger-benchmark.json`，避免把 0 分假报告当成证据。
+
+输出 `trigger-benchmark.json`：train/test 60/40 按 should_trigger 分层切分（官方 run_loop 口径），每 query 3 探针取严格多数，各层触发率/误触发率/invalid 计数；多轮（改写 description 后再跑探针，jsonl 行带 `description` 字段）时按 **test 正确数**选 best_description，防过拟合。结果同时记录 `valid_probes`，每轮记录有效探针数，便于审计证据是否充足。
 
 ### 迭代 description
 

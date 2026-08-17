@@ -1,5 +1,5 @@
 interface:
-  display_name: "Repository Analysis"
+  display_name: "analyze"
   short_description: "Ranked read-only repository analysis with evidence boundaries"
   default_prompt: "Use $analyze to investigate this repository question with evidence and confidence levels."
 policy:

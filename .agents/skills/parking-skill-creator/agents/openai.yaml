@@ -1,5 +1,5 @@
 interface:
-  display_name: "Parking Skill Creator"
+  display_name: "parking-skill-creator"
   short_description: "Create, evaluate, improve, and package agent skills"
   default_prompt: "Use $parking-skill-creator to create, evaluate, improve, or package an agent skill."
 

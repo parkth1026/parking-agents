@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Structural assertions for the skills/ directory.
+ * Structural assertions for the .agents/skills/ directory.
  *
  * Skill loading fails SILENTLY on every platform: a skill with a broken
  * frontmatter or at the wrong nesting depth simply never appears, with no error
@@ -15,7 +15,7 @@ import { join, resolve, dirname, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const skillsDir = join(repoRoot, "skills");
+const skillsDir = join(repoRoot, ".agents", "skills");
 
 const failures = [];
 const fail = (msg) => failures.push(msg);
@@ -23,7 +23,7 @@ const fail = (msg) => failures.push(msg);
 // --- 1. skills/ exists and has direct subdirectories -------------------------
 
 if (!existsSync(skillsDir)) {
-	console.error("FATAL: skills/ does not exist");
+	console.error("FATAL: .agents/skills/ does not exist");
 	process.exit(1);
 }
 
@@ -36,7 +36,7 @@ for (const f of looseFiles) {
 }
 
 if (skillDirs.length === 0) {
-	console.error("FATAL: skills/ contains no subdirectories");
+	console.error("FATAL: .agents/skills/ contains no subdirectories");
 	process.exit(1);
 }
 
@@ -130,6 +130,17 @@ for (const name of skillDirs) {
 	for (const f of readdirSync(agentsDir, { withFileTypes: true })) {
 		if (f.isFile() && /^openai\.(yml|yaml)$/.test(f.name) && f.name !== "openai.yaml") {
 			fail(`skills/${name}/agents/${f.name} must be named 'openai.yaml' — Codex ignores .yml`);
+		}
+	}
+	const metadataPath = join(agentsDir, "openai.yaml");
+	if (existsSync(metadataPath)) {
+		const metadata = readFileSync(metadataPath, "utf8");
+		const displayNameMatch = metadata.match(/^\s*display_name:\s*(.+)$/m);
+		const displayName = displayNameMatch
+			? displayNameMatch[1].trim().replace(/^[\"']|[\"']$/g, "")
+			: "";
+		if (displayName !== name) {
+			fail(`.agents/skills/${name}/agents/openai.yaml display_name must be '${name}', not '${displayName}'`);
 		}
 	}
 }

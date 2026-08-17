@@ -18,7 +18,7 @@ function usage() {
   console.log("用法: node init-skill.mjs <name> [--structure workflow|task|reference|capabilities] [--path <输出目录>]");
   console.log(`  --structure 结构模式（默认 task）: ${Object.keys(STRUCTURES).join(" | ")}`);
   console.log("  --path     输出目录（默认: 本技能目录的同级技能目录）");
-  console.log("  --interface key=value  覆盖 agents/openai.yaml 的 display_name、short_description 或 default_prompt（可重复）");
+  console.log("  --interface key=value  覆盖 agents/openai.yaml 的 short_description 或 default_prompt（可重复；display_name 固定为技能目录名）");
   console.log("示例: node init-skill.mjs log-classifier --structure task");
   process.exit(2);
 }
@@ -143,14 +143,14 @@ const DESIGN_TEMPLATE = (name) => `# design: ${name}
 | --- | --- | --- | --- |
 `;
 
-const OPENAI_INTERFACE_KEYS = new Set(["display_name", "short_description", "default_prompt"]);
+const OPENAI_INTERFACE_KEYS = new Set(["short_description", "default_prompt"]);
 function yamlString(value) {
   return JSON.stringify(String(value));
 }
 function openaiYaml(name, overrides) {
   const title = titleCase(name);
   const values = {
-    display_name: overrides.display_name ?? title,
+    display_name: name,
     short_description: overrides.short_description ?? `Create and use the ${title} skill`,
     default_prompt: overrides.default_prompt ?? `Use $${name} to handle a ${title} task.`,
   };
@@ -203,6 +203,7 @@ function parseArgs(argv) {  const args = { name: null, structure: "task", path: 
       if (equal <= 0) return { args, error: "bad-interface" };
       const key = pair.slice(0, equal);
       const value = pair.slice(equal + 1);
+      if (key === "display_name") return { args, error: "display-name-locked" };
       if (!OPENAI_INTERFACE_KEYS.has(key) || !value) return { args, error: `bad-interface:${key}` };
       args.interface[key] = value;
     } else {
@@ -219,6 +220,7 @@ if (error) {
     "missing-name": "缺少技能名",
     "bad-path": "--path 需要一个目录参数",
     "bad-interface": "--interface 需要 key=value",
+    "display-name-locked": "display_name 固定为技能目录名，不允许使用别名",
   };
   console.log(hint[error] ?? (error.startsWith("bad-structure")
     ? `未知结构模式: ${error.slice("bad-structure:".length)}（允许: ${Object.keys(STRUCTURES).join(" | ")}）`

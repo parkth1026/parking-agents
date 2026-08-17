@@ -1,5 +1,5 @@
 interface:
-  display_name: "PowerShell Script Creator"
+  display_name: "ps1-creator"
   short_description: "Create and review PowerShell scripts with a behavior contract"
   default_prompt: "Use $ps1-creator to review this PowerShell script against its behavior contract."
 policy:

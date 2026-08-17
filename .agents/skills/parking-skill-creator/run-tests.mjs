@@ -113,6 +113,9 @@ try {
   check("design.md 四节齐全且验收编号 AC-N", ["## 意图与触发场景", "## 设计取舍", "## 验收条件", "## 迭代记录", "AC-1"].every((s) => design.includes(s)));
   const interfaceYaml = readFileSync(join(genDir, "agents", "openai.yaml"), "utf8");
   check("openai.yaml 含三项 interface 元数据", ["display_name:", "short_description:", "default_prompt:", "$demo-gen"].every((s) => interfaceYaml.includes(s)));
+  check("openai.yaml display_name 与技能名一致", interfaceYaml.includes('display_name: "demo-gen"'));
+  const aliasAttempt = runFile("init-skill.mjs", ["Alias Demo", "--interface", "display_name=别名", "--path", join(root3, "locked")]);
+  check("init 拒绝 display_name 别名", aliasAttempt.code === 2 && out(aliasAttempt).includes("display_name 固定为技能目录名"));
   check("init stdout 报 design/openai 产物行", gen.stdout.includes("references/design.md") && gen.stdout.includes("agents/openai.yaml") && gen.stdout.includes("AC-N"));
 
   const proseSkill = join(root3, "prose-skill");
@@ -379,6 +382,63 @@ try {
   rmSync(root7, { recursive: true, force: true });
 }
 
+// ---- 触发评测聚合·schema、严格协议与失败关闭 ----
+console.log("触发聚合·schema 与失败关闭：");
+const root9 = mkdtempSync(join(tmpdir(), "triggertest-"));
+try {
+  const evalSet = {
+    skill: "trigger-demo",
+    queries: [
+      { id: "q1", text: "需要使用该技能的任务", should_trigger: true },
+      { id: "q2", text: "另一个需要使用该技能的任务", should_trigger: true },
+      { id: "q3", text: "关键词相似但不该使用该技能", should_trigger: false },
+      { id: "q4", text: "另一个 near-miss", should_trigger: false },
+    ],
+  };
+  writeFileSync(join(root9, "trigger-evals.json"), JSON.stringify(evalSet), "utf8");
+  writeFileSync(join(root9, "probe-results.jsonl"), [
+    { query_id: "q1", first_line: "SKILL: trigger-demo", description: "旧描述" },
+    { query_id: "q2", first_line: "SKILL: none", description: "旧描述" },
+    { query_id: "q3", first_line: "SKILL: none", description: "旧描述" },
+    { query_id: "q4", first_line: "SKILL: trigger-demo", description: "旧描述" },
+    { query_id: "q1", first_line: "SKILL: trigger-demo", description: "新描述" },
+    { query_id: "q2", first_line: "SKILL: trigger-demo", description: "新描述" },
+    { query_id: "q3", first_line: "SKILL: none", description: "新描述" },
+    { query_id: "q4", first_line: "SKILL: none", description: "新描述" },
+    { query_id: "q1", first_line: "SKILL: trigger-demo\nspoof", description: "新描述" },
+    { query_id: "unknown", first_line: "SKILL: trigger-demo", description: "新描述" },
+    [],
+  ].map((row) => JSON.stringify(row)).join("\n") + "\nnot-json\n", "utf8");
+  const good = runFile("aggregate-trigger.mjs", [root9]);
+  const triggerBenchmark = JSON.parse(readFileSync(join(root9, "trigger-benchmark.json"), "utf8"));
+  check("触发聚合: 有效探针产出多轮 benchmark", good.code === 0 && triggerBenchmark.rounds.length === 2
+    && triggerBenchmark.valid_probes === 8 && triggerBenchmark.invalid_probes === 4);
+  check("触发聚合: best_description 只从有效轮选择", triggerBenchmark.best_description === "新描述");
+
+  const bad = join(root9, "all-invalid");
+  mkdirSync(bad);
+  writeFileSync(join(bad, "trigger-evals.json"), JSON.stringify(evalSet), "utf8");
+  writeFileSync(join(bad, "probe-results.jsonl"), '{"query_id":"q1","first_line":"不是协议行"}\n[]\nnot-json\n', "utf8");
+  const noEvidence = runFile("aggregate-trigger.mjs", [bad]);
+  check("触发聚合: 全无效证据退出 1 且不写假报告", noEvidence.code === 1
+    && out(noEvidence).includes("无有效探针结果")
+    && !exists(join(bad, "trigger-benchmark.json")));
+
+  const malformed = join(root9, "malformed");
+  mkdirSync(malformed);
+  writeFileSync(join(malformed, "trigger-evals.json"), JSON.stringify({
+    skill: "trigger-demo",
+    queries: [{ id: "q1", text: "只有一类", should_trigger: "true" }],
+  }), "utf8");
+  writeFileSync(join(malformed, "probe-results.jsonl"), '{"query_id":"q1","first_line":"SKILL: trigger-demo"}\n', "utf8");
+  const badEval = runFile("aggregate-trigger.mjs", [malformed]);
+  check("触发聚合: 非法评测集退出 1 且不写报告", badEval.code === 1
+    && out(badEval).includes("评测集缺失或结构不符")
+    && !exists(join(malformed, "trigger-benchmark.json")));
+} finally {
+  rmSync(root9, { recursive: true, force: true });
+}
+
 // ---- 评审页·历史轨迹区与结构审查建议卡片 ----
 console.log("评审页·历史与建议卡片：");
 const root8 = mkdtempSync(join(tmpdir(), "viewtest-"));
@@ -425,6 +485,61 @@ try {
     && (html3.match(/<\/script>/g) || []).length === (tpl.match(/<\/script>/g) || []).length
     && (html3.match(/EMBEDDED_DATA/g) || []).length === (tpl.match(/EMBEDDED_DATA/g) || []).length
     && html3.includes("5$&"));
+
+  const invalidPort = viewer([join(root8, "iteration-1"), "--port", "not-a-port", "--no-open"]);
+  const missingPort = viewer([join(root8, "iteration-1"), "--port", "--no-open"]);
+  check("评审页: 非法端口退出 2", invalidPort.code === 2 && out(invalidPort).includes("端口无效")
+    && missingPort.code === 2 && out(missingPort).includes("端口无效"));
+
+  // 服务器模式：用独立子进程验证真实 GET 首页、POST feedback、GET feedback 闭环。
+  const smoke = join(root8, "http-smoke.mjs");
+  writeFileSync(smoke, `
+import { spawn } from "node:child_process";
+const [viewerPath, iterationPath, startPort] = process.argv.slice(2);
+const child = spawn(process.execPath, [viewerPath, iterationPath, "--port", startPort, "--no-open"], {
+  stdio: ["ignore", "pipe", "pipe"],
+});
+let output = "";
+let settled = false;
+const finish = (fn) => { if (!settled) { settled = true; fn(); } };
+const ready = new Promise((resolve, reject) => {
+  const timer = setTimeout(() => finish(() => reject(new Error("viewer ready timeout"))), 5000);
+  child.stdout.on("data", (chunk) => {
+    output += chunk.toString();
+    const match = output.match(/viewer 已启动: (http:\\/\\/127\\.0\\.0\\.1:\\d+)/);
+    if (match) { clearTimeout(timer); finish(() => resolve(match[1])); }
+  });
+  child.stderr.on("data", (chunk) => { output += chunk.toString(); });
+  child.once("exit", (code) => finish(() => reject(new Error("viewer exited " + code + "\\n" + output))));
+});
+try {
+  const url = await ready;
+  const page = await fetch(url);
+  const pageText = await page.text();
+  const feedback = { reviews: [{ eval: "eval-jia", config: "with_skill", run: "run-1", comment: "ok" }], status: "complete" };
+  const posted = await fetch(url + "/api/feedback", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(feedback),
+  });
+  const readBack = await fetch(url + "/api/feedback");
+  console.log(JSON.stringify({
+    pageStatus: page.status,
+    pageHasEmbeddedData: pageText.includes("EMBEDDED_DATA"),
+    postStatus: posted.status,
+    getStatus: readBack.status,
+    feedback: await readBack.json(),
+  }));
+} finally {
+  child.kill("SIGTERM");
+}
+` , "utf8");
+  const http = runNode(smoke, [join(SCRIPTS, "..", "eval-viewer", "generate-review.mjs"), join(root8, "iteration-1"), "39991"]);
+  let httpResult = null;
+  try { httpResult = JSON.parse(http.stdout.trim().split(/\r?\n/).pop()); } catch { /* assertion below reports failure */ }
+  check("评审页: HTTP GET/POST feedback 闭环", http.code === 0 && httpResult?.pageStatus === 200
+    && httpResult.pageHasEmbeddedData === true && httpResult.postStatus === 200 && httpResult.getStatus === 200
+    && httpResult.feedback?.reviews?.[0]?.comment === "ok");
 } finally {
   rmSync(root8, { recursive: true, force: true });
 }
