@@ -30,6 +30,8 @@ description: 本机技能生产流水线：创建、评测、迭代与打包 age
 5. **quick-validate + 自带测试** — 规则校验与回归测试，越早发现问题越便宜。
 6. **输出评测循环** — with/without 并行对照、评分、聚合、浏览器评审、迭代。
 
+本文所有 `node scripts/…`、`node eval-viewer/…` 命令都在**本技能目录**下执行；init 缺省输出目录按脚本自身位置解析，与当前工作目录无关。
+
 ---
 
 ## 第 1 步：理解意图与具体例子
@@ -57,7 +59,7 @@ description: 本机技能生产流水线：创建、评测、迭代与打包 age
 | 同一段代码每次重写（如 PDF 旋转、格式转换） | `scripts/` |
 | 每次重新查 schema/API/领域知识 | `references/` |
 | 每次重画同样的 boilerplate/模板/字体 | `assets/` |
-| 同一段验证步骤每次手工重跑 | `run-tests.mjs`（技能根） |
+| 同一段验证步骤每次手工重跑 | `run-tests.mjs`（技能目录根部） |
 
 同时给每个部分定**自由度分级**（低自由度=具体脚本固定参数，给脆弱操作上护栏；高自由度=文字指令，留给 agent 判断）。详见 `references/writing-guide.md`。
 
@@ -73,11 +75,11 @@ node scripts/init-skill.mjs <技能名> --structure <workflow|task|reference|cap
 
 - 名字自动归一化 kebab-case（`Log Classifier` → `log-classifier`），超 64 字符退出码 2。
 - 默认输出到本技能同级的技能目录；目标已存在且非空时拒绝（退出码 1，不覆盖）。
-- 产出：含待办占位与「结构选择指南」节的 SKILL.md + 按结构生成的 scripts/references/assets 占位 README。模板是**通用**的，不带本仓库假设——本仓库惯例见文末「本仓库使用提示」。
+- 产出：含待办占位与「结构选择指南」节的 SKILL.md + 技能目录根部 `run-tests.mjs` 回归测试骨架 + 按结构生成的 scripts/references/assets 占位 README。模板是**通用**的，不带本仓库假设——本仓库惯例见文末「本仓库使用提示」。
 
 ## 第 4 步：写资源再写 SKILL.md
 
-先实现第 2 步清单里的资源（这步常需要用户提供材料：品牌资产、模板、文档），再写 SKILL.md 把它们串起来。加入的脚本必须真实跑过至少一个代表性用例，不许「应该能跑」；跑通的用例当场固化进技能根的 `run-tests.mjs`（init 已生成骨架：check() 计数器 + 黑盒执行，fixtures/ 放黄金输入与 expected）——测试随技能分发，是后续反复升级校验的依据。
+先实现第 2 步清单里的资源（这步常需要用户提供材料：品牌资产、模板、文档），再写 SKILL.md 把它们串起来。加入的脚本必须真实跑过至少一个代表性用例，不许「应该能跑」；跑通的用例当场固化进技能目录根部的 `run-tests.mjs`（新建技能：init 已生成骨架；既有技能没有该文件时按同结构补建。check() 计数器 + 黑盒执行，fixtures/ 放黄金输入与 expected）——测试随技能分发，是后续反复升级校验的依据。
 
 写 SKILL.md 的完整方法论见 `references/writing-guide.md`，核心：
 
@@ -97,7 +99,7 @@ node scripts/quick-validate.mjs <技能目录>
 
 ## 第 6 步：输出评测循环
 
-评测结果放 `<技能根上一级>/skill-workspaces/<技能名>-workspace/`（如 `.claude/skill-workspaces/`）——**技能扫描根之外**，评测产物/夹具里出现再多的 `SKILL.md` 也不会被宿主识别成技能；既有技能的同级旧 workspace 可显式传路径沿用。按迭代组织（`iteration-1/`、`iteration-2/`…），每个测试用例一个 `eval-<描述性名>/` 目录。目录随用随建，不要预先全铺。
+评测结果放**扫描根上一级**的 `skill-workspaces/<技能名>-workspace/`——扫描根指 `.claude/skills/`、`.agents/skills/` 这类技能目录，落点即如 `.claude/skill-workspaces/<技能名>-workspace/`，在扫描根**之外**：评测产物/夹具里出现再多的 `SKILL.md` 也不会被宿主识别成技能。既有技能的同级旧 workspace 本身就在扫描根内，显式传路径沿用时，跑完 iteration 要用 check-shadow-skills 复查产物有没有冒充技能。按迭代组织（`iteration-1/`、`iteration-2/`…），每个测试用例一个 `eval-<描述性名>/` 目录。目录随用随建，不要预先全铺。
 
 ### 6.1 同一 turn 并行 spawn 全部 run（with-skill 与 baseline 一起）
 
@@ -116,10 +118,10 @@ node scripts/quick-validate.mjs <技能目录>
 
 目录布局对齐聚合器口径：`<config>/run-<K>/outputs/`（run 序号从 1 起，同一 eval 重跑多个 run 时递增）——聚合器只认 `run-<数字>` 子目录，产物直接放 `<config>/outputs/` 会收不到。
 
-基线 run（同 prompt）：
+基线 run（同 prompt 但去掉「技能路径」一行）：
 
 - **新建技能**：不给技能，存到 `without_skill/run-1/outputs/`。
-- **改进既有技能**：改动前先快照：`node scripts/snapshot-skill.mjs <技能目录> [<workspace>]`（workspace 缺省为 `<技能根上一级>/skill-workspaces/<技能名>-workspace`，在技能扫描根外；快照目录 `skill-snapshot`，已占用自动递增 `-v2`、`-v3`）。脚本会把快照里的 `SKILL.md` 改名 `SKILL.md.bak`——技能扫描器按 `SKILL.md` 文件名认技能，workspace 就在技能扫描根下，快照里留活的 `SKILL.md` 会冒出同名双技能、污染触发评测的技能清单；别徒手 `cp -r` 造快照。基线 run 的「技能路径」填快照目录，prompt 注明技能文档读 `SKILL.md.bak`，产物存 `old_skill/run-1/outputs/`。怀疑技能清单混进了快照/评测产物冒充的技能时，随时跑 `node scripts/check-shadow-skills.mjs [<技能根>…]` 复查（缺省查当前目录的 .claude/skills 与 .agents/skills）。
+- **改进既有技能**：改动前先快照：`node scripts/snapshot-skill.mjs <技能目录> [<workspace>]`（workspace 缺省为扫描根上一级的 `skill-workspaces/<技能名>-workspace`；快照目录 `skill-snapshot`，已占用自动递增 `-v2`、`-v3`）。脚本会把快照里的 `SKILL.md` 改名 `SKILL.md.bak`——技能扫描器按 `SKILL.md` 文件名认技能，若 workspace 沿用扫描根内的旧同级位置，快照里留活的 `SKILL.md` 会冒出同名双技能、污染触发评测的技能清单；新缺省位置虽在扫描根外，改名仍是双保险。别徒手 `cp -r` 造快照。基线 run 的「技能路径」填快照目录，prompt 注明技能文档读 `SKILL.md.bak`，产物存 `old_skill/run-1/outputs/`。怀疑技能清单混进了快照/评测产物冒充的技能时，随时跑 `node scripts/check-shadow-skills.mjs [<扫描根>…]` 复查（缺省查当前目录的 .claude/skills 与 .agents/skills）。
 
 每个 eval 目录写 `eval_metadata.json`（断言可先空，见 6.2）：
 
@@ -179,7 +181,7 @@ node eval-viewer/generate-review.mjs <workspace>/iteration-<N>
 3. **解释为什么**：反馈再简短也去理解用户真正要什么，把这份理解传进指令；满屏 ALWAYS 是黄旗。
 4. **识别重复劳动**：几个测试的 subagent 各自写了相似脚本 = 该进 `scripts/` 的最强信号。
 
-改进后先跑 `node <技能目录>/run-tests.mjs` 确认自带测试全过（回归门），再跑 `iteration-<N+1>/`（含 baseline），viewer 带 `--previous-workspace`，循环直到用户满意/反馈全空/不再有实质进展。
+改进后先跑 `node <技能目录>/run-tests.mjs` 确认自带测试全过（回归门，主观无测试的技能除外），再跑 `iteration-<N+1>/`（含 baseline），viewer 带 `--previous-workspace`，循环直到用户满意/反馈全空/不再有实质进展。
 
 ---
 
@@ -261,7 +263,7 @@ subagent 前向测试是把技能当评测面：验证泛化，不是验证另�
 node scripts/package-skill.mjs <技能目录> [输出目录]
 ```
 
-打包前自动跑同一校验器，违规目录拒绝打包（退出码 1）。分发前先跑技能自带 `run-tests.mjs`——带着失败测试的技能不许打包；`run-tests.mjs` 随技能进包（评测产物不进）。产出 `<技能名>.skill`——标准 zip 格式（STORE 不压缩），条目路径含技能目录名前缀，排除 `evals/`（技能根下）、`__pycache__/`、`node_modules/`、`*.pyc`、`.DS_Store`。可用任意 zip 工具或标准库核验内容。
+打包前自动跑同一校验器，违规目录拒绝打包（退出码 1）。分发前先跑技能自带 `run-tests.mjs`——带着失败测试的技能不许打包（主观无测试的技能除外）；`run-tests.mjs` 随技能进包（评测产物不进）。产出 `<技能名>.skill`——标准 zip 格式（STORE 不压缩），条目路径含技能目录名前缀，排除 `evals/`（技能目录根下）、`__pycache__/`、`node_modules/`、`*.pyc`、`.DS_Store`。可用任意 zip 工具或标准库核验内容。
 
 ## 本仓库使用提示
 

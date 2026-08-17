@@ -78,8 +78,9 @@ export function parseSkillMdFile(skillDir, readFileSync) {
   let content;
   try {
     content = readFileSync(join(skillDir, "SKILL.md"), "utf8");
-  } catch {
-    return { name: "", description: "", keys: [], content: "", error: "SKILL.md not found" };
+  } catch (err) {
+    const msg = err?.code === "EISDIR" ? "SKILL.md is a directory" : "SKILL.md not found";
+    return { name: "", description: "", keys: [], content: "", error: msg };
   }
   const { keys, values, error } = parseFrontmatter(content);
   return {
