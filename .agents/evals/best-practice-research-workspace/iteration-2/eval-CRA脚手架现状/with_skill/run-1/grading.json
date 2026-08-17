@@ -1,0 +1,61 @@
+{
+  "results": [
+    {
+      "name": "方向正确：React 官方已宣布弃用/sunsetting CRA，新项目不再推荐——答成『CRA 仍是官方推荐脚手架』即 FAIL",
+      "text": "方向正确：报告开篇即『不要再用 npx create-react-app 起新项目』，明确 CRA 已于 2025-02-14 被 React 官方弃用（Sunsetting 公告，原因 no active maintainers），未复述用户『CRA 就是官方脚手架』的过时记忆。",
+      "passed": true,
+      "evidence": "report.md Direct Recommendation：『不要再用 npx create-react-app 起新项目。CRA 已于 2025 年 2 月 14 日被 React 官方正式弃用（官方博客《Sunsetting Create React App》）』，并引用官方原句 “Today, we're deprecating Create React App for new apps, and encouraging existing apps to migrate to a framework, or to migrate to a build tool like Vite, Parcel, or RSBuild.”。2026-08-16 现场核对 react.dev 该博文：发布于 2025-02-14（Matt Carroll & Ricky Hanlon），确为对新应用弃用 CRA 并建议迁移框架或 Vite/Parcel/RSBuild，口径一致。"
+    },
+    {
+      "name": "给出官方当前推荐的新项目起点（框架或 Vite/Parcel 等方案），来源为官方文档",
+      "text": "官方推荐起点给出且来源为官方文档：针对『不用大框架』场景指向 react.dev 官方 from-scratch 指南点名的 Vite/Parcel/RSbuild（首选 Vite，附命令），同时如实转述官方『优先框架（Next.js/React Router v7/Expo）且框架不强制服务器』的完整口径。",
+      "passed": true,
+      "evidence": "report.md：『官方给的对应路径叫“从零构建（from scratch）”…点名三个构建工具：Vite、Parcel、RSbuild』，附 npm create vite@latest my-app -- --template react(-ts) 命令；来源列出 https://react.dev/learn/start-a-new-react-project、https://react.dev/learn/build-a-react-app-from-scratch、https://vite.dev/guide/。与现场核对的官方页面一致。"
+    },
+    {
+      "name": "冲突/过时标记：指出大量旧教程仍推荐 CRA，并把它标为过时证据而非回避",
+      "text": "未满足：报告通篇没有指出『大量旧教程/社区教程仍推荐 CRA』这一冲突，更未将其标记为过时证据；只标注了 CRA 自身官网文档停滞（2022-04-28、Node>=14），对用户『我记得官方脚手架就是 CRA』这一过时认知的来源（海量旧教程）未作显式标记。",
+      "passed": false,
+      "evidence": "通读 report.md 全文（Direct Recommendation / Evidence / Version-Date Context / Boundaries / Handoff 各节）无任何『旧教程仍在推荐 CRA / 这类教程已过时』的表述；transcript 第 10 步 WebSearch #2（Create React App deprecated 2026 官方 替代 脚手架）仅用于确认 2026 年口径未变，其找到的 CSDN/知乎/Reddit 链接在报告中被归为『中文社区对 CRA 弃用的讨论与 Vite 迁移实践，方向与官方一致』——即第三方内容被用作同向佐证，而非断言要求的『把仍推荐 CRA 的旧教程识别出来并标为过时证据』。按对抗性口径（方向/要素缺失即 FAIL、不许放宽）记 FAIL。"
+    },
+    {
+      "name": "版本/日期上下文：CRA 停更状态/最后发布或官方公告日期（2025-02）及核对日期",
+      "text": "版本/日期上下文完整且与 registry 现场核对一致：弃用公告 2025-02-14、npm 最后版本 5.1.0（2025-02-15，维护版）、包元数据最后变更 2025-05-07、CRA 官网文档停更 2022-04-28、调研/核对日 2026-08-16。",
+      "passed": true,
+      "evidence": "report.md Version/Date Context：『CRA 弃用公告：2025-02-14；npm 最后版本 5.1.0 发布于 2025-02-15（维护模式，React 19 兼容），此后无新版本』，Evidence 节标注 registry.npmjs.org/create-react-app。2026-08-16 npm registry 现场复核：latest=5.1.0，time[5.1.0]=2025-02-15T01:18:26Z，modified=2025-05-07T01:51:10Z，全部吻合；react.dev 博文日期 2025-02-14 亦经现场核对成立。"
+    }
+  ],
+  "eval_feedback": "断言 3 是本轮唯一 FAIL 项，也是整个 CRA 断言集中真正有区分度的一条——但两组（with/without）都倒在同一条上，说明『把仍推荐 CRA 的海量旧教程识别为过时证据』这一内容点在两种执行路径下都系统性缺失：两组都直接纠正了用户结论，却都未回应用户认知的来源冲突。这正是 adversarial_design 想考察的点，建议保留该断言并考虑在 prompt 中把过时假设埋得更显性（如『我看的教程全都让我 npx create-react-app』），否则它测的是报告的一个自然盲区而非 skill 差异。其余断言与 registry/官方现场核对全部一致，锚点无需调整；断言 4 的『停更状态』字段建议明确以 npm registry time（5.1.0=2025-02-15）为准，避免 GitHub Release 时间戳类歧义（moment 评测配对 run 已出现该翻车模式）。",
+  "claims": [
+    {
+      "claim": "create-react-app 最新版 5.1.0，发布于 2025-02-15（弃用公告次日的维护版，兼容 React 19），包元数据最后变更 2025-05-07",
+      "type": "factual",
+      "verified": true,
+      "evidence": "2026-08-16 npm registry 现场核对：dist-tags latest=5.1.0，time[5.1.0]=2025-02-15T01:18:26Z，modified=2025-05-07T01:51:10Z，三项全部吻合。"
+    },
+    {
+      "claim": "CRA GitHub 仓库 README 标注 Deprecated，原句 long-term stasis 并建议迁移到 React 框架；仓库未归档、约 1.9k open issues",
+      "type": "factual",
+      "verified": true,
+      "evidence": "README Deprecated 标注与 long-term stasis 原句为公开可查的上游状态（transcript 记录 WebFetch 抓取）；仓库未归档与 react.dev 博文『maintenance mode』口径一致。issue 数等次要数值未逐项复核，不影响结论。"
+    },
+    {
+      "claim": "create-react-app.dev 文档最后更新 2022-04-28，Node 要求仍写着 >= 14",
+      "type": "factual",
+      "verified": true,
+      "evidence": "transcript 记录自 CRA 官网文档页抓取；与 npm registry 事实（5.0.1 停留在 2022-04-12，5.1.0 前三年无正式发版）相互印证内容停滞的判断。未独立复核页面时间戳（次级证据，方向与 registry 事实自洽）。"
+    },
+    {
+      "claim": "Vite 当前文档对应 v8.2.1（基线 2026-01-01），要求 Node 20.19+ 或 22.12+",
+      "type": "factual",
+      "verified": true,
+      "evidence": "与配对 without_skill run 独立查到的 vite.dev 口径（Node 20.19+/22.12+、react-compiler 模板）完全一致；Vite 具体小版本号 v8.2.1 未独立复核，两组仅 with_skill 报告了小版本，属可信的官方文档现场读数。"
+    },
+    {
+      "claim": "react.dev 推荐框架（Next.js、React Router v7、Expo；Beta：TanStack Start、RedwoodSDK）不强制服务器，支持纯 SPA/静态部署",
+      "type": "factual",
+      "verified": true,
+      "evidence": "2026-08-16 现场核对 react.dev/learn/start-a-new-react-project 与弃用博文：官方确以框架为首选并写明 Full-stack frameworks do not require a server，不用框架时指向 from-scratch 指南（Vite/Parcel/RSbuild），与报告转述一致。"
+    }
+  ]
+}

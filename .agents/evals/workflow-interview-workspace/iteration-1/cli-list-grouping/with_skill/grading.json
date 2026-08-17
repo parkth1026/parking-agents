@@ -1,0 +1,13 @@
+{
+  "expectations": [
+    {"text": "contract.md 存在且 finalize 校验 status=valid", "passed": true, "evidence": "issue/manifest.json validation.status=\"valid\", ac_count=4, warnings=[]; issue/3-contract/contract.md Status: Ready"},
+    {"text": "每条 AC 都带 Verify: [A-D] 档位标注", "passed": true, "evidence": "AC-001~AC-004 全部标 Verify: [A]，且给出具体反引号命令"},
+    {"text": "访谈中主动问到「现在有没有别的东西依赖这个命令的输出格式」这类历史兼容性问题", "passed": true, "evidence": "rounds.jsonl round1 Q1 原文：\"分组要不要成为 list 的默认输出？会不会有仓库外的东西依赖现在这张摊平表的纯文本格式？\""},
+    {"text": "人设藏的个人脚本解析依赖这一隐藏事实被问出来并写进 context.md 或 rounds.jsonl", "passed": true, "evidence": "rounds.jsonl Q1 user_verbatim 完整记录了 PowerShell 脚本解析依赖；context.md「未知项」节也复述了这条事实并标注 overturned_recommendation"},
+    {"text": "2-prototype 下存在 behavior.md 或 example-run.md，记录改前改后的具体输出对照", "passed": true, "evidence": "issue/2-prototype/behavior.md（35行）与 example-run.md（71行）均存在，另有 drafts/v1-* 草稿保留迭代痕迹"},
+    {"text": "同一轮 round 内出现多条 tier=ask 的问题（批量问而不是挤牙膏）", "passed": true, "evidence": "rounds.jsonl 第7、8行同为 round:1 tier:ask（Q1、Q2）"},
+    {"text": "baseline（without_skill）是否也问到或假设了输出格式的历史兼容性风险，用作对比", "passed": true, "evidence": "without_skill 的 REPORT.md 显示基线也主动问了同一个问题并得到相同答案——本条在这个场景下不构成 with/without 的区分点，两边都因为「常识判断」触发了同一提问"}
+  ],
+  "summary": {"passed": 7, "failed": 0, "total": 7, "pass_rate": 1.0},
+  "notes": "跑在真正隔离的 worktree 里（.aes-workflow 落在 worktree 本地，未污染主仓库），结果可信。"
+}

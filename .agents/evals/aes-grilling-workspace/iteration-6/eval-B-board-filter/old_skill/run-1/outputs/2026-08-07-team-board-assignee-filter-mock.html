@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>团队看板 · 按负责人筛选（确认版 v2）</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0; }
+  .topbar {
+    padding: 12px 16px;
+    border-bottom: 1px solid #ddd;
+    display: flex;
+    align-items: center;
+    justify-content: space-between; /* 改动点：右侧新增筛选区 */
+  }
+  .topbar h1 { margin: 0; font-size: 18px; }
+  .filter-controls { display: flex; align-items: center; gap: 8px; } /* 改动点：新增 */
+  .filter-controls label { font-size: 14px; color: #555; }
+  .filter-controls select { padding: 4px 8px; }
+  .clear-btn { /* 改动点：新增「清除筛选」按钮 */
+    padding: 4px 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background: #fff;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  .clear-btn:disabled { color: #bbb; cursor: default; }
+  #board { display: flex; gap: 16px; padding: 16px; }
+  #board section { flex: 1; background: #f6f6f6; border-radius: 8px; padding: 8px; min-height: 60px; }
+  .card { background: #fff; border-radius: 6px; padding: 8px; margin: 8px 0; list-style: none; }
+  .empty-state { /* 改动点：新增空态文案 */
+    margin: 8px 16px;
+    padding: 24px;
+    text-align: center;
+    color: #888;
+    background: #fafafa;
+    border: 1px dashed #ddd;
+    border-radius: 8px;
+    display: none;
+  }
+  .demo-bar {
+    padding: 8px 16px;
+    background: #eef4ff;
+    border-bottom: 1px solid #cfe0ff;
+    font-size: 13px;
+  }
+  .demo-bar button { margin-right: 6px; }
+  .changelog {
+    margin: 16px;
+    padding: 12px;
+    background: #f6fff6;
+    border: 1px solid #cdeccd;
+    border-radius: 8px;
+    font-size: 13px;
+  }
+</style>
+</head>
+<body>
+  <div class="demo-bar">
+    确认版 v2（已按第一轮反馈修改）—— 演示三种状态：
+    <button onclick="setState('all')">全部任务（默认）</button>
+    <button onclick="setState('ayan')">筛选「ayan」（有结果）</button>
+    <button onclick="setState('empty')">筛选一个无任务的负责人（空态）</button>
+  </div>
+
+  <header class="topbar">
+    <h1>团队看板</h1>
+    <div class="filter-controls">
+      <label for="assignee-filter">负责人</label>
+      <select id="assignee-filter" onchange="onSelect(this.value)">
+        <option value="">全部负责人</option>
+        <option value="ayan">ayan</option>
+        <option value="bo">bo</option>
+        <option value="chen">chen</option>
+        <option value="empty-demo">yao（用于演示空态，无任务）</option>
+      </select>
+      <button class="clear-btn" id="clear-btn" onclick="clearFilter()" disabled>清除筛选</button>
+    </div>
+  </header>
+
+  <main id="board">
+    <section data-status="todo"><h2>待办</h2><ul id="todo"></ul></section>
+    <section data-status="doing"><h2>进行中</h2><ul id="doing"></ul></section>
+    <section data-status="done"><h2>已完成</h2><ul id="done"></ul></section>
+  </main>
+  <div class="empty-state" id="empty-state">没有匹配的任务</div>
+
+  <div class="changelog">
+    <strong>相对首版的改动点（对应第一轮反馈）：</strong>
+    <ol>
+      <li>筛选控件从看板上方独立一行，移到顶部工具栏右侧，与标题同一行。</li>
+      <li>新增「清除筛选」按钮：选中负责人后按钮可点，点击后恢复全部任务并重置下拉框。</li>
+      <li>筛选后没有任何卡片匹配时，三列下方显示空态文案「没有匹配的任务」。</li>
+    </ol>
+    <strong>结构说明（供质疑）：</strong> 下拉框枚举当前看板任务里出现过的负责人（去重）；
+    URL 会带上 <code>?assignee=&lt;负责人&gt;</code>，刷新页面或复制链接分享后筛选状态保留一致；
+    颜色、字体等视觉细节仅为示意，不代表最终视觉规范。
+  </div>
+
+  <script>
+    const TASKS = [
+      { id: 1, title: '整理季度目标', assignee: 'ayan', status: 'todo' },
+      { id: 2, title: '客户回访记录', assignee: 'bo', status: 'doing' },
+      { id: 3, title: '发布说明草稿', assignee: 'ayan', status: 'doing' },
+      { id: 4, title: '归档旧项目', assignee: 'chen', status: 'done' }
+    ];
+
+    function render(who) {
+      ['todo','doing','done'].forEach(s => document.getElementById(s).innerHTML = '');
+      const filtered = TASKS.filter(t => !who || t.assignee === who);
+      filtered.forEach(t => {
+        const li = document.createElement('li');
+        li.className = 'card';
+        li.textContent = `${t.title} — ${t.assignee}`;
+        document.getElementById(t.status).append(li);
+      });
+      document.getElementById('empty-state').style.display = (who && filtered.length === 0) ? 'block' : 'none';
+      document.getElementById('clear-btn').disabled = !who;
+    }
+
+    function onSelect(value) {
+      const who = value === 'empty-demo' ? 'yao' : value;
+      render(who);
+    }
+
+    function clearFilter() {
+      document.getElementById('assignee-filter').value = '';
+      render('');
+    }
+
+    function setState(mode) {
+      const select = document.getElementById('assignee-filter');
+      if (mode === 'all') { select.value = ''; render(''); }
+      if (mode === 'ayan') { select.value = 'ayan'; render('ayan'); }
+      if (mode === 'empty') { select.value = 'empty-demo'; render('yao'); }
+    }
+
+    render('');
+  </script>
+</body>
+</html>

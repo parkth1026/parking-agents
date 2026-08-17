@@ -1,0 +1,11 @@
+{
+  "total_tokens": 159698,
+  "duration_ms": 1309548,
+  "total_duration_seconds": 1309.5,
+  "questions_asked": 11,
+  "defaults": 15,
+  "confirms": 10,
+  "rounds": 4,
+  "overturned_by_user": 5,
+  "validity_note": "单 agent 扮演双角色，与 v6 同等条件。PERSONA 文件已移出仓库目录，grep 无法命中。agent 披露一处隔离泄漏：Q8 中「想要方案和代价」的措辞源自 PERSONA 而非仓库证据。"
+}

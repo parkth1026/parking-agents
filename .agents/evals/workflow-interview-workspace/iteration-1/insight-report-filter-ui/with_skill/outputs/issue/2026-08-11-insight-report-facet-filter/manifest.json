@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "slug": "2026-08-11-insight-report-facet-filter",
+  "created_at": "2026-08-11T11:22:35Z",
+  "updated_at": "2026-08-11T11:38:00Z",
+  "original_request": ".copilot/agents/insight/generate-insight-report.js 生成的报告现在是一份很长的静态大页面，想加一个按 facet 筛选的下拉框，选了之后只显示对应 facet 的内容，不用整页翻。",
+  "goal_oneline": "给 generate-insight-report.js 生成的 HTML 报告加一个顶部下拉框，按全部约25个区块(facet)筛选，选中后只显示该区块，其余用CSS隐藏不删除",
+  "target": null,
+  "stage": "3-contract",
+  "next_action": "契约已就绪，交给执行 Agent",
+  "stage_gates": {
+    "1-interview": {
+      "status": "done",
+      "closed_at": "2026-08-11T11:28:00Z",
+      "self_assessment": {
+        "意图": "已定",
+        "结果": "已定",
+        "边界": "已定",
+        "约束": "已定",
+        "现状": "已定"
+      }
+    },
+    "2-prototype": {
+      "status": "done",
+      "closed_at": "2026-08-11T11:31:40Z",
+      "artifacts_confirmed": [
+        "mock",
+        "behavior"
+      ]
+    },
+    "3-contract": {
+      "status": "done",
+      "closed_at": "2026-08-11T11:38:00Z"
+    }
+  },
+  "validation": {
+    "status": "valid",
+    "ac_count": 5,
+    "warnings": [],
+    "ran_at": "2026-08-11T11:37:12Z"
+  },
+  "blocked": [],
+  "residual_risk": null,
+  "status": "ready"
+}

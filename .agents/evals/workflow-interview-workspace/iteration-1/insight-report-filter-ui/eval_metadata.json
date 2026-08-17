@@ -1,0 +1,14 @@
+{
+  "eval_id": 3,
+  "eval_name": "insight-report-filter-ui",
+  "prompt": ".copilot/agents/insight/generate-insight-report.js 生成的报告现在是一份很长的静态大页面，想加一个按 facet 筛选的下拉框，选了之后只显示对应 facet 的内容，不用整页翻。",
+  "assertions": [
+    {"text": "2-prototype/mock.html 存在", "type": "programmatic"},
+    {"text": "mock.html 自包含：无外部 CDN 的 <script src=http...> 或 <link href=http...>，CSS/JS 都内联", "type": "programmatic"},
+    {"text": "mock.html 标出了改动点并在文件末尾注明新增什么/不变什么", "type": "programmatic"},
+    {"text": "contract.md 的「读什么」引用了 mock.html 路径，而不是重新用文字描述界面", "type": "programmatic"},
+    {"text": "问到了下拉框选项文案用内部 key 名还是人话这一点", "type": "judgment"},
+    {"text": "问到了某个 facet 没数据时下拉框如何表现这一点", "type": "judgment"},
+    {"text": "界面相关 AC 的 Verify 档位默认标 [C]，不是编不出证据链的 [A]（仓库没有视觉回归基建）", "type": "programmatic"}
+  ]
+}

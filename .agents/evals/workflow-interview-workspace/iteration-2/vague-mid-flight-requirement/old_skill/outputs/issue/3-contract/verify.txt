@@ -1,0 +1,11 @@
+# verify @ 2026-08-13T04:29:11Z
+# cwd: C:\wt\old
+
+[FAIL] AC-001  exit=1  $ node -e "process.exit(require('fs').readFileSync('.claude/skills/workflow-interview/SKILL.md','utf8').includes('中途改需求')?0:1)"
+[FAIL] AC-002  exit=1  $ node -e "process.exit(require('fs').readFileSync('.claude/skills/aes-goal-contract/SKILL.md','utf8').includes('中途改需求')?0:1)"
+[PASS] AC-003  exit=0  $ node .claude/skills/workflow-interview/scripts/session.mjs init verify-fixture-amend && node .claude/skills/workflow-interview/scripts/session.mjs stage .aes-workflow/grilling/verify-fixture-amend 3-contract done && node .claude/skills/workflow-interview/scripts/session.mjs stage .aes-workflow/grilling/verify-fixture-amend 3-contract in_progress
+         next: 跑 /aes-interview 调查事实并批量问清歧义。
+         3-contract → in_progress；当前阶段 3-contract
+         next: 跑 /aes-interview 调查事实并批量问清歧义。
+
+绿 1 / 红 2 / 跑不起来 0

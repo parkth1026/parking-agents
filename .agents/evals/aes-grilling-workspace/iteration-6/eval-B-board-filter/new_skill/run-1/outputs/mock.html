@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>团队看板 - 负责人筛选 mock v2（已确认）</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0; }
+  .topbar {
+    padding: 12px 16px;
+    border-bottom: 1px solid #ddd;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .topbar h1 { font-size: 18px; margin: 0; }
+  .filter-badge { background: #ffe9a8; border: 1px dashed #c9a227; font-size: 12px; padding: 2px 6px; border-radius: 4px; margin-left: 8px; }
+  .filter-bar { display: flex; align-items: center; gap: 8px; }
+  #board { display: flex; gap: 16px; padding: 16px; }
+  #board section { flex: 1; background: #f6f6f6; border-radius: 8px; padding: 8px; min-height: 80px; }
+  .card { background: #fff; border-radius: 6px; padding: 8px; margin: 8px 0; list-style: none; }
+  ul { padding-left: 0; margin: 0; }
+  .empty-state { color: #888; font-size: 13px; padding: 12px 4px; }
+  #clear-filter { display: none; }
+  #clear-filter.visible { display: inline-block; }
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <h1>团队看板</h1>
+    <div class="filter-bar">
+      <span class="filter-badge">改动点 v2：控件挪到工具栏最右侧（原 v1 在标题右侧），新增"清除筛选"</span>
+      <label>按负责人筛选：
+        <select id="assignee-filter">
+          <option value="">全部</option>
+          <option value="ayan">ayan</option>
+          <option value="bo">bo</option>
+          <option value="chen">chen</option>
+        </select>
+      </label>
+      <button id="clear-filter">清除筛选</button>
+    </div>
+  </header>
+  <main id="board">
+    <section data-status="todo"><h2>待办</h2><ul></ul></section>
+    <section data-status="doing"><h2>进行中</h2><ul></ul></section>
+    <section data-status="done"><h2>已完成</h2><ul></ul></section>
+  </main>
+
+  <hr style="margin: 24px 16px;">
+  <div style="padding: 0 16px 24px; color: #555; font-size: 13px;">
+    <strong>空态示例（改动点 v2 新增）：</strong>
+    选中一个"当前没有匹配任务"的负责人（例如直接在地址栏输入
+    <code>?assignee=someone-with-no-tasks</code>）时，每一列展示如下空态文案，
+    而不是留空白：
+    <div id="empty-demo" style="display:flex; gap:16px; margin-top:8px;">
+      <section style="flex:1; background:#f6f6f6; border-radius:8px; padding:8px;">
+        <h2 style="font-size:14px;">待办</h2>
+        <p class="empty-state">没有匹配的任务</p>
+      </section>
+      <section style="flex:1; background:#f6f6f6; border-radius:8px; padding:8px;">
+        <h2 style="font-size:14px;">进行中</h2>
+        <p class="empty-state">没有匹配的任务</p>
+      </section>
+      <section style="flex:1; background:#f6f6f6; border-radius:8px; padding:8px;">
+        <h2 style="font-size:14px;">已完成</h2>
+        <p class="empty-state">没有匹配的任务</p>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    // 写死的示例数据，仅用于 mock 演示，不连真实后端。
+    const TASKS = [
+      { id: 1, title: '整理季度目标', assignee: 'ayan', status: 'todo' },
+      { id: 2, title: '客户回访记录', assignee: 'bo', status: 'doing' },
+      { id: 3, title: '发布说明草稿', assignee: 'ayan', status: 'doing' },
+      { id: 4, title: '归档旧项目', assignee: 'chen', status: 'done' }
+    ];
+
+    function render(filterAssignee) {
+      let anyEmpty = false;
+      for (const status of ['todo', 'doing', 'done']) {
+        const section = document.querySelector(`[data-status="${status}"]`);
+        const list = section.querySelector('ul');
+        list.innerHTML = '';
+        const existingEmpty = section.querySelector('.empty-state');
+        if (existingEmpty) existingEmpty.remove();
+
+        const items = TASKS.filter(t => t.status === status && (!filterAssignee || t.assignee === filterAssignee));
+        if (items.length === 0) {
+          anyEmpty = true;
+          const p = document.createElement('p');
+          p.className = 'empty-state';
+          p.textContent = '没有匹配的任务';
+          section.append(p);
+        } else {
+          for (const task of items) {
+            const li = document.createElement('li');
+            li.className = 'card';
+            li.textContent = `${task.title} — ${task.assignee}`;
+            list.append(li);
+          }
+        }
+      }
+      document.getElementById('clear-filter').classList.toggle('visible', Boolean(filterAssignee));
+    }
+
+    const select = document.getElementById('assignee-filter');
+    const clearBtn = document.getElementById('clear-filter');
+    select.addEventListener('change', (e) => render(e.target.value));
+    clearBtn.addEventListener('click', () => { select.value = ''; render(''); });
+    render('');
+  </script>
+</body>
+</html>

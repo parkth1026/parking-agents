@@ -1,0 +1,36 @@
+{
+  "eval_id": 1,
+  "eval_name": "cli-list-grouping",
+  "prompt": "session.mjs 的 list 命令现在把所有 issue 摊平打印成一张表，issue 一多就看不过来了。我想让它按 stage 分组显示，并且能加个筛选只看某个 stage 或者只看 in_progress 的。",
+  "persona": "你是这个仓库的维护者本人，也是 workflow-interview 这套工具日常最重的使用者。\n- 动机：手头挂着的 issue 一多，`session.mjs list` 摊平成一张长表就看不过来了，想按 stage 分组，并能加个筛选。\n- 想要：按 stage 分组显示；能只看某个 stage，或者只看 in_progress 的。\n- 如果 Agent 问起「有没有别的东西依赖这份输出的格式」这类问题：你想起来自己写过一个不在这个仓库里的本地小脚本（自己电脑上的一个 PowerShell 脚本），靠固定列宽/列顺序去 parse `session.mjs list` 的纯文本输出，喂给自己的一个提醒小工具。这件事你一开始不会主动说，只有 Agent 明确问到「输出格式有没有别的东西在依赖」或类似问题时才说出来。你不确定新格式要不要兼容它，愿意让 Agent 给建议。\n- 如果 Agent 给你看行为对照表（behavior.md / example-run.md）之类的东西确认：第一次看你会提两条意见——分组标题行要清楚标出 stage 名字和数量；筛选参数命中 0 条时不能什么都不打印，得明确提示「没有匹配项」。改完后第二次看你就确认通过，不再提新意见。\n- 不变的（你依赖的）：没加任何 flag 时，`list` 的默认输出行为不能变（这是给你自己那个脚本兜底的），除非 Agent 跟你确认要不要迁移。\n- 验收方式：跟着仓库已有的测试/校验惯例走，Agent 推荐什么就是什么。\n- 其他任何未覆盖的问题：选 Agent 推荐项。",
+  "assertions": [
+    {
+      "text": "contract.md 存在且 finalize 校验 status=valid",
+      "type": "programmatic"
+    },
+    {
+      "text": "每条 AC 都带 Verify: [A-D] 档位标注",
+      "type": "programmatic"
+    },
+    {
+      "text": "访谈中主动问到「现在有没有别的东西依赖这个命令的输出格式」这类历史兼容性问题",
+      "type": "judgment"
+    },
+    {
+      "text": "人设藏的个人脚本解析依赖这一隐藏事实被问出来并写进 context.md 或 rounds.jsonl",
+      "type": "judgment"
+    },
+    {
+      "text": "2-prototype 下存在 behavior.md 或 example-run.md，记录改前改后的具体输出对照",
+      "type": "programmatic"
+    },
+    {
+      "text": "同一轮 round 内出现多条 tier=ask 的问题（批量问而不是挤牙膏）",
+      "type": "programmatic"
+    },
+    {
+      "text": "baseline（without_skill）是否也问到或假设了输出格式的历史兼容性风险，用作对比",
+      "type": "judgment"
+    }
+  ]
+}

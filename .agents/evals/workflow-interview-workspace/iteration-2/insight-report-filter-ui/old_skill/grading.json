@@ -1,0 +1,55 @@
+{
+  "expectations": [
+    {
+      "text": "contract.md 存在且 finalize 校验 status=valid",
+      "passed": true,
+      "evidence": "manifest.validation = {\"status\":\"valid\",\"ac_count\":5,\"warnings\":[],\"ran_at\":\"2026-08-13T04:34:07Z\",\"verify_tiers\":{\"A\":0,\"B\":0,\"C\":5,\"D\":0}}"
+    },
+    {
+      "text": "每条 AC 都带 Verify: [A-D] 档位标注",
+      "passed": true,
+      "evidence": "AC 数 5，Verify 标注数 5"
+    },
+    {
+      "text": "同一轮 round 内出现多条 tier=ask 的问题（批量问而不是挤牙膏）",
+      "passed": true,
+      "evidence": "每轮 ask 计数：{\"1\":2}"
+    },
+    {
+      "text": "2-prototype/mock.html 存在",
+      "passed": true,
+      "evidence": "G:\\GIT\\AI_WorkFlow\\parking-agents\\.claude\\skills\\workflow-interview-workspace\\iteration-2\\insight-report-filter-ui\\old_skill\\outputs\\issue\\2-prototype\\mock.html"
+    },
+    {
+      "text": "mock.html 自包含：无外部 CDN 的 <script src=http...> 或 <link href=http...>，CSS/JS 都内联",
+      "passed": true,
+      "evidence": "正则扫描外链关键词，零命中"
+    },
+    {
+      "text": "mock.html 标出了改动点并在文件末尾注明新增什么/不变什么",
+      "passed": true,
+      "evidence": "关键词匹配 changed/新增/不变"
+    },
+    {
+      "text": "contract.md 的「读什么」引用了 mock.html 路径，而不是重新用文字描述界面",
+      "passed": true,
+      "evidence": "contract.md 命中 mock.html 路径引用"
+    },
+    {
+      "text": "问到了下拉框选项文案用内部 key 名还是人话这一点",
+      "passed": true,
+      "evidence": "rounds.jsonl 命中相关关键词"
+    },
+    {
+      "text": "问到了某个 facet 没数据时下拉框如何表现这一点",
+      "passed": true,
+      "evidence": "rounds.jsonl 命中\"无数据\"相关表述"
+    },
+    {
+      "text": "界面相关 AC 的 Verify 档位默认标 [C]，不是编不出证据链的 [A]（仓库没有视觉回归基建）",
+      "passed": true,
+      "evidence": "契约里 [C] 档数量 = 5"
+    }
+  ],
+  "pass_rate": 1
+}

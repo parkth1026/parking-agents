@@ -1,0 +1,73 @@
+{
+  "results": [
+    {
+      "name": "冲突双方都被引用",
+      "text": "报告第 1 节逐字引用了 docs/install-layout.md 第 19 行的「4 平台」表述（含第 88-96 行分支表、第 147-150 行速查）和 hooks/session-start 第 43-44 行的「Only Claude Code is a supported target today」注释，均带文件路径与行号，经与仓库当前内容核对一致",
+      "passed": true,
+      "evidence": "outputs/analysis.md 第 1 节「冲突双方原文」：「**文档方** `docs/install-layout.md`（第 19 行、第 88-96 行、第 147-150 行）」引用 \"`hooks/session-start` | Claude Code / Cursor / Copilot CLI / Antigravity | 由 `run-hook.cmd` 调起…\"；「**代码方** `hooks/session-start`（第 43-44 行）」引用 \"Only Claude Code is a supported target today; the other branches are kept so adding Cursor / Copilot CLI later is a README change, not a rewrite.\"。抽查核验：两处原文及行号均与仓库实际内容逐字吻合"
+    },
+    {
+      "name": "逐平台接线证据",
+      "text": "报告给出逐平台接线证据表与证据文件清单：hooks/hooks.json（Claude Code）、.cursor-plugin/plugin.json + hooks/hooks-cursor.json（Cursor）、session-start 第 54-56 行环境变量分支（Copilot CLI）、.codex-plugin/plugin.json 的 \"hooks\": {} 抑制开关反证、两份契约测试——是真实接线文件而非复述文档。两处小瑕疵：.cursor-plugin/plugin.json 的 hooks 声明实为第 24 行而非报告所写第 18 行；Antigravity 一行的证据引用的是 README（文档）而非接线文件。实质仍明显超过「只复述文档清单」的判据",
+      "passed": true,
+      "evidence": "outputs/analysis.md 2.1 节表格逐平台给出「文件」列（hooks/hooks.json、.cursor-plugin/plugin.json + hooks/hooks-cursor.json、hooks/session-start 第 54-56 行）；「证据文件清单」另列 .codex-plugin/plugin.json（\"hooks\": {} 抑制开关反证共享目录确有多平台消费者）与 tests/hooks/test-session-start.mjs、tests/harnesses/test-harness-manifests.mjs。核验：hooks.json / hooks-cursor.json / .cursor-plugin/plugin.json 的 hooks 声明（grep 实测在第 24 行）/ .codex-plugin \"hooks\": {} / session-start 分支代码（48-57 行，54-56 为 else 分支）全部真实存在且内容相符"
+    },
+    {
+      "name": "第三层事实-bootstrap断链",
+      "text": "报告明确指出第三层事实且带精确行号：第 5.1 节指出 hooks/session-start 第 10 行仍硬编码 ${PLUGIN_ROOT}/skills/using-parking-skills/SKILL.md 而该路径（及其 skills/dev/ 变体）在工作树中均不存在，cat ... || echo 容错使失败静默；第 3 节第 3 层给出实测输出（含 cat 报错 + Error reading 回退文本）与契约测试 FAIL（9 项）。行号、回退串、测试失败数均与我的一手实测完全一致",
+      "passed": true,
+      "evidence": "outputs/analysis.md 5.1：「`hooks/session-start` 第 10 行仍硬编码 `${PLUGIN_ROOT}/skills/using-parking-skills/SKILL.md`，该路径（及其 `skills/dev/` 变体）在工作树中均无。`cat ... || echo` 的容错让 hook 退出码仍为 0，失败完全静默」；3 节第 3 层实测输出 \"additionalContext\": \"...cat: /g/.../skills/using-parking-skills/SKILL.md: No such file or directory\\nError reading using-parking-skills skill...\"。核验：session-start:10 确为 BOOTSTRAP_SKILL 行；ls skills/ 仅剩 dev/ 与 pub/；我实跑 hook 得到逐字相同的注入文本（含 \"Error reading using-parking-skills skill\" 回退串）；node tests/hooks/test-session-start.mjs 输出 \"FAIL — 9 problem(s)\""
+    },
+    {
+      "name": "证据-推断显式分级",
+      "text": "报告正文没有任何「直接证据 / 推断 / 未知」层级标注：无相应分节、无标签、无置信度区分。第二分句（冲突未被无声裁决）是满足的——第 4 节裁定「文档对」附有接线文件、git 时间线、同文件矛盾注释等证据，且专段承认「注释并非全错」；但第一分句不成立：实测结果（hook 输出错误文本、测试 FAIL）与解释性推断（「注释是化石」）以同等的确定性并列陈述，从未区分哪些结论有一手证据、哪些是推断、哪些不可知。断言为合取条件，判 FAIL",
+      "passed": false,
+      "evidence": "通读 outputs/analysis.md 全文：章节为 一句话结论 / 冲突双方原文 / 谁在说真话 / 三层答案 / 最终裁定 / 附带发现 / 修复建议 / 证据文件清单——「三层」是接线/验收/实际工作的分层，不是证据置信分层；全文无 \"证据\"\"推断\"\"未知\"\"置信度\" 等层级标注用语，无任何结论被标记为推断或未知（仅 4 节末尾一处 \"npm test 应处于失败状态\" 的弱限定）。对照 with_skill run 的显式 Evidence/Inference/Unknowns 分节，差距明确"
+    }
+  ],
+  "eval_feedback": "断言 4 是本用例唯一产生区分度的断言，建议保持「按正文是否真的标注证据/推断/未知层级」的严格判法（勿被表格数量或「三层答案」这类同形概念迷惑）。断言 2 判据可以更明确：本 run 对 Antigravity 的「接线证据」引用的是 README 而非接线文件、.cursor-plugin/plugin.json 行号写错（18 vs 实际 24）仍通过——若要求「每平台的接线证据必须指向非文档文件且行号经得起抽查」，该断言区分度会更强。断言 1 区分度偏低（读过两处原文即过）；断言 3 的 \"(Error reading ...)\" 括号把判据限定为特定回退串，建议放宽为「注入内容为错误/占位文本」。另无断言覆盖「接线 4 家 / 验收 1 家 / 当前能工作 0 家」三层答案本身的准确性与完整性。",
+  "claims": [
+    {
+      "claim": "f74e16e（2026-08-04 11:05）加入 .cursor-plugin/plugin.json、hooks/hooks-cursor.json、Kimi/OpenCode/Gemini，hook 改动 12 行，但漏删 43-44 行旧注释",
+      "type": "factual",
+      "verified": true,
+      "evidence": "git show --stat f74e16e：提交时间 11:05:19，.cursor-plugin/plugin.json +25、hooks/hooks-cursor.json +10、.kimi-plugin/plugin.json +27、.opencode/plugins/parking-skills.js +112、gemini-extension.json +6、hooks/session-start 12 行改动，全部吻合"
+    },
+    {
+      "claim": "b8e27f1（2026-08-04 20:51）新建 docs/install-layout.md 并补 references/antigravity-tools.md",
+      "type": "factual",
+      "verified": true,
+      "evidence": "git show --stat b8e27f1：20:51:44，docs/install-layout.md +164、references/antigravity-tools.md +31"
+    },
+    {
+      "claim": ".cursor-plugin/plugin.json 第 18 行声明 \"hooks\": \"./hooks/hooks-cursor.json\"",
+      "type": "factual",
+      "verified": false,
+      "evidence": "grep -n hooks .cursor-plugin/plugin.json 实测仅命中第 24 行；第 18 行是 keywords 数组中的 \"code-review\"。声明内容正确，行号漂移 6 行"
+    },
+    {
+      "claim": "tests/hooks/test-session-start.mjs 通过时的末行输出为 \"PASS — session-start emits the correct single field for all 3 platform shapes\"",
+      "type": "factual",
+      "verified": true,
+      "evidence": "实读测试源码第 126 行确为该字符串；当前实跑输出 \"FAIL — 9 problem(s)\"，与报告「契约测试当前 FAIL（9 项）」一致"
+    },
+    {
+      "claim": "实测执行 hook 输出的注入内容为 cat 报错 + \"Error reading using-parking-skills skill\" 错误占位文本",
+      "type": "factual",
+      "verified": true,
+      "evidence": "我以 CLAUDE_PLUGIN_ROOT 环境实跑 bash hooks/session-start，注入正文逐字为 \"cat: /g/GIT/AI_WorkFlow/parking-agents/skills/using-parking-skills/SKILL.md: No such file or directory\\nError reading using-parking-skills skill\"，与报告引用一致"
+    },
+    {
+      "claim": "hooks/ 目录自 f74e16e 之后、docs/install-layout.md 自 b8e27f1 之后均无任何提交",
+      "type": "factual",
+      "verified": true,
+      "evidence": "git log --oneline -- hooks/ 仅两提交（03d03c9、f74e16e）；git log -- docs/install-layout.md 仅 b8e27f1"
+    },
+    {
+      "claim": "README 第 101 行的 references/antigravity-tools.md 已成死链；install-layout.md 的「一层扁平」约束随 dev/pub 改造失效",
+      "type": "factual",
+      "verified": true,
+      "evidence": "README:99-101 实测提及该路径；ls skills/ 仅剩 dev/ 与 pub/，references 文件随 048efac 删除"
+    }
+  ]
+}

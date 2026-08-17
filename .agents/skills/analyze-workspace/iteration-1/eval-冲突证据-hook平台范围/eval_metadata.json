@@ -1,0 +1,25 @@
+{
+  "prompt": "docs/install-layout.md 里说 session-start hook 服务 Claude Code / Cursor / Copilot CLI / Antigravity 四个平台，但 hooks/session-start 脚本里的注释又说目前只有 Claude Code 是受支持的目标。到底现在哪些平台真的在用这个 hook？文档和代码哪个说的是事实？帮我分析清楚，先不要改任何东西。",
+  "assertions": [
+    {
+      "name": "冲突双方都被引用",
+      "type": "manual",
+      "text": "报告同时引用 docs/install-layout.md 的「4 平台」表述（约 :19 与 :85-94 表格）和 hooks/session-start:43-44 的「Only Claude Code is a supported target today」注释，均带具体文件路径与行号引用"
+    },
+    {
+      "name": "逐平台接线证据",
+      "type": "manual",
+      "text": "对讨论到的每个平台给出接线层面的证据文件（如 hooks/hooks.json、.cursor-plugin/plugin.json 引用 hooks-cursor.json、gemini-extension.json 无 hook 声明、package.json 无 hook 声明等），而不是只复述文档清单"
+    },
+    {
+      "name": "第三层事实-bootstrap断链",
+      "type": "manual",
+      "text": "报告指出 hooks/session-start:10 读取的 skills/using-parking-skills/SKILL.md 已不存在，当前注入内容落入错误回退文本（Error reading ...）——即文档/注释冲突之外还存在实际注入源损坏这一层事实"
+    },
+    {
+      "name": "证据-推断显式分级",
+      "type": "manual",
+      "text": "关键结论区分了「直接证据」「推断」「未知」中至少两级；冲突未被无声裁决（没有在无证据情况下直接宣布某一方正确而忽略另一方的矛盾）"
+    }
+  ]
+}

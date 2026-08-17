@@ -1,0 +1,21 @@
+{
+  "port": 8080,
+  "storage": {
+    "dir": "/var/lib/metrics-relay/data",
+    "rotateBytes": 268435456
+  },
+  "forward": {
+    "enabled": true,
+    "endpoint": "http://analytics-ingest.internal:9000/bulk",
+    "batchSize": 500,
+    "flushMs": 1000,
+    "maxRetries": 5
+  },
+  "validate": {
+    "rejectUnknownFields": false,
+    "maxEventBytes": 8192
+  },
+  "log": {
+    "level": "warn"
+  }
+}

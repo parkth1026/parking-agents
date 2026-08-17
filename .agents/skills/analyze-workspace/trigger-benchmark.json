@@ -1,0 +1,69 @@
+{
+  "skill": "analyze",
+  "split": {
+    "train": [
+      "q3",
+      "q2",
+      "q9",
+      "q10",
+      "q5",
+      "q7",
+      "q11",
+      "q12",
+      "q16",
+      "q18",
+      "q13",
+      "q15"
+    ],
+    "test": [
+      "q1",
+      "q8",
+      "q4",
+      "q6",
+      "q20",
+      "q17",
+      "q14",
+      "q19"
+    ],
+    "seed": 42,
+    "holdout": 0.4
+  },
+  "rounds": [
+    {
+      "description": null,
+      "train": {
+        "queries": 12,
+        "trigger_rate_on_should": 1,
+        "false_trigger_rate_on_should_not": 0,
+        "correct": 12,
+        "invalid_queries": 0
+      },
+      "test": {
+        "queries": 8,
+        "trigger_rate_on_should": 1,
+        "false_trigger_rate_on_should_not": 0,
+        "correct": 8,
+        "invalid_queries": 0
+      }
+    },
+    {
+      "description": "v2-修订版: Run read-only deep repository analysis and return a ranked synthesis with explicit confidence... 帮我分析/梳理/排查... Not for simple one-file fact lookups or code edits.",
+      "train": {
+        "queries": 12,
+        "trigger_rate_on_should": 1,
+        "false_trigger_rate_on_should_not": 0,
+        "correct": 12,
+        "invalid_queries": 0
+      },
+      "test": {
+        "queries": 8,
+        "trigger_rate_on_should": 1,
+        "false_trigger_rate_on_should_not": 0,
+        "correct": 8,
+        "invalid_queries": 0
+      }
+    }
+  ],
+  "best_description": null,
+  "invalid_probes": 14
+}

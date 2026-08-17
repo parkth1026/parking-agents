@@ -1,0 +1,9 @@
+命令: pwsh -NoProfile -File "G:\GIT\AI_WorkFlow\parking-agents\.claude\skills\aes-grilling-workspace\skill-snapshot-v4\scripts\validate-goal-contract.ps1" -Path "G:\GIT\AI_WorkFlow\parking-agents\.claude\skills\aes-grilling-workspace\iteration-5\eval-5-ui-board-filter\old_skill\run-1\workdir\docs\goal-contracts\2026-08-07-board-assignee-filter.md"
+--- 输出 ---
+VALID: G:\GIT\AI_WorkFlow\parking-agents\.claude\skills\aes-grilling-workspace\iteration-5\eval-5-ui-board-filter\old_skill\run-1\workdir\docs\goal-contracts\2026-08-07-board-assignee-filter.md
+FORMAT: AES Goal Contract B
+STATUS: Ready
+AC_COUNT: 7
+LINE_COUNT: 70
+--- 退出码 ---
+EXIT CODE: 0

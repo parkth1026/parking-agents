@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "slug": "2026-08-13-insight-report-filter-ui",
+  "created_at": "2026-08-13T04:18:46Z",
+  "updated_at": "2026-08-13T04:35:39Z",
+  "original_request": "generate-insight-report.js 生成的报告现在是一份很长的静态大页面，想加一个按 facet 筛选的下拉框，选了之后只显示对应 facet 的内容，不用整页翻。",
+  "goal_oneline": "给 generate-insight-report.js 生成的 HTML 报告加一个页面顶部的 facet 筛选下拉框，选中后只显示该 facet 内容、隐藏其余，未选中内容用 content-visibility:hidden 隐藏以保留 Ctrl+F 可搜性，无数据的 facet 选项照常出现并提示暂无数据",
+  "target": null,
+  "stage": "3-contract",
+  "next_action": "契约就绪，把交接指令发给执行 Agent",
+  "stage_gates": {
+    "1-interview": {
+      "status": "done",
+      "closed_at": "2026-08-13T04:24:25Z",
+      "self_assessment": {
+        "意图": "已定",
+        "结果": "已定",
+        "边界": "已定",
+        "约束": "已定",
+        "现状": "已定"
+      }
+    },
+    "2-prototype": {
+      "status": "done",
+      "closed_at": "2026-08-13T04:26:23Z",
+      "artifacts_confirmed": [
+        "mock"
+      ]
+    },
+    "3-contract": {
+      "status": "done",
+      "closed_at": "2026-08-13T04:35:39Z"
+    }
+  },
+  "validation": {
+    "status": "valid",
+    "ac_count": 6,
+    "warnings": [
+      "WARNING: 正文句子里出现 TODO、TBD 或 FIXME，确认它是内容本身，不是没做完的标记。"
+    ],
+    "ran_at": "2026-08-13T04:35:24Z",
+    "verify_tiers": {
+      "A": 3,
+      "B": 0,
+      "C": 3,
+      "D": 0
+    }
+  },
+  "blocked": [],
+  "residual_risk": null,
+  "status": "ready"
+}

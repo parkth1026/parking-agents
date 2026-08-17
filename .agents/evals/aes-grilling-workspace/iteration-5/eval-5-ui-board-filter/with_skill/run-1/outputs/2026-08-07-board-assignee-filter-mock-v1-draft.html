@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>团队看板 · 负责人筛选 Mock v1（草稿，未确认）</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0; color: #222; }
+  .note { background: #fffbe6; border-bottom: 1px solid #f0e0a0; padding: 10px 16px; font-size: 13px; }
+  .note b { color: #8a6d00; }
+  .topbar { padding: 12px 16px; border-bottom: 1px solid #ddd; }
+  .layout { display: flex; }
+  .sidebar { width: 200px; padding: 16px; border-right: 1px solid #ddd; background: #fafafa; }
+  .sidebar h3 { font-size: 13px; margin: 0 0 8px; color: #666; }
+  #board { display: flex; gap: 16px; padding: 16px; flex: 1; }
+  #board section { flex: 1; background: #f6f6f6; border-radius: 8px; padding: 8px; }
+  .card { background: #fff; border-radius: 6px; padding: 8px; margin: 8px 0; list-style: none; }
+  .changed { outline: 2px dashed #d46b08; outline-offset: 3px; }
+  .urlbar { font-family: ui-monospace, monospace; font-size: 12px; background: #eef; padding: 6px 16px; }
+  select { padding: 4px 6px; }
+</style>
+</head>
+<body>
+<div class="note">
+  <b>Mock v1（草稿）</b> — 写死示例数据，不连后端。橙色虚线框 = 相对现状的改动点。
+  请逐处质疑：控件位置、字段、文案、状态、交互、边界。
+</div>
+<div class="urlbar">地址栏：http://localhost:4173/?assignee=ayan</div>
+<header class="topbar"><h1>团队看板</h1></header>
+<div class="layout">
+  <aside class="sidebar changed">
+    <h3>筛选</h3>
+    <label>负责人<br>
+      <select id="f">
+        <option value="">全部负责人</option>
+        <option value="ayan" selected>ayan</option>
+        <option value="bo">bo</option>
+        <option value="chen">chen</option>
+      </select>
+    </label>
+  </aside>
+  <main id="board">
+    <section data-status="todo"><h2>待办</h2><ul><li class="card">整理季度目标 — ayan</li></ul></section>
+    <section data-status="doing"><h2>进行中</h2><ul><li class="card">发布说明草稿 — ayan</li></ul></section>
+    <section data-status="done"><h2>已完成</h2><ul></ul></section>
+  </main>
+</div>
+</body>
+</html>

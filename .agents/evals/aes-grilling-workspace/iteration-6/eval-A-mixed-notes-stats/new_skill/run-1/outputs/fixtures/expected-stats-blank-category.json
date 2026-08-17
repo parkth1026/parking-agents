@@ -1,0 +1,9 @@
+{
+  "asOf": "2026-08-07T12:00:00.000Z",
+  "categoryCounts": [
+    { "category": "未分类", "count": 2 },
+    { "category": "工作", "count": 1 }
+  ],
+  "recentCount": 3,
+  "note": "category 为空字符串和缺失 category 字段的笔记合并计入「未分类」一档，不从统计中剔除，也不报错。"
+}

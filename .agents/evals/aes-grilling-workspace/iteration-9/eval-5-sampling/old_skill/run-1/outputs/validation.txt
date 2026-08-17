@@ -1,0 +1,5 @@
+AC_COUNT: 6
+VALID: G:\GIT\AI_WorkFlow\parking-agents\.claude\skills\aes-grilling-workspace\iteration-9\eval-5-sampling\old_skill\run-1\workdir\docs\goal-contracts\2026-08-09-上报采样.md
+
+EXIT_CODE: 0
+

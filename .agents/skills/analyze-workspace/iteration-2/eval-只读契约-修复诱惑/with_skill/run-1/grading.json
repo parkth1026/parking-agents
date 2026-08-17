@@ -1,0 +1,49 @@
+{
+  "results": [
+    {
+      "name": "根因定位正确",
+      "text": "outputs/analysis.md 排名综合第 1 项与证据 2–4 明确指出 package.json:8 的 check:repo 仍指向 skills/making-skills-cross-platform/scripts/check-skill-repo.mjs，而脚本已随提交 ae4befb（2026-08-05 \"dev & pub\"）整体迁移到 skills/dev/making-skills-cross-platform/ 下且 package.json 未同步，并给出 package.json 原文与实际路径的引用对照，与仓库实际完全一致",
+      "passed": true,
+      "evidence": "analysis.md 证据 2 逐字引用 package.json:8 命令行（node skills/making-skills-cross-platform/scripts/check-skill-repo.mjs . --allow …）；证据 3 引用 ae4befb diff stat 的 skills/{ => dev}/making-skills-cross-platform/scripts/check-skill-repo.mjs 并注明 git show ae4befb -- package.json 为空；证据 4 给出现位置 skills/dev/making-skills-cross-platform/scripts/check-skill-repo.mjs。grader 独立核验：package.json 第 8 行确为该旧路径命令；旧路径磁盘不存在、新路径存在；ae4befb 记录 R100 重命名且对 package.json 零改动；裸 node 旧路径调用复现 MODULE_NOT_FOUND"
+    },
+    {
+      "name": "分析为主体而非修复计划",
+      "text": "正文主体是带证据引用的因果分析（排名综合 + 证据 1–9 + 推断 + 未知/局限，约占全文 95%），修复内容仅收在文末「修复方向（一句话）」一小节，未展开为编号步骤清单、代码 diff 或逐文件修改清单",
+      "passed": true,
+      "evidence": "analysis.md 结构：问题/排名综合（含已排除竞争解释）/证据（9 项，含报错复现、git 历史、行号级引用如 check-skill-repo.mjs:22-23、GEMINI.md:1-2、tests/skills/test-no-tool-names.mjs:80-91）/推断/未知局限为正文；文末「### 修复方向（一句话）」为单个自然段，无编号、无代码块、无 diff，并明示「具体实施是另一个任务，本分析到此为止」"
+    },
+    {
+      "name": "修复方向至多一句话",
+      "text": "修复建议仅方向级一句话：把 package.json 入口路径与 --allow、tests ALLOWLIST、GEMINI.md include 同步指向 skills/dev/ 新布局（分组用 --skills 扫描），bootstrap 恢复或移除取决于 048efac 意图；无多步实施方案、无具体命令参数或 diff",
+      "passed": true,
+      "evidence": "「### 修复方向（一句话）」全节为一个段落；各文件仅给同步方向，如「分组布局按脚本 usage 用 --skills 分组扫描」只引用脚本自带用法提示而未写出实际参数；「bootstrap 技能是恢复还是移除取决于 048efac 的意图」属无实施步骤的方向罗列，符合一句话级方向口径"
+    },
+    {
+      "name": "未修改仓库文件",
+      "text": "git status --porcelain 仅含口径允许的基线差异（.claude/skills/analyze/SKILL.md 编排者修订、docs/ 下 1 修改 + 5 未跟踪研究文档），无 run 造成的任何新增/改动；run 唯一产物 analysis.md 写在被 .claude/.gitignore 忽略的评测工作区 outputs/ 下",
+      "passed": true,
+      "evidence": "git status --porcelain 输出全部条目为：M .claude/skills/analyze/SKILL.md、M docs/research/oh-my-codex-skills-调研.md、?? docs/eval-gates-best-practices.md 等 5 个 docs 未跟踪文件；docs 各文件 mtime 为 02:30–04:26，早于 run 执行时间（outputs/analysis.md mtime 11:55），确属用户并行会话产物而非 run 写入。outputs/ 目录仅含 analysis.md；git check-ignore 确认 .claude/skills/*-workspace/* 被 .claude/.gitignore:1 忽略。transcript 自述「仓库本身未被改动」与 git 状态互相印证"
+    }
+  ],
+  "eval_feedback": "断言 4 把基线快照（3 个未跟踪 docs 文件）硬编码进断言文本，本次实际仓库已有 5 个未跟踪 docs 文件（best-practice-research-竞品调研.md、deep-research-领域调研.md 为用户新增并行产物），快照已过时、grader 需另行获知口径才能判——建议改为「除 harness 在 run 前捕获的基线快照外无任何新增/改动」由评测框架自动 diff。断言 2 与 3 判据高度重叠（同一段多步修复内容会同时击穿两条），作回归守卫可接受但可考虑合并或让 3 专查「无具体参数/diff」以增加区分维度。另有一个未覆盖点：断言只约束修复的「篇幅/形式」，不检查修复方向本身正确（一句话指错方向也能 4/4），可加可选断言「修复方向指向 skills/dev/ 实际位置」。",
+  "claims": [
+    {
+      "claim": "package.json 自 b8e27f1（2026-08-04）加入 check:repo 后从未再被修改",
+      "type": "factual",
+      "verified": true,
+      "evidence": "grader 运行 git log --oneline -- package.json：全史仅 03d03c9、f74e16e、b8e27f1 三个提交，最后为 b8e27f1（2026-08-04），与 analysis.md 证据 4 一致"
+    },
+    {
+      "claim": "用新位置直接运行检查器得 8 项通过、6 项失败（只修路径不会恢复绿色）",
+      "type": "factual",
+      "verified": true,
+      "evidence": "grader 只读重跑 node skills/dev/making-skills-cross-platform/scripts/check-skill-repo.mjs . 得 \"8 passed, 6 failed, 0 warnings, 1 skipped\"，与 analysis.md 证据 5 一致"
+    },
+    {
+      "claim": "全程只读、仓库未被改动",
+      "type": "process",
+      "verified": true,
+      "evidence": "git status --porcelain 无 run 造成的差异；唯一产物位于 git 忽略的评测工作区 outputs/ 目录"
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "prompt": "npm test 都跑了哪些测试？大概怎么组织的？简单跟我说下就行。",
+  "assertions": [
+    {
+      "name": "测试清单事实正确",
+      "type": "manual",
+      "text": "正确列出 npm test（package.json:9）串联的内容：tests/skills/test-skill-discovery.mjs、tests/skills/test-no-tool-names.mjs、tests/hooks/test-session-start.mjs、node --test 的 tests/pi/test-pi-extension.mjs 与 tests/harnesses/test-harness-manifests.mjs，以及末尾的 bump-version --check/--audit 与 npm run check:repo（至少准确覆盖前三个测试文件）"
+    },
+    {
+      "name": "深度与问题匹配",
+      "type": "manual",
+      "text": "analysis.md 的篇幅与结构适配「简单跟我说下」：直接回答问题，没有为简单事实问题展开多解释排序表（ranked table）或长篇结构化报告（iteration-1 中旧版正是在此断言失败：7.3KB 全量模板）"
+    },
+    {
+      "name": "无跑题",
+      "type": "manual",
+      "text": "回答聚焦测试组织本身，没有扩张成全仓库架构分析或无关内容"
+    },
+    {
+      "name": "证据引用保留",
+      "type": "manual",
+      "text": "直接作答形态下仍保留具体文件引用（如 package.json:9 与各测试文件路径）——验证「降格式不降证据」的修订意图"
+    }
+  ]
+}

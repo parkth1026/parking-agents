@@ -1,0 +1,32 @@
+{
+  "eval_id": 2,
+  "eval_name": "vague-mid-flight-requirement",
+  "prompt": "帮我给 workflow-interview 加个功能，允许用户中途改需求。",
+  "persona": "你是 workflow-interview 这个技能的作者，提需求时确实没想清楚。\n- 你说「中途改需求」时，脑子里其实想的是：访谈已经问完、对照物也确认过了，进入到 3-contract 阶段快收尾时，你才突然想加一条新的验收条件——这算不算「中途改需求」，你自己也没细分过。\n- 如果 Agent 问「你要的和现有 needs_reinterview 回退机制有什么不一样」：你愣一下，想起来仓库里已经有这套机制（子技能报 needs_reinterview 就退回 aes-interview），承认「好像……还真有点像，我可能就是想要一个更轻的版本——不用整个打回第一阶段重新走一遍，只是想在契约还没定稿前，能追加一条新的验收条件」。\n- 如果 Agent 问「新加的验收条件要不要触发 aes-prototype 重新出一次对照物」：说看情况，如果新条件涉及界面/行为变化就要，纯文字性质的（比如补一句边界说明）就不用，让 Agent 按现有门禁规则判断。\n- 你不想要一个全新的子系统或者新命令；如果 Agent 打算新增一整套机制，先跟你确认一下是不是有更小的改法。\n- 验收方式：跟着仓库现有校验脚本 validate-goal-contract.mjs 走。\n- 其他任何未覆盖的问题：选 Agent 推荐项。",
+  "assertions": [
+    {
+      "text": "调查阶段主动查过仓库里已有的 needs_reinterview 回退机制（Fact 调查），而不是假装它不存在",
+      "type": "judgment"
+    },
+    {
+      "text": "context.md 的四分类节把「中途改需求」拆成了多个子问题并分别归类，而不是整句话归成一类",
+      "type": "programmatic"
+    },
+    {
+      "text": "访谈中问到了「你要的和现有 needs_reinterview 机制有什么不一样」这类澄清问题",
+      "type": "judgment"
+    },
+    {
+      "text": "契约最终范围与人设被问到后透露的信息一致（人设可能说这未必需要新功能，契约范围应体现这一点而不是硬做一个新子系统）",
+      "type": "judgment"
+    },
+    {
+      "text": "rounds.jsonl 里没有在歧义收口前就把具体实现方案当成既定事实写死的情况",
+      "type": "judgment"
+    },
+    {
+      "text": "baseline（without_skill）是否也发现或提到了现有 needs_reinterview 机制，用作对比",
+      "type": "judgment"
+    }
+  ]
+}

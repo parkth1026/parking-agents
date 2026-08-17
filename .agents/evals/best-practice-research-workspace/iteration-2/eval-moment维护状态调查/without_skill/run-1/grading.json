@@ -1,0 +1,73 @@
+{
+  "results": [
+    {
+      "name": "方向正确：结论与 moment 官方口径一致——官方自述 legacy/维护模式（既非『活跃开发中』也非『已死不可用』）",
+      "text": "方向正确：报告结论为『没有死，但官方明确宣布已经完工——自 2020 年 9 月起进入维护模式，不再开发新功能』『官方不推荐新项目使用』，与官方口径一致，未复述用户问题中『仍在推荐/活跃』的过时假设。",
+      "passed": true,
+      "evidence": "report.md 一、结论速览表：『moment.js 死了吗？没有死，但官方明确宣布“已经完工”（done）——自 2020 年 9 月起进入维护模式（maintenance mode），不再开发新功能』；二、官方声明节引用原文 “We now generally consider Moment to be a legacy project in maintenance mode. It is not dead, but it is indeed done.”。2026-08-16 现场核对 momentjs.com 项目状态页，口径一致。"
+    },
+    {
+      "name": "官方点名的替代库（Luxon/date-fns/day.js 至少其一）被引用，且来源标注为官方建议而非社区排名",
+      "text": "Luxon、Day.js、date-fns、js-Joda、原生 Date+Intl 全部被引用，且第六节表格明确标注引自官方推荐页（momentjs.com/docs/#/-project-status/recommendations/），Luxon 的『the evolution of Moment』定位语也归因于官方，非社区排名。",
+      "passed": true,
+      "evidence": "report.md 第六节：『官方项目状态页给出的推荐替代（出处：momentjs.com/docs/#/-project-status/recommendations/）』表格列 Luxon（官方称其为 “the evolution of Moment”）、Day.js、date-fns、js-Joda、原生 Date + Intl；参考来源第 2 条即该官方 URL。与现场核对的官方推荐清单一致。"
+    },
+    {
+      "name": "存量项目与新代码两种情形分开给结论，未一刀切（未说『必须全迁』也未说『不用管』）",
+      "text": "两种情形分开：存量代码『不必为弃用而发起专项重构，但应停止增长，按机会成本逐步迁移』（冻结增量+机会式迁移的渐进策略）；新代码『不应再引入 moment』。未说『必须全迁』也未说『不用管』。",
+      "passed": true,
+      "evidence": "report.md 第五节标题『存量代码要不要动？结论：不必为“moment 被弃用”而发起专项重构，但应停止增长，按机会成本逐步迁移』，含 6 条渐进建议；第六节『新代码该不该继续用？结论：新代码不应再引入 moment（这是官方明文建议）』，并按场景分库推荐。"
+    },
+    {
+      "name": "版本/日期上下文：写明 legacy 宣告时间（2020-09）或当前版本/维护状态及核对日期",
+      "text": "报告写明了 legacy 宣告时间 2020-09 与核对日期 2026-08-16，但当前版本的关键日期事实错误：称最新版 2.30.1 发布于 2026-07-26，并据此得出『2.30.1 就是 2026 年 7 月发布的维护版本』『持续修 bug』的叙事——npm registry 实际 time[2.30.1]=2023-12-27T10:38:43Z，核心包自 2023-12-27 后零发版。关键事实与 registry 现场核对不符，按本轮对抗性口径记 FAIL。",
+      "passed": false,
+      "evidence": "report.md 第三节表格：『最新正式版本 2.30.1，发布于 2026-07-26｜GitHub Releases』，解读段：『（例如 2.30.1 就是 2026 年 7 月发布的维护版本）』；transcript 第 3 步称该日期经 gh CLI 从 GitHub Releases 取得。2026-08-16 仲裁（以 npm registry time 字段为准，按评测指令）：time[2.30.1]=2023-12-27T10:38:43Z，dist-tags latest 仍为 2.30.1，其后无任何版本。错误来源已定位：GitHub 上 2.30.1 的 Release 对象 published_at 确为 2026-07-26T19:57:03Z（晚于 npm 发包近两年半的重新发布/整理动作），本报告误把该字段当作发版日期，并进一步推出『2026-07 仍有维护性发版』的错误结论；同字段还误读了 registry 的 modified=2026-08-12（元数据变更，非发版）。配对 with_skill run 用 npm registry 得到正确的 2023-12-27——本组与 with_skill 组在『2.30.1 发布日期』上的冲突，仲裁结果为 with_skill 对、本组错。"
+    }
+  ],
+  "eval_feedback": "断言 4 本轮真正产生区分：registry 日期核对捕获了 GitHub Release 对象 published_at（2026-07-26，重新发布时间）与 npm 实际发版时间（2023-12-27）的混淆，以及把 registry modified 字段误读为『仍在维护性发版』的衍生错误。建议：(1) 在断言文本中预先写明『发布日期以 npm registry time 字段为准』，使 FAIL 判定无争议；(2) 可增加一条断言要求区分『包有元数据变更』与『包有新版本发布』——这正是本 run 暴露的具体混淆模式；(3) 断言 2 与断言 4 的出处要求在两组报告中均被官方 URL 引用同时满足，存在重叠，断言 2 可加码为要求转述官方定位语。除此之外本 run 其余事实（star 数、推送时间、下载量、Temporal Stage 4）经现场核对全部正确，方向性断言 1-3 的判定不受该日期错误影响。",
+  "claims": [
+    {
+      "claim": "最新正式版本 2.30.1，发布于 2026-07-26（来源 GitHub Releases）",
+      "type": "factual",
+      "verified": false,
+      "evidence": "2026-08-16 npm registry 现场核对：time[2.30.1]=2023-12-27T10:38:43Z。日期仲裁：with_skill 组（2023-12-27，npm registry）正确，本组（2026-07-26，GitHub Release 对象的 published_at）错误——经 gh api 复核该 Release 对象 published_at 确为 2026-07-26T19:57:03Z，但那是重新发布/整理动作时间，不代表 npm 实际发版日期。"
+    },
+    {
+      "claim": "『2.30.1 就是 2026 年 7 月发布的维护版本』，项目仍在持续修 bug、按维护模式承诺运转",
+      "type": "factual",
+      "verified": false,
+      "evidence": "npm registry 显示核心包 2023-12-27 之后零发版（latest 仍为 2.30.1），不存在 2026-07 的核心包维护版本；持续更新的只有 moment-timezone 0.6.3（2026-07-19）。该叙事由上面的错误日期衍生而来。"
+    },
+    {
+      "claim": "npm 注册表最近更新 2026-08-12（解读为『仍在维护性发版』）",
+      "type": "factual",
+      "verified": false,
+      "evidence": "registry modified 字段确为 2026-08-12T00:53:34Z（字段值本身对），但 modified 是包元数据最后变更时间，不等于发版；本报告用它佐证『仍在维护性发版』属误读。"
+    },
+    {
+      "claim": "仓库未归档（archived: false）、约 47,900 stars、最近一次推送 2026-08-15",
+      "type": "factual",
+      "verified": true,
+      "evidence": "2026-08-16 经 gh api 现场核对：archived=false，stargazers_count=47916，pushed_at=2026-08-15T04:31:05Z，三项全部吻合。"
+    },
+    {
+      "claim": "npm 近 30 天下载量：moment 约 1.43 亿、dayjs 约 2.60 亿、date-fns 约 3.90 亿、luxon 约 1.46 亿",
+      "type": "factual",
+      "verified": true,
+      "evidence": "api.npmjs.org/downloads/point/last-month 现场返回：moment=143,377,438；dayjs=260,367,478；date-fns=390,450,430；luxon=146,045,826，四项全部吻合（报告的相对倍数 2.7x/1.8x 亦成立）。"
+    },
+    {
+      "claim": "moment-timezone 最新 0.6.3，2026-07 仍有更新",
+      "type": "factual",
+      "verified": true,
+      "evidence": "npm registry：moment-timezone time[0.6.3]=2026-07-19T08:02:45Z，吻合。"
+    },
+    {
+      "claim": "Temporal 提案已达 Stage 4 并纳入 ES2026；Firefox 139 / Chrome 144 / Node 26 已实装",
+      "type": "factual",
+      "verified": true,
+      "evidence": "2026-08-16 现场核对 github.com/tc39/proposal-temporal README：『currently Stage 4』，且页面列出的实装版本（Firefox 139 2025-05-27、Chrome 144 2026-01-13、Node 26 2026-05-05）与报告一致；『ES2026』归属未在官方页逐字标注（小残差）。"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "expectations": [
+    {"text": "2-prototype/mock.html 存在", "passed": false, "evidence": "REPORT.md 明确承认「没有」——直接在真实文件上实现，用跑出来的样例报告 + 无头DOM验证脚本作为「实现完之后的自证产物」，而不是实现前给用户确认的独立 mock"},
+    {"text": "mock.html 自包含：无外部 CDN 的 <script src=http...> 或 <link href=http...>，CSS/JS 都内联", "passed": false, "evidence": "无 mock.html，不适用"},
+    {"text": "mock.html 标出了改动点并在文件末尾注明新增什么/不变什么", "passed": false, "evidence": "无 mock.html，不适用；改动点信息以「实现要点」形式写在 REPORT.md 里，不是嵌在界面对照物文件本身"},
+    {"text": "contract.md 的「读什么」引用了 mock.html 路径，而不是重新用文字描述界面", "passed": false, "evidence": "无 contract.md"},
+    {"text": "问到了下拉框选项文案用内部 key 名还是人话这一点", "passed": false, "evidence": "REPORT.md 明确承认「都没有主动向模拟用户发起确认式提问」，是照人设描述里预先给出的默认值直接实现的，不是问出来的（虽然最终结果碰巧和人设的答案一致）"},
+    {"text": "问到了某个 facet 没数据时下拉框如何表现这一点", "passed": false, "evidence": "同上，未主动确认，直接采用了人设描述里的默认值"},
+    {"text": "界面相关 AC 的 Verify 档位默认标 [C]，不是编不出证据链的 [A]（仓库没有视觉回归基建）", "passed": false, "evidence": "无 AC/Verify 结构，验证是自己写的一段无头 DOM 断言脚本，形态上更接近未声明档位的自制 [A]/[B] 混合，不是走确认过的 [C] 人工复现"}
+  ],
+  "summary": {"passed": 0, "failed": 7, "total": 7, "pass_rate": 0.0},
+  "notes": "三个场景里 with/without 差距最大的一次：baseline 完全跳过了「界面变更先出对照物给用户确认」这一步，直接在真实文件上实现，且自己承认「与理想流程有差距」。另外它多做了一件人设明确说不需要的事——用 localStorage 记住上次选择（人设原话「不需要，每次打开默认显示第一个 facet 就行」）——因为没有走确认流程，这个于本次任务而言属于外溢范围的选择没有被拦下来。"
+}

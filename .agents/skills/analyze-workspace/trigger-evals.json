@@ -1,0 +1,25 @@
+{
+  "skill": "analyze",
+  "queries": [
+    { "id": "q1", "text": "为什么我跑 npm run check:repo 会报 Cannot find module？帮我分析下原因，先别改", "should_trigger": true },
+    { "id": "q2", "text": "investigate 一下 ue-error-solver 的配置是怎么解析的，SKILL_ENV 环境变量和配置文件到底谁优先", "should_trigger": true },
+    { "id": "q3", "text": "帮我梳理 session-start hook 的注入链路，从 hooks.json 到最终注入上下文要经过哪些文件", "should_trigger": true },
+    { "id": "q4", "text": "仓库里 skills/ 和 .claude/skills/ 都有 ue-error-solver，到底哪个才是实际生效的版本？分析一下", "should_trigger": true },
+    { "id": "q5", "text": "npm test 现在 fail 得很奇怪，帮我查查是什么引起的，我要基于代码证据的解释", "should_trigger": true },
+    { "id": "q6", "text": "why does hooks/session-start 的注释说只支持 Claude Code，文档却说四个平台？哪个是真的", "should_trigger": true },
+    { "id": "q7", "text": "如果把 hooks.json 里的 session-start 去掉，哪些平台会受影响？先做影响面分析再说", "should_trigger": true },
+    { "id": "q8", "text": "在动手改配置之前，我想先弄明白 UeErrorSolver.mjs 现在的行为：配置从哪几层合并、NAS 检查什么时候触发", "should_trigger": true },
+    { "id": "q9", "text": "这两处文档对支持平台的说法对不上，帮我判断哪个是事实，排个序说明理由", "should_trigger": true },
+    { "id": "q10", "text": "我们想把构建脚本迁到 PS1 之前，先分析下现在 hooks/run-hook.cmd 这个 polyglot 是怎么同时当 bat 和 sh 用的", "should_trigger": true },
+    { "id": "q11", "text": "帮我把 D:/builds/ 下这几个 UE 编译失败日志按错误模式归类分析一下", "should_trigger": false },
+    { "id": "q12", "text": "用 jenkins-pair-analyze 把最近两次 jenkins 失败构建配对分析一下", "should_trigger": false },
+    { "id": "q13", "text": "分析一下 jenkins 日志里这个链接错误是哪次提交引入的，构建号 2333", "should_trigger": false },
+    { "id": "q14", "text": "这段 react 组件重复逻辑太多了，帮我 simplify 一下", "should_trigger": false },
+    { "id": "q15", "text": "帮我调研一下 Tailwind 4 的配置最佳实践", "should_trigger": false },
+    { "id": "q16", "text": "我想新建一个技能叫 log-classifier，帮我搭好脚手架并跑校验", "should_trigger": false },
+    { "id": "q17", "text": "读一下 package.json，告诉我版本号是多少", "should_trigger": false },
+    { "id": "q18", "text": "帮我把 GEMINI.md 翻译成英文", "should_trigger": false },
+    { "id": "q19", "text": "把 package.json 里 check:repo 的路径改成 skills/dev/ 下面的正确位置", "should_trigger": false },
+    { "id": "q20", "text": "安排一次完整的需求访谈，帮我把新技能的需求问清楚", "should_trigger": false }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "eval_id": 1,
+  "eval_name": "log-export-improvement",
+  "prompt": "fixtures/log-export 这个日志导出脚本太难用了,帮我改进一下。先把需求理清楚再给我一份 goal contract,别直接动手改。",
+  "assertions": [
+    "every-option-has-percentage: questions.md 里每一题的每一个选项都带一个百分比数字",
+    "percentages-sum-to-100: 每一题的选项百分比合计为 100（允许 ±1 的取整误差）",
+    "every-option-has-three-sections: 每个选项都写齐「选什么」「好处」「代价」三段",
+    "recommended-is-highest: 每题恰有一个选项标注（推荐），且它的百分比是该题最高",
+    "no-flat-distribution: 没有一题的最高与最低百分比之差 ≤ 3 个点（均匀分布视为未查够事实或问题停在表面）",
+    "section-cap-respected: 任一选项的好处、代价各不超过 3 条",
+    "cost-is-repo-specific: 代价写的是这个仓库里的具体后果（点名文件、命令、字段、默认值），不是「更灵活」「符合最佳实践」这类对任何选项都成立的通用词",
+    "scope-states-exclusion: 「选什么」写明了这个选项不覆盖什么，不只写覆盖什么",
+    "ac-candidates-same-format: 第 4b 阶段的验收条件候选同样带百分比与三段结构",
+    "contract-records-percentages: 契约「访谈记录」表的候选栏把当时给的百分比记了下来",
+    "passes-validator: 契约通过 validate-goal-contract.mjs（exit 0）"
+  ]
+}

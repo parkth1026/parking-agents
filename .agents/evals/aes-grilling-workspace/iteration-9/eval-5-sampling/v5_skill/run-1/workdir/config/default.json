@@ -1,0 +1,21 @@
+{
+  "port": 8080,
+  "storage": {
+    "dir": "./data",
+    "rotateBytes": 67108864
+  },
+  "forward": {
+    "enabled": true,
+    "endpoint": "http://analytics-ingest.internal:9000/bulk",
+    "batchSize": 200,
+    "flushMs": 2000,
+    "maxRetries": 3
+  },
+  "validate": {
+    "rejectUnknownFields": false,
+    "maxEventBytes": 8192
+  },
+  "log": {
+    "level": "info"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "event": "page_view",
+  "ts": 1754697600,
+  "user_id": "u-10293",
+  "session_id": "s-88f21",
+  "props": {
+    "path": "/dashboard",
+    "referrer": "/login"
+  }
+}

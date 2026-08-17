@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "slug": "2026-08-13-mid-flight-requirement-change",
+  "created_at": "2026-08-13T04:18:07Z",
+  "updated_at": "2026-08-13T04:29:23Z",
+  "original_request": "帮我给 workflow-interview 加个功能，允许用户中途改需求。",
+  "goal_oneline": "在 3-contract 阶段契约还没 done 之前，能追加一条新的验收条件，不用像 needs_reinterview 那样整套打回 1-interview 重走一遍；若追加内容涉及界面/行为差异则仍按现有门禁走 needs_reinterview",
+  "target": null,
+  "stage": "3-contract",
+  "next_action": "把交接指令发给执行 Agent，契约见 3-contract/contract.md",
+  "stage_gates": {
+    "1-interview": {
+      "status": "done",
+      "closed_at": "2026-08-13T04:23:14Z",
+      "self_assessment": {
+        "意图": "已定",
+        "结果": "已定",
+        "边界": "已定",
+        "约束": "已定",
+        "现状": "已定"
+      }
+    },
+    "2-prototype": {
+      "status": "done",
+      "closed_at": "2026-08-13T04:25:46Z",
+      "artifacts_confirmed": [
+        "behavior",
+        "example-run"
+      ]
+    },
+    "3-contract": {
+      "status": "done",
+      "closed_at": "2026-08-13T04:29:23Z"
+    }
+  },
+  "validation": {
+    "status": "valid",
+    "ac_count": 3,
+    "warnings": [],
+    "ran_at": "2026-08-13T04:29:10Z",
+    "verify_tiers": {
+      "A": 3,
+      "B": 0,
+      "C": 0,
+      "D": 0
+    }
+  },
+  "blocked": [],
+  "residual_risk": null,
+  "status": "ready"
+}

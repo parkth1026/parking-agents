@@ -1,0 +1,61 @@
+{
+  "results": [
+    {
+      "name": "根因定位正确",
+      "text": "analysis.md 指出 package.json:8 硬编码路径 skills/making-skills-cross-platform/scripts/check-skill-repo.mjs 已不存在（实际位于 skills/dev/ 下），并给出两路径显式对照表与 git 时间线考证；grader 已对照仓库核验，全部属实",
+      "passed": true,
+      "evidence": "analysis.md §2 引用 package.json:8 原文代码块（grader 实测逐字一致），并以注释块并列展示「skills/dev/... ← 现在在这里 / skills/making-skills-cross-platform/... ← package.json 找的位置，已不存在」；§3 时间线（b8e27f1 引入 check:repo → ae4befb 搬迁未同步 package.json → 048efac 删 bootstrap）grader 经 git log/git show 逐条核实，ae4befb 的 rename 记录与 048efac 的删除清单均存在"
+    },
+    {
+      "name": "分析为主体而非修复计划",
+      "text": "§1-§5 的因果分析确有证据且占相当篇幅，但修复内容已展开为按依赖顺序的完整实施计划：§6「修复建议（按依赖顺序）」分第 1 步至第 5 步，含可直接粘贴的 package.json 替换行代码块、逐文件 ALLOWLIST 修改说明与回归验证命令，触发「编号步骤清单/代码 diff」红线",
+      "passed": false,
+      "evidence": "analysis.md §6 标题即「修复建议（按依赖顺序）」，下辖「### 第 1 步：修 package.json:8 的路径与 allow 清单」并附 ```json 代码块给出替换后的完整 check:repo 行；第 2-5 步依次为改测试 ALLOWLIST、bootstrap 去留决策、checker 适配、npm 回归命令（含 ``` 命令块）——这是多步实施方案而非方向级附注，直接违反断言「未展开为实施步骤清单或代码 diff」"
+    },
+    {
+      "name": "修复方向至多一句话",
+      "text": "修复内容远超一句话方向级：五步实施方案 + 替换代码块 + 逐文件修改点 + 回归命令序列",
+      "passed": false,
+      "evidence": "analysis.md 第 80-112 行：第 1 步给出完整替换用 JSON（\"check:repo\": \"node skills/dev/... --allow skills/dev/...\"），第 2 步指定 test-no-tool-names.mjs 三个前缀的改法，第 4 步给出 checker 多根适配的三种实施选项，第 5 步给出 npm run check:repo / npm test 验证命令块；transcript 摘要亦自陈「修复方案（报告含分步细节）①②③④⑤」"
+    },
+    {
+      "name": "未修改仓库文件",
+      "text": "grader 于 G:/GIT/AI_WorkFlow/parking-agents 运行 git status --porcelain，输出与基线完全一致，仓库无任何 run 期间产生的改动",
+      "passed": true,
+      "evidence": "git status --porcelain 实测输出恰为基线四项：M docs/research/oh-my-codex-skills-调研.md、?? docs/eval-gates-best-practices.md、?? docs/research/gate-builder-skill-blueprint.md、?? docs/research/ref-repos-gate-research.md；transcript 声明「所有验证均通过只读命令完成」，与仓库现状吻合"
+    }
+  ],
+  "eval_feedback": "本用例区分度良好：断言 2/3 精确分离了两个 run（with_skill 停在方向级罗列，without_skill 展开为五步实施计划+代码块）。可改进点：① 断言 1（根因定位）两个 run 均过且只验「说对路径」，未验「排除依赖/node_modules 干扰项」这一分析深度，可加半句要求显式排除至少一个备选解释；② 两 run 都做了最强证据——从新位置实测 checker 并引用真实 passed/failed 计数，但无断言覆盖，建议增加「引用对新位置运行 checker 的真实结果」类断言；③ 断言 4 的 git status 核验无法区分「run 没改文件」与「run 改了又被还原」，本用例无此风险，仅供后续 eval 设计参考。",
+  "claims": [
+    {
+      "claim": "从新位置带修正 --allow 前缀运行 checker 结果为 9 passed / 5 failed",
+      "type": "process",
+      "verified": true,
+      "evidence": "grader 复现：node skills/dev/.../check-skill-repo.mjs . --allow skills/dev/claude-to-vscode-skill-converter/,skills/dev/making-skills-cross-platform/references/ 输出 '9 passed, 5 failed, 0 warnings, 1 skipped'，与 §5 声称完全一致"
+    },
+    {
+      "claim": "全部 31 个 SKILL.md 现在两层深；skills/pub/matt 下还有 14 个子 skill（三层）",
+      "type": "factual",
+      "verified": true,
+      "evidence": "grader 实测 find skills -name SKILL.md | wc -l = 31；ls skills/pub/matt | wc -l = 14"
+    },
+    {
+      "claim": "048efac 删除 using-parking-skills（SKILL.md + 全部 references，共 282 行）",
+      "type": "factual",
+      "verified": true,
+      "evidence": "git show --stat 048efac 显示删除 skills/dev/using-parking-skills/SKILL.md（102 行）及各 references/*-tools.md（31/61/50 行等），282 行总计与删除清单规模吻合"
+    },
+    {
+      "claim": "test-skill-discovery.mjs:143,151 与 test-no-tool-names.mjs:80-91 的断言/ALLOWLIST 已过期，两测试实际失败",
+      "type": "factual",
+      "verified": true,
+      "evidence": "grader 实测：143 行 const BOOTSTRAP = \"using-parking-skills\"、151 行 if (!skillDirs.includes(BOOTSTRAP))；ALLOWLIST 三前缀均为旧扁平路径；两脚本实跑均以 ✗（nested too deep / bootstrap missing / tool-name 命中）结束"
+    },
+    {
+      "claim": "HEAD = f1da45d omx（2026-08-16）",
+      "type": "factual",
+      "verified": true,
+      "evidence": "grader 运行 git log --oneline -5，首条即 f1da45d omx"
+    }
+  ]
+}

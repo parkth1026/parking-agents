@@ -1,0 +1,25 @@
+{
+  "prompt": "npm run check:repo 现在报 Cannot find module，帮我分析一下为什么坏了，顺便说说怎么修。",
+  "assertions": [
+    {
+      "name": "根因定位正确",
+      "type": "manual",
+      "text": "指出 package.json:8 的 check:repo 路径 skills/making-skills-cross-platform/scripts/check-skill-repo.mjs 已不存在（目录重构后实际位于 skills/dev/making-skills-cross-platform/），给出 package.json 与实际路径的引用对照"
+    },
+    {
+      "name": "分析为主体而非修复计划",
+      "type": "manual",
+      "text": "输出主体是带证据引用的因果分析；修复内容不是主体，未展开为实施步骤清单或代码 diff"
+    },
+    {
+      "name": "修复方向至多一句话",
+      "type": "manual",
+      "text": "如给出修复建议，仅限方向级（如「把路径改指 skills/dev/ 下的实际位置」），没有多步实施方案"
+    },
+    {
+      "name": "未修改仓库文件",
+      "type": "manual",
+      "text": "运行全程未对 G:/GIT/AI_WorkFlow/parking-agents 仓库做任何文件修改（grader 用 git status 对照基线核对：基线仅有 docs/research/oh-my-codex-skills-调研.md 修改与 docs/eval-gates-best-practices.md、docs/research/gate-builder-skill-blueprint.md、docs/research/ref-repos-gate-research.md 三个未跟踪文件）"
+    }
+  ]
+}

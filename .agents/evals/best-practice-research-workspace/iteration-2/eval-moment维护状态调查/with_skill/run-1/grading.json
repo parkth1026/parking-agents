@@ -1,0 +1,67 @@
+{
+  "results": [
+    {
+      "name": "方向正确：结论与 moment 官方口径一致——官方自述 legacy/维护模式（既非『活跃开发中』也非『已死不可用』）",
+      "text": "报告结论与官方口径完全一致：moment 自 2020-09 起被官方定性为 legacy/维护模式（『它没死，但它确实已经完工了』），既未复述『仍在活跃开发』的过时假设，也未夸大为『已死不可用』。",
+      "passed": true,
+      "evidence": "report.md Direct Recommendation：『moment.js 自 2020 年 9 月起被官方定性为“遗留项目（legacy project）、处于维护模式（maintenance mode）”，官方明确表示“大多数情况下应选择其他库”；但官方同时说明存量项目可以继续使用，不必强制迁移』；并引用官方原文 “It is not dead, but it is indeed done.”。2026-08-16 现场核对 momentjs.com/docs/#/-project-status/：原文确为 “We now generally consider Moment to be a legacy project in maintenance mode. It is not dead, but it is indeed done.”，口径一致。"
+    },
+    {
+      "name": "官方点名的替代库（Luxon/date-fns/day.js 至少其一）被引用，且来源标注为官方建议而非社区排名",
+      "text": "Luxon、Day.js、date-fns、js-Joda、原生 Date+Intl 全部被引用，且明确标注出自官方项目状态页的推荐（含 Luxon『moment 的演进版』的官方定位语），非社区排名。",
+      "passed": true,
+      "evidence": "report.md 第 4 节：『替代方案直接按官方项目状态页的推荐选择：Luxon——官方定位为“moment 的演进版”，作者为 moment 长期贡献者…Day.js…date-fns…js-Joda…不引库：直接用原生 Date + Intl』；Evidence Used 首条即 https://momentjs.com/docs/#/-project-status/。2026-08-16 现场核对该官方页：推荐的正是 Luxon/Day.js/date-fns/js-Joda/原生 Intl 四库加无库方案，报告引用与官方一致且明确归因于官方建议。"
+    },
+    {
+      "name": "存量项目与新代码两种情形分开给结论，未一刀切（未说『必须全迁』也未说『不用管』）",
+      "text": "两种情形严格分开：存量代码『默认不动，按触发条件再动』并列出 4 个具体触发信号；新代码『不建议』再引入。既未说『必须全迁』，也未说『不用管』。",
+      "passed": true,
+      "evidence": "report.md 第 3 节标题『存量代码要不要动：默认不动，按触发条件再动』，列出包体积痛点、已知不修 bug、需要不可变/现代时区能力、依赖收敛 4 个触发条件；第 4 节标题『新代码该不该继续用：不建议』，且对老项目内新增功能给出『避免扩大使用面、例外情况注明过渡状态』的分层建议；迁移注意还提醒 Day.js 非 drop-in 替换、应逐模块进行，明确反对全局一刀切替换。"
+    },
+    {
+      "name": "版本/日期上下文：写明 legacy 宣告时间（2020-09）或当前版本/维护状态及核对日期",
+      "text": "版本/日期上下文完整且全部与 npm registry 现场核对一致：legacy 宣告 2020-09（2.29.0=2020-09-22）、最新版 2.30.1=2023-12-27、moment-timezone 0.6.3=2026-07-19、调研/核对日 2026-08-16。",
+      "passed": true,
+      "evidence": "report.md Version/Date Context 表：『官方宣告维护模式 2020-09（2.29.0 发布于 2020-09-22）』『moment 最新版 2.30.1｜2023-12-27（截至 2026-08-16 无更新版本）』。2026-08-16 经 npm registry 复核（npm view moment time）：time[2.30.1]=2023-12-27T10:38:43Z、time[2.29.0]=2020-09-22T08:31:04Z、time[2.29.2]=2022-04-03、time[2.29.3]=2022-04-17、time[2.29.4]=2022-07-06，dist-tags latest=2.30.1，报告所有日期零偏差。与配对 without_skill run 的 2026-07-26 说法冲突，registry 仲裁：本 run 的 2023-12-27 正确。"
+    }
+  ],
+  "eval_feedback": "断言集本轮对配对 run 产生了实质区分（断言 4 的 registry 日期核对捕获了 without_skill 的真实错误），不再是零区分度。两点改进：(1) 断言 2『来源标注为官方建议而非社区排名』实际靠引用官方 URL 即可满足，与断言 4 的出处要求部分重叠，可改为要求逐库转述官方定位语（如 Luxon=the evolution of Moment）以拉开区分；(2) 断言 4 建议显式写明『发布日期以 npm registry time 字段为准』——本轮发现 GitHub Release 对象的 published_at（2.30.1 显示 2026-07-26，系晚于 npm 发包近两年半的重新发布动作）与 npm 实际发版时间（2023-12-27）不一致，预先钉死口径可让仲裁无争议。另注意：momentjs.com 项目状态页至今仍写 Temporal 处于 Stage 3（页面本身陈旧），两 run 均以 TC39 仓库为准改报 Stage 4 且核实为真；未来若断言涉及 Temporal 现状，锚点应指向 tc39/proposal-temporal 而非 moment 官方页。",
+  "claims": [
+    {
+      "claim": "moment 最新版 2.30.1，发布于 2023-12-27，截至 2026-08-16 无更新版本",
+      "type": "factual",
+      "verified": true,
+      "evidence": "2026-08-16 npm registry 现场核对：dist-tags latest=2.30.1，time[2.30.1]=2023-12-27T10:38:43Z。日期仲裁：本报告正确；without_skill 报告所写 2026-07-26 错误（该值是 GitHub Release 对象的 published_at，非 npm 发版时间）。"
+    },
+    {
+      "claim": "moment-timezone 最新版 0.6.3，发布于 2026-07-19，时区数据持续更新",
+      "type": "factual",
+      "verified": true,
+      "evidence": "npm registry 现场核对：moment-timezone time[0.6.3]=2026-07-19T08:02:45Z，与报告一致。"
+    },
+    {
+      "claim": "moment 最近一周（2026-08-03 至 2026-08-09）npm 下载 35,779,413 次",
+      "type": "factual",
+      "verified": true,
+      "evidence": "api.npmjs.org/downloads/point/last-week/moment 现场返回 downloads=35779413, start=2026-08-03, end=2026-08-09，逐位吻合。"
+    },
+    {
+      "claim": "2.29.2/2.29.3（2022-04）与 2.29.4（2022-07）为安全修复发布，对应 GHSA-8hfj-j24r-96c4 与 GHSA-wc69-rhjr-hc9g",
+      "type": "factual",
+      "verified": true,
+      "evidence": "npm registry time 字段核对：2.29.2=2022-04-03、2.29.3=2022-04-17、2.29.4=2022-07-06，与报告的版本-日期对应一致；GHSA 编号与等级未逐条复核（次级证据），但版本时间线吻合。"
+    },
+    {
+      "claim": "TC39 Temporal 提案已达 Stage 4（2026-03，并入 ES2026）",
+      "type": "factual",
+      "verified": true,
+      "evidence": "2026-08-16 现场核对 github.com/tc39/proposal-temporal README：『This proposal is currently Stage 4』，两 run 一致。注意：momentjs.com 官方页自身仍写 Stage 3（该页陈旧），报告以 TC39 上游为准的处理正确；具体达成时间 2026-03 来自第三方报道，官方页未直接标注（小残差，不影响结论）。"
+    },
+    {
+      "claim": "报告识别并排除了第三方传言『moment 最后版本是 2.29.x、之后完全冻结』",
+      "type": "process",
+      "verified": true,
+      "evidence": "transcript 第 5 步与 report 第 5 节：将搜索到的『最后版本 2.29.x』摘要与 registry 事实（2.30.1 存在）对撞后标记为陈旧/冲突证据并明示不入结论，符合官方优先与冲突标记要求。"
+    }
+  ]
+}

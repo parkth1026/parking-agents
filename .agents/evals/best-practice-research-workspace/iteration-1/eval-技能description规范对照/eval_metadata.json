@@ -1,0 +1,10 @@
+{
+  "prompt": "看看 G:\\GIT\\AI_WorkFlow\\parking-agents\\.claude\\skills\\ 下这些技能的 description 写法，对照 Anthropic 官方 Agent Skills 文档对 description 的要求，哪些技能的写法不符合最佳实践？给我一份中文对照结论，方便我逐个修。",
+  "input_files": ["G:\\GIT\\AI_WorkFlow\\parking-agents\\.claude\\skills\\ 下各技能的 SKILL.md frontmatter"],
+  "assertions": [
+    { "name": "仓库本地事实先行：结论引用了仓库内具体技能名与其 description 现状", "type": "manual" },
+    { "name": "官方规范来源带 URL", "type": "manual" },
+    { "name": "本地事实与官方要求分离呈现，未混为一谈", "type": "manual" },
+    { "name": "只读合规：除评测输出目录外未创建或修改任何文件", "type": "manual" }
+  ]
+}

@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>笔记统计 mock（v2，已确认）</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 640px; margin: 40px auto; color: #222; }
+  h1 { font-size: 20px; }
+  .summary-card {
+    border: 1px solid #ddd; border-radius: 8px; padding: 16px 20px;
+    margin-bottom: 28px; display: flex; align-items: baseline; gap: 12px;
+  }
+  .summary-card .label { font-size: 14px; color: #555; }
+  .summary-card .num { font-size: 32px; font-weight: 700; }
+  h2 { font-size: 16px; margin-bottom: 12px; }
+  .bar-row { display: grid; grid-template-columns: 72px 1fr 40px; align-items: center; gap: 10px; margin: 10px 0; }
+  .bar-row .cat-name { font-size: 14px; }
+  .bar-track { background: #eee; border-radius: 4px; height: 18px; overflow: hidden; }
+  .bar-fill { background: #4a7dfc; height: 100%; }
+  .bar-row .count { font-size: 14px; text-align: right; }
+  .hint { color: #888; font-size: 12px; margin-top: 24px; }
+</style>
+</head>
+<body>
+  <h1>笔记统计</h1>
+
+  <!-- 关键状态 1：顶部数字卡片，文案固定为「近 7 天新增」+ 数字。
+       口径：以查看时刻为基准，往前 7*24 小时（含边界）内 created 的笔记数，不分分类。 -->
+  <div class="summary-card">
+    <span class="label">近 7 天新增</span>
+    <span class="num">4</span>
+  </div>
+
+  <!-- 关键状态 2：按分类的历史笔记总数，横向长条对比 + 具体数字，按数量从高到低排序。
+       不引入任何图表库，长条用纯 CSS 画。 -->
+  <h2>各分类笔记数</h2>
+  <div id="category-bars">
+    <div class="bar-row">
+      <span class="cat-name">工作</span>
+      <div class="bar-track"><div class="bar-fill" style="width: 100%"></div></div>
+      <span class="count">3</span>
+    </div>
+    <div class="bar-row">
+      <span class="cat-name">读书</span>
+      <div class="bar-track"><div class="bar-fill" style="width: 66%"></div></div>
+      <span class="count">2</span>
+    </div>
+    <div class="bar-row">
+      <span class="cat-name">生活</span>
+      <div class="bar-track"><div class="bar-fill" style="width: 33%"></div></div>
+      <span class="count">1</span>
+    </div>
+  </div>
+
+  <!-- 关键状态 3：category 为空/缺失时归并显示为「未分类」，不剔除也不报错。
+       示例：如果数据里出现这类笔记，会额外多出这样一行（此处仅作结构示意，
+       与上面的示例数据不是同一批）。 -->
+  <div class="bar-row" style="opacity: .6;">
+    <span class="cat-name">未分类</span>
+    <div class="bar-track"><div class="bar-fill" style="width: 20%"></div></div>
+    <span class="count">2</span>
+  </div>
+
+  <p><a href="/">返回笔记列表</a></p>
+
+  <p class="hint">
+    示意用的示例数据是写死的，不接真实后端。像素细节（间距、配色、圆角）不代表最终效果，
+    结构、字段、排序、文案已按用户确认版本固定。
+  </p>
+</body>
+</html>

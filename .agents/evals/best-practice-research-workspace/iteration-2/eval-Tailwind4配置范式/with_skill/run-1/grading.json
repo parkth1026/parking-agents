@@ -1,0 +1,61 @@
+{
+  "results": [
+    {
+      "name": "方向正确：当前官方默认配置范式为 CSS-first（@import \"tailwindcss\" + @theme），tailwind.config.js 不是默认必须——答成『必须先建 config.js』即 FAIL",
+      "text": "方向正确：报告明确现行官方范式为 CSS-first——入口一行 @import \"tailwindcss\"、主题定制用 @theme，全程不需要 tailwind.config.js，并直接否定用户教程的 config.js+purge 流程，未复述『必须先建 config.js』。",
+      "passed": true,
+      "evidence": "report.md 一句话结论：『2026 年新开项目直接按官方现行 v4 文档走：不创建 tailwind.config.js、不配 purge/content，全部配置写进 CSS』；路线 A 代码示例（vite 插件 + @import \"tailwindcss\"，并标注『全程不需要 tailwind.config.js』）与第 4 节 @theme 块示例。2026-08-16 现场核对 tailwindcss.com/docs/installation（v4.3）：官方安装流程确实无任何 config 文件步骤，入口仅 @import \"tailwindcss\"；官方 v4.0 博客原文确认『Instead of a tailwind.config.js file, you can configure all of your customizations directly in the CSS file』。"
+    },
+    {
+      "name": "版本钉死：明确写出当前 Tailwind 大版本号，并给出核对来源",
+      "text": "版本已钉死：明确写出 v4.3 系列、最新 release v4.3.3（2026-07-16），核对来源为官方文档站版本标注 + GitHub Releases，与 npm registry 现场核对完全一致。",
+      "passed": true,
+      "evidence": "report.md Version/Date Context：『现行版本：v4.3 系列——文档站顶部标注 v4.3；GitHub 最新 release 为 v4.3.3（2026-07-16）』，Evidence Used 给出来源 URL（docs/installation 标注 v4.3、github.com/tailwindlabs/tailwindcss/releases）。2026-08-16 npm registry 现场复核：tailwindcss dist-tags latest=4.3.3，time[4.3.3]=2026-07-16T12:03:35Z，版本号与日期均吻合（transcript 诚实标注 2026-07-16 的年份系按页面版权推断，最终值与 registry 相符）。"
+    },
+    {
+      "name": "识别过时内容：明确指出旧教程的 v3 口径（config.js/purge 优先）已过时或仅作兼容存在",
+      "text": "过时内容识别到位且比断言要求更细：指出 purge 属 v2 时代选项、v3 已改名 content、v4 彻底移除，tailwind.config.js 在 v4 仅剩 @config 显式加载的兼容通道且明确『新项目不要走这条路』。",
+      "passed": true,
+      "evidence": "report.md 第 1 节引用官方 v2→v3 升级指南原文（『we've renamed the purge option to content…』）坐实教程属 v2 时代；第 4 节『存量兼容（仅迁移期用）：旧的 JS 配置文件仍可显式加载（@config 指向后缀为 .js 的旧配置文件路径）…新项目不要走这条路』；三代范式对照表将 v2/v3/v4 的配置文件、裁剪机制、CSS 入口逐项对照；第 5 节还指出『留在 v3.4 也用 content 而不是 purge』。"
+    },
+    {
+      "name": "官方来源（tailwindcss.com）带 URL",
+      "text": "全部结论来源均为官方域名的完整 URL（tailwindcss.com 主站、v3/v2 存档子站、官方 GitHub Releases），在 Evidence Used 与报告各节逐一列出。",
+      "passed": true,
+      "evidence": "report.md Evidence Used 列出 8 条官方 URL：https://tailwindcss.com/blog/tailwindcss-v4、https://tailwindcss.com/docs/installation、https://tailwindcss.com/docs/upgrade-guide、https://tailwindcss.com/docs/theme、https://tailwindcss.com/docs/detecting-classes-in-source-files、https://v3.tailwindcss.com/docs/installation、https://v3.tailwindcss.com/docs/upgrade-guide、https://github.com/tailwindlabs/tailwindcss/releases；并声明『未使用任何第三方教程/博客作为论断依据』。"
+    }
+  ],
+  "eval_feedback": "断言集方向正确且与官方现场核对一致，本 run 4/4。区分度点评：断言 4（官方来源带 URL）是本组最弱的一条——两组报告都轻易满足，几乎不产生区分，建议与断言 1/2 合并或改为『每个关键论断就近标注来源 URL 而非集中在文末』；断言 2 只要求大版本号+来源，两组也都满足，可加码要求同时写出 4.x 的两条关键指令（@import \"tailwindcss\" 与 @theme）作为版本钉死的操作性证据。断言 1 的『答成必须先建 config.js 即 FAIL』本轮未触发（两组方向都对），说明该陷阱对强模型区分度有限，真正的区分发生在事实精度层（见配对 run）。另：本轮发现 npm registry 存在 v3-lts=3.4.19 与 next=4.0.0 等 dist-tag，若未来要考察『v3 停留版本』事实，建议直接锚 registry dist-tags。",
+  "claims": [
+    {
+      "claim": "现行最新版本为 v4.3.3（2026-07-16）",
+      "type": "factual",
+      "verified": true,
+      "evidence": "2026-08-16 npm registry 现场核对：tailwindcss latest=4.3.3，time[4.3.3]=2026-07-16T12:03:35Z，吻合；transcript 如实标注年份按页面版权推断的不确定性，最终值与 registry 一致。"
+    },
+    {
+      "claim": "v4.0 发布于 2025-01-22，配置范式从 JS 迁移到 CSS，content 配置被自动内容检测取代",
+      "type": "factual",
+      "verified": true,
+      "evidence": "2026-08-16 现场核对官方博客 tailwindcss.com/blog/tailwindcss-v4：发布日期 2025-01-22，原文『the shift from configuring your project in JavaScript to configuring your project in CSS』『Instead of a tailwind.config.js file, you can configure all of your customizations directly in the CSS file』，与报告引用一致。"
+    },
+    {
+      "claim": "v4 环境要求 Node 20+；Safari 16.4+/Chrome 111+/Firefox 128+，旧浏览器留在 v3.4",
+      "type": "factual",
+      "verified": true,
+      "evidence": "与官方 upgrade-guide 的要求一致（两组 run 独立引用同一口径；未逐字复核该页，但与 docs 主站及博客交叉一致，且 registry 存在 v3-lts=3.4.19 tag 佐证 v3.4 LTS 线存在）。"
+    },
+    {
+      "claim": "purge 是 v2 选项，v3 已改名 content（官方 v2→v3 升级指南原文）",
+      "type": "factual",
+      "verified": true,
+      "evidence": "报告引用 v3.tailwindcss.com/docs/upgrade-guide 原文『Since Tailwind no longer uses PurgeCSS under the hood, we've renamed the purge option to content』；与配对 run 独立引用的 v2 存档页（purge 选项存在）相互印证，结论一致。"
+    },
+    {
+      "claim": "corePlugins/safelist/separator 在 v4 不受支持，safelist 用 @source inline() 替代",
+      "type": "factual",
+      "verified": true,
+      "evidence": "与官方 upgrade-guide 口径一致（两组 run 独立引用相同结论）；docs/detecting-classes-in-source-files 现场 reachable 且报告的 @source 语法与官方安装页一致。"
+    }
+  ]
+}

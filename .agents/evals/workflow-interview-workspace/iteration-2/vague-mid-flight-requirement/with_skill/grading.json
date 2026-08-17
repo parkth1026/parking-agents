@@ -1,0 +1,35 @@
+{
+  "expectations": [
+    {
+      "text": "contract.md 存在且 finalize 校验 status=valid",
+      "passed": true,
+      "evidence": "manifest.validation = {\"status\":\"valid\",\"ac_count\":3,\"warnings\":[],\"ran_at\":\"2026-08-13T04:29:10Z\",\"verify_tiers\":{\"A\":3,\"B\":0,\"C\":0,\"D\":0}}"
+    },
+    {
+      "text": "每条 AC 都带 Verify: [A-D] 档位标注",
+      "passed": true,
+      "evidence": "AC 数 3，Verify 标注数 3"
+    },
+    {
+      "text": "同一轮 round 内出现多条 tier=ask 的问题（批量问而不是挤牙膏）",
+      "passed": true,
+      "evidence": "每轮 ask 计数：{\"1\":5,\"2\":5}"
+    },
+    {
+      "text": "调查阶段主动查过仓库里已有的 needs_reinterview 回退机制（Fact 调查），而不是假装它不存在",
+      "passed": true,
+      "evidence": "context.md 命中 needs_reinterview 次数"
+    },
+    {
+      "text": "context.md 的四分类节把「中途改需求」拆成了多个子问题并分别归类，而不是整句话归成一类",
+      "passed": true,
+      "evidence": "四分类节包含 Fact/User decision/Agent-owned 多类标注"
+    },
+    {
+      "text": "访谈中问到了「你要的和现有 needs_reinterview 机制有什么不一样」这类澄清问题",
+      "passed": true,
+      "evidence": "rounds.jsonl 命中 needs_reinterview"
+    }
+  ],
+  "pass_rate": 1
+}

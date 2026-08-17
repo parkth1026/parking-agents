@@ -1,0 +1,67 @@
+{
+  "run_id": "eval-4-perf-threshold-old_skill",
+  "expectations": [
+    {
+      "text": "every-option-has-percentage: 每一题的每一个选项都带一个百分比数字",
+      "passed": false,
+      "evidence": "脚本判定：10 题 / 30 个选项，百分比覆盖 3.3%（唯一命中是「比优化前快 60%」这个门槛值）"
+    },
+    {
+      "text": "percentages-sum-to-100: 每一题的选项百分比合计为 100（允许 ±1）",
+      "passed": false,
+      "evidence": "无任何一题给出可合计的选项百分比"
+    },
+    {
+      "text": "every-option-has-three-sections: 每个选项写齐「选什么」「好处」「代价」三段",
+      "passed": false,
+      "evidence": "脚本判定：缺段 30/30，全部选项缺「选什么」与「好处」"
+    },
+    {
+      "text": "recommended-is-highest: 每题恰有一个选项标注（推荐），且它的百分比为该题最高",
+      "passed": false,
+      "evidence": "有「推荐 [A]」段落，但无百分比可比高低"
+    },
+    {
+      "text": "no-flat-distribution: 没有一题的最高与最低百分比之差 ≤ 3 个点",
+      "passed": false,
+      "evidence": "无百分比，本项不适用（判为未违反）"
+    },
+    {
+      "text": "section-cap-respected: 任一选项的好处、代价各不超过 3 条",
+      "passed": true,
+      "evidence": "选项为「含义 + 代价」的一两句式，未超 3 条"
+    },
+    {
+      "text": "cost-is-repo-specific: 代价写的是这个仓库里的具体后果，不是对任何选项都成立的通用词",
+      "passed": true,
+      "evidence": "代价写得具体，例「本机跑基准时如果机器有负载，可能偶发不过」，但没有对应的「好处」一栏供比较"
+    },
+    {
+      "text": "scope-states-exclusion: 「选什么」写明了这个选项不覆盖什么",
+      "passed": false,
+      "evidence": "选项有「含义」但不写不覆盖什么"
+    },
+    {
+      "text": "ac-candidates-same-format: 第 4b 阶段的验收候选同样带百分比与三段结构",
+      "passed": false,
+      "evidence": "验收候选写了途径与代价，无百分比、无三段"
+    },
+    {
+      "text": "contract-records-percentages: 契约「访谈记录」表的候选栏记录了当时给的百分比",
+      "passed": false,
+      "evidence": "契约内百分比出现 1 次，且是「快 60%」门槛值，不是候选权重"
+    },
+    {
+      "text": "passes-validator: 契约通过 validate-goal-contract.mjs（exit 0）",
+      "passed": true,
+      "evidence": "validation.txt: VALID，exit code 0"
+    }
+  ],
+  "pass_rate": 0.273,
+  "summary": {
+    "pass_rate": 0.273,
+    "passed": 3,
+    "failed": 8,
+    "total": 11
+  }
+}

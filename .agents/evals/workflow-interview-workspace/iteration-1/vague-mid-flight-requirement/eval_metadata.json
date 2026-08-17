@@ -1,0 +1,13 @@
+{
+  "eval_id": 2,
+  "eval_name": "vague-mid-flight-requirement",
+  "prompt": "帮我给 workflow-interview 加个功能，允许用户中途改需求。",
+  "assertions": [
+    {"text": "调查阶段主动查过仓库里已有的 needs_reinterview 回退机制（Fact 调查），而不是假装它不存在", "type": "judgment"},
+    {"text": "context.md 的四分类节把「中途改需求」拆成了多个子问题并分别归类，而不是整句话归成一类", "type": "programmatic"},
+    {"text": "访谈中问到了「你要的和现有 needs_reinterview 机制有什么不一样」这类澄清问题", "type": "judgment"},
+    {"text": "契约最终范围与人设被问到后透露的信息一致（人设可能说这未必需要新功能，契约范围应体现这一点而不是硬做一个新子系统）", "type": "judgment"},
+    {"text": "rounds.jsonl 里没有在歧义收口前就把具体实现方案当成既定事实写死的情况", "type": "judgment"},
+    {"text": "baseline（without_skill）是否也发现或提到了现有 needs_reinterview 机制，用作对比", "type": "judgment"}
+  ]
+}

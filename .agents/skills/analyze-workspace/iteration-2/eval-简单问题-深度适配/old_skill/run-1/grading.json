@@ -1,0 +1,61 @@
+{
+  "results": [
+    {
+      "name": "测试清单事实正确",
+      "text": "analysis.md Evidence 节完整准确列出 package.json:9 的 8 步 && 链及各测试文件用途，前三个测试文件覆盖准确，附带行号级描述经抽查属实",
+      "passed": true,
+      "evidence": "analysis.md「1. 命令链本体」代码块逐行列出 8 步命令，grader 已与 parking-agents-dev/package.json:9 实际 test 脚本逐项比对完全一致；分步骤表格对 5 个测试文件的描述（含文件行数 170/143/126/180/209、pi 6 个 test、harnesses 11 个 test、DENIED 列表 27-71 行、allowlist 80-91 行）经 wc -l 与 grep 抽查全部准确"
+    },
+    {
+      "name": "深度与问题匹配",
+      "text": "对「简单跟我说下」的单一事实问题套用了全量模板：Ranked synthesis 排序表（Rank/结论/Confidence/Basis 列）+ Question/Evidence/Inference/Unknowns 五段结构，66 行 / 6.7KB，复现了 iteration-1 的失败形态",
+      "passed": false,
+      "evidence": "analysis.md 第 7-13 行「### Ranked synthesis」为含 Rank 与 Confidence 列的多结论排序表——正是断言明列的不过形态（为单一事实问题构造的 Rank/Confidence 排序表）；全文按全量模板组织（Question / Ranked synthesis / Evidence / Inference / Unknowns-limits），没有以直接答案开篇。尽管信息本身准确，但形态与「简单跟我说下」明显不匹配，与 iteration-1 v1 在本用例的失败模式相同"
+    },
+    {
+      "name": "无跑题",
+      "text": "内容聚焦 npm test 的测试清单与组织方式，运行时发现（第一步失败、路径脱节）均与 npm test 本身直接相关，未扩张成全仓库架构分析",
+      "passed": true,
+      "evidence": "analysis.md 各节主题为：命令链本体、各步骤内容、组织方式、当前树上的实际状态；dev/pub 重组仅作为测试断言失配的佐证出现，无测试体系之外的子系统分析"
+    },
+    {
+      "name": "证据引用保留",
+      "text": "保留了 package.json:9 与全部测试文件路径的具体引用（含行号级引用），抽查属实",
+      "passed": true,
+      "evidence": "Evidence 节首条即 `package.json:9`（并指出 check:repo 在 package.json:8）；分步表格引用 tests/skills/test-no-tool-names.mjs 的 DENIED 列表 27-71 行与 allowlist 80-91 行，grader 抽查 sed 确认第 27 行起为 const DENIED、第 80 行起为 const ALLOWLIST；bump-version --audit 54-123 行、check:repo 旧路径 vs skills/dev/ 实际路径的引用亦与 find 结果一致"
+    }
+  ],
+  "eval_feedback": "本 run 的事实准确性极强（行数、测试数、行号引用全部核实无误），却在「深度与问题匹配」上失败——说明该断言确实在测形态而非内容，区分度良好。两个改进点：(1) 两份报告都包含「npm test 当前第一步即失败（exit=1, 34 个问题）」的运行时实证声明，现有 4 条断言均不覆盖其真伪——本次 grader 复跑核实为真，建议增设「报告中的运行时实证论断须可复现」断言以防幻觉；(2) 「明显超配的长篇结构化报告」判定偏主观，本例因存在 Ranked synthesis 表而可客观判负，但若 v1 恰好省略排序表而保留其余全量模板，判定将依赖 grader 主观裁量，建议补充可机检信号（直接回答章节是否位于首节、是否有 Rank/Confidence 列名表格）。",
+  "claims": [
+    {
+      "claim": "npm test 是 package.json:9 中一条 8 段 && 命令链，fail-fast",
+      "type": "factual",
+      "verified": true,
+      "evidence": "与 parking-agents-dev/package.json:9 实际 test 脚本逐项比对一致"
+    },
+    {
+      "claim": "五个测试文件行数分别为 170/143/126/180/209 行，pi 测试含 6 个 test、harnesses 测试含 11 个 test",
+      "type": "factual",
+      "verified": true,
+      "evidence": "wc -l 结果与报告完全一致（170/143/126/180/209）；grep 计数 pi=6、harnesses=11，与报告一致"
+    },
+    {
+      "claim": "当前工作树上 npm test 第一步即失败（exit=1，34 个问题），后续步骤被 && 短路不会执行",
+      "type": "process",
+      "verified": true,
+      "evidence": "grader 复跑 node tests/skills/test-skill-discovery.mjs：exit=1，恰 34 个 ✗ 问题项；&& 短路语义与报告描述一致"
+    },
+    {
+      "claim": "skills 已重组为 skills/dev/ + skills/pub/ 两层布局且 using-parking-skills 已不存在，多处脚本路径仍假定旧单层布局（check:repo 引用 skills/making-skills-cross-platform/... 而实际在 skills/dev/ 下）",
+      "type": "factual",
+      "verified": true,
+      "evidence": "ls 确认 skills/ 仅含 dev、pub；using-parking-skills 不存在；find 确认 check-skill-repo.mjs 实际位于 skills/dev/making-skills-cross-platform/scripts/"
+    },
+    {
+      "claim": "skills 重组（dev/pub 两层、移除 using-parking-skills）是测试未同步适配的迁移（推理，非实证）",
+      "type": "quality",
+      "verified": true,
+      "evidence": "报告自身已在 Unknowns 节明确标注此为无法仅凭仓库现状裁定的推断，并给出可降低不确定性的下一步探针（git log 对比时间先后），推理与证据边界标注诚实规范"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "name": "metrics-relay",
+  "version": "2.4.1",
+  "private": true,
+  "type": "module",
+  "description": "内部埋点上报中继：接收业务方事件，落盘并转发下游",
+  "scripts": {
+    "start": "node src/index.mjs",
+    "test": "node test/run-tests.mjs",
+    "lint": "node scripts/lint.mjs",
+    "replay": "node scripts/replay.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

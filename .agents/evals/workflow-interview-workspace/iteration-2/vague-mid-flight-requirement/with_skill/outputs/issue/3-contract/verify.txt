@@ -1,0 +1,8 @@
+# verify @ 2026-08-13T04:29:10Z
+# cwd: C:\wt\new
+
+[FAIL] AC-001  exit=1  $ node -e "const fs=require('fs');const a=fs.readFileSync('.claude/skills/aes-goal-contract/SKILL.md','utf8');const b=fs.readFileSync('.claude/skills/workflow-interview/SKILL.md','utf8');const ok=a.includes('契约还没 done 前追加一条 AC')&&a.includes('needs_reinterview')&&b.includes('契约还没 done 前追加一条 AC');process.exit(ok?0:1)"
+[FAIL] AC-002  exit=1  $ node -e "const fs=require('fs');const src=fs.readFileSync('.claude/skills/workflow-interview/scripts/session.test.mjs','utf8');if(!src.includes('amend-after-done'))process.exit(1);const{status}=require('child_process').spawnSync(process.execPath,['.claude/skills/workflow-interview/scripts/session.test.mjs'],{stdio:'inherit'});process.exit(status)"
+[FAIL] AC-003  exit=1  $ node -e "const fs=require('fs');const src=fs.readFileSync('.claude/skills/workflow-interview/scripts/session.test.mjs','utf8');if(!src.includes('amend-without-finalize-rejected'))process.exit(1);const{status}=require('child_process').spawnSync(process.execPath,['.claude/skills/workflow-interview/scripts/session.test.mjs'],{stdio:'inherit'});process.exit(status)"
+
+绿 0 / 红 3 / 跑不起来 0

@@ -1,0 +1,119 @@
+<!-- draft v1 | published 2026-08-11T00:00:00+08:00
+     用户意见：两条——(1) 下拉框要放在页面顶部醒目位置，不要塞得像一行小字说明；
+     (2) 选中态要有明显视觉反馈，比如高亮当前选中的 facet 名字，现在选完只有 <select>
+     本身变了值，看不出「我现在正看着哪个」。
+     状态：superseded by v2 -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Insight Report Mock v1 — facet 筛选</title>
+<style>
+:root {
+  --bg: #1a1a2e; --bg2: #16213e; --bg3: #0f3460; --bg4: #1a1a3e;
+  --fg: #e4e4e4; --fg2: #8892b0; --fg3: #a8b2d1;
+  --accent: #64ffda; --accent2: #82aaff;
+  --border: #233554; --radius: 8px; --shadow: 0 4px 14px rgba(0,0,0,0.4);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--fg); font-family: 'Segoe UI','Inter',system-ui,sans-serif; line-height: 1.7; padding: 24px; max-width: 1440px; margin: 0 auto; }
+.header { text-align: center; padding: 32px 0 24px; border-bottom: 2px solid var(--border); margin-bottom: 16px; }
+.header h1 { font-size: 2em; font-weight: 700; background: linear-gradient(135deg,var(--accent),var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.header .subtitle { color: var(--fg2); font-size: 0.9em; margin-top: 8px; }
+
+/* v1: 筛选控件就是一个朴素的段落，塞在 header 和第一个区块之间，没有特别处理 */
+.facet-filter-line { margin: 8px 0 20px; color: var(--fg3); font-size: 0.85em; }
+.facet-filter-line select { background: var(--bg2); color: var(--fg); border: 1px solid var(--border); border-radius: 4px; padding: 4px 8px; }
+
+.section { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin: 24px 0; box-shadow: var(--shadow); }
+.section h2 { font-size: 1.3em; font-weight: 600; color: var(--accent2); margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.section p { color: var(--fg3); margin: 6px 0; }
+.stat-card { display: inline-block; background: var(--bg3); border-radius: var(--radius); padding: 12px 16px; margin: 4px; }
+.no-data-hint { color: var(--fg2); font-style: italic; padding: 24px 0; text-align: center; }
+.changed { outline: 2px dashed #ffcb6b; outline-offset: 4px; }
+.changed::before { content: '改动点'; display: block; font-size: 0.7em; color: #ffcb6b; margin-bottom: 4px; }
+</style>
+</head>
+<body>
+
+<div class="header" id="sec-header">
+  <h1>VS Code Copilot Insight Report（示例数据）</h1>
+  <div class="subtitle">扫描日期: 2026-08-10 &nbsp;&bull;&nbsp; Sessions: 42 &nbsp;&bull;&nbsp; 时间跨度: 2026-07-12 ~ 2026-08-10</div>
+</div>
+
+<p class="facet-filter-line changed">
+  查看: <select id="facetSelect" onchange="onFacetChange()"></select>
+</p>
+
+<div class="section" id="sec-glance">
+  <h2>&#x1F52D; 总览</h2>
+  <p>做得好的：Prompt 质量稳步上升；Quick wins：把重复出现的 lint 错误做成 snippet。</p>
+</div>
+
+<div class="section" id="sec-tokens">
+  <h2>&#x1F4CA; Token 消耗分析</h2>
+  <div class="stat-card"><b>1.2M</b> 总 Token</div>
+  <div class="stat-card"><b>820K</b> 输入</div>
+  <div class="stat-card"><b>380K</b> 输出</div>
+</div>
+
+<div class="section" id="sec-tools">
+  <h2>&#x1F527; 工具使用分析</h2>
+  <p>edit_file 214 次 / read_file 189 次 / run_terminal 76 次</p>
+</div>
+
+<div class="section" id="sec-goals">
+  <h2>&#x1F3AF; 目标分布</h2>
+  <div class="no-data-hint">这个 facet 暂无数据</div>
+</div>
+
+<div class="section" id="sec-anomaly">
+  <h2>&#x1F50D; 异常检测</h2>
+  <p>检测到 2 处响应时长异常（&gt;5min），发生在 2026-08-03。</p>
+</div>
+
+<script>
+var FACETS = [
+  { id: 'sec-glance', label: '总览' },
+  { id: 'sec-tokens', label: 'Token 消耗分析' },
+  { id: 'sec-tools', label: '工具使用分析' },
+  { id: 'sec-goals', label: '目标分布' },
+  { id: 'sec-anomaly', label: '异常检测' }
+];
+
+function buildOptions() {
+  var sel = document.getElementById('facetSelect');
+  FACETS.forEach(function (f) {
+    var opt = document.createElement('option');
+    opt.value = f.id;
+    opt.textContent = f.label;
+    sel.appendChild(opt);
+  });
+}
+
+function onFacetChange() {
+  var sel = document.getElementById('facetSelect');
+  var target = sel.value;
+  FACETS.forEach(function (f) {
+    var el = document.getElementById(f.id);
+    if (!el) return;
+    el.style.display = (f.id === target) ? '' : 'none';
+  });
+}
+
+buildOptions();
+document.getElementById('facetSelect').value = FACETS[0].id;
+onFacetChange();
+</script>
+
+<!--
+  v1 改动点（.changed 标出）：
+  - 新增：header 下方一行朴素的 <select id="facetSelect">，纯文字段落形式。
+  - 新增：选中 facet 以外的 .section 用 display:none 隐藏（本 draft 尚未处理 Ctrl+F 可搜问题）。
+  - 新增：sec-goals 演示「无数据」状态，显示"这个 facet 暂无数据"。
+  - 不变：.header、各 .section 的结构、id、内部内容排布与真实报告一致。
+  - 不变：默认打开显示第一个 facet（sec-glance）。
+-->
+</body>
+</html>

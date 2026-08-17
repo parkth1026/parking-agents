@@ -1,0 +1,6 @@
+[
+  { "event": "page_view", "ts": 1754697600, "user_id": "u-1" },
+  { "event": "click", "ts": 1754697605, "user_id": "u-1", "props": { "target": "cta" } },
+  { "event": "page_view", "ts": 1754697610, "user_id": "u-2" },
+  { "event": "purchase", "ts": 1754697620, "user_id": "u-2", "props": { "amount": 4200 } }
+]

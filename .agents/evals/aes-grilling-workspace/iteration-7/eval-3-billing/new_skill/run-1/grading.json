@@ -1,0 +1,14 @@
+{
+  "expectations": [
+    {"text": "contract-exists", "passed": true, "evidence": "outputs/2026-08-07-monthly-billing-summary.md 已落盘"},
+    {"text": "passes-new-validator", "passed": true, "evidence": "AC_COUNT 2, VALID, exit code 0"},
+    {"text": "every-ac-has-tiered-verify", "passed": true, "evidence": "AC-001/AC-002 均为 [B] 黄金用例"},
+    {"text": "golden-case-b-tier", "passed": true, "evidence": "AC-001 Verify 引用 data/bill-2026-07.csv"},
+    {"text": "expected-summary-pinned", "passed": true, "evidence": "tests/fixtures/expected-monthly-summary.csv 数值与用户手核对结果逐项一致（616.50/437.90/285.40/143.00/1482.80）"},
+    {"text": "fixture-planned-on-disk", "passed": true, "evidence": "D-01~D-03 均已落盘在 tests/fixtures/"},
+    {"text": "verification-escalated", "passed": true, "evidence": "PERSONA 已主动给出数据来源与期望数字，直接采纳为 Fact 并落 fixture，未占用多余提问轮次"},
+    {"text": "single-batched-round", "passed": true, "evidence": "第2步3问一轮问完，第4步2问一轮问完"},
+    {"text": "verify-checks-real-output", "passed": true, "evidence": "AC-001/AC-002 的 [B] Verify 均是「跑脚本产出」与「期望 fixture」逐字节 diff，验证的是脚本真实输出"}
+  ],
+  "summary": {"total": 9, "passed": 9, "pass_rate": 1.0}
+}

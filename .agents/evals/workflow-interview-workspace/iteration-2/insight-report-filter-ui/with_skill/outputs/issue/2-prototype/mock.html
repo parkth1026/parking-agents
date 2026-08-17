@@ -1,0 +1,150 @@
+<!-- confirmed v2 | published 2026-08-13T01:30:00Z
+     用户确认：2026-08-13，第二次看无新意见，通过
+     状态：confirmed -->
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>Insight Report — Facet 筛选 Mock（确认版）</title>
+<style>
+  :root{
+    --bg:#1a1a2e; --bg2:#16213e; --bg3:#0f3460; --fg:#e8e8f0; --muted:#9aa0b4;
+    --accent:#4fc3f7; --card:#0f3460; --border:#2a2a4a; --warn:#ffb74d;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--fg);font-family:-apple-system,"Segoe UI",sans-serif;}
+
+  /* ── 顶部全局区（始终显示，不受 facet 筛选影响） ───────────────────── */
+  .header{padding:24px 32px 8px;background:var(--bg2);}
+  .header h1{margin:0 0 8px;font-size:22px;}
+  .header .subtitle{color:var(--muted);font-size:13px;}
+
+  .facet-bar{
+    position:sticky; top:0; z-index:10;
+    display:flex; align-items:center; gap:12px;
+    padding:14px 32px; background:var(--bg3);
+    border-bottom:1px solid var(--border);
+  }
+  .facet-bar label{font-size:14px;color:var(--muted);}
+  .facet-select{
+    padding:8px 12px; border-radius:6px; background:var(--card); color:var(--fg);
+    border:1px solid #345; font-size:14px; min-width:220px;
+  }
+  .facet-current{
+    font-weight:600; color:var(--accent);
+    padding:4px 10px; border:1px solid var(--accent); border-radius:14px;
+    font-size:13px;
+  }
+
+  .section{padding:24px 32px;border-top:1px solid var(--border);}
+  .section h2{margin-top:0;font-size:18px;}
+  .empty-note{color:var(--muted);font-style:italic;padding:12px 0;}
+  .bar-row{display:flex;align-items:center;gap:10px;margin:6px 0;}
+  .bar{height:18px;background:var(--accent);border-radius:4px;}
+
+  /* mock 专用：标出这版相对 v1 的改动点，产品代码里不需要这个框 */
+  .changed{outline:2px dashed var(--warn);outline-offset:4px;}
+</style>
+</head>
+<body>
+
+<!-- 全局横幅：始终显示，不算进可筛选的 facet 列表（1-interview 阶段已用户确认） -->
+<div class="header" id="sec-header">
+  <h1>Insight Report — 2026-08-01 ~ 2026-08-13</h1>
+  <div class="subtitle">Sessions: 42 &nbsp;&bull;&nbsp; 数据量: 3.1 MB</div>
+</div>
+
+<div class="section" id="sec-glance">
+  <h2>&#x1F52D; At a Glance</h2>
+  <p>本周共 42 个 session，平均耗时 6.2 分钟，工具调用成功率 96%。</p>
+</div>
+
+<!-- 改动点（对照 v1）：筛选控件从「At a Glance」区块内部移到独立的顶部横条，
+     全局唯一、sticky，不属于任何一个 facet 区块。当前选中项在旁边高亮显示。 -->
+<div class="facet-bar changed">
+  <label for="facetSelect">按 facet 筛选：</label>
+  <select class="facet-select" id="facetSelect">
+    <option value="sec-dynamics">对话动力学</option>
+    <option value="sec-agents">Agent 使用分布</option>
+    <option value="sec-goals" selected>目标分布</option>
+    <option value="sec-satisfaction">满意度分析</option>
+    <option value="sec-narratives">叙事洞察</option>
+  </select>
+  <span class="facet-current" id="facetCurrent">当前：目标分布</span>
+</div>
+
+<div class="section" id="sec-dynamics" data-facet>
+  <h2>&#x1F504; 对话动力学总览</h2>
+  <p>平均每个 session 4.3 轮对话，最长一次 21 轮。</p>
+</div>
+
+<div class="section" id="sec-agents" data-facet>
+  <h2>&#x1F916; Agent 使用分布</h2>
+  <div class="bar-row"><div class="bar" style="width:220px"></div><span>主 Agent 78%</span></div>
+  <div class="bar-row"><div class="bar" style="width:60px"></div><span>子 Agent 22%</span></div>
+</div>
+
+<div class="section" id="sec-goals" data-facet>
+  <h2>&#x1F3AF; 目标分布</h2>
+  <div class="bar-row"><div class="bar" style="width:180px"></div><span>代码生成 60%</span></div>
+  <div class="bar-row"><div class="bar" style="width:90px"></div><span>调试 30%</span></div>
+  <div class="bar-row"><div class="bar" style="width:30px"></div><span>其它 10%</span></div>
+</div>
+
+<div class="section" id="sec-satisfaction" data-facet>
+  <h2>&#x1F60A; 满意度分析</h2>
+  <div class="bar-row"><div class="bar" style="width:240px"></div><span>满意 80%</span></div>
+  <div class="bar-row"><div class="bar" style="width:60px"></div><span>不满意 20%</span></div>
+</div>
+
+<!-- 无数据 facet 示例：选项照常存在，选中后主区域显示提示，不是空白一片 -->
+<div class="section" id="sec-narratives" data-facet>
+  <h2>&#x1F4D6; 叙事洞察</h2>
+  <p class="empty-note">这个 facet 暂无数据。</p>
+</div>
+
+<script>
+  var FACET_LABELS = {
+    'sec-dynamics': '对话动力学',
+    'sec-agents': 'Agent 使用分布',
+    'sec-goals': '目标分布',
+    'sec-satisfaction': '满意度分析',
+    'sec-narratives': '叙事洞察'
+  };
+  var sel = document.getElementById('facetSelect');
+  var currentLabel = document.getElementById('facetCurrent');
+
+  function applyFacet() {
+    var chosen = sel.value;
+    document.querySelectorAll('[data-facet]').forEach(function (el) {
+      // content-visibility:hidden 而不是 display:none —— 未选中内容仍在 DOM 里、
+      // 视觉上完全隐藏不占版面，同时现代浏览器的 Ctrl+F 页内查找依然能匹配到隐藏
+      // 内容并自动展开、滚动过去，满足“偶尔想搜别的 facet”这条。
+      el.style.contentVisibility = (el.id === chosen) ? 'visible' : 'hidden';
+    });
+    currentLabel.textContent = '当前：' + (FACET_LABELS[chosen] || chosen);
+  }
+
+  sel.addEventListener('change', applyFacet);
+  applyFacet(); // 默认显示第一个 facet（这里是 <select> 里 selected 的那项），不记忆上次选择
+</script>
+
+</body>
+</html>
+
+<!--
+新增什么：
+- 页面顶部新增一条全局 sticky 筛选横条（.facet-bar），含一个原生 <select>（选项文案取自
+  各区块 <h2> 的人话标题，不暴露内部 sec-xxx key）和一个高亮的“当前选中 facet”标签。
+- 选中某个 facet 后，其余 facet 区块用 content-visibility:hidden 隐藏（不占版面），
+  不是从 DOM 里删除——浏览器原生 Ctrl+F 页内查找仍能匹配隐藏内容并自动展开定位。
+- 没有数据的 facet（示例：叙事洞察）选项照常出现在下拉框里，选中后主区域显示
+  “这个 facet 暂无数据。”，不是空白一片、也不隐藏或置灰该选项。
+- 默认选中下拉框里的第一个 facet，不记忆用户上次的选择（每次打开都是同一个默认状态）。
+
+不变什么：
+- sec-header（标题/概览条）与 sec-glance（At a Glance）不算进可筛选的 facet 列表，
+  始终显示在筛选横条上方，不受筛选影响。
+- 已经生成过的旧版报告文件不受影响，只影响下次重新生成的新文件。
+- generate-quant-report.js、generate-qual-report.js 两个脚本不在本次改动范围内。
+-->

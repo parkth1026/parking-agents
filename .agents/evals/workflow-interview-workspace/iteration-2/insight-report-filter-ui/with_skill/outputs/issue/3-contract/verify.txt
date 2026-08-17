@@ -1,0 +1,11 @@
+# verify @ 2026-08-13T04:35:24Z
+# cwd: C:\wt\new
+
+[FAIL] AC-001  exit=1  $ node -e "const s=require('fs').readFileSync('.copilot/agents/insight/generate-insight-report.js','utf8'); if(!/facet-select/.test(s)) process.exit(1); if(/>\s*sec-[a-zA-Z-]+\s*<\/option>/.test(s)) process.exit(1); process.exit(0)"
+[FAIL] AC-003  exit=1  $ node -e "const s=require('fs').readFileSync('.copilot/agents/insight/generate-insight-report.js','utf8'); const hasCV=/content-?[Vv]isibility/.test(s); const usesDisplayNoneOnFacet=/data-facet[\s\S]{0,400}display\s*[:=]\s*['\"]?none/.test(s); process.exit(hasCV && !usesDisplayNoneOnFacet ? 0 : 1)"
+             at node:internal/main/eval_string:71:3
+         Node.js v24.12.0
+[FAIL] AC-006  exit=1  $ node -e "const s=require('fs').readFileSync('.copilot/agents/insight/generate-insight-report.js','utf8'); if(!/facet-select/.test(s)) process.exit(1); if(/localStorage|sessionStorage/.test(s)) process.exit(1); process.exit(0)"
+
+绿 0 / 红 3 / 跑不起来 0
+另有 3 条非 [A] 档没跑：AC-002 [C]、AC-004 [C]、AC-005 [C]

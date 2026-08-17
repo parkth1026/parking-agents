@@ -1,0 +1,12 @@
+{
+  "expectations": [
+    {"text": "调查阶段主动查过仓库里已有的 needs_reinterview 回退机制（Fact 调查），而不是假装它不存在", "passed": true, "evidence": "REPORT.md 第1节：开口前先读了 workflow-interview/SKILL.md、session.mjs 的 cmdStage 代码、三份子技能文档、validate-goal-contract.mjs，查到「已有两条路径」而不止 needs_reinterview 一条"},
+    {"text": "context.md 的四分类节把「中途改需求」拆成了多个子问题并分别归类，而不是整句话归成一类", "passed": false, "evidence": "没有 context.md / 四分类结构；用 SIMULATED_INTERVIEW.md 的分诊表做了类似的拆分（拆成「中途指哪」「和 needs_reinterview 什么关系」「要不要新命令」三问），但不是这个技能定义的 Fact/User decision/Agent-owned 格式"},
+    {"text": "访谈中问到了「你要的和现有 needs_reinterview 机制有什么不一样」这类澄清问题", "passed": true, "evidence": "REPORT.md 第2节：自问自答问清了这一点，人设回应「承认是想要一个更轻的版本」，与 with_skill 一路的回答一致"},
+    {"text": "契约最终范围与人设被问到后透露的信息一致（人设可能说这未必需要新功能，契约范围应体现这一点而不是硬做一个新子系统）", "passed": true, "evidence": "REPORT.md 第3节：最终方案收敛为「大部分已存在，缺的是一处 3 行状态一致性修复 + 文档补一个正式入口」，明确没有做成新子系统"},
+    {"text": "rounds.jsonl 里没有在歧义收口前就把具体实现方案当成既定事实写死的情况", "passed": false, "evidence": "没有 rounds.jsonl 文件，无法用这个特定格式验证「是否提前锁死」；从 SIMULATED_INTERVIEW.md 叙述顺序看不出明显的提前锁死，但缺乏可核对的结构化记录，判为不适用/未达标"},
+    {"text": "baseline（without_skill）是否也发现或提到了现有 needs_reinterview 机制，用作对比", "passed": true, "evidence": "即本身：确认为真，且比 with_skill 一路额外挖到一个真实代码 bug（manifest.status 重开时不复位）"}
+  ],
+  "summary": {"passed": 4, "failed": 2, "total": 6, "pass_rate": 0.67},
+  "notes": "这一路基线的工程判断力很强（主动调研、拆解歧义、方案收敛克制），2 条失败都是「没有对应结构化文件格式可核对」而非「判断错了」。值得单独指出：这一路 baseline 额外发现了一个 with_skill 路径没提到的真实代码缺陷（session.mjs 重开 ready 状态的 issue 时 manifest.status 不复位），这是 with_skill 契约范围里没有的产出。"
+}

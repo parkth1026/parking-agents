@@ -1,0 +1,12 @@
+{
+  "expectations": [
+    {"text": "调查阶段主动查过仓库里已有的 needs_reinterview 回退机制（Fact 调查），而不是假装它不存在", "passed": true, "evidence": "context.md「已查事实」表逐行引用 session.mjs:222-236、aes-prototype/aes-goal-contract/workflow-interview 三份 SKILL.md 关于 needs_reinterview 的定位，并进一步查到 aes-goal-contract/SKILL.md:137 与:147-149 两条更轻的既有路径"},
+    {"text": "context.md 的四分类节把「中途改需求」拆成了多个子问题并分别归类，而不是整句话归成一类", "passed": true, "evidence": "context.md「User decision」节把请求拆成5个子问题（中途指哪、改什么、和needs_reinterview关系、要不要触发aes-prototype、要不要新命令/状态），逐条列裁决结果"},
+    {"text": "访谈中问到了「你要的和现有 needs_reinterview 机制有什么不一样」这类澄清问题", "passed": true, "evidence": "contract.md 访谈记录 round1 Q2 原文一字不差：「和现有 needs_reinterview 有什么不一样？」，人设按剧本回答"},
+    {"text": "契约最终范围与人设被问到后透露的信息一致（人设可能说这未必需要新功能，契约范围应体现这一点而不是硬做一个新子系统）", "passed": true, "evidence": "contract.md「强约束」第一条即「零行代码改动」，范围「不做」清单明确排除新命令/子系统/新status，与人设「不想要全新子系统」的信息完全一致"},
+    {"text": "rounds.jsonl 里没有在歧义收口前就把具体实现方案当成既定事实写死的情况", "passed": true, "evidence": "round1 三问都是先给候选百分比+推荐项，等用户裁决后才落笔；round2 才收敛到「零代码改动」的最终方案，顺序正确，未见提前锁死"},
+    {"text": "baseline（without_skill）是否也发现或提到了现有 needs_reinterview 机制，用作对比", "passed": true, "evidence": "without_skill REPORT.md 第1节明确记录「有，而且是第一步」，还额外读出了 session.mjs 里一个真实的 manifest.status 复位 bug，比 with_skill 这一路多挖到一处代码缺陷"}
+  ],
+  "summary": {"passed": 6, "failed": 0, "total": 6, "pass_rate": 1.0},
+  "notes": "跑在真正隔离的 worktree 里，但该 agent 执行 session.mjs 命令时实际写到了主仓库的 .aes-workflow/grilling/2026-08-11-mid-flight-requirement-change/（隔离失效，已核对内容与本次拷贝逐字节一致后从主仓库删除，详见 iteration-1/NOTE-worktree-contamination.md）。内容本身真实可信，只是「该在隔离环境里跑」这条卫生要求没做到。"
+}

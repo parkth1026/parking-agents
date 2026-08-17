@@ -1,0 +1,76 @@
+{
+  "iteration": "iteration-1",
+  "skill_name": "analyze",
+  "configs": {
+    "with_skill": {
+      "runs": 4,
+      "pass_rate": {
+        "mean": 0.9167,
+        "stddev": 0.1667,
+        "min": 0.6667,
+        "max": 1
+      },
+      "time_ms": {
+        "mean": 456332,
+        "stddev": 122966.5668,
+        "min": 278587,
+        "max": 550569
+      },
+      "tokens": {
+        "mean": 545743.5,
+        "stddev": 265617.3546,
+        "min": 295923,
+        "max": 915286
+      },
+      "skipped": {
+        "time_ms": 0,
+        "tokens": 0
+      }
+    },
+    "without_skill": {
+      "runs": 4,
+      "pass_rate": {
+        "mean": 0.8125,
+        "stddev": 0.2394,
+        "min": 0.5,
+        "max": 1
+      },
+      "time_ms": {
+        "mean": 410321,
+        "stddev": 119584.5298,
+        "min": 248898,
+        "max": 524425
+      },
+      "tokens": {
+        "mean": 463887.25,
+        "stddev": 244514.8087,
+        "min": 274292,
+        "max": 823067
+      },
+      "skipped": {
+        "time_ms": 0,
+        "tokens": 0
+      }
+    }
+  },
+  "delta": {
+    "pass_rate": 0.1042,
+    "time_ms": 46011,
+    "tokens": 81856.25
+  },
+  "evals": [
+    "eval-冲突证据-hook平台范围",
+    "eval-只读契约-修复诱惑",
+    "eval-简单问题-深度适配",
+    "eval-配置解析链-版本陷阱"
+  ],
+  "warnings": [],
+  "notes": [
+    "增益集中在「纪律型断言」：只读契约用例中基线把「顺便说说怎么修」膨胀成 5 步实施计划+可粘贴代码块，with_skill 克制在末尾 8 行互斥方向——Non-negotiable contract 是技能的主要价值来源",
+    "证据分级有实效且与事实准确率相关：冲突证据用例两 run 都挖出全部三层事实，但基线无任何证据/推断标注而失分；基线在简单问题用例还把已提交的 dev/pub 重组误称「未提交改动」，with_skill 表述正确",
+    "真实短板（机制定位）：简单问题用例 with_skill 失败于「深度与问题匹配」——SKILL.md 的 Output contract 是无条件模板（Ranked synthesis 表+四节结构），Question-aligned 节只说减少 swarm 强度、未豁免输出格式，导致单一事实问题也被套 7KB 全量报告骨架。迭代方向：Output contract 增加简单问题条件豁免",
+    "断言集缺陷：配置解析链用例 4/4 vs 4/4 无区分度——放宽口径让 with_skill 漏掉 skills/dev 埋点陷阱仍通过，而基线反而发现了它；若按严格口径该用例结论反转。下轮应把「发现同名僵尸拷贝」设为独立断言",
+    "成本结构：+11% 时间/+18% tokens，主要来自两个深挖用例（冲突证据 +163k、配置解析链 +92k）；简单问题用例仅 +8%（+21.7k），说明成本大头是深度探索而非输出模板",
+    "统计口径提醒：每配置仅 1 run/用例，±17%/±24% 方差下 +10pp 通过率差不显著，结论应以逐断言质性对比（前两条）为主、均值为辅"
+  ]
+}

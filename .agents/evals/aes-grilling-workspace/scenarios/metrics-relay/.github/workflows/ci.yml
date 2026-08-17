@@ -1,0 +1,23 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: lint
+        run: npm run lint
+      - name: test
+        run: npm test
+      - name: 校验配置文件可解析
+        run: |
+          node -e "JSON.parse(require('fs').readFileSync('config/default.json'))"
+          node -e "JSON.parse(require('fs').readFileSync('config/production.json'))"

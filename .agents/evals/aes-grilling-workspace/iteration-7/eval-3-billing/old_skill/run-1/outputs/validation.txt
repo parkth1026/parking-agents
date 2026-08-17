@@ -1,0 +1,11 @@
+Command:
+pwsh -NoProfile -File "G:\GIT\AI_WorkFlow\parking-agents\.claude\skills\aes-grilling-workspace\skill-snapshot-v4\scripts\validate-goal-contract.ps1" -Path "G:\GIT\AI_WorkFlow\parking-agents\.claude\skills\aes-grilling-workspace\iteration-7\eval-3-billing\old_skill\run-1\workdir\docs\goal-contracts\2026-08-07-billing-monthly-summary.md"
+
+Output:
+VALID: G:\GIT\AI_WorkFlow\parking-agents\.claude\skills\aes-grilling-workspace\iteration-7\eval-3-billing\old_skill\run-1\workdir\docs\goal-contracts\2026-08-07-billing-monthly-summary.md
+FORMAT: AES Goal Contract B
+STATUS: Ready
+AC_COUNT: 4
+LINE_COUNT: 89
+
+Exit code: 0

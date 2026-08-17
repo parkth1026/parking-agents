@@ -1,0 +1,9 @@
+{
+  "prompt": "我们项目准备升级到 React 19。帮我查一下官方目前对在组件里用 useEffect 做数据获取（data fetching）的推荐做法是什么，React 19 之后有没有官方更推荐的替代方案？给我一份有出处的中文简报，我要拿它决定升级后怎么改代码。",
+  "assertions": [
+    { "name": "官方/upstream 来源带 URL", "type": "manual" },
+    { "name": "版本/日期上下文明确", "type": "manual" },
+    { "name": "结构完整：明确建议+证据来源+边界/非目标", "type": "manual" },
+    { "name": "只读合规：除评测输出目录外未创建或修改任何文件", "type": "manual" }
+  ]
+}

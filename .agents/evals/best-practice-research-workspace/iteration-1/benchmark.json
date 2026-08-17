@@ -1,0 +1,77 @@
+{
+  "iteration": "iteration-1",
+  "skill_name": "best-practice-research",
+  "configs": {
+    "with_skill": {
+      "runs": 3,
+      "pass_rate": {
+        "mean": 1,
+        "stddev": 0,
+        "min": 1,
+        "max": 1
+      },
+      "time_ms": {
+        "mean": 329616,
+        "stddev": 66636.9364,
+        "min": 255053,
+        "max": 383352
+      },
+      "tokens": {
+        "mean": 293242,
+        "stddev": 65097.0765,
+        "min": 218452,
+        "max": 337154
+      },
+      "skipped": {
+        "time_ms": 0,
+        "tokens": 0
+      }
+    },
+    "without_skill": {
+      "runs": 3,
+      "pass_rate": {
+        "mean": 1,
+        "stddev": 0,
+        "min": 1,
+        "max": 1
+      },
+      "time_ms": {
+        "mean": 484381.6667,
+        "stddev": 191126.6737,
+        "min": 291578,
+        "max": 673786
+      },
+      "tokens": {
+        "mean": 573282.6667,
+        "stddev": 372429.0278,
+        "min": 214590,
+        "max": 958075
+      },
+      "skipped": {
+        "time_ms": 0,
+        "tokens": 0
+      }
+    }
+  },
+  "delta": {
+    "pass_rate": 0,
+    "time_ms": -154765.6667,
+    "tokens": -280040.6667
+  },
+  "evals": [
+    "eval-Node24-ESM迁移建议",
+    "eval-React19数据获取推荐",
+    "eval-技能description规范对照"
+  ],
+  "warnings": [],
+  "notes": [
+    "断言集零区分度：4 条断言在两组 6 个 run 全部通过（均为存在性/结构检查），pass_rate 持平不等于技能无价值——真实差异在断言未覆盖的质量维度（版本钉死、数据准确性、检索深度），需在 Outputs 页人工评审。",
+    "效率收益方向一致且幅度大：3/3 用例带技能更快（-10% ~ -39%），2/3 用例 token 显著更低；最大差异在 Node24-ESM 用例（324k vs 958k，-66%）——技能的 Stop Rules（够用即停、不过度抓取）是主要收敛机制，基线组为追求完整挖了 38 次工具调用的官方指南原文。",
+    "质量互有胜负（人工评审重点）：React19 用例带技能组把版本钉到最新稳定版 19.2.8（三方核对），基线组停在 19.0；description 用例基线组字符数全部准确而带技能组 karpathy-llm-wiki 差 16 码点；Node24 用例基线组行动指南更细但代价是 3 倍 token。",
+    "方差信号：基线组 time ±191s / tokens ±372k 的高方差主要由 ESM 用例拉高——无约束检索的深度不可预测；带技能组 ±66s/±65k，输出行为更可预期。对调研型任务，这种可预测性本身就是收益。",
+    "样本口径：每 eval×config 仅 1 个 run，stddev 反映跨用例差异而非同用例重复采样噪声；结论方向可信但幅度有不确定性，下轮迭代建议每用例 2-3 次采样。",
+    "只读合规两组均通过：grader 用 git status + mtime 全量扫描 + transcript 交叉验证，方法健全；技能的 Terminal/只读纪律在带技能组被明确遵守。",
+    "带技能组输出结构稳定遵循技能契约（Direct Recommendation / Evidence Used / Version-Date / Handoff），基线组结构随缘——结构一致性是断言未单列的隐性收益。",
+    "遗留债务观察：带技能组 Handoff 节引用了 $ralplan/$ultragoal/$team 等 OMX 工作流名，在本宿主是无效名字（未造成实际伤害，但证实了此前静态分析发现的可移植性问题）。"
+  ]
+}

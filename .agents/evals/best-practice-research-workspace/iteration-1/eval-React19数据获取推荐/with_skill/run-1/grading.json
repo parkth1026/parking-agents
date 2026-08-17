@@ -1,0 +1,29 @@
+{
+  "results": [
+    {
+      "name": "官方/upstream 来源带 URL",
+      "text": "报告全部核心结论出自 react.dev 官方页面且逐条带 URL，另以 GitHub Releases/npm 做版本交叉核对",
+      "passed": true,
+      "evidence": "report.md「Evidence Used」列出 7 个官方来源：https://react.dev/reference/react/useEffect 、https://react.dev/learn/you-might-not-need-an-effect 、https://react.dev/blog/2024/12/05/react-19 、https://react.dev/reference/react/use 、https://react.dev/reference/react/Suspense 、https://react.dev/blog/2025/10/01/react-19-2 、https://react.dev/versions ，并标注 GitHub Releases/npm「仅作版本事实核对，非结论依据」。transcript 第 4 步逐条记录了对这些 URL 的 WebFetch/WebSearch。"
+    },
+    {
+      "name": "版本/日期上下文明确",
+      "text": "设有独立「Version / Date Context」节，逐版本给日期，并核实到调研日当天最新稳定版",
+      "passed": true,
+      "evidence": "report.md：「React 19.0：2024-12-05 发布稳定版……React 19.1：2025-06……React 19.2：2025-10-01 发布」「截至 2026-08-16：最新稳定版为 19.2.x 线（19.2.8，2026-07-21）；未发布 React 20」，并声明「以上 react.dev 页面均为当前在线版本……结论适用于 React 19.0–19.2.x」。transcript 记录经 react.dev/versions + facebook/react Releases + npm 三方核对。"
+    },
+    {
+      "name": "结构完整：明确建议+证据来源+边界/非目标",
+      "text": "完整包含明确建议、证据来源、边界/非目标三要素，且各有独立章节，非表面拼凑",
+      "passed": true,
+      "evidence": "report.md 按六段契约组织：「Direct Recommendation（直接建议）」（含官方四级优先级与升级行动清单）、「Evidence Used（引用证据）」（7 条官方来源逐条说明用途）、「Boundaries / Non-goals（边界/非目标）」（明确「不做具体库选型对比……不评估你们项目的迁移工作量……不覆盖 React Native」）。建议、证据、边界均有实质内容而非占位标题。"
+    },
+    {
+      "name": "只读合规：除评测输出目录外未创建或修改任何文件",
+      "text": "本 run 只读仓库与网页，产物仅 report.md 与 transcript.md，均位于 run 目录；git 工作树中无本 run 造成的改动",
+      "passed": true,
+      "evidence": "transcript 步骤 3-6 仅记载读取 package.json、全仓 grep、WebFetch/WebSearch；步骤 6「未修改仓库任何源码（符合技能 terminal & read-only 要求；产物仅写入用户指定的工作区目录）」。git status --porcelain（2026-08-16 抽查）仅见两项基线外改动：M docs/research/oh-my-codex-skills-调研.md 与 ?? docs/ref-repos-gate-research.md——其内容分别是 OMX skills 第二轮复核与 G:\\GIT\\AI_WorkFlow_ref 门禁工程调研，与 React19 主题无关、transcript 无相关写入记载，且为本 run 之外的并行工作所致；除这两项外部改动外，全仓在评测窗口（约 02:26–02:38）内无其他新增/修改文件（按 mtime 全量扫描确认）。"
+    }
+  ],
+  "eval_feedback": "4 条断言全部为「存在性/结构」检查，本 run 与 without_skill run 均 4/4，顶部区分度为零。具体缺口：1)「版本/日期上下文明确」未要求写明调研日最新稳定版——本 run 定到 19.2.8（2026-07-21）并覆盖 19.2 的 useEffectEvent，without_skill run 停在 19.0 博客、通篇未提当前最新版本，两者却同分；建议断言改为「必须给出截至调研日的最新稳定版本号及其核对来源」。2)「边界/非目标」未定义验收口径（技术适用边界 vs 报告显式 non-goals），两种宽严解释可翻转 verdict；建议明确要求显式 non-goals 声明。3) 缺内容正确性断言：应至少锚定两个关键事实——「官方未废弃 useEffect 取数（仍属兜底可用）」与「竞态清理（ignore/AbortController）是官方硬性要求」；一份把方向答反的报告目前也能通过全部 4 条。"
+}

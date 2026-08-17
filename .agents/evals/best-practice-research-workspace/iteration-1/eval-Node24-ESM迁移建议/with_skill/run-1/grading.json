@@ -1,0 +1,55 @@
+{
+  "results": [
+    {
+      "name": "Node 官方来源带 URL（nodejs.org 或 nodejs/help GitHub）",
+      "text": "结论主依据全部为 nodejs.org 官方页面并逐条带 URL，另含 nodejs 官方 GitHub 组织仓库与核心维护者上游文章",
+      "passed": true,
+      "evidence": "report.md「Evidence Used」官方/上游清单：https://nodejs.org/docs/latest-v24.x/api/modules.html 、…/esm.html 、…/packages.html 、https://nodejs.org/en/about/releases/ 、https://nodejs.org/en/blog/release/v24.11.0 、…/v24.15.0 、…/v22.7.0 （7 条 nodejs.org）；另有 nodejs/node#58523、nodejs/package-examples（nodejs 官方 GitHub 组织）、Joyee Cheung（require(esm) 作者）博客、TypeScript 官方发布说明。第三方 npm-esm-vs-cjs 被单独降级为「补充……不构成决策主依据」。"
+    },
+    {
+      "name": "版本/日期上下文明确（Node 版本、ESM 支持状态或文档日期）",
+      "text": "设有独立「Version / Date Context」节：Node 24 LTS 时间线、require(esm) 全版本里程碑、当前最新小版本与 EOL 均带日期",
+      "passed": true,
+      "evidence": "report.md：「v24.0.0 2025-05-06；2025-10（v24.11.0）进入 Active LTS；当前最新 v24.19.0（2026-08-03）；LTS 支持预计至约 2028-04」「require(esm) 版本线：v22.0.0/v20.17.0（实验+flag）→ …… → v24.15.0（2026-04-15）Stable」「模块语法检测默认启用：v22.7.0（2024-08）；module-sync 条件：v23.5.0/v22.13.0（2025-01）」；并声明「报告日期 2026-08-16（当日抓取全部来源）」及失效条件「若 2026-08 之后 Node 26/27 出现新政策，需重新核查」。"
+    },
+    {
+      "name": "结构完整：明确建议+证据来源+边界/非目标",
+      "text": "明确建议（要不要迁+分步路径）、证据来源、边界/非目标三要素齐备且各有独立实质章节",
+      "passed": true,
+      "evidence": "建议：「Direct Recommendation」一句话结论「不需要必须迁移……渐进式 ESM-first」+ 决策表 + 第 0–5 步渐进路径。证据：「Evidence Used」官方/上游逐条带 URL 与用途。边界/非目标：「Boundaries / Non-goals」节明确「不决定依赖的采用/替换/对比……不做整体架构评审……不实际修改任何代码或配置……未验证第三方 codemod 的实际迁移质量」。"
+    },
+    {
+      "name": "只读合规：除评测输出目录外未创建或修改任何文件",
+      "text": "本 run 未读取项目代码（调用方已给定事实），全部为网页检索，产物仅 outputs/report.md 与 transcript.md；git 工作树中无本 run 造成的改动",
+      "passed": true,
+      "evidence": "transcript 第 3–6 步全部为 WebFetch/WebSearch（含一次 404 来源弃用记录）；第 8 步「未修改仓库其他任何文件/状态」。git status --porcelain（2026-08-16 抽查）仅见两项基线外改动：M docs/research/oh-my-codex-skills-调研.md 与 ?? docs/ref-repos-gate-research.md——内容分别是 OMX skills 复核与 G:\\GIT\\AI_WorkFlow_ref 门禁调研，与 Node ESM 主题无关、transcript 无相关写入记载；除这两项外部改动外，全仓在评测窗口（约 02:26–02:38）内无其他新增/修改文件（按 mtime 全量扫描确认）。"
+    }
+  ],
+  "eval_feedback": "1)「Node 官方来源带 URL」门槛过低：任何一条 nodejs.org 链接即满足，测不出证据质量。本 run 与 without_skill run 的实质差异在别处——本 run 按技能 Stop Rules 收敛（4 轮检索即停，324K tokens/350s），without_skill run 深挖到 nodejs/package-examples 指南章节原文但耗 958K tokens/674s；效率与深度的取舍没有任何断言度量。2) 缺关键事实断言：应锚定「CommonJS 在 v24 为 Stability: 2、无弃用时间表」「require(esm) 于 v24.15.0（2026-04-15）转正且不支持 top-level await」这两个可证伪要点——目前一份漏掉 TLA 限制的报告也能 4/4。3)「版本/日期上下文」断言措辞尚可但建议直接要求「须含 Node 24 LTS 支持窗口（至 2028-04）与调研日最新小版本」，两个 run 都已达到，可作为硬锚防止低质输出。",
+  "claims": [
+    {
+      "claim": "require(esm) 自 v24.15.0（2026-04-15）起不再实验",
+      "type": "factual",
+      "verified": true,
+      "evidence": "transcript 记录 WebFetch nodejs.org/docs/latest-v24.x/api/modules.html 得到该版本历史，并经 WebSearch 官方 release 页核对 v24.15.0=2026-04-15；without_skill run 经 nodejs.org/dist/index.json 独立得到同一日期（跨 run 交叉印证）。"
+    },
+    {
+      "claim": "Node 24 当前最新小版本 v24.19.0（2026-08-03）、LTS 至约 2028-04",
+      "type": "factual",
+      "verified": true,
+      "evidence": "transcript 记录来源为 nodejs.org/en/about/releases/ ；without_skill run 经 dist/index.json 独立核对为同一版本与日期（交叉印证）。"
+    },
+    {
+      "claim": "chalker/npm-esm-vs-cjs 已 404、改用 wooorm/npm-esm-vs-cjs（2026-06-08 数据）",
+      "type": "process",
+      "verified": true,
+      "evidence": "transcript 第 5 步明确记录「WebFetch github.com/chalker/npm-esm-vs-cjs → 404（来源无效，弃用）」及后续替换来源，报告中该数据也只作第三方补充。"
+    },
+    {
+      "claim": "npm 高影响包中 CJS-only 约 52%、ESM-only 约 16%、dual 约 22%（2026-06-08）",
+      "type": "factual",
+      "verified": false,
+      "evidence": "外部数据，无法在本地复验；报告已自我标注为第三方补充证据且附来源 URL 与数据源切换说明（2025-12 起改用 ecosyste.ms，前后不可比），处理审慎，但 grader 未能独立核实数字。"
+    }
+  ]
+}

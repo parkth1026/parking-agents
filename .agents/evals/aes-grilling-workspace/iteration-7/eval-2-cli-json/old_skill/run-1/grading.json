@@ -1,0 +1,14 @@
+{
+  "expectations": [
+    {"text": "contract-exists", "passed": true, "evidence": "outputs/2026-08-07-minicli-json-output.md 已落盘"},
+    {"text": "passes-new-validator", "passed": true, "evidence": "validation.txt: 首次校验因 Verify 行残留 <fixture> 占位符报错 exit 1，修正后 AC_COUNT 5, VALID, exit code 0"},
+    {"text": "every-ac-has-tiered-verify", "passed": true, "evidence": "AC-01~AC-05 均带 [A]/[B] 档位标签"},
+    {"text": "verify-uses-repo-test-command", "passed": true, "evidence": "AC-01/AC-02/AC-04/AC-05 Verify: [A] npm test"},
+    {"text": "verification-not-asked", "passed": true, "evidence": "questions.md 未把验证方式当问题问，走仓库既有 npm test 默认档"},
+    {"text": "single-batched-round", "passed": true, "evidence": "第2步 Q1/Q2 一轮问完"},
+    {"text": "no-mock-no-behavior-diff", "passed": false, "evidence": "同上，断言假设有误，不计入对比结论"},
+    {"text": "invariant-not-counted-as-ac", "passed": false, "evidence": "AC-01「不带 --json 时行为不变」是不变量却被单独编号为 AC，与新版「不变量不占 AC 编号」的规则相比多占了一条编号"},
+    {"text": "constraint-fidelity-exit-code", "passed": false, "evidence": "Q2 候选把新增退出码 2 标注为「推荐」并采纳，虽在代价栏提到与「退出码也不能变」的字面冲突，但推荐结论没有据此调整，弱于新版的裁决"}
+  ],
+  "summary": {"total": 9, "passed": 6, "pass_rate": 0.667}
+}

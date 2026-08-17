@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "slug": "2026-08-13-cli-list-grouping",
+  "created_at": "2026-08-13T04:18:14Z",
+  "updated_at": "2026-08-13T04:31:23Z",
+  "original_request": "session.mjs 的 list 命令现在把所有 issue 摊平打印成一张表，issue 一多就看不过来了。我想让它按 stage 分组显示，并且能加个筛选只看某个 stage 或者只看 in_progress 的。",
+  "goal_oneline": "session.mjs list 按 stage 分组显示，并支持 --stage/--status 筛选，默认零参数输出保持字节级不变",
+  "target": null,
+  "stage": "3-contract",
+  "next_action": "契约已就绪，把交接指令发给执行 Agent",
+  "stage_gates": {
+    "1-interview": {
+      "status": "done",
+      "closed_at": "2026-08-13T04:23:09Z",
+      "self_assessment": {
+        "意图": "已定",
+        "结果": "已定",
+        "边界": "已定",
+        "约束": "已定",
+        "现状": "已定"
+      }
+    },
+    "2-prototype": {
+      "status": "done",
+      "closed_at": "2026-08-13T04:26:26Z",
+      "artifacts_confirmed": [
+        "behavior",
+        "example-run"
+      ]
+    },
+    "3-contract": {
+      "status": "done",
+      "closed_at": "2026-08-13T04:31:23Z"
+    }
+  },
+  "validation": {
+    "status": "valid",
+    "ac_count": 5,
+    "warnings": [],
+    "ran_at": "2026-08-13T04:31:09Z",
+    "verify_tiers": {
+      "A": 5,
+      "B": 0,
+      "C": 0,
+      "D": 0
+    }
+  },
+  "blocked": [],
+  "residual_risk": null,
+  "status": "ready"
+}

@@ -1,0 +1,76 @@
+{
+  "iteration": "iteration-2",
+  "skill_name": "best-practice-research",
+  "configs": {
+    "with_skill": {
+      "runs": 3,
+      "pass_rate": {
+        "mean": 0.9167,
+        "stddev": 0.1443,
+        "min": 0.75,
+        "max": 1
+      },
+      "time_ms": {
+        "mean": 237261.6667,
+        "stddev": 12121.8806,
+        "min": 223547,
+        "max": 246542
+      },
+      "tokens": {
+        "mean": 232775,
+        "stddev": 37153.5436,
+        "min": 195875,
+        "max": 270177
+      },
+      "skipped": {
+        "time_ms": 0,
+        "tokens": 0
+      }
+    },
+    "without_skill": {
+      "runs": 3,
+      "pass_rate": {
+        "mean": 0.8333,
+        "stddev": 0.1443,
+        "min": 0.75,
+        "max": 1
+      },
+      "time_ms": {
+        "mean": 205226.6667,
+        "stddev": 97887.6543,
+        "min": 128128,
+        "max": 315357
+      },
+      "tokens": {
+        "mean": 211508.3333,
+        "stddev": 78106.5229,
+        "min": 157032,
+        "max": 300995
+      },
+      "skipped": {
+        "time_ms": 0,
+        "tokens": 0
+      }
+    }
+  },
+  "delta": {
+    "pass_rate": 0.0834,
+    "time_ms": 32035,
+    "tokens": 21266.6667
+  },
+  "evals": [
+    "eval-CRA脚手架现状",
+    "eval-Tailwind4配置范式",
+    "eval-moment维护状态调查"
+  ],
+  "warnings": [],
+  "notes": [
+    "效率结论反转：本轮带技能组平均多花 21k tokens（+10%）、慢 32s。问题带明确指向性时基线自然快速收敛，无过度挖掘可防；技能的多来源核对纪律反而是净增成本。与 iteration-1（-49% tokens）合并看：token 收益集中在终点模糊的开放式调研，事实精度收益集中在对抗性问题——技能没有免费午餐，它在两种题型里卖点不同。",
+    "质量实锤（部分兑现）：moment 用例基线组掉入 GitHub Release published_at 陷阱（2026-07 的回填时间戳被误读为发版日期），并衍生出「仍在持续修 bug」的错误叙事；带技能组按版本/日期纪律直取 npm registry time 字段，全表零误差。这是首个可归因于技能规则（来源质量+版本上下文）的「答案更好」案例——防住了一次真实的证据污染。",
+    "非全面胜：Tailwind 两组 4/4 持平且基线更省（176k vs 232k）；CRA 两组同挂断言 3——都纠正了官方口径，却都没点破「海量旧教程仍在教 CRA」这一用户认知来源。共同盲区说明技能的 stale-evidence 规则只对检索中遇到的冲突生效，不会主动渲染用户提问里携带的过时假设。",
+    "方差是两轮一致的稳定收益：本轮 time ±12s vs ±98s（iteration-1 为 ±66s vs ±191s），token ±37k vs ±78k。基线是抽奖，技能是预算——对把本技能当子步骤的父工作流，这是比均值更重要的性质。",
+    "样本口径提醒：pass_rate +8pp（92% vs 83%）的真实内容是「moment 日期断言」一条的翻转（12 条断言中 1 条），量化幅度勿过度解读；方向性结论（技能防证据污染）比数字本身可靠。",
+    "grader 对断言集的评价：本轮不再零区分度——moment 断言 4 区分了两组，CRA 断言 3 双 FAIL 暴露共同盲区，Tailwind 断言集仍无区分。改进建议已记录：版本/日期类断言应显式写明以 npm registry time 字段为准（GitHub Release published_at 的回填歧义本轮实际翻车）。",
+    "CRA 双 FAIL 的技能改进线索：可在 Source-Quality Rules 或 Workflow 里加一条「结论与提问者假设相反时，显式指出该假设为何过时、其流行来源是什么」——这正是本轮唯一的双盲区，且与技能的 stale/conflicting evidence 规则同源。"
+  ]
+}

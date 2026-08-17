@@ -1,0 +1,25 @@
+{
+  "prompt": "ue-error-solver 这个技能跑 node scripts/UeErrorSolver.mjs config 的时候，配置值到底按什么顺序、从哪几层文件解析合并出来的？NAS 挂掉的话脚本会有什么表现？给我一个带文件引用的分析。",
+  "assertions": [
+    {
+      "name": "回退顺序正确",
+      "type": "manual",
+      "text": "报告给出的配置解析顺序为 $SKILL_ENV > ~/.config/parking-agents/skill-env.json（新 XDG 路径） > ~/.claude/skill-env.json（旧路径），第一个存在的文件生效，且引用 .claude/skills/ue-error-solver/scripts/UeErrorSolver.mjs 具体行号（约 :47-55）"
+    },
+    {
+      "name": "合并与模板角色正确",
+      "type": "manual",
+      "text": "说明技能目录 config.json 作为固有默认层与环境层深合并（deepMerge，约 :110-128），config.example.json 只是模板、不被运行时读取"
+    },
+    {
+      "name": "NAS-fail-fast行为正确",
+      "type": "manual",
+      "text": "说明对 knowledgeBase 等字段中的 UNC 路径（//nas.51vr.local/... 形态）检查共享根可达性，不可达时打印现状报告并以退出码 1 终止（fail-fast）；本地盘路径不受该检查"
+    },
+    {
+      "name": "版本陷阱处理",
+      "type": "manual",
+      "text": "报告明确指出仓库存在第二份同名技能 skills/dev/ue-error-solver（旧版本、硬编码配置的僵尸拷贝），且分析以 .claude/skills/ue-error-solver 为准、或将该分叉标为风险/未知，而不是把两份拷贝的文件引用混为一谈"
+    }
+  ]
+}
