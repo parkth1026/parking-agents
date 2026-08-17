@@ -50,6 +50,24 @@
         {"text": "问到了某个 facet 没数据时下拉框如何表现这一点", "type": "judgment"},
         {"text": "界面相关 AC 的 Verify 档位默认标 [C]，不是编不出证据链的 [A]（仓库没有视觉回归基建）", "type": "programmatic"}
       ]
+    },
+    {
+      "id": 4,
+      "name": "arch-dependency-diagram",
+      "prompt": "我要把仓库里两个技能各自带的公共脚本抽到一个共享 lib 目录，改完之后技能对脚本的依赖方向和文件归属都变了。这种架构改动以前只有文字表格，拓扑看不懂，帮我走一遍需求访谈把它锁清楚。",
+      "persona": "你是这套技能集的维护者。\n- 动机：架构和依赖变化只有表格没有图，谁依赖谁、改了哪里，确认对照物时看不明白，质疑成本高。\n- 想要：架构改动有一份浏览器能打开、能逐处质疑的可视化对照物，改动点一眼看得出来。\n- 如果 Agent 问业务流程要不要也画：要，但只画行为对照表里跨多环节的变化行对应的路径，别把没变的流程全画上。\n- 如果 Agent 给你看的图改动点没有高亮：第一次看你会提意见——新增/变更的节点和连线必须一眼可辨，删掉的东西也要知道去哪了。改完后第二次看你确认通过，不再提新意见。\n- 不变的：行为对照表仍是事实源，图只是视图，不许把表格产物并进 HTML；页面不许连任何外部资源。\n- 验收方式：跟着仓库已有校验惯例走，Agent 推荐什么就是什么。\n- 其他任何未覆盖的问题：选 Agent 推荐项。",
+      "expected_output": "识别出「架构与依赖」影响面判「有」，产出 2-prototype/diagram.html：单文件自包含（内联 SVG/CSS、零 JS、零外链、系统字体）；架构视图画改后态并用 .changed/accent 标注新增与变更的节点和连线，删除项进页脚清单；每图页脚带 fidelity ledger 逐条申报；需要时同一文件内加流程视图对应 behavior.md 变化行。impact-surface.md 七面逐面判定；契约「读什么」引用 diagram.html，架构视图的每处标注变化落成强约束或 [A] 依赖断言。",
+      "files": [],
+      "assertions": [
+        {"text": "2-prototype/diagram.html 存在，架构视图画出改后依赖拓扑", "type": "programmatic"},
+        {"text": "diagram.html 自包含：无 <script src=http...>、无 <link href=http...>、无任何 <script>，SVG 与 CSS 内联，不引外部字体", "type": "programmatic"},
+        {"text": "diagram.html 架构视图标出改动点（.changed 或 accent 标注），删除项在页脚清单里可查", "type": "programmatic"},
+        {"text": "diagram.html 每张图页脚带 fidelity ledger（Detail/Merged/Collapsed/Dropped/Kept 逐条申报）", "type": "programmatic"},
+        {"text": "impact-surface.md 七面逐面判定，「架构与依赖」面有明确的有/无结论", "type": "programmatic"},
+        {"text": "contract.md 的「读什么」引用了 diagram.html 路径，而不是用文字重述拓扑", "type": "programmatic"},
+        {"text": "契约对架构视图的每处标注变化有消费规则：依赖断言进强约束或 [A] 档 Verify（如 grep 断言依赖方向）", "type": "programmatic"},
+        {"text": "baseline（without_skill）是否也识别出架构与依赖影响面并产出可视化对照物，用作对比", "type": "judgment"}
+      ]
     }
   ]
 }

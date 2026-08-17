@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<!-- draft v1 | published 2026-08-17T17:45:00+08:00 | 状态: draft -->
+<!-- viewer 评审页新增区 mock：历史轨迹 + 拆分建议卡片。写死示例数据，零外链。 -->
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>viewer 新增区 mock — 历史轨迹 + 拆分建议</title>
+<style>
+  body{font-family:system-ui,sans-serif;margin:24px;background:#f6f7f9;color:#222}
+  .card{background:#fff;border:1px solid #d8dbe0;border-radius:8px;padding:16px;margin-bottom:16px}
+  .changed{outline:3px solid #d97706;outline-offset:2px}
+  h2{font-size:16px;margin:0 0 8px}
+  h3{font-size:13px;color:#555;margin:12px 0 6px}
+  table{border-collapse:collapse;width:100%;font-size:13px}
+  th,td{border:1px solid #e2e4e8;padding:4px 8px;text-align:left}
+  th{background:#f0f2f5}
+  .won{color:#15803d;font-weight:600}.lost{color:#b91c1c;font-weight:600}.tie{color:#92400e}
+  details{margin-top:8px}summary{cursor:pointer;font-size:14px;font-weight:600}
+  .badge{display:inline-block;font-size:12px;border:1px solid #d97706;color:#92400e;border-radius:4px;padding:1px 6px;margin-left:8px}
+  .hint{font-size:12px;color:#888;margin-top:6px}
+</style>
+</head>
+<body>
+
+<div class="card changed">
+  <h2>历史轨迹 <span class="badge">新增 · 读技能目录 history.json</span></h2>
+  <details open>
+    <summary>历次评测（2 轮，点击折叠）</summary>
+    <table>
+      <tr><th>轮次</th><th>日期</th><th>gate</th><th>pass_rate</th><th>mean_ms</th><th>mean_tokens</th><th>vs 上轮</th></tr>
+      <tr><td rowspan="3">iteration-2 ★current_best</td><td rowspan="3">08-17 18:00</td>
+          <td>with_skill</td><td>100%</td><td>121k</td><td>44.1k</td><td class="won">won 2</td></tr>
+      <tr><td>old_skill</td><td>67%</td><td>139k</td><td>51.8k</td><td class="tie">tie 1</td></tr>
+      <tr><td>without_skill</td><td>50%</td><td>158k</td><td>63.5k</td><td class="hint">—（基线持平）</td></tr>
+      <tr><td rowspan="2">iteration-1</td><td rowspan="2">08-17 14:00</td>
+          <td>with_skill</td><td>100%</td><td>137k</td><td>48.2k</td><td class="hint">首轮无对比</td></tr>
+      <tr><td>without_skill</td><td>50%</td><td>155k</td><td>62.0k</td><td class="hint">首轮无对比</td></tr>
+    </table>
+    <p class="hint">逐 eval 胜负：贴URL直问 tie · 例会最新一期 won · 周报关键词问答 won ｜ 上轮存在本轮缺席：(无) ｜ 数据源：技能目录 history.json（只追加）</p>
+  </details>
+</div>
+
+<div class="card changed">
+  <h2>结构审查建议 <span class="badge">仅建议 · 未执行</span></h2>
+  <table>
+    <tr><th>信号</th><th>命中</th><th>证据</th></tr>
+    <tr><td>1 原子能力可复用</td><td>✓</td><td>日志解析例程被 ue-error-solver 重复实现</td></tr>
+    <tr><td>2 多类不相干意图</td><td>✓</td><td>description 同时招「翻译报错」与「汇总周报」</td></tr>
+    <tr><td>3 编排逻辑内嵌</td><td>—</td><td>无</td></tr>
+    <tr><td>4 near-miss 误触发集中</td><td>✓</td><td>q5/q9 误触发集中于「翻译」类</td></tr>
+  </table>
+  <p>建议：抽「日志解析」为原子技能，本技能改编排层调度（样板：grill-with-docs 之于 grilling）。拆不拆由用户决定。结论已记入 design.md 迭代记录。</p>
+</div>
+
+<div class="card">
+  <h2>Outputs / Benchmark（现有页，不动）</h2>
+  <p class="hint">现有评审页内容原样保留——本 mock 只框出两个新增区（橙框 .changed）。</p>
+</div>
+
+<!-- 新增：历史轨迹卡片、结构审查卡片；不变：Outputs 逐例产物、Benchmark 量化对比、上轮折叠对照 -->
+</body>
+</html>

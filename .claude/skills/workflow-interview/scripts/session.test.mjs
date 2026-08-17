@@ -55,7 +55,7 @@ function expect(name, res, code, needle) {
 
 const CONTEXT = ['任务陈述', '用户提出的方案', '意图假设', '已查事实', '验证基建候选池', '四分类']
   .map((s) => `## ${s}\n\n占位内容。`).join('\n\n');
-const IMPACT = `# 影响面\n\n${['用户可见界面', '可观察行为', '可运行输出', '对外接口报文', '用户配置', '历史兼容性']
+const IMPACT = `# 影响面\n\n${['用户可见界面', '可观察行为', '可运行输出', '对外接口报文', '用户配置', '历史兼容性', '架构与依赖']
   .map((s) => `- ${s}：无`).join('\n')}\n`;
 const ROUND_OK = JSON.stringify({ stage: '1-interview', round: 1, tier: 'default', item: '占位决定' });
 const ASSESS = JSON.stringify({ 意图: '已定', 结果: '已定', 边界: '已定', 约束: '已定', 现状: '已定' });
@@ -161,8 +161,18 @@ const askRow = (pcts) => JSON.stringify({
   const dir = mkIssue({ impact: true, artifacts: ['custom-view.md'] });
   expect('gate2/自定义命名对照物放行', run('stage', dir, '2-prototype', 'done', '--artifacts', 'custom-view'), 0);
 }
+{
+  const dir = mkIssue({ impact: true, artifacts: ['behavior.md'] });
+  writeFileSync(join(dir, '2-prototype', 'impact-surface.md'), IMPACT.replace('\n- 架构与依赖：无', ''), 'utf8');
+  expect('gate2/缺第七面「架构与依赖」done 拒收', run('stage', dir, '2-prototype', 'done', '--artifacts', 'behavior'), 1, '架构与依赖');
+  expect('gate2/缺第七面 skipped 同样拒收', run('stage', dir, '2-prototype', 'skipped', '--reason', '差异极小'), 1, '架构与依赖');
+}
+{
+  const dir = mkIssue({ impact: true, artifacts: ['diagram.html'] });
+  expect('gate2/--artifacts diagram 命中 .html 候选放行', run('stage', dir, '2-prototype', 'done', '--artifacts', 'diagram'), 0);
+}
 
-// ─────────────────────────────── skipped：只许 2-prototype，且六面在盘 ───────────────────────────────
+// ─────────────────────────────── skipped：只许 2-prototype，且七面在盘 ───────────────────────────────
 
 {
   const dir = mkIssue({ interview: true, impact: true });
@@ -172,12 +182,12 @@ const askRow = (pcts) => JSON.stringify({
 }
 {
   const dir = mkIssue({ interview: true });
-  expect('skip/无 impact-surface 拒收', run('stage', dir, '2-prototype', 'skipped', '--reason', '差异极小'), 1, '不豁免六面扫描');
+  expect('skip/无 impact-surface 拒收', run('stage', dir, '2-prototype', 'skipped', '--reason', '差异极小'), 1, '不豁免七面扫描');
 }
 {
   const dir = mkIssue({ interview: true, impact: true });
   doneInterview(dir);
-  expect('skip/六面在盘 + reason 放行', run('stage', dir, '2-prototype', 'skipped', '--reason', '差异极小'), 0);
+  expect('skip/七面在盘 + reason 放行', run('stage', dir, '2-prototype', 'skipped', '--reason', '差异极小'), 0);
   const m = manifest(dir);
   check('skip/放行后推进到 3-contract 而非 ready', m.stage === '3-contract' && m.status === 'in_progress',
     `stage=${m.stage} status=${m.status}`);
@@ -202,6 +212,16 @@ const askRow = (pcts) => JSON.stringify({
   const m = manifest(dir);
   check('rebuild/自定义命名对照物恢复为 done',
     m.stage_gates['2-prototype'].status === 'done' && m.stage_gates['2-prototype'].artifacts_confirmed.includes('custom-view'),
+    JSON.stringify(m.stage_gates['2-prototype']));
+}
+{
+  const dir = mkIssue({ impact: true, artifacts: ['diagram.html'] });
+  run('stage', dir, '2-prototype', 'done', '--artifacts', 'diagram');
+  unlinkSync(join(dir, 'manifest.json'));
+  expect('rebuild/diagram.html 在盘可重建', run('rebuild', dir), 0);
+  const m = manifest(dir);
+  check('rebuild/.html 对照物按去扩展名恢复为 done',
+    m.stage_gates['2-prototype'].status === 'done' && m.stage_gates['2-prototype'].artifacts_confirmed.includes('diagram'),
     JSON.stringify(m.stage_gates['2-prototype']));
 }
 {

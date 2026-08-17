@@ -146,7 +146,7 @@ function resolveIssueDir(arg) {
 const ROUND_TIERS = ['default', 'confirm', 'ask'];
 const ASSESS_DIMS = ['意图', '结果', '边界', '约束', '现状'];
 const CONTEXT_SECTIONS = ['任务陈述', '用户提出的方案', '意图假设', '已查事实', '验证基建候选池', '四分类'];
-const IMPACT_SURFACES = ['用户可见界面', '可观察行为', '可运行输出', '对外接口报文', '用户配置', '历史兼容性'];
+const IMPACT_SURFACES = ['用户可见界面', '可观察行为', '可运行输出', '对外接口报文', '用户配置', '历史兼容性', '架构与依赖'];
 
 function validateRoundObj(obj) {
   const errs = [];
@@ -236,7 +236,7 @@ function validateImpactSurfaceFile(dir) {
   const errs = [];
   for (const s of IMPACT_SURFACES) {
     if (!content.includes(s)) {
-      errs.push(`impact-surface.md 没提到影响面「${s}」。六面逐面扫，判「无」也要写下来。`);
+      errs.push(`impact-surface.md 没提到影响面「${s}」。七面逐面扫，判「无」也要写下来。`);
     }
   }
   return errs;
@@ -283,7 +283,7 @@ function gateDone(dir, stage, gate, m) {
       }
     }
     if (artifacts.length === 0) {
-      errs.push('done 至少要用 --artifacts 列一份确认版对照物。六面全「无」该报 needs_reinterview；差异极小且用户文字确认过才是 skipped。');
+      errs.push('done 至少要用 --artifacts 列一份确认版对照物。七面全「无」该报 needs_reinterview；差异极小且用户文字确认过才是 skipped。');
     } else {
       errs.push(...missingArtifacts(dir, artifacts));
     }
@@ -400,11 +400,11 @@ function cmdStage(argv) {
     if (typeof gate.reason !== 'string' || !gate.reason.trim()) {
       die('skipped 必须带 --reason 写清为什么跳、赌的是什么。', 1);
     }
-    // skipped 的前提是六面扫过了、只是差异极小——扫过的证据就是 impact-surface.md 在盘。
+    // skipped 的前提是七面扫过了、只是差异极小——扫过的证据就是 impact-surface.md 在盘。
     const skipErrs = validateImpactSurfaceFile(dir);
     if (skipErrs.length > 0) {
       for (const e of skipErrs) console.error(`gate: ${e}`);
-      die('skipped 不豁免六面扫描。理由写进 impact-surface.md（见 aes-prototype 的 SKILL.md），再来跳。', 1);
+      die('skipped 不豁免七面扫描。理由写进 impact-surface.md（见 aes-prototype 的 SKILL.md），再来跳。', 1);
     }
   }
 
