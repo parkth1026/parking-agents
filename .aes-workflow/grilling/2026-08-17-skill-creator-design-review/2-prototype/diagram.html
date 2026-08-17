@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<!-- draft v1 | published 2026-08-17T17:50:00+08:00 | 状态: confirmed(用户 2026-08-17 通过) -->
+<!-- 架构视图：改后态 + 改动标注（accent）。单文件自包含，零 JS、零外链。 -->
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>技能生产线数据流 — 改后态</title>
+<style>
+  body{font-family:system-ui,sans-serif;margin:24px;color:#222;background:#fff}
+  h2{font-size:16px}
+  .fig{margin:12px 0 28px}
+  text{font-size:13px;fill:#222}
+  .node rect{fill:#eef1f5;stroke:#8a929c;stroke-width:1.5;rx:6}
+  .node text{font-weight:600}
+  .edge{stroke:#8a929c;stroke-width:1.5;fill:none;marker-end:url(#arrow)}
+  .edge.accent{stroke:#d97706;stroke-width:2.5}
+  .node.accent rect{stroke:#d97706;stroke-width:2.5}
+  .lbl{font-size:11px;fill:#6b7280}
+  .lbl.accent{fill:#92400e;font-weight:600}
+  .legend{font-size:12px;color:#555}
+</style>
+</head>
+<body>
+<h2>技能生产线数据流（改后态）</h2>
+
+<svg viewBox="0 0 900 380" width="900" height="380" role="img">
+  <defs><marker id="arrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+    <path d="M0,0 L10,4 L0,8 z" fill="#8a929c"/></marker></defs>
+
+  <!-- 节点 -->
+  <g class="node"><rect x="20" y="30" width="150" height="46" rx="6"/><text x="95" y="57" text-anchor="middle">init 脚手架</text></g>
+  <g class="node accent"><rect x="20" y="120" width="150" height="46" rx="6"/><text x="95" y="140" text-anchor="middle">design.md</text>
+    <text x="95" y="156" text-anchor="middle" class="lbl accent">四节·AC 编号（新）</text></g>
+  <g class="node"><rect x="220" y="30" width="170" height="46" rx="6"/><text x="305" y="57" text-anchor="middle">技能目录(SKILL.md…)</text></g>
+  <g class="node"><rect x="220" y="220" width="170" height="46" rx="6"/><text x="305" y="240" text-anchor="middle">评测循环 workspace</text>
+    <text x="305" y="256" text-anchor="middle" class="lbl">gates×runs×iteration</text></g>
+  <g class="node"><rect x="470" y="220" width="150" height="46" rx="6"/><text x="545" y="240" text-anchor="middle">aggregate-benchmark</text>
+    <text x="545" y="256" text-anchor="middle" class="lbl">benchmark.json/md</text></g>
+  <g class="node accent"><rect x="470" y="110" width="150" height="46" rx="6"/><text x="545" y="130" text-anchor="middle">history.json</text>
+    <text x="545" y="146" text-anchor="middle" class="lbl accent">随包·只追加（新）</text></g>
+  <g class="node"><rect x="680" y="110" width="170" height="46" rx="6"/><text x="765" y="130" text-anchor="middle">viewer 评审页</text>
+    <text x="765" y="146" text-anchor="middle" class="lbl accent">+历史轨迹/审查建议（新）</text></g>
+  <g class="node accent"><rect x="470" y="300" width="150" height="46" rx="6"/><text x="545" y="320" text-anchor="middle">结构审查步</text>
+    <text x="545" y="336" text-anchor="middle" class="lbl accent">拆分建议·只建议（新）</text></g>
+
+  <!-- 边 -->
+  <path class="edge" d="M170,53 L220,53"/><text class="lbl" x="185" y="45">骨架</text>
+  <path class="edge" d="M95,76 L95,120"/><text class="lbl" x="100" y="100">生成</text>
+  <path class="edge" d="M240,76 L240,120 M240,120 L240,166 M240,166 L220,166 M95,166 L240,166" style="display:none"/>
+  <path class="edge" d="M170,143 C 200,143 200,60 220,57"/><text class="lbl" x="178" y="115">落进技能</text>
+  <path class="edge" d="M305,76 L305,220"/><text class="lbl" x="310" y="150">被评测</text>
+  <path class="edge" d="M390,243 L470,243"/><text class="lbl" x="405" y="235">聚合</text>
+  <path class="edge accent" d="M545,220 L545,156"/><text class="lbl accent" x="552" y="192">追加 --history（新边）</text>
+  <path class="edge" d="M620,133 L680,133"/><text class="lbl" x="635" y="125">渲染</text>
+  <path class="edge accent" d="M620,110 C 660,90 660,333 620,323"/><text class="lbl accent" x="700" y="300">建议回写（新边）</text>
+  <path class="edge" d="M470,323 C 400,323 300,300 240,260"/><text class="lbl" x="360" y="345">审查输入:技能本体+触发评测</text>
+</svg>
+
+<p class="legend">橙框/橙线 = 本次新增节点与数据流边；灰 = 既有。改动标注 3 处：
+①design.md 进 init 产物与技能目录；②评测数据经 --history 反向沉淀进技能目录 history.json（历史上首次）；③结构审查步读技能本体产出建议并回写 design.md 迭代记录。
+既有边（init→技能、技能→评测、评测→聚合、聚合→viewer）方向与归属不变。</p>
+
+<p class="legend">fidelity ledger：实际流程含 quick-validate/check-shadow-skills/package-skill 等节点，与本图主旨（新增数据流方向）无关，合并省略未画；「触发评测」并入评测循环节点。无删除节点。</p>
+</body>
+</html>

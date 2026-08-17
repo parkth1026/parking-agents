@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "slug": "2026-08-17-skill-creator-design-review",
+  "created_at": "2026-08-17T04:59:55Z",
+  "updated_at": "2026-08-17T05:51:08Z",
+  "original_request": null,
+  "goal_oneline": "parking-skill-creator 升级为带质量证据链的技能生产线:新技能自包含设计文档(意图/取舍/验收编号/迭代记录,随包分发),评测循环含结构审查步(拆分建议只建议不执行,判据 checklist 固化),评测配置改为 gate 可选制(跑前问用户),历史对比覆盖跨 workspace 与跨 iteration 趋势(history.json 契约落地,成绩沉淀进技能)",
+  "target": null,
+  "stage": "3-contract",
+  "next_action": "契约就绪,等用户发起 /goal 交接执行",
+  "stage_gates": {
+    "1-interview": {
+      "status": "done",
+      "closed_at": "2026-08-17T05:27:44Z",
+      "self_assessment": {
+        "意图": "已定",
+        "结果": "已定",
+        "边界": "已定",
+        "约束": "已定",
+        "现状": "已定"
+      }
+    },
+    "2-prototype": {
+      "status": "done",
+      "closed_at": "2026-08-17T05:41:22Z",
+      "artifacts_confirmed": [
+        "behavior",
+        "api-mock",
+        "example-run",
+        "mock",
+        "diagram"
+      ]
+    },
+    "3-contract": {
+      "status": "done",
+      "closed_at": "2026-08-17T05:51:08Z"
+    }
+  },
+  "validation": {
+    "status": "valid",
+    "ac_count": 6,
+    "warnings": [
+      "WARNING: 正文句子里出现 TODO、TBD 或 FIXME，确认它是内容本身，不是没做完的标记。"
+    ],
+    "ran_at": "2026-08-17T05:51:08Z",
+    "verify_tiers": {
+      "A": 3,
+      "B": 0,
+      "C": 1,
+      "D": 2
+    }
+  },
+  "blocked": [],
+  "residual_risk": null,
+  "status": "ready"
+}
