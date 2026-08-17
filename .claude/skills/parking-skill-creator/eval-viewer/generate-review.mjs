@@ -123,11 +123,11 @@ export function loadPrevious(prevDir) {
   return { previousFeedback, previousOutputs };
 }
 
-/** 生成自包含 HTML（viewer.html 模板 + 嵌入数据） */
+/** 生成自包含 HTML（viewer.html 模板 + 嵌入数据）。替换值用函数形式：嵌入数据里的 $& / $' / $` 等不会被当替换模式展开 */
 export function generateHtml(data) {
   const templatePath = join(dirname(fileURLToPath(import.meta.url)), "viewer.html");
   const template = readFileSync(templatePath, "utf8");
-  return template.replace("/*__EMBEDDED_DATA__*/", `const EMBEDDED_DATA = ${JSON.stringify(data)};`);
+  return template.replace("/*__EMBEDDED_DATA__*/", () => `const EMBEDDED_DATA = ${JSON.stringify(data)};`);
 }
 
 // --- CLI ---
@@ -158,7 +158,15 @@ function inferSkillName(iterDir) {
   }
   return name;
 }
-const skillName = flag("--skill-name") || inferSkillName(iterDir);
+// --history：读技能目录 history.json（只读不写）。有旗标但读不到 → history: null（viewer 显示首次评测）
+const historyArg = flag("--history");
+const historySkillDir = historyArg ? resolve(historyArg) : null;
+const historyData = historySkillDir ? readJson(join(historySkillDir, "history.json")) : undefined;
+
+// 技能名优先级：--skill-name 显式 > history.json 的 skill 字段（带 --history 时）> 目录名推断
+const skillName = flag("--skill-name")
+  || (historyData && typeof historyData.skill === "string" && historyData.skill ? historyData.skill : null)
+  || inferSkillName(iterDir);
 const portArg = flag("--port");
 const startPort = portArg ? parseInt(portArg, 10) : 3117;
 const staticPath = flag("--static");
@@ -170,11 +178,6 @@ const previous = prevArg && isDir(resolve(prevArg)) ? loadPrevious(resolve(prevA
 const benchmarkArg = flag("--benchmark");
 const benchmarkPath = benchmarkArg ? resolve(benchmarkArg) : join(iterDir, "benchmark.json");
 const benchmark = existsSync(benchmarkPath) ? readJson(benchmarkPath) : null;
-
-// --history：读技能目录 history.json（只读不写）。有旗标但读不到 → history: null（viewer 显示首次评测）
-const historyArg = flag("--history");
-const historySkillDir = historyArg ? resolve(historyArg) : null;
-const historyData = historySkillDir ? readJson(join(historySkillDir, "history.json")) : undefined;
 
 // 结构审查步产物自动发现：<iteration>/structure-review.json（有才渲染建议卡片）
 const structureReview = readJson(join(iterDir, "structure-review.json"));

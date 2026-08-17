@@ -5,7 +5,7 @@ description: 本机技能生产流水线：创建、评测、迭代与打包 age
 
 # parking-skill-creator：技能生产流水线
 
-把一个想法变成经过评测验证、可分发的技能：创建 → 校验 → 输出评测 → 触发评测 → 评审 → 打包，全链路在本机（Windows + Node）可跑，零外部依赖。
+把一个想法变成经过评测验证、可分发的技能：创建 → 校验 → 输出评测与评审迭代 → 触发评测 → 打包，全链路在本机（Windows + Node）可跑，零外部依赖。
 
 **fork 基线**：本技能融合两家官方 skill-creator——claude-skill-creator（输出评测管线与评审循环，2026-08 版）与 codex-skill-creator（脚手架与写作方法论，2026-08 版）。原版在 `ref/skill-creator/` 下只读对照；官方语义按本机环境重实现（mjs，替代 Python+PyYAML+无头 CLI）。对照官方升级时以 ref/ 为准做手工合并。
 
@@ -28,7 +28,7 @@ description: 本机技能生产流水线：创建、评测、迭代与打包 age
 3. **init 脚手架** — 确定性生成骨架，不徒手写 boilerplate。
 4. **写资源再写 SKILL.md** — 先实现可复用资源，再写主文档。
 5. **quick-validate + 自带测试** — 规则校验与回归测试，越早发现问题越便宜。
-6. **输出评测循环** — gate 问询与并行对照、评分、聚合、结构审查、浏览器评审、历史沉淀、迭代。
+6. **输出评测循环** — gate 问询与并行对照、评分、聚合并沉淀历史（--history）、结构审查、浏览器评审、迭代。
 
 本文所有 `node scripts/…`、`node eval-viewer/…` 命令都在**本技能目录**下执行；init 缺省输出目录按脚本自身位置解析，与当前工作目录无关。
 
@@ -97,7 +97,7 @@ frontmatter 只允许 name/description（必需）+ license/allowed-tools/metada
 node scripts/quick-validate.mjs <技能目录>
 ```
 
-官方规则集：name kebab-case ≤64；description ≤1024 且无尖括号；键白名单；compatibility ≤500。合法 → `PASS`（退出码 0）；违规逐条列规则名（退出码 1）；参数缺失出用法（退出码 2）。CRLF 与 LF 同判定。PASS 但缺 `run-tests.mjs` 或 `references/design.md` 时给警告（不挡退出码——存量老技能照常工作，新技能必须补齐）。修完再跑直到 PASS。PASS 后跑 `node <技能目录>/run-tests.mjs`，自带测试全过才算过本步（主观无测试的技能除外）；此后每次升级改动，先跑它做回归。
+官方规则集：name kebab-case ≤64；description ≤1024 且无尖括号；键白名单；compatibility ≤500。合法 → `PASS`（退出码 0）；违规逐条列规则名（退出码 1）；参数缺失出用法（退出码 2）。CRLF 与 LF 同判定。PASS 但缺 `run-tests.mjs` 或 `references/design.md` 时给警告、SKILL.md 仍含 `[TODO` 占位时给提示（都不挡退出码——存量老技能照常工作，升级时补上；新技能必须齐）。修完再跑直到 PASS。PASS 后跑 `node <技能目录>/run-tests.mjs`，自带测试全过才算过本步（主观无测试的技能除外）；此后每次升级改动，先跑它做回归。
 
 ## 第 6 步：输出评测循环
 
@@ -105,11 +105,13 @@ node scripts/quick-validate.mjs <技能目录>
 
 ### 6.1 起跑前问 gate 集，同一 turn 并行 spawn 全部 run
 
-评测配置叫 **gate**（= 产物目录名）。起跑前先问用户「**这轮评测跑哪些 gate？**」——默认组合只是建议，用户可增删、可自定义 gate 名：
+评测配置叫 **gate**（= 产物目录名，下文统一用 gate 称呼；目录布局模板里的 `<config>` 即 gate 目录名）。起跑前先问用户「**这轮评测跑哪些 gate？**」——默认组合只是建议，用户可增删、可自定义 gate 名：
 
 - 新建技能（建议默认）：`with_skill` + `without_skill`
 - 改进既有技能（建议默认）：`with_skill` + `old_skill` + `without_skill`
 - 自定义例：`with_skill_no_refs`（不带 references 跑一组）、任意配置目录名——聚合器按目录名动态发现，都能聚合
+
+用户不在场（夜间批跑/自动化流程）或已授权自动时，按默认组合执行并在结果里注明「按默认 gate 集跑」——别卡在问询上。
 
 问完按用户定的 gate 集，对每个测试用例**同一个回合**spawn 各 gate 的 subagent——带技能的与基线的一起。别先跑 with 再回头补 baseline：一起跑完时间对齐、状态一致。
 
@@ -143,7 +145,7 @@ node scripts/quick-validate.mjs <技能目录>
 
 ### 6.2 run 进行中：起草断言
 
-别干等——趁 run 在跑，为每个用例起草可客观验证的断言并向用户解释每条查什么。好断言名字能在评测页上一眼懂；主观技能别硬上断言，走人工评审。写回 `eval_metadata.json`。断言**引用 design.md 的 AC 编号**：能在 `references/design.md` 验收条件表里找到出处的断言，标上 `ac` 字段（如 `"ac": "AC-1"`）——评分与后续迭代都能追溯「这条断言当初为什么存在」。空断言集合法（grader 会在 eval_feedback 里点名「无区分度」）。
+别干等——趁 run 在跑，为每个用例起草可客观验证的断言并向用户解释每条查什么。好断言名字能在评测页上一眼懂；主观技能别硬上断言，走人工评审。**既有技能没有 `references/design.md` 时，先按 init 的四节模板补建骨架、填出本轮能引用的验收条件，再起草断言。**写回 `eval_metadata.json`。断言**引用 design.md 的 AC 编号**：能在 `references/design.md` 验收条件表里找到出处的断言，标上 `ac` 字段（如 `"ac": "AC-1"`）——评分与后续迭代都能追溯「这条断言当初为什么存在」。空断言集合法（grader 会在 eval_feedback 里点名「无区分度」）。
 
 ### 6.3 run 完成通知到达：立刻抓 timing
 
@@ -166,7 +168,9 @@ node scripts/quick-validate.mjs <技能目录>
 
    产出 `benchmark.json` + `benchmark.md`：pass_rate/time_ms/tokens 的 mean±stddev（样本方差）+ delta（with − baseline）。配置目录名动态发现（with_skill/without_skill/old_skill/自定义都行）。
 
-   `--history` 是评测数据反向写进技能目录的**唯一通道**（聚合默认不碰技能目录，须显式传参）：把本轮各 gate 指标**追加**一条 run 进 `<技能目录>/history.json`（只追加不覆盖，历史可审计），与上一轮按同 eval 名比 won/lost/tie，current_best 按 with_skill（或首个 gate）pass_rate 严格更高才推进、平局不推进；上一轮有本轮没有的 eval 标 dropped。终端多 3 行趋势摘要。history.json 随 .skill 包分发——workspace 会被 clean，成绩沉淀进技能才留得住。目标目录不可写时拒绝追加（退出码 1），已产出的 benchmark 不回滚。
+   `--history` 是评测数据反向写进技能目录的**唯一通道**（聚合默认不碰技能目录，须显式传参）：把本轮各 gate 指标**追加**一条 run 进 `<技能目录>/history.json`（只追加不覆盖，历史可审计）。**从首轮起每轮聚合都带上它**（用户明说不沉淀除外）——某轮忘带则 history 断档，下一轮的对比会静默跳过断档轮。终端多 3 行趋势摘要。history.json 随 .skill 包分发——workspace 会被 clean，成绩沉淀进技能才留得住；但 `vs_previous` 的逐 eval 对比要**现场重算上一轮 iteration 目录**，所以 clean workspace 前先把该轮聚合并沉淀（跨机/跨会话续跑时旧目录可能已不在，对比会记「不可比」而不是报错）。目标目录不可写时拒绝追加（退出码 1），已产出的 benchmark 不回滚。
+
+   对比与星标口径（防脏数据）：**主 gate** = with_skill，没有 with_skill 时取字典序首个 gate 名。`vs_previous` 与上一条 run 按**同 eval 名**比 won/lost/tie（pass 布尔翻转；本轮新增 eval 计入 total 不计胜负，上轮有本轮没有的 eval 标 dropped）；两轮主 gate 名不同且无共同 with_skill 时记「gate 不连续不可比」，**绝不当失败记 lost**。`current_best` 按主 gate pass_rate 严格更高才推进、平局不推进（防抖）；主 gate 名不同的轮次（纯实验 gate）不参与推进；同一 iteration 重复聚合视为修正——追加一条并在 stdout 提示，星标以该 iteration 最新一条为准（早期半程数据锁不住上限）。`iteration_ref` 存本机绝对路径，仅供本机回溯，跨机时只作轮次标识读。
 3. **分析**：读 benchmark 数据做一轮 analyst pass（读 `agents/analyzer.md` 的 Analyzing Benchmark Results 节）——找聚合看不见的模式：两组全过的无区分度断言、高方差疑似 flaky 的 eval、时间/token 代价。观察写入 benchmark.json 的 `notes` 数组，viewer 会展示。
 
 ### 6.5 结构审查：拆分建议（只建议，不执行）
@@ -180,14 +184,14 @@ node scripts/quick-validate.mjs <技能目录>
 | 3 | 编排逻辑内嵌 | 主体是「调度多个步骤/子能力」的流程逻辑，却和原子能力混写在同一份 SKILL.md |
 | 4 | 触发评测 near-miss 集中 | 触发评测的误触发案例集中在某一类意图上（失败 query 按意图聚类看） |
 
-样板参照：**grill-with-docs 之于 grilling**——前者是薄编排层（带着文档生成去调度访谈流程），后者是原子访谈能力；拆层后各自触发面干净、原子能力可被别的编排复用。本地对照：`G:\GIT\AI_WorkFlow_ref\mattpocock-skills\skills\engineering\grill-with-docs\SKILL.md` 与 `G:\GIT\AI_WorkFlow_ref\mattpocock-skills\skills\productivity\grilling\SKILL.md`。
+样板参照：**grill-with-docs 之于 grilling**——前者是薄编排层（带着文档生成去调度访谈流程），后者是原子访谈能力；拆层后各自触发面干净、原子能力可被别的编排复用。本地对照（文件不存在时跳过，上文描述已足够判定）：`G:\GIT\AI_WorkFlow_ref\mattpocock-skills\skills\engineering\grill-with-docs\SKILL.md` 与 `G:\GIT\AI_WorkFlow_ref\mattpocock-skills\skills\productivity\grilling\SKILL.md`。
 
-命中信号（≥1 条有实质证据）时产出拆分建议，铁律：**只建议不执行**——拆不拆由用户裁定，agent 不动手改结构。建议落两处：
+命中信号（≥1 条有实质证据）时产出拆分建议，铁律：**只建议不执行**——拆不拆由用户裁定，agent 不动手改结构。产出落点按时间线分两步：
 
-- **对话**：向用户报逐信号结论（✓/✗ + 证据一句）+ 一句建议 + 「是否拆分由你决定，我不动手」。
-- **被审技能的 `references/design.md`「迭代记录」节**：追加一行，拆分建议列写结论（如「建议拆出日志解析原子技能，用户未拆」）。
+- **审查时（本步，起评审页之前）**：① 对话向用户报逐信号结论（✓/✗ + 证据一句）+ 一句建议 + 「是否拆分由你决定，我不动手」；② 把结论写进 `<iteration>/structure-review.json`（schema 见 `references/schemas.md`：signals 逐条 + recommendation + conclusion），viewer 评审页 Benchmark 页上方会渲染建议卡片（带「仅建议 · 未执行」标记；本轮还没聚合 benchmark 时卡片也照常出现）。
+- **收尾时（6.7，用户裁定之后）**：把「建议 + 用户裁定」写进被审技能 `references/design.md`「迭代记录」节的拆分建议列（如「建议拆出日志解析原子技能，用户未拆」）——裁定前别预写用户的决定。
 
-同时把审查结论写进 `<iteration>/structure-review.json`（schema 见 `references/schemas.md`：signals 逐条 + recommendation + conclusion），viewer 评审页 Benchmark 页上方会渲染建议卡片（带「仅建议 · 未执行」标记）。信号全不命中时也写该文件（signals 全 ✓/✗ 如实记，recommendation 留空或「无需拆分」），历史轮次可对照。
+信号 4 的输入是触发评测的误触发案例；该轮还没跑触发评测时（首轮常态）如实记 `hit: null`（无数据，viewer 显示「无数据」），evidence 写「触发评测未跑」，别凭空判 ✓/✗。信号全不命中时对话报一句「结构审查信号未命中，无需拆分」，structure-review.json 照写（如实记录），历史轮次可对照。
 
 ### 6.6 起服务器评审
 
@@ -197,7 +201,7 @@ node eval-viewer/generate-review.mjs <workspace>/iteration-<N> [--history <技�
 
 - 默认起 `http://127.0.0.1:3117`，端口被占自动换下一个空闲端口，Windows 下用 start 开浏览器，Ctrl+C 停。
 - 迭代 ≥2 加 `--previous-workspace <workspace>/iteration-<N-1>`，页面会出现上轮输出与留言的折叠对照。
-- 加 `--history <技能目录>` 读 `history.json`：评审页顶部出现**历史轨迹**折叠区——历次评测 pass_rate/mean_ms/mean_tokens 表 + 本轮 vs 上轮 won/lost/tie + 逐 eval 明细（含 dropped），跨轮对比在评审页直接看。读不到 history.json 时显示「无历史轨迹（首次评测）」，不报错；不带该旗标则整个历史区不出现。
+- 加 `--history <技能目录>` 读 `history.json`：评审页顶部出现**历史轨迹**折叠区——历次评测 pass_rate/mean_ms/mean_tokens 表 + 本轮 vs 上轮 won/lost/tie + 逐 eval 明细（含 dropped），跨轮对比在评审页直接看。读不到 history.json 时显示「无历史轨迹（首次评测）」，不报错；不带该旗标则整个历史区不出现。标题技能名的优先级：`--skill-name` 显式 > history.json 的 skill 字段 > 目录名推断。
 - 本轮做过结构审查（6.5）时，Benchmark 页上方自动出现**结构审查建议卡片**（读 `<iteration>/structure-review.json`，带「仅建议 · 未执行」标记）。
 - 无浏览器/远程环境加 `--static <输出.html>`：单文件自包含，反馈改走对话（你按同结构手写 feedback.json）。
 

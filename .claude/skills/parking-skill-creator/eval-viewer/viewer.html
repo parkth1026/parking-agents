@@ -1066,8 +1066,9 @@
         return;
       }
 
+      // 指针越界/无法解析时不亮星（不默认指到 runs[0]）
       const m = typeof hist.current_best === "string" ? hist.current_best.match(/^runs\[(\d+)\]$/) : null;
-      const bestIdx = m ? Number(m[1]) : 0;
+      const bestIdx = m && Number(m[1]) < hist.runs.length ? Number(m[1]) : -1;
 
       let html = '<div style="padding: 1rem;">';
       html += '<table class="benchmark-table"><thead><tr><th>轮次</th><th>日期</th><th>gate</th><th>pass_rate</th><th>mean_ms</th><th>mean_tokens</th><th>vs 上轮</th></tr></thead><tbody>';
@@ -1246,19 +1247,16 @@
     // ---- Benchmark rendering（v2 数据：configs + delta + skipped + notes；逐例分解从 evals 现算）----
     function renderBenchmark() {
       const data = EMBEDDED_DATA.benchmark;
-      if (!data) return;
+      const sr = EMBEDDED_DATA.structure_review;
 
-      // Show the tabs
-      document.getElementById("view-tabs").style.display = "flex";
+      // Show the tabs（benchmark 或结构审查产物任一存在即显示）
+      if (data || sr) document.getElementById("view-tabs").style.display = "flex";
+      if (!data && !sr) return;
 
       const container = document.getElementById("benchmark-content");
-      const summary = data.configs || {};
-      const notes = data.notes || [];
-
       let html = "";
 
       // 结构审查建议卡片（新增：评测循环结构审查步的产物；仅建议，未执行）
-      const sr = EMBEDDED_DATA.structure_review;
       if (sr) {
         html += '<div class="benchmark-notes" style="margin-bottom: 1.5rem;">';
         html += "<h3>结构审查建议 <span class=\"track-badge\">仅建议 · 未执行</span></h3>";
@@ -1266,7 +1264,8 @@
           html += '<table class="benchmark-table" style="margin-bottom: 0;">';
           html += "<thead><tr><th>信号</th><th>命中</th><th>证据</th></tr></thead><tbody>";
           for (const s of sr.signals) {
-            html += "<tr><td>" + escapeHtml(s.signal || "") + "</td><td>" + (s.hit ? "\u2713" : "—") + "</td><td>" + escapeHtml(s.evidence || "") + "</td></tr>";
+            const mark = s.hit === true ? "\u2713" : s.hit === false ? "—" : "无数据";
+            html += "<tr><td>" + escapeHtml(s.signal || "") + "</td><td>" + mark + "</td><td>" + escapeHtml(s.evidence || "") + "</td></tr>";
           }
           html += "</tbody></table>";
         }
@@ -1274,6 +1273,15 @@
         if (sr.conclusion) html += '<p class="track-hint">' + escapeHtml(sr.conclusion) + "</p>";
         html += "</div>";
       }
+
+      if (!data) {
+        html += '<div class="benchmark-empty">No benchmark data available. Run aggregate-benchmark.mjs to see quantitative results here.</div>';
+        container.innerHTML = html;
+        return;
+      }
+
+      const summary = data.configs || {};
+      const notes = data.notes || [];
 
       // Header
       html += "<h2 style='font-family: Poppins, sans-serif; margin-bottom: 0.5rem;'>Benchmark Results</h2>";
@@ -1313,26 +1321,22 @@
       html += "<thead><tr><th>Metric</th>" + configs.map(c => "<th>" + escapeHtml(c.replace(/_/g, " ")) + "</th>").join("") + "<th>Delta</th></tr></thead>";
       html += "<tbody>";
 
-      const a = summary[configs[0]] || {};
-      const b = summary[configs[1]] || {};
       const delta = data.delta || {};
 
+      // 数据行逐 gate 输出全部配置列（任意 gate 数都对齐）；delta 仍 = 字母序前两配置之差
       html += "<tr><td><strong>Pass Rate</strong></td>";
-      html += "<td>" + fmtStat(a.pass_rate, true) + "</td>";
-      html += "<td>" + fmtStat(b.pass_rate, true) + "</td>";
+      for (const c of configs) html += "<td>" + fmtStat((summary[c] || {}).pass_rate, true) + "</td>";
       html += deltaCell(delta.pass_rate, v => (v * 100).toFixed(0) + " pct", false) + "</tr>";
 
-      if (a.time_ms || b.time_ms) {
+      if (configs.some(c => (summary[c] || {}).time_ms)) {
         html += "<tr><td><strong>Time</strong></td>";
-        html += "<td>" + fmtTimeStat(a.time_ms) + "</td>";
-        html += "<td>" + fmtTimeStat(b.time_ms) + "</td>";
+        for (const c of configs) html += "<td>" + fmtTimeStat((summary[c] || {}).time_ms) + "</td>";
         html += deltaCell(delta.time_ms, v => (v / 1000).toFixed(1) + "s", true) + "</tr>";
       }
 
-      if (a.tokens || b.tokens) {
+      if (configs.some(c => (summary[c] || {}).tokens)) {
         html += "<tr><td><strong>Tokens</strong></td>";
-        html += "<td>" + fmtStat(a.tokens, false) + "</td>";
-        html += "<td>" + fmtStat(b.tokens, false) + "</td>";
+        for (const c of configs) html += "<td>" + fmtStat((summary[c] || {}).tokens, false) + "</td>";
         html += deltaCell(delta.tokens, v => Math.round(v).toLocaleString(), true) + "</tr>";
       }
 
