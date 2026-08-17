@@ -118,7 +118,7 @@ node scripts/quick-validate.mjs <技能目录>
 基线 run（同 prompt）：
 
 - **新建技能**：不给技能，存到 `without_skill/run-1/outputs/`。
-- **改进既有技能**：改动前先快照：`node scripts/snapshot-skill.mjs <技能目录> [<workspace>]`（workspace 缺省为技能同级 `<技能名>-workspace`；快照目录 `skill-snapshot`，已占用自动递增 `-v2`、`-v3`）。脚本会把快照里的 `SKILL.md` 改名 `SKILL.md.bak`——技能扫描器按 `SKILL.md` 文件名认技能，workspace 就在技能扫描根下，快照里留活的 `SKILL.md` 会冒出同名双技能、污染触发评测的技能清单；别徒手 `cp -r` 造快照。基线 run 的「技能路径」填快照目录，prompt 注明技能文档读 `SKILL.md.bak`，产物存 `old_skill/run-1/outputs/`。
+- **改进既有技能**：改动前先快照：`node scripts/snapshot-skill.mjs <技能目录> [<workspace>]`（workspace 缺省为技能同级 `<技能名>-workspace`；快照目录 `skill-snapshot`，已占用自动递增 `-v2`、`-v3`）。脚本会把快照里的 `SKILL.md` 改名 `SKILL.md.bak`——技能扫描器按 `SKILL.md` 文件名认技能，workspace 就在技能扫描根下，快照里留活的 `SKILL.md` 会冒出同名双技能、污染触发评测的技能清单；别徒手 `cp -r` 造快照。基线 run 的「技能路径」填快照目录，prompt 注明技能文档读 `SKILL.md.bak`，产物存 `old_skill/run-1/outputs/`。怀疑技能清单混进了快照/评测产物冒充的技能时，随时跑 `node scripts/check-shadow-skills.mjs [<技能根>…]` 复查（缺省查当前目录的 .claude/skills 与 .agents/skills）。
 
 每个 eval 目录写 `eval_metadata.json`（断言可先空，见 6.2）：
 
@@ -279,7 +279,7 @@ node scripts/package-skill.mjs <技能目录> [输出目录]
 - `agents/grader.md` — grader subagent 指令（评分哲学与 grading.json 契约）
 - `agents/comparator.md` — 盲比较指令（A/B 不知情评审）
 - `agents/analyzer.md` — 基准分析指令（找聚合看不见的模式）
-- `scripts/` — init-skill / snapshot-skill / quick-validate / aggregate-benchmark / aggregate-trigger / package-skill + lib/
+- `scripts/` — init-skill / snapshot-skill / check-shadow-skills / quick-validate / aggregate-benchmark / aggregate-trigger / package-skill + lib/
 - `eval-viewer/` — generate-review.mjs（服务器与 --static 模式）+ viewer.html
 
 ---
