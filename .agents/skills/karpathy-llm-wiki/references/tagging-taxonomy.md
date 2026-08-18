@@ -59,6 +59,9 @@ Guidelines for tagging wiki pages. All tags must be defined here before use.
 - `microsoft` — Microsoft related
 - `academic` — university research
 
+### People
+- `person` — individual researcher, engineer, educator, or public figure
+
 ### Source Types
 - `paper` — research paper
 - `blog` — blog post or article

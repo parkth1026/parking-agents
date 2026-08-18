@@ -4,10 +4,10 @@ import { mkdirSync, writeFileSync, rmSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 
-const SCRIPT = "D:/GIT_dev/parking-agents/.claude/skills/karpathy-llm-wiki/scripts/validate-wiki.mjs";
-const ROOT = "D:/GIT_dev/parking-agents/.claude/skills/karpathy-llm-wiki-workspace/unit-tests";
+const SCRIPT = "D:/GIT_dev/parking-agents/.agents/skills/karpathy-llm-wiki/scripts/validate-wiki.mjs";
+const ROOT = "D:/GIT_dev/parking-agents/.agents/evals/karpathy-llm-wiki-workspace/unit-tests";
 // Windows: 无法删除脚本自身所在目录，只清子目录
-for (const sub of ["good-wiki", "bad-wiki", "cfg-wiki", "bom-wiki", "empty-wiki", "sandbox", "strict-config.json", "mock-skill-env.json"])
+for (const sub of ["good-wiki", "bad-wiki", "cfg-wiki", "bom-wiki", "empty-wiki", "idx-wiki", "idx-off-config.json", "hardgate-wiki", "stale-wiki", "stale-wiki-raw", "type-wiki", "stale-enforce-config.json", "sandbox", "strict-config.json", "mock-skill-env.json"])
   rmSync(join(ROOT, sub), { recursive: true, force: true });
 
 let pass = 0, fail = 0;
@@ -15,9 +15,12 @@ function check(name, cond, detail = "") {
   if (cond) { pass++; console.log(`  PASS  ${name}`); }
   else { fail++; console.log(`  FAIL  ${name} ${detail}`); }
 }
+// v6：hermetic —— SKILL_ENV 指向不存在的文件，阻止 validator 回退到真实机器
+// 配置（~/.config/parking-agents/skill-env.json 指向 NAS raw），测试不依赖外部状态
+const HERMETIC_ENV = { ...process.env, SKILL_ENV: join(ROOT, "no-such-env.json") };
 function run(args) {
   try {
-    const stdout = execFileSync("node", [SCRIPT, ...args], { encoding: "utf8" });
+    const stdout = execFileSync("node", [SCRIPT, ...args], { encoding: "utf8", env: HERMETIC_ENV });
     return { code: 0, stdout };
   } catch (e) {
     return { code: e.status, stdout: e.stdout?.toString() ?? "" };
@@ -138,7 +141,7 @@ function run(args) {
   const { execFileSync: ef } = await import("node:child_process");
   const merged = JSON.parse(ef("node", ["-e", `
     const fs = require('fs');
-    const skillCfg = JSON.parse(fs.readFileSync('D:/GIT_dev/parking-agents/.claude/skills/karpathy-llm-wiki/config.json','utf8').replace(/^\\uFEFF/,''));
+    const skillCfg = JSON.parse(fs.readFileSync('D:/GIT_dev/parking-agents/.agents/skills/karpathy-llm-wiki/config.json','utf8').replace(/^\\uFEFF/,''));
     const envCfg = JSON.parse(fs.readFileSync(${JSON.stringify(mockEnv)},'utf8').replace(/^\\uFEFF/,''));
     const merged = structuredClone(skillCfg);
     (function deep(dst, src){ for (const k of Object.keys(src)) { if (src[k] && typeof src[k]==='object' && !Array.isArray(src[k])) { dst[k] = dst[k] && typeof dst[k]==='object' ? dst[k] : {}; deep(dst[k], src[k]); } else dst[k] = src[k]; } })(merged, envCfg);
@@ -173,6 +176,91 @@ function run(args) {
   writeFileSync(cfgOff, JSON.stringify({ scoring: { indexCountsAsInbound: false } }));
   const rOff = run(["--wiki", wiki, "--config", cfgOff]);
   check("关闭开关后 C 判孤儿", rOff.stdout.includes("Orphan Pages (1)") && rOff.stdout.includes("C"));
+}
+
+// ============ 场景 8: 高分 + 断链 → 硬门 FAIL 且原因明示（T2 回归） ============
+{
+  const wiki = join(ROOT, "hardgate-wiki");
+  mkdirSync(join(wiki, "concepts"), { recursive: true });
+  writeFileSync(join(wiki, "SCHEMA.md"), "# S\n## Tags\n- architecture\n");
+  writeFileSync(join(wiki, "index.md"), "# I\n- [[A]] — x\n- [[B]] — x\n- [[C]] — x\n");
+  writeFileSync(join(wiki, "log.md"), "# Log\n");
+  writeFileSync(join(wiki, "concepts", "A.md"),
+    "---\ntitle: A\ntype: concept\ntags: [architecture]\n---\n# A\nSee [[B]] and [[C]] and [[Ghost]].\n");
+  writeFileSync(join(wiki, "concepts", "B.md"),
+    "---\ntitle: B\ntype: concept\ntags: [architecture]\n---\n# B\nSee [[A]] and [[C]].\n");
+  writeFileSync(join(wiki, "concepts", "C.md"),
+    "---\ntitle: C\ntype: concept\ntags: [architecture]\n---\n# C\nSee [[A]] and [[B]].\n");
+  const r = run(["--wiki", wiki]);
+  console.log("\n[8] hard gate: score>=9 + 1 broken link");
+  check("exit code 1", r.code === 1, `got ${r.code}`);
+  check("FAIL 原因明示硬门", r.stdout.includes("hard gate: broken links must be 0 — found 1"));
+  check("总分两位小数展示", /Total: \d+\.\d{2} \/ 10/.test(r.stdout));
+  check("总分不再四舍五入虚高到 10", !r.stdout.includes("Total: 10.00 / 10"));
+}
+
+// ============ 场景 9: v6 staleness（raw 证据 vs 页面 updated） ============
+{
+  const wiki = join(ROOT, "stale-wiki");
+  const raw = join(ROOT, "stale-wiki-raw");
+  mkdirSync(join(wiki, "concepts"), { recursive: true });
+  mkdirSync(join(raw, "details"), { recursive: true });
+  writeFileSync(join(wiki, "SCHEMA.md"), "# S\n## Tags\n- architecture\n");
+  writeFileSync(join(wiki, "index.md"), "# I\n- [[A]] — x\n- [[B]] — x\n- [[C]] — x\n");
+  writeFileSync(join(wiki, "log.md"), "# Log\n");
+  writeFileSync(join(wiki, "concepts", "A.md"),
+    "---\ntitle: A\ntype: concept\ntags: [architecture]\nupdated: 2026-01-01\n---\n# A\nSee [[B]] and [[C]].\n");
+  writeFileSync(join(wiki, "concepts", "B.md"),
+    "---\ntitle: B\ntype: concept\ntags: [architecture]\nupdated: 2026-08-18\n---\n# B\nSee [[A]] and [[C]].\n");
+  // C 有 frontmatter 但缺 updated 字段 —— 无法证明新鲜度
+  writeFileSync(join(wiki, "concepts", "C.md"),
+    "---\ntitle: C\ntype: concept\ntags: [architecture]\n---\n# C\nSee [[A]] and [[B]].\n");
+  // raw 证据：a.md 比 A 新（stale）；recurrence-b.md 比 B 旧（fresh）；recurrence-c.md 存在而 C 缺 updated（stale）
+  writeFileSync(join(raw, "details", "a.md"),
+    "---\nschema: raw-knowledge/2\nrecorded_at: 2026-06-01\n---\n# a evidence\n");
+  writeFileSync(join(raw, "details", "recurrence-b.md"),
+    "---\nrecorded_at: 2026-08-01\n---\n# b recurrence\n");
+  writeFileSync(join(raw, "details", "recurrence-c.md"),
+    "---\nrecorded_at: 2026-08-10\n---\n# c recurrence\n");
+  writeFileSync(join(raw, "details", "unmatched.md"),
+    "---\nrecorded_at: 2026-08-18\n---\n# no matching page\n");
+  const rSkip = run(["--wiki", wiki]);
+  console.log("\n[9] v6 staleness");
+  check("无 --raw 且 SKILL_ENV 不可用 → staleness 跳过", rSkip.stdout.includes("Skipped — rawDir not found"));
+  const r = run(["--wiki", wiki, "--raw", raw]);
+  check("默认 report-only：exit 0", r.code === 0, `got ${r.code}`);
+  check("stale 页 = 2（A 与 C；B 证据较旧不计）", r.stdout.includes("Stale Pages (2)"));
+  check("A 以证据文件+日期列出", r.stdout.includes("A: a.md (2026-06-01) > page updated 2026-01-01"));
+  check("recurrence- 前缀匹配 + 缺 updated 字段标注", r.stdout.includes("C: recurrence-c.md (2026-08-10)") && r.stdout.includes("(missing updated field)"));
+  check("B 不在 stale 列表", !r.stdout.includes("B: recurrence-b.md"));
+  check("report-only 提示开关", r.stdout.includes("report-only"));
+  const enforceCfg = join(ROOT, "stale-enforce-config.json");
+  writeFileSync(enforceCfg, JSON.stringify({ scoring: { stalenessEnforce: true } }));
+  const rEnf = run(["--wiki", wiki, "--raw", raw, "--config", enforceCfg]);
+  check("stalenessEnforce=true → exit 1", rEnf.code === 1, `got ${rEnf.code}`);
+  check("FAIL 原因明示 staleness", rEnf.stdout.includes("staleness enforced: 2 stale pages"));
+}
+
+// ============ 场景 10: v6 type 枚举（SCHEMA `## Page Types` 声明扩展） ============
+{
+  const wiki = join(ROOT, "type-wiki");
+  mkdirSync(join(wiki, "concepts"), { recursive: true });
+  writeFileSync(join(wiki, "SCHEMA.md"), "# S\n## Tags\n- architecture\n\n## Page Types\n- jenkins-error\n\n## Page Directories\n- details/\n");
+  writeFileSync(join(wiki, "index.md"), "# I\n- [[A]] — x\n- [[B]] — x\n");
+  writeFileSync(join(wiki, "log.md"), "# Log\n");
+  writeFileSync(join(wiki, "concepts", "A.md"),
+    "---\ntitle: A\ntype: jenkins-error\ntags: [architecture]\n---\n# A\nSee [[B]].\n");
+  writeFileSync(join(wiki, "concepts", "B.md"),
+    "---\ntitle: B\ntype: custom-type\ntags: [architecture]\n---\n# B\nSee [[A]].\n");
+  const r = run(["--wiki", wiki]);
+  console.log("\n[10] v6 type enum");
+  check("SCHEMA 声明的 jenkins-error 合法", !r.stdout.includes("Invalid type 'jenkins-error'"));
+  check("未声明的 custom-type 报 Invalid type", r.stdout.includes("Invalid type 'custom-type'"));
+  check("提示在 SCHEMA Page Types 声明", r.stdout.includes("declare it in SCHEMA.md"));
+  check("计入 Frontmatter Issues", r.stdout.includes("Frontmatter Issues (1)"));
+  // Page Types 声明不得混入标签集
+  const r2 = run(["--wiki", wiki, "--config", join(ROOT, "no-config.json")]);
+  check("声明节条目不算标签（jenkins-error 不在 Invalid Tags）", !r2.stdout.includes("tag 'jenkins-error'"));
 }
 
 console.log(`\n=== ${pass} passed, ${fail} failed ===`);

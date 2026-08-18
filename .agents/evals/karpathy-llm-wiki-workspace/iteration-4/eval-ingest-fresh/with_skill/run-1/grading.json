@@ -1,0 +1,7 @@
+{
+  "verdict": "PASS 10.00/10（1 次自愈修复循环，根因 A6 已在第二轮修复闭合）",
+  "expectations_all_passed": true,
+  "notes": "12 页（1 source + 10 concept + 1 entity）；D1/T12 批量子句 3/3 照走并记录；T8 报告落 wiki 外；person 标签直接可用零扩表；A5 反引号陷阱被 agent 识别并正确去反引号（该指令现已写明）",
+  "friction_fixed_in_round2": ["A5 taxonomy 反引号", "A6 index 条目格式", "A8 别名/换行 wikilink", "A3 raw 日期语义"],
+  "friction_by_design": ["A13 文档 frontmatter 严于校验器（6 字段 vs 3）", "A9 comparison 页判断", "A11 校验器不读 SKILL_ENV（信息类）"]
+}

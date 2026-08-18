@@ -64,6 +64,16 @@ description: |
 
 `{trackFile}`（analyzed-builds.json）是长期账本，与 `ue-error-solver` 技能共享，其结构、状态值 grammar（`failure:score=...` / `success:w=...` / `skip:...`）见 [references/tracking.md](references/tracking.md)。本技能只经 session.mjs 写入。
 
+## 复发记录与 wiki 回流（跨技能契约）
+
+同一错误模式再次出现、且 wikiDir 已有覆盖该模式的知识页时，子技能**不另立新知识文件**，而是在 `{rawDir}/details/` 写一条复发记录：
+
+- 文件名 `recurrence-{PageStem}.md`——**PageStem 必须等于既有 wiki 页的文件名主干**（去 `.md`）。这个命名就是交给 `karpathy-llm-wiki` 的回流信号
+- frontmatter 必须带 `recorded_at`（ISO 日期），结论串 `result` 的 `:see=` 指向既有 wiki 页完整路径
+- 正文记录：本次构建对、与原始根因的关系（同因 / 新变体）、修复 commit
+
+**回流由 karpathy-llm-wiki 拥有**（本技能约束 3 禁止写 wikiDir）：它在 Lint 的 staleness 检查中发现 `recurrence-*` 证据新于对应页面 `updated` 时，负责把复发信息编译回 wiki 页（Recurrence 节 + updated 提升）。因此阶段 3 的用户报告里，若本轮产出或账本中存在未被回流的 recurrence 记录，应提示用户：*"有 N 条复发记录待回流，可对 wiki 跑一次 karpathy-llm-wiki 的 Lint"*。验收口径：任何 recurrence 文件的 `recorded_at` ≤ 对应 wiki 页的 `updated`。
+
 ## 参考文件
 
 | 主题 | 文件 |

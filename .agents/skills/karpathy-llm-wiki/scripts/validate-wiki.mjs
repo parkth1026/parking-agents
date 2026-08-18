@@ -1,9 +1,21 @@
 #!/usr/bin/env node
-// validate-wiki.mjs — Wiki 校验 v5：8 维度综合检查
+// validate-wiki.mjs — Wiki 校验 v6：8 维度综合检查 + staleness 体检
 // （唯一入口；原 validate-wiki.ps1 已按仓库脚本标准移除）
 //
-// 用法: node validate-wiki.mjs --wiki <path/to/wiki> [--config <path/to/config.json>]
+// 用法: node validate-wiki.mjs --wiki <path/to/wiki> [--config <path/to/config.json>] [--raw <path/to/rawDir>]
 // 退出码: 0 = PASS（总分 >= minScore 且断链为 0），1 = FAIL
+//
+// v6 变更（2026-08-18 真实库只读审计后，见 docs/reports/karpathy-wiki-live-audit-2026-08-18）:
+//   7. staleness 检查：raw 证据日期 vs 页面 updated（--raw > $SKILL_ENV > ~/.config 解析 rawDir；
+//      证据日期取 frontmatter recorded_at/ingested/date，缺省回退文件 mtime；
+//      recurrence-<page>.md 去前缀后按页名匹配）。默认仅报告，scoring.stalenessEnforce=true 时
+//      存在 stale 页即 FAIL —— 复利闭环「知识必须不旧于原始证据」的可执行化
+//   8. type 枚举校验：基础五类（entity/concept/source/comparison/query）恒有效，SCHEMA.md
+//      `## Page Types` 节声明的扩展类型（如 jenkins-error）并入合法集；违规计入 frontmatter 维度
+//   9. 链接解析目录可插拔：SEARCH_DIRS = 规范五目录 + 根 + SCHEMA.md `## Page Directories`
+//      声明的扩展目录（替代 v5 硬编码 details/scratch/patterns —— 部署形态由 SCHEMA 声明，
+//      skill 文本与磁盘现实不再两套世界观）
+//  10. SCHEMA 标签收集排除 `## Page Types` / `## Page Directories` 两节（避免扩展声明混入标签集）
 //
 // v5 变更（2026-08-17 对抗审查后修复，见 docs/reports/wiki-lint-adversarial-review-2026-08-16）:
 //   1. SCHEMA 标签过滤正则允许点号（ue5.5 等版本号标签不再误杀）
@@ -16,6 +28,7 @@
 import { fileURLToPath } from "node:url";
 import { dirname, join, basename, extname } from "node:path";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { homedir } from "node:os";
 
 // ---- ANSI 颜色（等价 PowerShell Write-Host -ForegroundColor）----
 const C = {
@@ -28,10 +41,11 @@ const C = {
 
 // ---- CLI 参数 ----
 function parseArgs(argv) {
-  const args = { wiki: null, config: null };
+  const args = { wiki: null, config: null, raw: null };
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--wiki") args.wiki = argv[++i];
     else if (argv[i] === "--config") args.config = argv[++i];
+    else if (argv[i] === "--raw") args.raw = argv[++i];
     else { console.error(`未知参数: ${argv[i]}`); process.exit(2); }
   }
   if (!args.wiki) { console.error("缺少必填参数 --wiki <path/to/wiki>"); process.exit(2); }
@@ -61,9 +75,9 @@ function lineCount(content) {
 }
 
 // ---- 入口 ----
-const { wiki: wikiPath, config: configPath } = parseArgs(process.argv.slice(2));
+const { wiki: wikiPath, config: configPath, raw: rawArg } = parseArgs(process.argv.slice(2));
 
-console.log(C.cyan("=== Wiki Validation Script v5 ==="));
+console.log(C.cyan("=== Wiki Validation Script v6 ==="));
 if (!existsSync(wikiPath)) {
   console.error(`Wiki path does not exist: ${wikiPath}`);
   process.exit(1);
@@ -74,6 +88,7 @@ let maxLines = 200;
 let minOutboundLinks = 2;
 let minScore = 9.0;
 let indexCountsAsInbound = true;
+let stalenessEnforce = false;
 const weights = {
   brokenLinks: 0.25, selfReferences: 0.10, orphanPages: 0.10,
   indexCompleteness: 0.15, frontmatter: 0.15, pageSize: 0.10,
@@ -88,6 +103,7 @@ if (configPath && existsSync(configPath)) {
   if (config.scoring?.minScore) minScore = config.scoring.minScore;
   if (config.scoring?.weights) Object.assign(weights, config.scoring.weights);
   if (typeof config.scoring?.indexCountsAsInbound === "boolean") indexCountsAsInbound = config.scoring.indexCountsAsInbound;
+  if (typeof config.scoring?.stalenessEnforce === "boolean") stalenessEnforce = config.scoring.stalenessEnforce;
 }
 
 // 收集所有 .md（排除 SCHEMA.md / index.md / log.md / raw 目录；basename 大小写不敏感）
@@ -106,14 +122,35 @@ const baseName = (p) => basename(p, extname(p));
 // 否则带 BOM 的页面 ^--- 匹配失败，frontmatter/tags 维度误判
 const read = (p) => readFileSync(p, "utf8").replace(/^\uFEFF/, "");
 
-// SCHEMA.md 提取标签分类（允许点号：ue5.5 等版本号标签；仍要求小写 kebab 风格，
-// 大写条目如 Conventions 节的 Page/Tags/Dates 依旧被过滤）
+// SCHEMA.md 解析：标签分类（允许点号：ue5.5 等版本号标签；仍要求小写 kebab 风格，
+// 大写条目如 Conventions 节的 Page/Tags/Dates 依旧被过滤）。
+// v6：`## Page Types` / `## Page Directories` 两节是类型/目录声明而非标签，排除在标签收集之外，
+// 但解析出 validTypes（扩展 type 枚举）与 declaredDirs（扩展链接解析目录）
 const validTags = [];
+const validTypes = new Set(["entity", "concept", "source", "comparison", "query"]);
+const declaredDirs = [];
 const schemaPath = join(wikiPath, "SCHEMA.md");
+const SCHEMA_DECL_SECTIONS = ["page types", "page directories"];
 if (existsSync(schemaPath)) {
-  for (const m of read(schemaPath).matchAll(/^[ \t]*-[ \t]+(\S+)/gm)) {
-    const tag = m[1].trim();
-    if (/^[a-z][a-z0-9.-]+$/.test(tag)) validTags.push(tag);
+  const schemaLines = read(schemaPath).split(/\r?\n/);
+  let inDeclSection = null;
+  for (const line of schemaLines) {
+    const h = line.match(/^##\s+(.+?)\s*$/);
+    if (h) {
+      inDeclSection = SCHEMA_DECL_SECTIONS.includes(h[1].trim().toLowerCase()) ? h[1].trim().toLowerCase() : null;
+      continue;
+    }
+    const item = line.match(/^[ \t]*-[ \t]+(\S+)/);
+    if (!item) continue;
+    const token = item[1].trim();
+    if (inDeclSection === "page types") {
+      if (/^[a-z][a-z0-9-]*$/.test(token)) validTypes.add(token);
+    } else if (inDeclSection === "page directories") {
+      const dir = token.replace(/[\\/]+$/, "").replace(/^\.?[\\/]/, "");
+      if (dir && !dir.includes("/")) declaredDirs.push(dir); // 只收单层目录名，拒绝路径穿越
+    } else if (/^[a-z][a-z0-9.-]+$/.test(token)) {
+      validTags.push(token);
+    }
   }
 }
 
@@ -136,7 +173,10 @@ for (const file of allFiles) {
   inboundCount.set(baseName(file), 0);
 }
 
-const SEARCH_DIRS = ["entities", "concepts", "sources", "comparisons", "queries", "details", "scratch", "patterns", ""];
+// v6：链接解析目录 = 规范五目录 + 根 + SCHEMA `## Page Directories` 声明的扩展目录
+// （v5 曾硬编码 details/scratch/patterns —— 部署形态现由 SCHEMA 声明）
+const CANONICAL_DIRS = ["entities", "concepts", "sources", "comparisons", "queries"];
+const SEARCH_DIRS = [...CANONICAL_DIRS, ...declaredDirs, ""];
 let totalLinkSum = 0;
 
 for (const file of allFiles) {
@@ -224,6 +264,14 @@ for (const file of allFiles) {
       frontmatterIssues.push({ File: basename(file), Issue: `Missing field: ${field}` });
     }
   }
+  // v6：type 值必须落在 基础五类 + SCHEMA `## Page Types` 声明的扩展集内
+  const typeMatch = fm.match(/^type:\s*["']?([A-Za-z0-9_-]+)/m);
+  if (typeMatch && !validTypes.has(typeMatch[1])) {
+    frontmatterIssues.push({
+      File: basename(file),
+      Issue: `Invalid type '${typeMatch[1]}' — use a base type or declare it in SCHEMA.md '## Page Types'`,
+    });
+  }
 }
 
 // === 维度 6: 页面大小 ===
@@ -251,6 +299,59 @@ if (validTags.length > 0) {
         for (const tag of tags) {
           if (tag && !validTags.includes(tag)) invalidTags.push({ File: basename(file), Tag: tag });
         }
+      }
+    }
+  }
+}
+
+// === v6: staleness（raw 证据日期 vs 页面 updated；纯日期比较，零 LLM）===
+// rawDir 解析链：--raw > $SKILL_ENV > ~/.config/parking-agents/skill-env.json（knowledgeBase.rawDir）
+// 证据日期：frontmatter recorded_at / ingested / date（YYYY-MM-DD 前缀即可），缺省回退 mtime
+// 匹配：raw 文件名去 recurrence- 前缀后与页面 basename 大小写不敏感比对
+function resolveRawDir(cliRaw) {
+  const normalize = (p) => (p && p.startsWith("~")) ? join(homedir(), p.replace(/^~[\\/]/, "")) : p;
+  if (cliRaw) return normalize(cliRaw);
+  const envPath = normalize(process.env.SKILL_ENV) || join(homedir(), ".config", "parking-agents", "skill-env.json");
+  try {
+    const cfg = JSON.parse(readFileSync(envPath, "utf8").replace(/^\uFEFF/, ""));
+    return normalize(cfg.knowledgeBase?.rawDir || null);
+  } catch { return null; }
+}
+const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+const stalePages = [];
+let rawEvidenceScanned = 0;
+const rawDir = resolveRawDir(rawArg);
+if (rawDir && existsSync(rawDir)) {
+  // lower(basename) -> { name: 原大小写页名, updated: YYYY-MM-DD | null（null = 缺 updated 字段）}
+  const pageMeta = new Map();
+  for (const file of allFiles) {
+    const fmM = read(file).match(fmRe);
+    pageMeta.set(baseName(file).toLowerCase(), {
+      name: baseName(file),
+      updated: fmM ? (fmM[1].match(/^updated:\s*["']?(\d{4}-\d{2}-\d{2})/m)?.[1] ?? null) : null,
+    });
+  }
+  for (const rf of walkMd(rawDir)) {
+    rawEvidenceScanned++;
+    const target = basename(rf, extname(rf)).replace(/^recurrence-/, "").toLowerCase();
+    if (!pageMeta.has(target)) continue;
+    const fmS = read(rf).match(fmRe);
+    let evDate = null;
+    if (fmS) {
+      for (const f of ["recorded_at", "ingested", "date"]) {
+        const m = fmS[1].match(new RegExp(`^${f}:\\s*["']?(\\d{4}-\\d{2}-\\d{2})`, "m"));
+        if (m) { evDate = m[1]; break; }
+      }
+    }
+    if (!evDate) evDate = ymd(statSync(rf).mtime);
+    const meta = pageMeta.get(target);
+    if (!meta.updated || evDate > meta.updated) {
+      // 同页多条证据只保留最新一条，避免报告噪声
+      const prev = stalePages.find((s) => s.Page.toLowerCase() === target);
+      const entry = { Page: meta.name, Evidence: basename(rf), EvidenceDate: evDate, PageUpdated: meta.updated || "(missing updated field)" };
+      if (!prev || entry.EvidenceDate > prev.EvidenceDate) {
+        if (prev) Object.assign(prev, entry); else stalePages.push(entry);
       }
     }
   }
@@ -344,12 +445,41 @@ if (invalidTags.length > 0) {
   for (const t of invalidTags) console.log(C.yellow(`    ${t.File}: tag '${t.Tag}' not in SCHEMA.md`));
 }
 
+// === v6: staleness 报告 ===
+console.log("\n" + C.cyan("=== Staleness (raw evidence vs page `updated`) ==="));
+if (!rawDir || !existsSync(rawDir)) {
+  console.log(C.yellow(`  Skipped — rawDir not found${rawDir ? `: ${rawDir}` : " (pass --raw or set knowledgeBase.rawDir)"}`));
+} else {
+  console.log(`  Scanned ${rawEvidenceScanned} raw evidence files (rawDir: ${rawDir})`);
+  if (stalePages.length === 0) {
+    console.log(C.green("  No stale pages — wiki knowledge is not older than any raw evidence."));
+  } else {
+    console.log(C.yellow(`  Stale Pages (${stalePages.length}) — raw evidence newer than page knowledge:`));
+    for (const s of stalePages.sort((a, b) => b.EvidenceDate.localeCompare(a.EvidenceDate))) {
+      console.log(C.yellow(`    ${s.Page}: ${s.Evidence} (${s.EvidenceDate}) > page updated ${s.PageUpdated}`));
+    }
+    if (!stalenessEnforce) {
+      console.log(C.yellow("  (report-only — set scoring.stalenessEnforce=true to hard-gate)"));
+    }
+  }
+}
+
 // === 最终得分 ===
 console.log("\n" + C.cyan("=== Final Score ==="));
 const totalRounded = Math.round(totalScore * 10) / 10;
-const pass = totalRounded >= minScore && brokenLinks.length === 0;
-console.log((totalRounded >= 9 ? C.green : totalRounded >= 7 ? C.yellow : C.red)(`  Total: ${totalRounded} / 10`));
+const stalenessFail = stalenessEnforce && stalePages.length > 0;
+const pass = totalRounded >= minScore && brokenLinks.length === 0 && !stalenessFail;
+// 总分展示 2 位小数：避免 9.95 四舍五入显示成 10 误导
+console.log((totalRounded >= 9 ? C.green : totalRounded >= 7 ? C.yellow : C.red)(`  Total: ${totalScore.toFixed(2)} / 10`));
 console.log(C.white(`  Threshold: ${minScore} / 10`));
-console.log((pass ? C.green : C.red)(`  Status: ${pass ? "PASS" : "FAIL"}`));
+if (pass) {
+  console.log(C.green("  Status: PASS"));
+} else if (stalenessFail) {
+  console.log(C.red(`  Status: FAIL (staleness enforced: ${stalePages.length} stale pages — knowledge must be recompiled to cover newer raw evidence)`));
+} else if (brokenLinks.length > 0 && totalRounded >= minScore) {
+  console.log(C.red(`  Status: FAIL (hard gate: broken links must be 0 — found ${brokenLinks.length})`));
+} else {
+  console.log(C.red(`  Status: FAIL (score ${totalRounded} < ${minScore}; broken links: ${brokenLinks.length})`));
+}
 
 process.exit(pass ? 0 : 1);

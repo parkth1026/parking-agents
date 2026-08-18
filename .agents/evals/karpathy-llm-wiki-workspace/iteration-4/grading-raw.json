@@ -1,0 +1,34 @@
+{
+  "meta": {
+    "date": "2026-08-18",
+    "skill_state": "post-fix round 1 (11 fixes) + round 2 (6 fixes from it4 cold-start findings); SKILL.md 399 lines",
+    "runs_per_arm": 1,
+    "grader": "main-session agent (non-blind)",
+    "validator": "scripts/validate-wiki.mjs v5.1 (T2: hard-gate reason + 2-decimal total)",
+    "harness_incidents": ["eval-1 without_skill first attempt killed by provider content filter (1301) at 65s; retried identical prompt successfully"]
+  },
+  "results": {
+    "eval-ingest-fresh": {
+      "with_skill": {"validationScore": 10, "validationPassed": true, "validatorExitCode": 0, "fixLoops": 1, "fixLoopCause": "A6 entry-format ambiguity (agent bracketed the header example itself; template itself was clean — T1 fix held). A6 now fixed in docs", "entityPages": 1, "conceptPages": 10, "sourcePages": 1, "rawSaved": true, "rawNaming": "followed (ingestion-date)", "batchClausesFollowed": ["D1 takeaways auto-pass logged", "T12 mkdir auto-pass logged", "T8 report saved outside wikiDir"], "tokens": 1597897, "tool_uses": 49, "duration_s": 485.9},
+      "without_skill": {"validationScore": 2.5, "validationPassed": false, "validatorExitCode": 1, "layout": "flat (Home.md + pages/ + templates/), relative links, frontmatter present this run", "orphans": 12, "missingFromIndex": 12, "brokenLinks": 1, "rawSaved": false, "tokens": 289164, "tool_uses": 14, "duration_s": 268.3, "note": "比 it3 同臂(5.0)更低——平铺更彻底、模板页与 process-log 也被计入；without 臂跨运行方差大(5.0/2.5)"}
+    },
+    "eval-ingest-incremental": {
+      "with_skill": {"validationScore": 10, "validationPassed": true, "validatorExitCode": 0, "fixLoops": 0, "entityPages": 0, "conceptPages": 4, "sourcePages": 1, "rawSaved": true, "rawNaming": "followed", "thresholdDiscipline": "Tri Dao/PyTorch logged as plain-text pending-page candidates", "t10CollisionResolved": "concept [[FlashAttention]] vs source [[Flash Attention]]", "tokens": 689915, "tool_uses": 33, "duration_s": 211.6},
+      "without_skill": {"validationScore": 10, "validationPassed": true, "validatorExitCode": 0, "entityPages": 0, "conceptPages": 4, "sourcePages": 0, "rawSaved": true, "rawNaming": "violated (flash-attention.md 无日期前缀)", "tokens": 172143, "tool_uses": 18, "duration_s": 91.3, "note": "本次把新页放进了 concepts/（it3 同任务用 techniques/ 判 9.3 FAIL）——without 臂能力强但不稳定，目录选择靠模仿种子而非约定"}
+    },
+    "eval-lint": {
+      "with_skill": {"validationScoreBefore": 8.52, "validationScore": 10, "validationPassed": true, "validatorExitCode": 0, "plantedIssuesFixed": "5/5", "fixIterations": 1, "newProtocolFollowed": ["T4: Ghost Network 去链留文 + log 记 pending（新流程完全照走）", "T9: retro-fill created 用当日并在 log 注明", "T8: lint-report.md 落 wiki 外"], "tokens": 707056, "tool_uses": 35, "duration_s": 240.9},
+      "without_skill": {"validationScoreBefore": 8.52, "validationScore": 9.6, "validationPassed": true, "validatorExitCode": 0, "plantedIssuesFixed": "4/5", "missed": "under-linked ×2（连续两轮漏同一维度，自建检查器无 outbound 规则）", "bonus": "重建 Attention Mechanism 为明确标注的 stub（it3 同臂选择只标记不重建——两种诚实策略）", "tokens": 253166, "tool_uses": 19, "duration_s": 210.1}
+    }
+  },
+  "audit_run_2": {
+    "executor": "main session (disclosed: not cold)",
+    "task": "eval-ingest-fresh, templates copied VERBATIM from fixed SKILL.md",
+    "result": "10.00/10 PASS exit 0, FIRST RUN (vs audit #1 pre-fix: FAIL at 9.75 with misleading 'Total: 10/10')",
+    "fidelity_log": "audit-run/process-fidelity-log.md"
+  },
+  "verification": {
+    "unit_tests": "37/37 (33 original + 4 T2 regression)",
+    "verify_fixes": "27/27 (11 round-1 + 6 round-2 + line count 399<500)"
+  }
+}

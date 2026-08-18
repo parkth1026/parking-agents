@@ -47,6 +47,22 @@
         {"text": "Final score reported to user", "type": "content_check"}
       ],
       "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "Answer these questions using my LLM wiki: (1) How does the attention mechanism's cost scale, and what did Flash Attention change about it? (2) What does my wiki say about Mamba or RWKV?",
+      "expected_output": "Should run the Query operation: read index.md, synthesize the covered answer from wiki pages with [[wikilink]] citations, archive the significant multi-page answer to queries/, honestly state the wiki does not cover Mamba/RWKV and suggest ingesting a source instead of fabricating, update log.md, and leave the wiki passing validation",
+      "assertions": [
+        {"text": "Covered answer grounded in wiki page content (no fabricated specifics)", "type": "content_check"},
+        {"text": "Covered answer cites pages via [[wikilinks]]", "type": "content_check"},
+        {"text": "Uncovered topic: honest not-covered statement", "type": "content_check"},
+        {"text": "Suggests ingesting a source rather than answering from memory", "type": "content_check"},
+        {"text": "Significant answer archived to queries/", "type": "content_check"},
+        {"text": "log.md updated with query entry", "type": "content_check"},
+        {"text": "Wiki passes validation after the operation", "type": "validation"},
+        {"text": "No pages created/modified outside queries/ and log.md", "type": "process_check"}
+      ],
+      "files": []
     }
   ]
 }

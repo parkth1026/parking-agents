@@ -1,0 +1,19 @@
+[36m=== Wiki Validation Script v5 ===[0m
+[32mFound 12 wiki pages[0m
+
+[36m=== Dimension Scores ===[0m
+[32m  Broken Links              10/10  (weight: 25%)[0m
+[32m  Self References           10/10  (weight: 10%)[0m
+[32m  Orphan Pages              10/10  (weight: 10%)[0m
+[32m  Index Completeness        10/10  (weight: 15%)[0m
+[32m  Frontmatter               10/10  (weight: 15%)[0m
+[32m  Page Size                 10/10  (weight: 10%)[0m
+[32m  Outbound Links            10/10  (weight: 10%)[0m
+[32m  Tag Compliance            10/10  (weight: 5%)[0m
+
+[36m=== Issues ===[0m
+
+[36m=== Final Score ===[0m
+[32m  Total: 10.00 / 10[0m
+[37m  Threshold: 9 / 10[0m
+[32m  Status: PASS[0m
