@@ -1,0 +1,17 @@
+{
+  "expectations": [
+    {"text": "SCHEMA.md exists with tag taxonomy", "passed": true, "evidence": "完整标签分类 + 按协议先加 person 标签再用"},
+    {"text": "index.md exists and lists all created pages", "passed": true, "evidence": "11 页全编目；规避了模板 [[Page Name]] 陷阱（改写表头）"},
+    {"text": "log.md exists with ingestion entry", "passed": true, "evidence": "Init/Ingest/Lint 三行"},
+    {"text": "Source page created for the talk", "passed": true, "evidence": "sources/Intro to Large Language Models.md，含 provenance 说明"},
+    {"text": "Entity pages created (e.g., Karpathy, OpenAI)", "passed": true, "evidence": "entities/Andrej Karpathy.md"},
+    {"text": "Concept pages created", "passed": true, "evidence": "9 个概念页（LLM/Pretraining/Fine-tuning/Emergent/Tool Use/System Prompt/Jailbreaking/Prompt Injection/LLM OS）"},
+    {"text": "All pages have YAML frontmatter with required fields", "passed": true, "evidence": "校验器 Frontmatter 维度 10/10"},
+    {"text": "Each page has at least 2 outbound wikilinks", "passed": true, "evidence": "Outbound Links 维度 10/10"},
+    {"text": "No broken wikilinks", "passed": true, "evidence": "Broken Links 维度 10/10，断链 0"},
+    {"text": "Validation score >= 9.0", "passed": true, "evidence": "10/10 PASS exit 0，首跑即过"},
+    {"text": "Wiki written to config-resolved path", "passed": true, "evidence": "落在 mock-env knowledgeBase.wikiDir"},
+    {"text": "No files created inside skill dir or real user dirs", "passed": true, "evidence": "agent 自述 skill 目录只读"}
+  ],
+  "quantitative": {"validationScore": 10, "validationPassed": true, "validatorExitCode": 0, "entityPages": 1, "conceptPages": 9, "sourcePages": 1, "rawSaved": true, "rawNamingConvention": "followed"}
+}

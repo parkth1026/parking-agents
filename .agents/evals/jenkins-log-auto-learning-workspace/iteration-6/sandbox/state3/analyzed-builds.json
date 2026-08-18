@@ -1,0 +1,13 @@
+{
+  "last_analyzed": {},
+  "analyzed": {
+    "job/teamA/job/job-alpha#10": "success:w=?",
+    "job/teamA/job/job-alpha#13": "success:w=?",
+    "job/teamA/job/job-alpha#15": "skip:ABORTED",
+    "job/teamA/job/job-alpha#16": "success:w=?",
+    "job/teamA/job/job-alpha#20": "success:w=?",
+    "job/teamA/job/job-alpha#22": "success:w=?",
+    "job/teamA/job/job-alpha#24": "success:w=?"
+  },
+  "runHistory": []
+}

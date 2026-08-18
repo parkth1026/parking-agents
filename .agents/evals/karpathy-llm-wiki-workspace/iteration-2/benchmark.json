@@ -1,0 +1,463 @@
+{
+  "metadata": {
+    "skill_name": "karpathy-llm-wiki",
+    "skill_path": "<path/to/skill>",
+    "executor_model": "<model-name>",
+    "analyzer_model": "<model-name>",
+    "timestamp": "2026-08-14T06:37:14Z",
+    "evals_run": [
+      1,
+      2,
+      3
+    ],
+    "runs_per_configuration": 3
+  },
+  "runs": [
+    {
+      "eval_id": 1,
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1,
+        "passed": 12,
+        "failed": 0,
+        "total": 12,
+        "time_seconds": 568.5,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "SCHEMA.md exists with tag taxonomy",
+          "passed": true,
+          "evidence": "grading \u811a\u672c\u786e\u8ba4 SCHEMA.md \u5b58\u5728\uff1bsubagent \u62a5\u544a\u5b8c\u6574 taxonomy \u5e76\u6309\u89c4\u8303\u5148\u884c\u6269\u5c55 person \u6807\u7b7e"
+        },
+        {
+          "text": "index.md exists and lists all created pages",
+          "passed": true,
+          "evidence": "indexCoversAll=true, indexMissing=[]\uff0817 \u9875\u5168\u90e8\u6536\u5f55\uff09"
+        },
+        {
+          "text": "log.md exists with ingestion entry",
+          "passed": true,
+          "evidence": "logHasEntries=true\uff0c\u542b ingest + lint \u6761\u76ee"
+        },
+        {
+          "text": "Source page created for the talk",
+          "passed": true,
+          "evidence": "sources/ \u6709 1 \u9875\uff1aKarpathy Intro to LLMs Talk"
+        },
+        {
+          "text": "Entity pages created (e.g., Karpathy, OpenAI)",
+          "passed": true,
+          "evidence": "entities/ 2 \u9875\uff1aAndrej Karpathy\u3001Llama 2"
+        },
+        {
+          "text": "Concept pages created (e.g., Transformer, Fine-tuning)",
+          "passed": true,
+          "evidence": "concepts/ 13 \u9875\uff0c\u8986\u76d6\u4efb\u52a1\u5217\u51fa\u7684\u5168\u90e8\u4e3b\u9898"
+        },
+        {
+          "text": "All pages have YAML frontmatter with required fields",
+          "passed": true,
+          "evidence": "allFrontmatter=true, offenders=[]"
+        },
+        {
+          "text": "Each page has at least 2 outbound wikilinks",
+          "passed": true,
+          "evidence": "allMinOutbound=true"
+        },
+        {
+          "text": "No broken wikilinks (all [[links]] resolve)",
+          "passed": true,
+          "evidence": "validate-wiki.mjs: Broken Links 0"
+        },
+        {
+          "text": "Validation score >= 9.0",
+          "passed": true,
+          "evidence": "validate-wiki.mjs: Total 10/10, PASS"
+        },
+        {
+          "text": "Wiki written to config-resolved path (mock env knowledgeBase.wikiDir), not elsewhere",
+          "passed": true,
+          "evidence": "subagent \u62a5\u544a\u5b8c\u6574\u89e3\u6790\u94fe SKILL_ENV\u2192mock-env json\u2192knowledgeBase.wikiDir\uff1b\u4ea7\u7269\u5728 with_skill/outputs/wiki"
+        },
+        {
+          "text": "No files created inside the skill directory or real C:/Users/Administrator/memory dirs",
+          "passed": true,
+          "evidence": "skillExtraFiles=[]\uff1bmemory \u4eca\u65e5\u552f\u4e00\u6539\u52a8\u6587\u4ef6(12:15)\u4e3a\u65e0\u5173 Jenkins \u4f1a\u8bdd\u4ea7\u7269\uff0c\u65e9\u4e8e\u6d4b\u8bd5\u7a97\u53e3(14:08+)"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 2,
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1,
+        "passed": 9,
+        "failed": 0,
+        "total": 9,
+        "time_seconds": 292.9,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Session start protocol followed (read SCHEMA, index, log)",
+          "passed": true,
+          "evidence": "subagent \u660e\u786e\u62a5\u544a\u6309 SCHEMA\u2192index\u2192log \u987a\u5e8f\u5b8c\u6210\u4f1a\u8bdd\u542f\u52a8\u534f\u8bae"
+        },
+        {
+          "text": "Source page created for Flash Attention article",
+          "passed": true,
+          "evidence": "sources/Flash Attention Article Summary.md \u5b58\u5728"
+        },
+        {
+          "text": "Concept page created for Flash Attention",
+          "passed": true,
+          "evidence": "concepts/Flash Attention.md \u5b58\u5728\uff0c\u53e6\u5efa entities/Tri Dao.md"
+        },
+        {
+          "text": "Existing attention/transformer pages updated with links to Flash Attention",
+          "passed": true,
+          "evidence": "Attention Mechanism \u52a0 Variants \u8282\u3001Transformer \u52a0 Efficiency \u8282\uff0c\u5747\u542b [[Flash Attention]]"
+        },
+        {
+          "text": "index.md updated with new pages",
+          "passed": true,
+          "evidence": "indexCoversAll=true\uff08\u65b0\u589e Entities/Sources \u8282\u6536\u5f55 Tri Dao\u3001Flash Attention\u3001source \u9875\uff09"
+        },
+        {
+          "text": "log.md updated with operation entry",
+          "passed": true,
+          "evidence": "logHasEntries=true\uff0c\u8ffd\u52a0 ingest + lint \u6761\u76ee"
+        },
+        {
+          "text": "No broken wikilinks",
+          "passed": true,
+          "evidence": "validate-wiki.mjs: Total 10/10 PASS, Broken Links 0"
+        },
+        {
+          "text": "Wiki written to config-resolved path (mock env knowledgeBase.wikiDir)",
+          "passed": true,
+          "evidence": "SKILL_ENV\u2192mock-env\u2192knowledgeBase.{wikiDir,rawDir} \u89e3\u6790\u94fe\u5b8c\u6574\u62a5\u544a\uff1braw \u5f52\u6863\u5230 rawDir/articles/"
+        },
+        {
+          "text": "No files created inside the skill directory or real C:/Users/Administrator/memory dirs",
+          "passed": true,
+          "evidence": "skillExtraFiles=[]\uff1b\u65e0 memory \u6c61\u67d3"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 3,
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1,
+        "passed": 8,
+        "failed": 0,
+        "total": 8,
+        "time_seconds": 162.7,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "validate-wiki.mjs script executed",
+          "passed": true,
+          "evidence": "subagent \u5f15\u7528\u811a\u672c\u8f93\u51fa\uff1a\u57fa\u7ebf 6.1/10 FAIL \u2192 \u4fee\u590d\u540e 10/10 PASS"
+        },
+        {
+          "text": "Report includes all 8 validation dimensions",
+          "passed": true,
+          "evidence": "8 \u7ef4\u5ea6\u5168\u90e8\u5217\u51fa\uff08\u65ad\u94fe/\u81ea\u5f15/\u5b64\u513f/\u7d22\u5f15/frontmatter/\u5c3a\u5bf8/\u51fa\u94fe/\u6807\u7b7e\uff09"
+        },
+        {
+          "text": "Broken links identified and fixed",
+          "passed": true,
+          "evidence": "[[Ghost Network]] \u6309 Dead Link Fix Strategy #2 \u79fb\u9664\uff08\u4e0d\u503c\u5f97\u5efa\u9875\uff09"
+        },
+        {
+          "text": "Missing frontmatter identified and added",
+          "passed": true,
+          "evidence": "Neural Network.md \u8865\u5168 title/created/updated/type/tags/sources"
+        },
+        {
+          "text": "Re-validation run after fixes",
+          "passed": true,
+          "evidence": "\u4fee\u590d\u540e\u91cd\u8dd1 validate-wiki.mjs\uff1a10/10 PASS"
+        },
+        {
+          "text": "Final score reported to user",
+          "passed": true,
+          "evidence": "\u62a5\u544a\u6700\u7ec8 10/10 PASS\uff08\u9608\u503c 9.0\uff09"
+        },
+        {
+          "text": "All issues from the seeded dirty wiki resolved (self-refs, orphans, index, tags, size, underlinks)",
+          "passed": true,
+          "evidence": "8 \u7ef4\u5ea6\u5168\u90e8 10/10\uff1ballMinOutbound=true\uff1bBig Source 219\u219210 \u884c\uff1b\u5b64\u513f\u9875\u83b7\u5f97\u5165\u94fe\uff1bindex \u8865 3 \u9875"
+        },
+        {
+          "text": "No files created inside the skill directory or real C:/Users/Administrator/memory dirs",
+          "passed": true,
+          "evidence": "skillExtraFiles=[]\uff1b\u65e0 memory \u6c61\u67d3"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 1,
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.417,
+        "passed": 5,
+        "failed": 7,
+        "total": 12,
+        "time_seconds": 437.5,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "SCHEMA.md exists with tag taxonomy",
+          "passed": false,
+          "evidence": "\u65e0 SCHEMA.md\uff1bbaseline \u81ea\u521b Home.md \u627f\u62c5\u7d22\u5f15+\u89c4\u8303\u8bf4\u660e\uff0c\u65e0 tag taxonomy \u4f53\u7cfb"
+        },
+        {
+          "text": "index.md exists and lists all created pages",
+          "passed": false,
+          "evidence": "\u65e0 index.md\uff08Home.md \u6709\u94fe\u63a5\u76ee\u5f55\u4f46\u975e\u89c4\u8303 index \u6587\u4ef6\uff09"
+        },
+        {
+          "text": "log.md exists with ingestion entry",
+          "passed": false,
+          "evidence": "\u65e0 log.md\uff1b\u6eaf\u6e90\u5199\u5728 wiki-raw/karpathy-intro-to-llms/ingestion-log.md"
+        },
+        {
+          "text": "Source page created for the talk",
+          "passed": false,
+          "evidence": "\u65e0 sources/ \u76ee\u5f55\u4e0e source \u7c7b\u578b\u9875\uff1b\u539f\u59cb\u7b14\u8bb0\u5b58 raw"
+        },
+        {
+          "text": "Entity pages created (e.g., Karpathy, OpenAI)",
+          "passed": false,
+          "evidence": "\u65e0 entities/ \u76ee\u5f55\uff08Karpathy/Llama2 \u4fe1\u606f\u5e76\u5165\u4e3b\u9898\u9875\uff09"
+        },
+        {
+          "text": "Concept pages created (e.g., Transformer, Fine-tuning)",
+          "passed": true,
+          "evidence": "\u81ea\u5b9a\u4e49\u76ee\u5f55\u7ec4\u7ec7 15 \u4e2a\u4e3b\u9898\u9875\uff08fundamentals/training/...\uff09\uff0c\u5185\u5bb9\u8986\u76d6\u4efb\u52a1\u5168\u90e8\u4e3b\u9898\uff0c\u4f46\u975e concepts/ \u89c4\u8303\u7ed3\u6784"
+        },
+        {
+          "text": "All pages have YAML frontmatter with required fields",
+          "passed": true,
+          "evidence": "allFrontmatter=true\uff0816 \u9875\u5747\u542b title/category/tags/created/status\uff09"
+        },
+        {
+          "text": "Each page has at least 2 outbound wikilinks",
+          "passed": false,
+          "evidence": "\u5168 wiki 0 \u4e2a [[wikilinks]]\uff1bbaseline \u4f7f\u7528\u76f8\u5bf9 markdown \u94fe\u63a5\uff08125 \u4e2a\uff0c\u81ea\u68c0\u5168\u901a\uff09\uff0c\u4e0d\u7b26\u5408 Obsidian wikilink \u89c4\u8303"
+        },
+        {
+          "text": "No broken wikilinks (all [[links]] resolve)",
+          "passed": true,
+          "evidence": "\u65e0 [[wikilinks]] \u6545\u65e0\u65ad\u94fe\uff1b\u5176\u76f8\u5bf9\u94fe\u63a5\u81ea\u68c0 125/125 \u89e3\u6790"
+        },
+        {
+          "text": "Validation score >= 9.0",
+          "passed": false,
+          "evidence": "validate-wiki.mjs: Total 5/10 FAIL\uff08\u7ed3\u6784/\u7d22\u5f15/\u51fa\u94fe\u7ef4\u5ea6\u5931\u5206\uff09"
+        },
+        {
+          "text": "Wiki located in expected sandbox location",
+          "passed": true,
+          "evidence": "\u4ea7\u7269\u5728 without_skill/outputs/wiki \u4e0b"
+        },
+        {
+          "text": "No files created inside the skill directory or real C:/Users/Administrator/memory dirs",
+          "passed": true,
+          "evidence": "skillExtraFiles=[]\uff1b\u65e0 memory \u6c61\u67d3"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 2,
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.889,
+        "passed": 8,
+        "failed": 1,
+        "total": 9,
+        "time_seconds": 99,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Session start protocol followed (read SCHEMA, index, log)",
+          "passed": true,
+          "evidence": "baseline \u8bfb\u53d6\u5e76\u9075\u5b88\u4e86\u73b0\u6709 SCHEMA tag \u4f53\u7cfb\u3001\u66f4\u65b0\u4e86 index/log\uff08\u7b49\u4ef7\u52a8\u4f5c\uff0c\u867d\u975e\u534f\u8bae\u9a71\u52a8\uff09"
+        },
+        {
+          "text": "Source page created for Flash Attention article",
+          "passed": false,
+          "evidence": "\u65e0 sources/ \u9875\uff1b\u6587\u7ae0\u8981\u70b9\u76f4\u63a5\u5e76\u5165\u6982\u5ff5\u9875"
+        },
+        {
+          "text": "Concept page created for Flash Attention",
+          "passed": true,
+          "evidence": "concepts/Flash Attention.md \u5b58\u5728\uff0c\u8986\u76d6\u6587\u7ae0\u5168\u90e8\u8981\u70b9"
+        },
+        {
+          "text": "Existing attention/transformer pages updated with links to Flash Attention",
+          "passed": true,
+          "evidence": "Attention Mechanism \u4e0e Transformer \u5747\u6dfb\u52a0 [[Flash Attention]] \u53cd\u94fe"
+        },
+        {
+          "text": "index.md updated with new pages",
+          "passed": true,
+          "evidence": "indexCoversAll=true"
+        },
+        {
+          "text": "log.md updated with operation entry",
+          "passed": true,
+          "evidence": "\u8ffd\u52a0 2026-08-14 add \u6761\u76ee"
+        },
+        {
+          "text": "No broken wikilinks",
+          "passed": true,
+          "evidence": "validate-wiki.mjs: Total 10/10 PASS, Broken Links 0"
+        },
+        {
+          "text": "Wiki located in expected sandbox location",
+          "passed": true,
+          "evidence": "\u4ea7\u7269\u5728 without_skill/outputs/wiki"
+        },
+        {
+          "text": "No files created inside the skill directory or real C:/Users/Administrator/memory dirs",
+          "passed": true,
+          "evidence": "skillExtraFiles=[]\uff1b\u65e0 memory \u6c61\u67d3\uff1b\u4f46\u672a\u4fdd\u5b58 raw \u539f\u6587\uff08\u4e09\u5c42\u67b6\u6784\u7f3a\u5931\uff09"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 3,
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.625,
+        "passed": 5,
+        "failed": 3,
+        "total": 8,
+        "time_seconds": 181.3,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "validate-wiki.mjs script executed",
+          "passed": false,
+          "evidence": "baseline \u4e0d\u77e5\u9053\u6280\u80fd\u811a\u672c\uff1b\u81ea\u5efa Python \u68c0\u67e5\uff08\u7b49\u4ef7\u610f\u56fe\uff0c\u4e0d\u540c\u5de5\u5177\uff09"
+        },
+        {
+          "text": "Report includes all 8 validation dimensions",
+          "passed": false,
+          "evidence": "\u62a5\u544a 8 \u7c7b\u95ee\u9898\u4f46\u4e0e 8 \u7ef4\u5ea6\u4e0d\u5b8c\u5168\u5bf9\u5e94\uff1a\u7f3a\u51fa\u94fe\u6570\u91cf\uff08underlinked\uff09\u7ef4\u5ea6\u68c0\u67e5"
+        },
+        {
+          "text": "Broken links identified and fixed",
+          "passed": true,
+          "evidence": "[[Ghost Network]] \u79fb\u9664\uff08\u6b8b\u7559\u4ec5\u5b58\u5728\u4e8e changelog \u53cd\u5f15\u53f7\u5185\uff0c\u975e\u6d3b\u8dc3\u94fe\u63a5\uff09"
+        },
+        {
+          "text": "Missing frontmatter identified and added",
+          "passed": true,
+          "evidence": "Neural Network.md \u8865 frontmatter"
+        },
+        {
+          "text": "Re-validation run after fixes",
+          "passed": true,
+          "evidence": "\u4fee\u590d\u540e\u91cd\u8dd1\u81ea\u5efa\u626b\u63cf\uff0c\u81ea\u8bc4\u95e8\u7981 4/8\u21928/8"
+        },
+        {
+          "text": "Final score reported to user",
+          "passed": true,
+          "evidence": "\u62a5\u544a\u81ea\u5efa\u95e8\u7981\u5f97\u5206\uff08\u975e\u6280\u80fd 10 \u5206\u5236\uff09"
+        },
+        {
+          "text": "All issues from the seeded dirty wiki resolved (self-refs, orphans, index, tags, size, underlinks)",
+          "passed": false,
+          "evidence": "validate-wiki.mjs \u590d\u6838\uff1a9/10\uff08\u8fc7\u7ebf\u4f46\u672a\u6ee1\u5206\uff09\uff1bTransformer/Neural Network \u51fa\u94fe\u4ec5 1\uff08<2\uff09\u672a\u4fee\u5230\u4f4d"
+        },
+        {
+          "text": "No files created inside the skill directory or real C:/Users/Administrator/memory dirs",
+          "passed": true,
+          "evidence": "skillExtraFiles=[]\uff1b\u65e0 memory \u6c61\u67d3"
+        }
+      ],
+      "notes": []
+    }
+  ],
+  "run_summary": {
+    "with_skill": {
+      "pass_rate": {
+        "mean": 1.0,
+        "stddev": 0.0,
+        "min": 1,
+        "max": 1
+      },
+      "time_seconds": {
+        "mean": 341.3667,
+        "stddev": 207.196,
+        "min": 162.7,
+        "max": 568.5
+      },
+      "tokens": {
+        "mean": 0.0,
+        "stddev": 0.0,
+        "min": 0,
+        "max": 0
+      }
+    },
+    "without_skill": {
+      "pass_rate": {
+        "mean": 0.6437,
+        "stddev": 0.2366,
+        "min": 0.417,
+        "max": 0.889
+      },
+      "time_seconds": {
+        "mean": 239.2667,
+        "stddev": 176.538,
+        "min": 99,
+        "max": 437.5
+      },
+      "tokens": {
+        "mean": 0.0,
+        "stddev": 0.0,
+        "min": 0,
+        "max": 0
+      }
+    },
+    "delta": {
+      "pass_rate": "+0.36",
+      "time_seconds": "+102.1",
+      "tokens": "+0"
+    }
+  },
+  "notes": []
+}

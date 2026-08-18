@@ -1,0 +1,8 @@
+{
+  "api": {
+    "baseUrl": "http://127.0.0.1:62838",
+    "origin": "https://mock-origin.example",
+    "referer": "https://mock-referer.example/assistant",
+    "userAgent": "MockUA/1.0 (epic-test)"
+  }
+}

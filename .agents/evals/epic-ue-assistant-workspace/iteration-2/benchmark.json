@@ -1,0 +1,183 @@
+{
+  "metadata": {
+    "skill_name": "epic-ue-assistant",
+    "skill_path": "D:\\GIT_dev\\Claude_skills\\.claude\\skills\\epic-ue-assistant",
+    "executor_model": "builtin:bigmodel-coding-plan/GLM-5.2 (subagents)",
+    "analyzer_model": "builtin:bigmodel-coding-plan/GLM-5.2",
+    "timestamp": "2026-08-14T07:05:00Z",
+    "evals_run": [
+      4,
+      5,
+      6
+    ],
+    "runs_per_configuration": 1
+  },
+  "runs": [
+    {
+      "eval_id": 4,
+      "eval_name": "eval-lnk2019-zconstruct",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 5,
+        "failed": 0,
+        "total": 5,
+        "time_seconds": 415.4,
+        "tokens": 296380,
+        "tool_calls": 14,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "answer_非空_含实质内容: answer.md 至少 300 字符的实质回答",
+          "passed": true,
+          "evidence": "answer.md 4064 字符"
+        },
+        {
+          "text": "answer_覆盖_LNK2019_典型原因: 内容包含 Build.cs/模块依赖/API宏/UHT codegen 之一",
+          "passed": true,
+          "evidence": "命中关键词"
+        },
+        {
+          "text": "answer_附官方参考链接: 至少 1 个 dev.epicgames.com 链接",
+          "passed": true,
+          "evidence": "['dev.epicgames.com', 'dev.epicgames.com/documentation/unreal-engine/module-api-specifiers-in-unreal-engine']"
+        },
+        {
+          "text": "transcript_使用了技能脚本: transcript 记录了 epic-assistant.mjs 的调用（而非自行 curl 或凭记忆作答）",
+          "passed": true,
+          "evidence": "transcript 含 epic-assistant.mjs 调用"
+        },
+        {
+          "text": "错误被正确处理: 若 CLI 报错，transcript 显示按 SKILL.md 指引处理且最终答案未编造",
+          "passed": true,
+          "evidence": "有错误且已处理"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 5,
+      "eval_name": "eval-enhanced-input-mapping-context",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 5,
+        "failed": 0,
+        "total": 5,
+        "time_seconds": 268.3,
+        "tokens": 244417,
+        "tool_calls": 13,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "answer_非空_含实质内容: answer.md 至少 300 字符",
+          "passed": true,
+          "evidence": "answer.md 5332 字符"
+        },
+        {
+          "text": "answer_含可运行C++示例: 包含 AddMappingContext / EnhancedInputComponent / BindAction 之一",
+          "passed": true,
+          "evidence": "含 Enhanced Input C++ API 调用"
+        },
+        {
+          "text": "answer_附官方参考链接: 至少 1 个 dev.epicgames.com/documentation 链接",
+          "passed": true,
+          "evidence": "['dev.epicgames.com', 'dev.epicgames.com/documentation/unreal-engine/input-overview-in-unreal-engine)']"
+        },
+        {
+          "text": "answer_与EnhancedInput主题相关: 提到 Mapping Context 或 Enhanced Input",
+          "passed": true,
+          "evidence": "主题相关"
+        },
+        {
+          "text": "引用链接与References一致: answer.md 中的官方链接出现在 result.json 的 References 里（防伪造引用）",
+          "passed": true,
+          "evidence": "answer 链接与 References 交集 2 条: ['dev.epicgames.com/community/learning/tutorials/aqrD/unreal-engine-enhanced-input-binding-with-gameplay-tags-c', 'dev.epicgames.com/documentation/unreal-engine/input-overview-in-unreal-engine']"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 6,
+      "eval_name": "eval-multiturn-followup",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 5,
+        "failed": 0,
+        "total": 5,
+        "time_seconds": 367.1,
+        "tokens": 499015,
+        "tool_calls": 21,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "两问答案齐全: answer.md 同时覆盖 指针区别 与 异步加载示例",
+          "passed": true,
+          "evidence": "两问内容均覆盖"
+        },
+        {
+          "text": "第二问复用同一会话: transcript 显示第二次调用带 --conversation-id 且等于第一次返回的 ConversationId",
+          "passed": true,
+          "evidence": "transcript 传入 ['01KZZGMZZWAFQFD8PKNG6ECKJF', '01KZZGMZZWAFQFD8PKNG6ECKJF'], 查询返回 ['01KZZGMZZWAFQFD8PKNG6ECKJF', '01KZZGMZZWAFQFD8PKNG6ECKJF']"
+        },
+        {
+          "text": "第二问查询成功: result2.json 无 Error 字段且含答案内容",
+          "passed": true,
+          "evidence": "Error=None, 答案长度=4849"
+        },
+        {
+          "text": "示例含异步加载机制: 匹配 FStreamableManager / LoadSynchronous / AsyncLoad 之一",
+          "passed": true,
+          "evidence": "含异步加载 API"
+        },
+        {
+          "text": "answer_附官方参考链接: 至少 1 个 dev.epicgames.com 链接",
+          "passed": true,
+          "evidence": "['dev.epicgames.com', 'dev.epicgames.com/documentation/unreal-engine/object-pointers-in-unreal-engine']"
+        }
+      ],
+      "notes": []
+    }
+  ],
+  "run_summary": {
+    "with_skill": {
+      "pass_rate": {
+        "mean": 1.0,
+        "stddev": 0.0,
+        "min": 1.0,
+        "max": 1.0
+      },
+      "time_seconds": {
+        "mean": 350.3,
+        "stddev": 61.2,
+        "min": 268.3,
+        "max": 415.4
+      },
+      "tokens": {
+        "mean": 346604,
+        "stddev": 109839,
+        "min": 244417,
+        "max": 499015
+      }
+    },
+    "delta": {
+      "pass_rate": "+0.00",
+      "time_seconds": "+0.0",
+      "tokens": "+0"
+    }
+  },
+  "notes": [
+    "本迭代无基线对照（为控制 Epic API 限流风险仅跑 with_skill；iteration-1 同样仅有 with_skill）。",
+    "全部 3 个子代理均一次成功、零重试：未触发限流/Cloudflare/CSRF 错误，SKILL.md 所有可验证声明均被证实。",
+    "多轮追问（新修复能力）在代理真实使用中验证通过：第二问返回相同 ConversationId、不同 QuestionId。",
+    "执行过程问题集中在文档完备性而非功能：check_limit 请求头未说明、ask 输出字段列表不全、answer 子命令不支持追问未提示、回答为英文未提示、curl.exe 在 Git Bash 解析到 MinGW curl 的歧义。",
+    "单轮耗时 268-415 秒，其中 Epic API 查询占 43-53 秒/问，其余为子代理阅读技能/验证链接/整理答案；token 用量 24-50 万，多轮任务最高。"
+  ]
+}

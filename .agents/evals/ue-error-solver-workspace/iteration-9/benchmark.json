@@ -1,0 +1,74 @@
+{
+  "iteration": "iteration-9",
+  "skill_name": "ue-error-solver",
+  "configs": {
+    "with_skill": {
+      "runs": 1,
+      "pass_rate": {
+        "mean": 1,
+        "stddev": 0,
+        "min": 1,
+        "max": 1
+      },
+      "time_ms": {
+        "mean": 496848,
+        "stddev": 0,
+        "min": 496848,
+        "max": 496848
+      },
+      "tokens": {
+        "mean": 1756814,
+        "stddev": 0,
+        "min": 1756814,
+        "max": 1756814
+      },
+      "skipped": {
+        "time_ms": 0,
+        "tokens": 0
+      }
+    },
+    "without_skill": {
+      "runs": 1,
+      "pass_rate": {
+        "mean": 0.5,
+        "stddev": 0,
+        "min": 0.5,
+        "max": 0.5
+      },
+      "time_ms": {
+        "mean": 223422,
+        "stddev": 0,
+        "min": 223422,
+        "max": 223422
+      },
+      "tokens": {
+        "mean": 551365,
+        "stddev": 0,
+        "min": 551365,
+        "max": 551365
+      },
+      "skipped": {
+        "time_ms": 0,
+        "tokens": 0
+      }
+    }
+  },
+  "delta": {
+    "pass_rate": 0.5,
+    "time_ms": 273426,
+    "tokens": 1205449
+  },
+  "evals": [
+    "eval-1-diagnose-installed-627"
+  ],
+  "warnings": [],
+  "notes": [
+    "样本 n=1×2 配置，无方差数据；本例为错误信息清晰的编译失败，基线天然容易，结论对难例的外推需谨慎。",
+    "5/10 断言两组全过（url-parse、error-identification、diagnosis-report、chinese-output、no-side-effects）无区分度——基线对清晰编译错误也能产出方向正确的中文报告，只守下限。",
+    "pass_rate 差距全部来自技能机制断言（env-check/log-download/kb-search/source-context）与最关键的 evidence-cited：基线把 FTextureResource 修复头文件臆测为 RenderResource.h（真实 diff 是 TextureResource.h）且写入团队规范建议，属'根因对、修复内容错'；技能组经 GitLab REST + GITLAB_PRIVATE_TOKEN 取回真实 diff 实证。下轮应加'修复建议与真实 commit diff 一致'的结果断言（grader 建议）。",
+    "代价显著：with_skill 3.2× tokens（1.76M vs 551k）、2.2× 耗时（497s vs 223s）。多源链路（check-env/KB/Epic×2/GitLab blame+diff/构建历史）是主要开销；本例的边际价值主要来自 GitLab 取证与 Epic 佐证，若日常高频使用可考虑按知识库评分分级决定取证深度。",
+    "降级路径实测全部按 SKILL.md 规则工作：本地仓库陈旧+fetch 无凭据→GitLab API 只读降级；KB 详情文件缺失→按 6/10 继续走 Epic；Web 搜索按'Epic 已给明确修复'跳过；诊断-only 正确未触发 Phase 4/5/6。",
+    "副作用零确认：AesWorld 仓库 HEAD/分支/工作树不变（reflog 痕迹为 2026-06-18 历史遗留，与本轮无关）、技能目录零写入、Jenkins 只读；with_skill 报告 UTF-8 无 BOM + CRLF 符合约束 8，基线为 LF。",
+    "管线噪音观察：extract-errors 原始输出混有大量 UBT 命令行与编译进度块（type:UBT/Infrastructure），靠 LLM 分组步骤过滤才得到 2 组真实错误——本轮未失分，但提取器可考虑对这两类更激进过滤以降 token。"
+  ]
+}

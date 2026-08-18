@@ -1,0 +1,38 @@
+{
+  "skill": "golden-demo",
+  "split": {
+    "train": [
+      "q1",
+      "q2",
+      "q5",
+      "q6"
+    ],
+    "test": [
+      "q3",
+      "q4"
+    ],
+    "seed": 42,
+    "holdout": 0.4
+  },
+  "rounds": [
+    {
+      "description": "归档并分类 Jenkins 构建失败日志，按错误模式聚合并跨构建去重",
+      "train": {
+        "queries": 4,
+        "trigger_rate_on_should": 1,
+        "false_trigger_rate_on_should_not": 0.5,
+        "correct": 3,
+        "invalid_queries": 0
+      },
+      "test": {
+        "queries": 2,
+        "trigger_rate_on_should": 0,
+        "false_trigger_rate_on_should_not": 0,
+        "correct": 1,
+        "invalid_queries": 0
+      }
+    }
+  ],
+  "best_description": "归档并分类 Jenkins 构建失败日志，按错误模式聚合并跨构建去重",
+  "invalid_probes": 1
+}

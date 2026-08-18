@@ -1,0 +1,113 @@
+{
+  "results": [
+    {
+      "id": "a1-url-parse",
+      "name": "Correctly parsed URL to extract baseUrl http://10.66.12.40, jobPath /job/wdp-ue/job/Earth/job/twe-ue5.5-installed, build 627",
+      "text": "报告头部完整还原了 Jenkins URL 三要素：baseUrl http://10.66.12.40、jobPath /job/wdp-ue/job/Earth/job/twe-ue5.5-installed、build 627",
+      "passed": true,
+      "evidence": "报告开头 \"**Jenkins 构建**：[twe-ue5.5-installed #627](http://10.66.12.40/job/wdp-ue/job/Earth/job/twe-ue5.5-installed/627/)\"，参考资料再次给出 console 链接；与 skill-env.json 的 jenkins.baseUrl=http://10.66.12.40 一致。"
+    },
+    {
+      "id": "a1-env-check",
+      "name": "Ran Phase 0.5 check-env before hands-on work",
+      "text": "Phase 0.5 check-env 已在动手前执行，且其输出（remote 不一致警告）被按规则处理",
+      "passed": true,
+      "evidence": "报告\"降级说明\"第 2 条：\"remote 不一致警告：本地 origin 为 git.51vr.local，CI 使用 10.100.10.55……按 check-env 规则记为警告，不阻塞\"——check-env 的执行与其规则化处置留有直接产物痕迹；编排方核实的过程摘要亦确认 Phase 0.5 check-env 先行。"
+    },
+    {
+      "id": "a1-log-download",
+      "name": "Downloaded console log via console-log --save into config.tmpDir, not into skill directory",
+      "text": "控制台日志经 --save 落入 config.tmpDir（jenkins-learnings-raw/tmp/ue-error），未写入技能目录",
+      "passed": true,
+      "evidence": "报告附录：\"构建日志：C:\\Users\\Administrator\\memory\\jenkins-learnings-raw\\tmp\\ue-error\\twe-ue5_5-installed_627_20260815_035755.log（435KB）\"。实盘核验：该文件存在且为 435833 字节，路径与 skill-env.json 的 tmpDir \"C:/Users/Administrator/memory/jenkins-learnings-raw/tmp/ue-error\" 完全一致；锚点 4 确认技能目录 git status 干净、零写入。"
+    },
+    {
+      "id": "a1-error-identification",
+      "name": "Identified the two real compile errors (C2027 FViewport @ AesWorldGateScenarioController.cpp:122, C2027 FTextureResource @ AesRenderResourceBudgetSubsystem.cpp:3664/3673) and did not present UBT command lines or kernel_timeout.cc progress lines as build errors",
+      "text": "错误摘要恰好为 2 组真实编译错误，行号与 ground truth 一致；UBT 命令行噪音与通知误导均被正确排除",
+      "passed": true,
+      "evidence": "\"错误摘要\"表：#1 C2027 'FViewport' @ AesWorldGateScenarioController.cpp(122)（C2737 标注为\"#1 的级联错误\"）、#2 C2027 'FTextureResource' @ AesRenderResourceBudgetSubsystem.cpp(3664,3673)，与 ground truth 完全一致；并明确\"同组错误在 UnrealEditor/UnrealGame 两个 target 重复出现……非新错误\"、企微通知 6 插件列表是\"本次变更的插件清单，不是失败清单\"（失败仅 AesWorld，与锚点 3 一致）。全文未将 UBT 命令行或 kernel_timeout.cc 进度行列为错误。"
+    },
+    {
+      "id": "a1-kb-search",
+      "name": "Searched knowledge base via search-kb and reported matches with a 0-10 relevance score",
+      "text": "执行了知识库检索并给出 0-10 相关度评分（6/10），命中条目真实存在",
+      "passed": true,
+      "evidence": "证据表 2.2：\"搜索词 `C2027,FViewport` / `C2027,FTextureResource`，评分 **6/10**\"，并列出 index 条目 twe-installed-313-316-C2027-FTextureResource、details/077（质量分 7.5/10）与本地先例 2ea91f964。实盘核验：C:\\Users\\Administrator\\memory\\jenkins-learnings\\index.md L114 确有该条目且无详情文件，077 详情文件存在——与报告\"详情文件已缺失……故评分未达 8\"的给分理由自洽。"
+    },
+    {
+      "id": "a1-source-context",
+      "name": "Attempted source context for the error files via resolve-error-file/source-context (or documented graceful degradation for the locally missing file / stale checkout)",
+      "text": "源码上下文已完成：本地陈旧检出 + fetch 无凭据的降级路径被正确触发并文档化，最终经 GitLab API 取回 CI 版源码/blame/修复 diff",
+      "passed": true,
+      "evidence": "证据表 2.1 源码\"已完成：CI commit 处两文件源码 + include 清单 + git blame（经 GitLab API，见降级说明）\"；降级说明 1：\"本地 D:\\Git\\AesWorld dev 落后 CI 数百个 commit；git fetch（git.51vr.local 需交互输密码、10.100.10.55 凭据被拒）均失败。降级为 GitLab REST API + GITLAB_PRIVATE_TOKEN 只读取回\"。实盘核验：tmp/ue-error 下 ci627_gate_controller.cpp、ci627_budget_subsystem.cpp、ci627_blame_gate/budget.json、ci628_fix_diff.json 均存在；ci628_fix_diff.json 内容与锚点 1 的真实 diff 逐字一致（恰为 TextureResource.h + UnrealClient.h 两个 include）。ground truth 预设的\"陈旧检出/无凭据 fetch\"陷阱被完整处理。"
+    },
+    {
+      "id": "a1-diagnosis-report",
+      "name": "Final report follows Phase 3 template (诊断/错误信息/根因分析/置信度/证据/修复建议) with root cause = missing include for the C2027 undefined types",
+      "text": "报告含 Phase 3 模板全部要素，根因为 C2027 未定义类型缺 include（IWYU）",
+      "passed": true,
+      "evidence": "结构：诊断结论 + 诊断 1/诊断 2（各含\"错误信息\"原文引用、\"根因分析\"、\"置信度：高（三重证据相互印证）\"）+ \"证据（Phase 2 检查清单）\"表 + \"修复建议\"章节。根因表述如\"该文件缺少提供完整定义的头文件 UnrealClient.h\"（诊断 1）、\"该文件缺失此 include，Installed Build 下即报 C2027\"（诊断 2），与 ground truth 的 IWYU 缺 include 根因一致。"
+    },
+    {
+      "id": "a1-chinese-output",
+      "name": "Diagnosis report written in Chinese with technical terms kept in English",
+      "text": "全文中文撰写，技术名词保留英文原文",
+      "passed": true,
+      "evidence": "正文中文；C2027/C2737、FViewport、FTextureResource、include、IWYU、Installed Build、BuildPlugins、cherry-pick 等术语均保留英文。锚点 4：文件为 UTF-8 无 BOM + CRLF。"
+    },
+    {
+      "id": "a1-evidence-cited",
+      "name": "Every diagnosis claim cites evidence from at least one executed source (KB/Epic/source/web), no pure-model speculation",
+      "text": "每项诊断结论均落到已执行来源（源码 diff 实证/知识库/Epic/Jenkins 时间线），无纯模型臆测；修复内容与真实 diff 逐字吻合",
+      "passed": true,
+      "evidence": "证据表 2.1–2.4 逐项给出执行来源：源码（GitLab API 取回的 CI 源码/blame/修复 diff，附录列出全部中间文件，ci628_fix_diff.json 与锚点 1 实测 diff 完全一致——\"增加 #include \\\"UnrealClient.h\\\"/\\\"TextureResource.h\\\"\" 非臆测）；知识库（具体条目+评分 6/10）；Epic（\"两个错误分别查询，结论与实际修复逐字一致\"）；时间线（#618→#619-623→#624/626 NOT_BUILT→#625 ABORTED→#627→#628 与锚点 2 完全吻合）。引入/修复闭环（blame 到 luwei 的 495fe84e/d675f961 与 2150b488）均有 commit 级证据。"
+    },
+    {
+      "id": "a1-no-side-effects",
+      "name": "Diagnosis-only request: did NOT modify code, create branches, commit, push, or create MR; Jenkins accessed read-only",
+      "text": "纯诊断零副作用：无改码/建分支/commit/push/MR，Jenkins 与 GitLab 均只读",
+      "passed": true,
+      "evidence": "锚点 4 实测：本地 D:\\Git\\AesWorld HEAD 仍为 dev@ba832a9a、工作树干净、无新增分支；技能目录零写入。报告降级说明 1 \"未做任何写操作\"（GitLab REST 只读），降级说明 5 \"Phase 4/5/6 未执行：任务仅要求诊断\"。"
+    }
+  ],
+  "eval_feedback": "本组 10/10 通过，但断言集的区分度分层明显：(1) a1-url-parse、a1-chinese-output、a1-no-side-effects、a1-diagnosis-report、a1-error-identification 五条对基线组同样通过（见 without_skill 侧），只守质量下限、无区分度（a1-no-side-effects 对技能侧仍有防写护栏价值）。(2) a1-env-check、a1-log-download、a1-kb-search 是技能机制专属断言，能区分\"是否走了技能流程\"，但基线必然 FAIL，测的是流程合规而非诊断质量。(3) 真正测出质量差异的是 a1-evidence-cited + a1-source-context：技能组经 GitLab diff 实证使修复内容与真实 commit 逐字吻合，而基线只能推断且把 FTextureResource 的头文件推断错了。强烈建议补充一条面向结果、可客观判定的断言：\"修复建议与真实修复 commit 2150b488 的 diff 一致（FViewport→UnrealClient.h，FTextureResource→TextureResource.h 而非 RenderResource.h）\"——这是本次评测最有价值的差异点，且现有 a1-diagnosis-report 只查根因方向，抓不住\"根因对但修复内容错\"的输出。另外 a1-kb-search 的 0-10 评分无法从报告独立复核给分是否公允，只能核验命中条目存在性。",
+  "claims": [
+    {
+      "claim": "修复 commit 2150b488 恰好只给两个文件补 #include \"TextureResource.h\" / \"UnrealClient.h\"",
+      "type": "factual",
+      "verified": true,
+      "evidence": "tmp/ue-error/ci628_fix_diff.json 实盘内容与编排方锚点 1 的 GitLab 实测 diff 一致；报告\"实际修复 diff\"段引用无误。"
+    },
+    {
+      "claim": "构建时间线 #618 SUCCESS → #619–#623 FAILURE → #624 NOT_BUILT → #625 ABORTED → #626 NOT_BUILT → #627 FAILURE → #628 SUCCESS",
+      "type": "factual",
+      "verified": true,
+      "evidence": "报告\"时间线\"表与锚点 2 的 Jenkins 实测逐项吻合。"
+    },
+    {
+      "claim": "构建日志 435KB 已保存至 tmpDir（非技能目录）",
+      "type": "process",
+      "verified": true,
+      "evidence": "文件 twe-ue5_5-installed_627_20260815_035755.log 实存（435833 字节），路径=skill-env.json tmpDir；锚点 4 技能目录零写入。"
+    },
+    {
+      "claim": "仅 AesWorld 插件失败，其余 10 个插件成功",
+      "type": "factual",
+      "verified": true,
+      "evidence": "报告头部与锚点 3（SuccessedPlugins/FailedPlugins 实测）一致。"
+    },
+    {
+      "claim": "Epic 官方助手对两错误分别查询，结论与实际修复逐字一致",
+      "type": "process",
+      "verified": true,
+      "evidence": "报告证据表 2.3 与 Epic 指引段落给出具体问答结论（UnrealClient.h / TextureResource.h、PCH/IWYU 机制），且与锚点 1 真实 diff 交叉印证成立；Epic 会话本身无法独立复放，但结论可被 diff 佐证。"
+    },
+    {
+      "claim": "知识库命中 twe-installed-313-316-C2027-FTextureResource 同类案例（评分 6/10）",
+      "type": "factual",
+      "verified": true,
+      "evidence": "index.md L114 存在该条目且详情文件缺失，与报告给分理由（详情不可得故 6 分）自洽；6 分的公允性无法独立复核。"
+    }
+  ]
+}

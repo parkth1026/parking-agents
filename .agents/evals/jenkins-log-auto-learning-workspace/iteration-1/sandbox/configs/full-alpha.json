@@ -1,0 +1,28 @@
+{
+  "jenkins": {
+    "baseUrl": "http://127.0.0.1:49397"
+  },
+  "trackFile": "D:\\GIT_dev\\Claude_skills\\.claude\\skills\\jenkins-log-auto-learning-workspace\\iteration-1\\sandbox\\state\\track-p1.json",
+  "jobs": [
+    {
+      "enabled": true,
+      "name": "alpha",
+      "path": "job/teamA/job/job-alpha"
+    },
+    {
+      "enabled": false,
+      "name": "beta-disabled",
+      "path": "job/teamA/job/job-beta"
+    },
+    {
+      "enabled": true,
+      "name": "unreachable",
+      "path": "job/teamA/job/job-gone"
+    },
+    {
+      "enabled": true,
+      "name": "empty",
+      "path": "job/teamA/job/job-empty"
+    }
+  ]
+}

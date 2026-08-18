@@ -1,0 +1,15 @@
+{
+  "expectations": [
+    {"text": "SCHEMA.md exists with tag taxonomy", "passed": false, "evidence": "无 SCHEMA.md；约定写在 index.md 的 conventions 节"},
+    {"text": "index.md exists and lists all created pages", "passed": false, "evidence": "有 index.md 与主题导览，但用相对链接非 [[wikilink]] 编目，校验器 Index Completeness 0/10"},
+    {"text": "log.md exists with ingestion entry", "passed": false, "evidence": "无 log.md，changelog 并入 index.md"},
+    {"text": "Source page created for the talk", "passed": false, "evidence": "无独立 source 页；各页带 provenance 注记（部分补偿）"},
+    {"text": "Entity pages created (e.g., Karpathy, OpenAI)", "passed": false, "evidence": "无实体页，Karpathy 未建页"},
+    {"text": "Concept pages created", "passed": true, "evidence": "pages/ 下 8 篇主题文章覆盖全部概念，另含 24 词 glossary（内容质量高）"},
+    {"text": "All pages have YAML frontmatter with required fields", "passed": false, "evidence": "全部无 frontmatter，Frontmatter 维度 0/10"},
+    {"text": "Each page has at least 2 outbound wikilinks", "passed": false, "evidence": "用相对 md 链接非 wikilink，Outbound Links 维度 0/10"},
+    {"text": "No broken wikilinks (all [[links]] resolve)", "passed": true, "evidence": "vacuous pass：全 wiki 无一条 wikilink；相对链接自检通过"},
+    {"text": "Validation score >= 9.0", "passed": false, "evidence": "5/10 FAIL（orphan 0、index 0、frontmatter 0、outbound 0）"}
+  ],
+  "quantitative": {"validationScore": 5, "validationPassed": false, "validatorExitCode": 1, "entityPages": 0, "conceptPages": 8, "sourcePages": 0, "rawSaved": false, "rawNamingConvention": "n/a", "notes": "与 iteration-2 without 臂同分（5/10），跨迭代一致。亮点：glossary、时效标注、阅读顺序、自有模板；硬伤：无 raw 沉淀、无机器可解析元数据、非 wikilink 生态"}
+}

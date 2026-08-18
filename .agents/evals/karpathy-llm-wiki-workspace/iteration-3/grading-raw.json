@@ -1,0 +1,29 @@
+{
+  "meta": {
+    "date": "2026-08-18",
+    "skill_head": "397a4ea",
+    "runs_per_arm": 1,
+    "grader": "main-session agent (non-blind, same model family as runners)",
+    "validator": "scripts/validate-wiki.mjs v5 (post-397a4ea)"
+  },
+  "results": {
+    "eval-ingest-fresh": {
+      "with_skill": {"validationScore": 10, "validationPassed": true, "validatorExitCode": 0, "brokenLinkCount": 0, "hasSchema": true, "hasIndex": true, "hasLog": true, "entityPages": 1, "conceptPages": 9, "sourcePages": 1, "indexCoversAll": true, "logHasEntries": true, "rawSaved": true, "rawNaming": "followed", "tokens": 685372, "duration_s": 556.9},
+      "without_skill": {"validationScore": 5, "validationPassed": false, "validatorExitCode": 1, "brokenLinkCount": 0, "hasSchema": false, "hasIndex": false, "hasLog": false, "entityPages": 0, "conceptPages": 8, "sourcePages": 0, "rawSaved": false, "rawNaming": "n/a", "tokens": 322760, "duration_s": 635.4}
+    },
+    "eval-ingest-incremental": {
+      "with_skill": {"validationScore": 10, "validationPassed": true, "validatorExitCode": 0, "brokenLinkCount": 0, "hasSchema": true, "hasIndex": true, "hasLog": true, "entityPages": 1, "conceptPages": 4, "sourcePages": 1, "indexCoversAll": true, "logHasEntries": true, "rawSaved": true, "rawNaming": "followed", "tokens": 634423, "duration_s": 522.5},
+      "without_skill": {"validationScore": 9.3, "validationPassed": false, "validatorExitCode": 1, "brokenLinkCount": 3, "brokenDetail": "[[Flash Attention]] x3 — page exists in non-canonical techniques/ dir", "hasSchema": true, "hasIndex": true, "hasLog": true, "entityPages": 0, "conceptPages": 3, "sourcePages": 0, "rawSaved": true, "rawNaming": "violated (no date prefix)", "tokens": 330520, "duration_s": 156.2}
+    },
+    "eval-lint": {
+      "with_skill": {"validationScoreBefore": 8.5, "validationScore": 10, "validationPassed": true, "validatorExitCode": 0, "brokenLinkCount": 0, "plantedIssuesFixed": "5/5", "fixIterations": 1, "tokens": 380270, "duration_s": 412.9},
+      "without_skill": {"validationScoreBefore": 8.5, "validationScore": 9.8, "validationPassed": true, "validatorExitCode": 0, "plantedIssuesFixed": "4/5 (missed under-linked; own checker lacks rule)", "bonusFindings": "caught unplanted log/reality discrepancy, flagged honestly", "tokens": 347188, "duration_s": 408.1}
+    }
+  },
+  "audit_run": {
+    "executor": "main session (disclosed: not cold)",
+    "task": "eval-ingest-fresh",
+    "result": "10/10 PASS exit 0 after 1 fix loop (T1 template trap fired: verbatim SKILL.md index template → broken index link → FAIL at 9.75 shown as 10/10)",
+    "fidelity_log": "audit-run/process-fidelity-log.md"
+  }
+}

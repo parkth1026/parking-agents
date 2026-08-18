@@ -1,0 +1,19 @@
+{
+  "jenkins": {
+    "baseUrl": "http://127.0.0.1:1"
+  },
+  "gitRepos": "D:/GIT_dev/Claude_skills/.claude/skills/jenkins-log-auto-learning-workspace/iteration-7/sandbox/repos",
+  "knowledgeBase": {
+    "rawDir": "D:/GIT_dev/Claude_skills/.claude/skills/jenkins-log-auto-learning-workspace/iteration-7/sandbox/state/raw",
+    "wikiDir": "D:/GIT_dev/Claude_skills/.claude/skills/jenkins-log-auto-learning-workspace/iteration-7/sandbox/state/wiki"
+  },
+  "trackFile": "D:/GIT_dev/Claude_skills/.claude/skills/jenkins-log-auto-learning-workspace/iteration-7/sandbox/state/raw/analyzed-builds.json",
+  "tmpDir": "D:/GIT_dev/Claude_skills/.claude/skills/jenkins-log-auto-learning-workspace/iteration-7/sandbox/state/tmp",
+  "jobs": [
+    {
+      "enabled": true,
+      "name": "cjob",
+      "path": "job/contract/job/cjob"
+    }
+  ]
+}

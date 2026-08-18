@@ -1,0 +1,26 @@
+{
+  "generatedAt": "2026-08-15T18:12:53",
+  "totalBuilds": 6,
+  "totalFailures": 3,
+  "totalPairs": 2,
+  "pairs": [
+    {
+      "jobName": "alpha",
+      "jobPath": "job/teamA/job/job-alpha",
+      "failBuilds": [
+        31
+      ],
+      "fixBuild": 32,
+      "hasFix": true
+    },
+    {
+      "jobName": "alpha",
+      "jobPath": "job/teamA/job/job-alpha",
+      "failBuilds": [
+        35
+      ],
+      "fixBuild": 36,
+      "hasFix": true
+    }
+  ]
+}

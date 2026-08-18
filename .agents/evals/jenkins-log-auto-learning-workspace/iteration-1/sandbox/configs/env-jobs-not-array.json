@@ -1,0 +1,7 @@
+{
+  "jenkins": {
+    "baseUrl": "http://127.0.0.1:49397"
+  },
+  "trackFile": "D:\\GIT_dev\\Claude_skills\\.claude\\skills\\jenkins-log-auto-learning-workspace\\iteration-1\\sandbox\\state\\t3.json",
+  "jobs": "not-an-array"
+}

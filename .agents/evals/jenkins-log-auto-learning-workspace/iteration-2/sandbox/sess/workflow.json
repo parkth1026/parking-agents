@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "pair": {
+    "jobName": "alpha",
+    "jobPath": "job/teamA/job/job-alpha",
+    "failBuilds": [
+      31
+    ],
+    "fixBuild": 32,
+    "hasFix": true
+  },
+  "stage_gates": {
+    "1-analyze": {
+      "status": "done",
+      "closed_at": "2026-08-15T18:12:53"
+    },
+    "2-track": {
+      "status": "pending"
+    }
+  },
+  "status": "in_progress",
+  "result": "failure:score=6:C1083:fix=#32:see=D:\\GIT_dev\\Claude_skills\\.claude\\skills\\jenkins-log-auto-learning-workspace\\iteration-2\\sandbox\\sess\\raw\\details\\x.md",
+  "knowledge_file": null,
+  "success_value": null,
+  "error_reason": null,
+  "claimed_at": "2026-08-15T18:12:53",
+  "claimed_pid": 12144,
+  "finished_at": null,
+  "next_action": "跑 finish 把结论落账 analyzed{} 与 runHistory。"
+}

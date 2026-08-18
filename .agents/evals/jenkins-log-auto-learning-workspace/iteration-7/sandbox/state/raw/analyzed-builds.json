@@ -1,0 +1,59 @@
+{
+  "last_analyzed": {
+    "job/contract/job/cjob": 51
+  },
+  "analyzed": {
+    "job/contract/job/cjob#10": "failure:score=10:C2061:fix=#11",
+    "job/contract/job/cjob#20": "failure:score=8:C2061:fix=#21",
+    "job/contract/job/cjob#30": "failure:infra:disk-full-on-agent",
+    "job/contract/job/cjob#40": "failure:score=6:C2061:fix=#41:see=D:/GIT_dev/Claude_skills/.claude/skills/jenkins-log-auto-learning-workspace/iteration-7/sandbox/state/raw/details/see-target-40.md",
+    "job/contract/job/cjob#50": "failure:score=0:UNKNOWN:fix=#51"
+  },
+  "runHistory": [
+    {
+      "timestamp": "2026-08-15T18:13:22",
+      "buildsAnalyzed": 1,
+      "buildsSkipped": 0,
+      "failurePairsFound": 1,
+      "infraFailures": 0,
+      "knowledgeWritten": 0,
+      "remaining": 4
+    },
+    {
+      "timestamp": "2026-08-15T18:13:23",
+      "buildsAnalyzed": 1,
+      "buildsSkipped": 0,
+      "failurePairsFound": 1,
+      "infraFailures": 0,
+      "knowledgeWritten": 1,
+      "remaining": 3
+    },
+    {
+      "timestamp": "2026-08-15T18:13:23",
+      "buildsAnalyzed": 1,
+      "buildsSkipped": 0,
+      "failurePairsFound": 1,
+      "infraFailures": 1,
+      "knowledgeWritten": 1,
+      "remaining": 2
+    },
+    {
+      "timestamp": "2026-08-15T18:13:23",
+      "buildsAnalyzed": 1,
+      "buildsSkipped": 0,
+      "failurePairsFound": 1,
+      "infraFailures": 0,
+      "knowledgeWritten": 0,
+      "remaining": 1
+    },
+    {
+      "timestamp": "2026-08-15T18:13:23",
+      "buildsAnalyzed": 1,
+      "buildsSkipped": 0,
+      "failurePairsFound": 1,
+      "infraFailures": 0,
+      "knowledgeWritten": 0,
+      "remaining": 0
+    }
+  ]
+}

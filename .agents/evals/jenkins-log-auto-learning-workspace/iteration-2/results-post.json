@@ -1,0 +1,238 @@
+{
+  "phase": "post",
+  "baseUrl": "http://127.0.0.1:49272",
+  "results": [
+    {
+      "id": 1,
+      "name": "C1 缺 jenkins.baseUrl → exit 1 + 明确报错",
+      "passed": true,
+      "evidence": "exit=1 stderr=缺少 jenkins.baseUrl —— 请在 ~/.claude/skill-env.json（或 --config / $SKILL_ENV 指向的文件）中设置。"
+    },
+    {
+      "id": 2,
+      "name": "C2 缺 trackFile → exit 1 + 明确报错",
+      "passed": true,
+      "evidence": "exit=1 stderr=缺少 trackFile —— 请在 skill-env.json 中设置。"
+    },
+    {
+      "id": 3,
+      "name": "C3 jobs 非数组 → exit 1 + 明确报错",
+      "passed": true,
+      "evidence": "exit=1 stderr=缺少 jobs 列表 —— 请在 skill-env.json 中设置。"
+    },
+    {
+      "id": 4,
+      "name": "C4 深合并: 环境层 trackFile 覆盖技能层 + jobs 数组整体替换",
+      "passed": true,
+      "evidence": "exit=0 requests=[\"/job/teamA/job/job-beta/api/json\"] envTrack=true skillTrackCreated=false"
+    },
+    {
+      "id": 5,
+      "name": "C5 环境层为空 → 技能层配置兜底生效",
+      "passed": true,
+      "evidence": "exit=0 requests=[\"/job/teamA/job/job-alpha/api/json\"]"
+    },
+    {
+      "id": 6,
+      "name": "C6 带 UTF-8 BOM 的 config 可正常解析",
+      "passed": true,
+      "evidence": "exit=0 stderr="
+    },
+    {
+      "id": 7,
+      "name": "C7 SKILL_ENV 指向不存在文件 → 按空环境层处理",
+      "passed": true,
+      "evidence": "exit=0 stderr="
+    },
+    {
+      "id": 8,
+      "name": "C8 未知 CLI 参数 → exit 2",
+      "passed": true,
+      "evidence": "exit=2 stderr=未知参数: --bogus"
+    },
+    {
+      "id": 9,
+      "name": "C9 trackFile 以 ~ 开头 → 展开到用户主目录(不产生字面 ~ 目录)",
+      "passed": true,
+      "evidence": "expanded=true literalTildeDir=false exit=0 stderr="
+    },
+    {
+      "id": 10,
+      "name": "P1 黄金序列配对+跟踪状态",
+      "passed": true,
+      "evidence": "pairs=[{\"jobName\":\"alpha\",\"jobPath\":\"job/teamA/job/job-alpha\",\"failBuilds\":[11,12],\"fixBuild\":13,\"hasFix\":true},{\"jobName\":\"alpha\",\"jobPath\":\"job/teamA/job/job-alpha\",\"failBuilds\":[14],\"fixBuild\":16,\"hasFix\":true}] analyzed={\"job/teamA/job/job-alpha#10\":\"success:w=?\",\"job/teamA/job/job-alpha#13\":\"success:w=?\",\"job/teamA/job/job-alpha#15\":\"skip:ABORTED\",\"job/teamA/job/job-alpha#16\":\"success:w=?\"} totals=9/4/2 stdout=\n--- Scanning: alpha (job/teamA/job/job-alpha) ---\n  Builds: 9 (#10 ~ #18)\n  FAIL"
+    },
+    {
+      "id": 11,
+      "name": "P1b ABORTED 不打断 FAILURE→SUCCESS 相邻配对 ([14]→16)",
+      "passed": true,
+      "evidence": "pairs=[{\"jobName\":\"alpha\",\"jobPath\":\"job/teamA/job/job-alpha\",\"failBuilds\":[11,12],\"fixBuild\":13,\"hasFix\":true},{\"jobName\":\"alpha\",\"jobPath\":\"job/teamA/job/job-alpha\",\"failBuilds\":[14],\"fixBuild\":16,\"hasFix\":true}]"
+    },
+    {
+      "id": 12,
+      "name": "P2 幂等重跑: pending pairs 一致, track 无重复条目",
+      "passed": true,
+      "evidence": "pairsEqual=true trackUnchanged=true"
+    },
+    {
+      "id": 13,
+      "name": "P3 已分析首键的构建对被跳过",
+      "passed": true,
+      "evidence": "pairs=[{\"jobName\":\"alpha\",\"jobPath\":\"job/teamA/job/job-alpha\",\"failBuilds\":[14],\"fixBuild\":16,\"hasFix\":true}]"
+    },
+    {
+      "id": 14,
+      "name": "P4 enabled:false 任务不被扫描",
+      "passed": true,
+      "evidence": "betaRequested=false"
+    },
+    {
+      "id": 15,
+      "name": "P5 不可达任务 WARN 跳过且整体 exit 0, 空构建列表正常",
+      "passed": true,
+      "evidence": "exit=0 warn=true noBuilds=true"
+    },
+    {
+      "id": 16,
+      "name": "P6 输出格式: 无 BOM + CRLF + 字段 {generatedAt,totalBuilds,totalFailures,totalPairs,pairs}",
+      "passed": true,
+      "evidence": "keys=generatedAt,pairs,totalBuilds,totalFailures,totalPairs bom=false crlf=true"
+    },
+    {
+      "id": 17,
+      "name": "P7 首次运行自动初始化跟踪文件结构",
+      "passed": true,
+      "evidence": "track={\"last_analyzed\":{},\"analyzed\":{\"job/teamA/job/job-beta#21\":\"success:w=?\"},\"runHistory\":[]}"
+    },
+    {
+      "id": 18,
+      "name": "T1 默认输出不得写入技能目录 tmp/",
+      "passed": true,
+      "evidence": "freshWrite=false newlyCreated=false exit=0"
+    },
+    {
+      "id": 19,
+      "name": "T2 默认输出=trackFile 同目录, 技能目录文件清单零变化",
+      "passed": true,
+      "evidence": "outAtTrackDir=true skillDirClean=true stdout=\n--- Scanning: beta (job/teamA/job/job-beta) ---\n  Builds: 2 (#20 ~ #21)\n  FAILURE->SUCCESS pairs: 1\n\n=== DONE ===\nPairs file: D:\\GIT_dev\\Claude_skill"
+    },
+    {
+      "id": 20,
+      "name": "S1 status: 无会话时 exit 0 并给出 next 提示",
+      "passed": true,
+      "evidence": "exit=0 out=会话: 无 | next: 跑 next 领取下一个构建对。 | 配置: baseUrl=http://127.0.0.1:49272 |       gitRepos=(未设) |       rawDir=D:/GIT_dev/Claude_skills/.claude/skills/jenkins-log-auto-learning-workspace/iteration-2/sandbox"
+    },
+    {
+      "id": 21,
+      "name": "S2 next: pending-pairs 不存在 → exit 1 提示先扫描",
+      "passed": true,
+      "evidence": "exit=1 err=session: pending-pairs.json 不存在 —— 先跑 scan-pairs.mjs。"
+    },
+    {
+      "id": 22,
+      "name": "S3 next: 领取第一个未分析对并原子写入 workflow.json",
+      "passed": true,
+      "evidence": "exit=0 wf={\"schema_version\":1,\"pair\":{\"jobName\":\"alpha\",\"jobPath\":\"job/teamA/job/job-alpha\",\"failBuilds\":[31],\"fixBuild\":32,\"hasFix\":true},\"stage_gates\":{\"1-analyze\":{\"st"
+    },
+    {
+      "id": 23,
+      "name": "S4 next: 已有进行中会话 → 拒绝领取(单实例锁)",
+      "passed": true,
+      "evidence": "exit=1 err=session: 已有进行中的会话（alpha fail=[31]，claimed_at=2026-08-15T18:12:48）。\n同一跟踪文件同一时间只运行一个实例。续跑见 status 输出；确"
+    },
+    {
+      "id": 24,
+      "name": "S5 finish: 1-analyze 未收尾 → exit 1 门禁拦截",
+      "passed": true,
+      "evidence": "exit=1 err=session: 门禁: 1-analyze 还是 pending（未收尾）。先由子技能 stage 1-analyze done|skipped|error。"
+    },
+    {
+      "id": 25,
+      "name": "S6 stage done: 缺 --result → exit 2",
+      "passed": true,
+      "evidence": "exit=2 err=session: done 必须带 --result \"<结论串>\"，grammar 见脚本头注释。"
+    },
+    {
+      "id": 26,
+      "name": "S7 stage done: 非法结论串 → exit 1 拒绝",
+      "passed": true,
+      "evidence": "exit=1 err=session: --result 不符合 grammar: failure:bogus"
+    },
+    {
+      "id": 27,
+      "name": "S19 stage: 非法阶段名/非法状态 → exit 2",
+      "passed": true,
+      "evidence": "stage2=2 pending=2"
+    },
+    {
+      "id": 28,
+      "name": "S8 stage done: 合法结论串+知识文件+success 落入会话",
+      "passed": true,
+      "evidence": "exit=0 result=failure:score=9:C2061:fix=#32"
+    },
+    {
+      "id": 29,
+      "name": "S9 stage: 已收尾后重复收尾 → exit 1",
+      "passed": true,
+      "evidence": "exit=1 err=session: 1-analyze 已是 done，不得重复收尾。"
+    },
+    {
+      "id": 30,
+      "name": "S10 finish: analyzed{} 落账 + runHistory 恰好 7 字段 + 会话终结 + 账本无BOM CRLF",
+      "passed": true,
+      "evidence": "exit=0 keys=buildsAnalyzed,buildsSkipped,failurePairsFound,infraFailures,knowledgeWritten,remaining,timestamp analyzed={\"job/teamA/job/job-alpha#31\":\"failure:score=9:C2061:fix=#32\",\"job/teamA/job/job-alpha#32\":\"success:w=12\"}"
+    },
+    {
+      "id": 31,
+      "name": "S11 next: 终结后领取下一对(跳过已落账)",
+      "passed": true,
+      "evidence": "exit=0 fail=35"
+    },
+    {
+      "id": 32,
+      "name": "S12/13 error→finish: failure:error:{reason} 落账",
+      "passed": true,
+      "evidence": "stage=0 finish=0 v=failure:error:api down"
+    },
+    {
+      "id": 33,
+      "name": "S15 next: 全部落账后 → exit 1 报告没有新对",
+      "passed": true,
+      "evidence": "exit=1"
+    },
+    {
+      "id": 34,
+      "name": "S14 abandon: 落账 failure:error 防重复领取, 之后 next 取下一对",
+      "passed": true,
+      "evidence": "abandon=0 next2=0 fail=35"
+    },
+    {
+      "id": 35,
+      "name": "S18b stage done: :see= 指向不存在文件 → exit 1 拒绝",
+      "passed": true,
+      "evidence": "exit=1"
+    },
+    {
+      "id": 36,
+      "name": "S18 stage done: 重复模式 :see= 后缀被接受（指向真实知识文件）",
+      "passed": true,
+      "evidence": "exit=0 err="
+    },
+    {
+      "id": 37,
+      "name": "S16/17 list+status: 会话指针可见, 目录无 .tmp 残留(原子写)",
+      "passed": true,
+      "evidence": "list=0 status=0 tmp=[]"
+    },
+    {
+      "id": 38,
+      "name": "E1 编排闭环: scan→next→分析收尾→落账→下一对→error→落账→无对可领",
+      "passed": true,
+      "evidence": "scan=0 n1=0 fin1=0 n2=0 fin2=0 n3=1"
+    }
+  ],
+  "summary": {
+    "passed": 38,
+    "total": 38
+  }
+}

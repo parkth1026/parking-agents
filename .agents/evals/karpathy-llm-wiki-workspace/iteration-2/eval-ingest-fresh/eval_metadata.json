@@ -1,0 +1,19 @@
+{
+  "eval_id": 1,
+  "eval_name": "eval-ingest-fresh",
+  "prompt": "I want to start a fresh LLM wiki. I just watched Karpathy's 'Intro to Large Language Models' talk — can you ingest the key concepts from it? Here are the main topics he covered: what LLMs are (next token prediction on internet text), how training works (pretraining vs fine-tuning), emergent capabilities at scale, tool use and system prompts, security risks (jailbreaks, prompt injection), and the future of LLM OS. Set up the wiki structure and create the initial pages.",
+  "assertions": [
+    {"text": "SCHEMA.md exists with tag taxonomy", "type": "file_exists"},
+    {"text": "index.md exists and lists all created pages", "type": "content_check"},
+    {"text": "log.md exists with ingestion entry", "type": "content_check"},
+    {"text": "Source page created for the talk", "type": "content_check"},
+    {"text": "Entity pages created (e.g., Karpathy, OpenAI)", "type": "content_check"},
+    {"text": "Concept pages created (e.g., Transformer, Fine-tuning)", "type": "content_check"},
+    {"text": "All pages have YAML frontmatter with required fields", "type": "content_check"},
+    {"text": "Each page has at least 2 outbound wikilinks", "type": "content_check"},
+    {"text": "No broken wikilinks (all [[links]] resolve)", "type": "validation"},
+    {"text": "Validation score >= 9.0", "type": "validation"},
+    {"text": "Wiki written to config-resolved path (mock env knowledgeBase.wikiDir), not elsewhere", "type": "process_check"},
+    {"text": "No files created inside the skill directory or real C:/Users/Administrator/memory dirs", "type": "process_check"}
+  ]
+}

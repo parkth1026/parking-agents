@@ -1,0 +1,27 @@
+{
+  "eval_id": 5,
+  "eval_name": "eval-enhanced-input-mapping-context",
+  "prompt": "UE5 的 Enhanced Input，在 PlayerController 的 C++ 里怎么添加 Input Mapping Context 并绑定移动回调？请通过 Epic 官方助手查权威答案，回答要含官方文档链接和可运行的 C++ 代码示例。",
+  "assertions": [
+    {
+      "name": "answer_非空_含实质内容",
+      "description": "answer.md 至少 300 字符"
+    },
+    {
+      "name": "answer_含可运行C++示例",
+      "description": "包含 AddMappingContext / EnhancedInputComponent / BindAction 之一"
+    },
+    {
+      "name": "answer_附官方参考链接",
+      "description": "至少 1 个 dev.epicgames.com/documentation 链接"
+    },
+    {
+      "name": "answer_与EnhancedInput主题相关",
+      "description": "提到 Mapping Context 或 Enhanced Input"
+    },
+    {
+      "name": "引用链接与References一致",
+      "description": "answer.md 中的官方链接出现在 result.json 的 References 里（防伪造引用）"
+    }
+  ]
+}

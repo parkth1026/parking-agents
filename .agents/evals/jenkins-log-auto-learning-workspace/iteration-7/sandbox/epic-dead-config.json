@@ -1,0 +1,8 @@
+{
+  "api": {
+    "baseUrl": "http://127.0.0.1:9",
+    "origin": "http://127.0.0.1:9",
+    "referer": "http://127.0.0.1:9/x",
+    "userAgent": "contract-test"
+  }
+}

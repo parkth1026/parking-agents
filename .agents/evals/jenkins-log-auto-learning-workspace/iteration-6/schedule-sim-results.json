@@ -1,0 +1,342 @@
+{
+  "total": 56,
+  "failed": 0,
+  "results": [
+    {
+      "id": 1,
+      "name": "A1 冷启动 status: 无会话+提示先扫描",
+      "passed": true,
+      "evidence": "会话: 无"
+    },
+    {
+      "id": 2,
+      "name": "A2 首次 scan 成功且发现 3 对",
+      "passed": true,
+      "evidence": "exit=0, totalPairs=3"
+    },
+    {
+      "id": 3,
+      "name": "A3 scan 只记终态事实（5 键；尾部失败/BUILDING 不落账）",
+      "passed": true,
+      "evidence": "{\"job/teamA/job/job-alpha#10\":\"success:w=?\",\"job/teamA/job/job-alpha#13\":\"success:w=?\",\"job/teamA/job/job-alpha#15\":\"skip:ABORTED\",\"job/teamA/job/job-alpha#16\":\"success:w=?\",\"job/teamA/job/job-beta#21\":\"success:w=?\"}"
+    },
+    {
+      "id": 4,
+      "name": "A4 禁用任务未被请求",
+      "passed": true,
+      "evidence": "job/teamA/job/job-alpha,job/teamA/job/job-beta,job/teamA/job/job-empty,job/teamA/job/job-stress"
+    },
+    {
+      "id": 5,
+      "name": "A5 next 领取第一对 alpha[11,12]→13",
+      "passed": true,
+      "evidence": "已领取: alpha (job/teamA/job/job-alpha) fail=[11,12] fix=#13"
+    },
+    {
+      "id": 6,
+      "name": "A6 单实例锁: 会话进行中再 next 拒绝(exit 1)+续跑提示",
+      "passed": true,
+      "evidence": "session: 已有进行中的会话（alpha fail=[11,12]，claimed_at=2026-08-15T18:13:08）。"
+    },
+    {
+      "id": 7,
+      "name": "B1 stage done 收尾成功",
+      "passed": true,
+      "evidence": "1-analyze → done；result=failure:score=8:C2061:fix=#13"
+    },
+    {
+      "id": 8,
+      "name": "B2 finish 落账 3 键+fixBuild 覆盖 success:w=3",
+      "passed": true,
+      "evidence": "{\"a11\":\"failure:score=8:C2061:fix=#13\",\"a13\":\"success:w=3\"}"
+    },
+    {
+      "id": 9,
+      "name": "B3 runHistory 第 1 条字段正确",
+      "passed": true,
+      "evidence": "{\"timestamp\":\"2026-08-15T18:13:09\",\"buildsAnalyzed\":3,\"buildsSkipped\":0,\"failurePairsFound\":1,\"infraFailures\":0,\"knowledgeWritten\":1,\"remaining\":2}"
+    },
+    {
+      "id": 10,
+      "name": "B4 last_analyzed 推进到 13",
+      "passed": true,
+      "evidence": "13"
+    },
+    {
+      "id": 11,
+      "name": "B5 第 2 次触发领取下一对 alpha[14]（不重复）",
+      "passed": true,
+      "evidence": "已领取: alpha (job/teamA/job/job-alpha) fail=[14] fix=#16"
+    },
+    {
+      "id": 12,
+      "name": "B6 skip 路径落账",
+      "passed": true,
+      "evidence": "skip:REUSED"
+    },
+    {
+      "id": 13,
+      "name": "B7 第 3 次触发领取 beta[20]",
+      "passed": true,
+      "evidence": "已领取: beta (job/teamA/job/job-beta) fail=[20] fix=#21"
+    },
+    {
+      "id": 14,
+      "name": "B8 error 路径落账且不中断循环",
+      "passed": true,
+      "evidence": "failure:error:log-download-404"
+    },
+    {
+      "id": 15,
+      "name": "B9 耗尽: next 报无对(exit 1)",
+      "passed": true,
+      "evidence": "没有新的构建对需要分析（pending-pairs 中所有对都已落账）。可重跑 scan-pairs.mjs 拉取新构建。"
+    },
+    {
+      "id": 16,
+      "name": "B10 耗尽后重扫(无新构建)仍 0 对",
+      "passed": true,
+      "evidence": "totalPairs=0"
+    },
+    {
+      "id": 17,
+      "name": "B11 再次 next 仍无对 → 报告停止（脚本层 exit 1）",
+      "passed": true,
+      "evidence": "没有新的构建对需要分析（pending-pairs 中所有对都已落账）。可重跑 scan-pairs.mjs 拉取新构建。"
+    },
+    {
+      "id": 18,
+      "name": "B12 status 提示 pending 已过期(>1h)",
+      "passed": true,
+      "evidence": "pending-pairs: 0 对待分析，生成于 2026-08-15T16:13:09 (2.0 小时前（超过 1 小时，建议先重跑 scan-pairs.mjs）)"
+    },
+    {
+      "id": 19,
+      "name": "B13 重扫发现新失败对 beta[22]→23，旧账未丢",
+      "passed": true,
+      "evidence": "pairs=1, keys=11"
+    },
+    {
+      "id": 20,
+      "name": "B14 新对完成分析落账（持续积累成立）",
+      "passed": true,
+      "evidence": "failure:score=6:LNK2019:fix=#23"
+    },
+    {
+      "id": 21,
+      "name": "C1 崩溃后新触发: status 显示进行中+续跑指针",
+      "passed": true,
+      "evidence": "会话: 进行中"
+    },
+    {
+      "id": 22,
+      "name": "C2 续跑后正常落账，fixBuild 覆盖 w=12",
+      "passed": true,
+      "evidence": "success:w=12"
+    },
+    {
+      "id": 23,
+      "name": "C3 stage 后崩溃: status 指针指向 finish",
+      "passed": true,
+      "evidence": "next: 跑 finish 把结论落账 analyzed{} 与 runHistory。"
+    },
+    {
+      "id": 24,
+      "name": "C4 恢复 finish 恰好落账一次（无重复记账）",
+      "passed": true,
+      "evidence": "5 → 6"
+    },
+    {
+      "id": 25,
+      "name": "C5 abandon 僵死会话: 落账 error + 会话终结",
+      "passed": true,
+      "evidence": "failure:error:stale-agent-crash"
+    },
+    {
+      "id": 26,
+      "name": "C6 abandon 后下次触发领取恢复正常（无对时干净退出）",
+      "passed": true,
+      "evidence": "没有新的构建对需要分析（pending-pairs 中所有对都已落账）。可重跑 scan-pairs.mjs 拉取新构建。"
+    },
+    {
+      "id": 27,
+      "name": "D1 门禁: 1-analyze 未收尾时 finish 拒绝",
+      "passed": true,
+      "evidence": "session: 门禁: 1-analyze 还是 pending（未收尾）。先由子技能 stage 1-analyze done|skipped|error。"
+    },
+    {
+      "id": 28,
+      "name": "D3 非法结论串拒绝(grammar 校验)",
+      "passed": true,
+      "evidence": "session: --result 不符合 grammar: 不合法的结论串"
+    },
+    {
+      "id": 29,
+      "name": "D2 重复收尾拒绝",
+      "passed": true,
+      "evidence": "session: 1-analyze 已是 done，不得重复收尾。"
+    },
+    {
+      "id": 30,
+      "name": "D4 正常 finish 通过",
+      "passed": true,
+      "evidence": "0"
+    },
+    {
+      "id": 31,
+      "name": "D5 会话终结后重复 finish 拒绝",
+      "passed": true,
+      "evidence": "session: 会话已终结。"
+    },
+    {
+      "id": 32,
+      "name": "D6 workflow.json 损坏: status 优雅报错+指引(不静默)",
+      "passed": true,
+      "evidence": "session: workflow.json 不是合法 JSON（Expected property name or '}' in JSON at position 2 (line 1 column 3)）。人工检查后删除再 next，或 abandon。"
+    },
+    {
+      "id": 33,
+      "name": "D7 人工删除损坏 workflow 后恢复",
+      "passed": true,
+      "evidence": "会话: 无"
+    },
+    {
+      "id": 34,
+      "name": "D8 账本损坏: status 优雅报错+恢复指引",
+      "passed": true,
+      "evidence": "analyzed-builds.json（跟踪账本） 不是合法 JSON（Unexpected end of JSON input）。从备份恢复或人工修复 JSON 后重试；损坏期间不要跑 next/finish（会以空账本覆盖历史）。"
+    },
+    {
+      "id": 35,
+      "name": "E1 20 轮零重复领取",
+      "passed": true,
+      "evidence": "dup=0"
+    },
+    {
+      "id": 36,
+      "name": "E2 账本键数单调不减",
+      "passed": true,
+      "evidence": "shrank=0"
+    },
+    {
+      "id": 37,
+      "name": "E3 每轮恰好一次 runHistory 记账",
+      "passed": true,
+      "evidence": "8 → 28"
+    },
+    {
+      "id": 38,
+      "name": "E4 期末 remaining 与 pending/analyzed 交叉一致",
+      "passed": true,
+      "evidence": "history=0, recount=0"
+    },
+    {
+      "id": 39,
+      "name": "E5 终态分布覆盖 done/infra/skip/error 四路",
+      "passed": true,
+      "evidence": ""
+    },
+    {
+      "id": 40,
+      "name": "E6 重扫幂等: 键数与对数稳定",
+      "passed": true,
+      "evidence": "第1次=60/0, 第2次=60/0"
+    },
+    {
+      "id": 41,
+      "name": "E7 账本 UTF-8 无 BOM + CRLF",
+      "passed": true,
+      "evidence": "bom=false, crlf=true"
+    },
+    {
+      "id": 42,
+      "name": "F1a 尾部失败从未被预写 no-fix-found（瞬态不落账）",
+      "passed": true,
+      "evidence": "undefined"
+    },
+    {
+      "id": 43,
+      "name": "F1b 修复到来后尾部组配对成功（[17,19]→20，错误案例不丢）",
+      "passed": true,
+      "evidence": "{\"jobName\":\"alpha\",\"jobPath\":\"job/teamA/job/job-alpha\",\"failBuilds\":[17,19],\"fixBuild\":20,\"hasFix\":true}"
+    },
+    {
+      "id": 44,
+      "name": "F1c 修复对可被领取",
+      "passed": true,
+      "evidence": "已领取: alpha (job/teamA/job/job-alpha) fail=[17,19] fix=#20"
+    },
+    {
+      "id": 45,
+      "name": "F1d 领取后落账真实终态（覆盖曾经的瞬态）",
+      "passed": true,
+      "evidence": "failure:score=7:HEAL1:fix=#20"
+    },
+    {
+      "id": 46,
+      "name": "F2a BUILDING 构建不落账",
+      "passed": true,
+      "evidence": "undefined"
+    },
+    {
+      "id": 47,
+      "name": "F2b BUILDING→FAILURE 完成后修复对正常入队",
+      "passed": true,
+      "evidence": "{\"jobName\":\"alpha\",\"jobPath\":\"job/teamA/job/job-alpha\",\"failBuilds\":[21],\"fixBuild\":22,\"hasFix\":true}"
+    },
+    {
+      "id": 48,
+      "name": "F2c 该对可被领取",
+      "passed": true,
+      "evidence": "已领取: alpha (job/teamA/job/job-alpha) fail=[21] fix=#22"
+    },
+    {
+      "id": 49,
+      "name": "F3a 旧版预写的 no-fix-found 被自愈回炉入队（healed_no_fix 记录）",
+      "passed": true,
+      "evidence": "pair=存在, healed={\"job/teamA/job/job-beta#34\":true}"
+    },
+    {
+      "id": 50,
+      "name": "F3b 自愈对可被领取",
+      "passed": true,
+      "evidence": "已领取: beta (job/teamA/job/job-beta) fail=[34] fix=#35"
+    },
+    {
+      "id": 51,
+      "name": "F3c 分析结论为 no-fix 时不无限重开（一次性自愈守卫）",
+      "passed": true,
+      "evidence": "pair=未重开"
+    },
+    {
+      "id": 52,
+      "name": "F4 旧版 skip:BUILDING 冻结被自愈（删冻结键 + 修复对入队）",
+      "passed": true,
+      "evidence": "val=undefined"
+    },
+    {
+      "id": 53,
+      "name": "F5a Jenkins 全断: scan exit 1 且不生成 pending（告警而非静默无对）",
+      "passed": true,
+      "evidence": "exit=1"
+    },
+    {
+      "id": 54,
+      "name": "F5b 部分任务不可达: exit 0 + WARN + pending 照常生成",
+      "passed": true,
+      "evidence": "exit=0"
+    },
+    {
+      "id": 55,
+      "name": "F6 账本损坏: scan 优雅报错且不以空账本覆盖历史",
+      "passed": true,
+      "evidence": "analyzed-builds.json（跟踪账本） 不是合法 JSON（Unexpected token 'o', \"not json\" is not valid JSON）。从备份恢复或人工修复 JSON 后重试；损坏期间不要继续扫描（会以空账本覆盖历史）。"
+    },
+    {
+      "id": 56,
+      "name": "F7 pending 损坏: status 优雅报错（重扫重建指引）",
+      "passed": true,
+      "evidence": "会话: 已终结(上一轮)"
+    }
+  ]
+}

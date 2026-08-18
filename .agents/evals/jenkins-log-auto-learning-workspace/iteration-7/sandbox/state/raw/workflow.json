@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "pair": {
+    "jobName": "cjob",
+    "jobPath": "job/contract/job/cjob",
+    "failBuilds": [
+      50
+    ],
+    "fixBuild": 51,
+    "hasFix": true
+  },
+  "stage_gates": {
+    "1-analyze": {
+      "status": "done",
+      "closed_at": "2026-08-15T18:13:23"
+    },
+    "2-track": {
+      "status": "done",
+      "closed_at": "2026-08-15T18:13:23"
+    }
+  },
+  "status": "done",
+  "result": "failure:score=0:UNKNOWN:fix=#51",
+  "knowledge_file": null,
+  "success_value": null,
+  "error_reason": null,
+  "claimed_at": "2026-08-15T18:13:23",
+  "claimed_pid": 11244,
+  "finished_at": "2026-08-15T18:13:23",
+  "next_action": "向用户报告本轮结论（阶段 3），然后停止。下次调用从 next 开始。"
+}

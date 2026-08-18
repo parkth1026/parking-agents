@@ -1,0 +1,180 @@
+{
+  "total": 29,
+  "failed": 0,
+  "results": [
+    {
+      "id": 1,
+      "name": "C1 领取首对（夹具就绪）",
+      "passed": true,
+      "evidence": "已领取: cjob (job/contract/job/cjob) fail=[10] fix=#11"
+    },
+    {
+      "id": 2,
+      "name": "C2 [G3] score=99 被拒（满分 10）",
+      "passed": true,
+      "evidence": "session: --result 不符合 grammar: failure:score=99:C2061:fix=#11"
+    },
+    {
+      "id": 3,
+      "name": "C3 [G3] score=11 被拒",
+      "passed": true,
+      "evidence": "1"
+    },
+    {
+      "id": 4,
+      "name": "C4 [G3] score=10 上界放行",
+      "passed": true,
+      "evidence": "1-analyze → done；result=failure:score=10:C2061:fix=#11"
+    },
+    {
+      "id": 5,
+      "name": "C5 score=10 正常落账",
+      "passed": true,
+      "evidence": "0"
+    },
+    {
+      "id": 6,
+      "name": "C6 [G1] knowledge 不存在被拒",
+      "passed": true,
+      "evidence": "session: --knowledge 文件不存在: D:/GIT_dev/Claude_skills/.claude/skills/jenkins-log-auto-learning-workspace/iteration-7/sandbox/state/raw/details/ghost.md"
+    },
+    {
+      "id": 7,
+      "name": "C7 [G1] knowledge 在 rawDir 外被拒（只写 rawDir 约束机械化）",
+      "passed": true,
+      "evidence": "session: --knowledge 必须位于 knowledgeBase.rawDir（D:/GIT_dev/Claude_skills/.claude/skills/jenkins-log-auto-learning-workspace/iteration-7/sandbox/state/raw）内，收到: D:/GIT_dev/Claude_skills/.claude/skills/jenkins-log-auto-learning-workspace/iteration-7/sandbox/outside/evil.md"
+    },
+    {
+      "id": 8,
+      "name": "C8 [G1] rawDir 内存在的 knowledge 放行",
+      "passed": true,
+      "evidence": "1-analyze → done；result=failure:score=8:C2061:fix=#21"
+    },
+    {
+      "id": 9,
+      "name": "C9 合法 knowledge 落账 knowledgeWritten=1",
+      "passed": true,
+      "evidence": "{\"timestamp\":\"2026-08-15T18:13:23\",\"buildsAnalyzed\":1,\"buildsSkipped\":0,\"failurePairsFound\":1,\"infraFailures\":0,\"knowledgeWritten\":1,\"remaining\":3}"
+    },
+    {
+      "id": 10,
+      "name": "C10 [G2] 缺一级标题被拒",
+      "passed": true,
+      "evidence": "session: 知识文件缺一级标题（格式 \"# {ErrorCode}: {简述}\"，见 knowledge-format.md）: D:/GIT_dev/Claude_skills/.claude/skills/jenkins-log-auto-learning-workspace/iteration-7/sandbox/state/raw/details/no-heading-30.md"
+    },
+    {
+      "id": 11,
+      "name": "C11 [G2] 内容不含错误码 token 被拒（防搜索沉底）",
+      "passed": true,
+      "evidence": "session: 知识文件内容不含错误码 token \"C4180\"——search-kb 按内容检索，该文件将永远搜不到（标题需含 ErrorCode，见 knowledge-format.md）"
+    },
+    {
+      "id": 12,
+      "name": "C12 [G2] infra 结论的 reason token 同样校验",
+      "passed": true,
+      "evidence": "session: 知识文件内容不含错误码 token \"disk-full-on-agent\"——search-kb 按内容检索，该文件将永远搜不到（标题需含 ErrorCode，见 knowledge-format.md）"
+    },
+    {
+      "id": 13,
+      "name": "C13 [G2] infra token 存在时放行",
+      "passed": true,
+      "evidence": "1-analyze → done；result=failure:infra:disk-full-on-agent"
+    },
+    {
+      "id": 14,
+      "name": "C14 [G1] :see= 指向不存在的文件被拒",
+      "passed": true,
+      "evidence": "session: --result 的 :see= 必须指向 rawDir/wikiDir 内已存在的知识文件，收到: D:/GIT_dev/Claude_skills/.claude/skills/jenkins-log-auto-learning-workspace/iteration-7/sandbox/state/raw/details/ghost.md"
+    },
+    {
+      "id": 15,
+      "name": "C15 [G1] :see= 指向 rawDir 内存在文件放行",
+      "passed": true,
+      "evidence": "1-analyze → done；result=failure:score=6:C2061:fix=#41:see=D:/GIT_dev/Claude_skills/.claude/skills/jenkins-log-auto-learning-workspace/iteration-7/sandbox/state/raw/details/see-target-40.md"
+    },
+    {
+      "id": 16,
+      "name": "C16 :see= 落账完整",
+      "passed": true,
+      "evidence": "failure:score=6:C2061:fix=#41:see=D:/GIT_dev/Claude_skills/.claude/skills/jenkins-log-auto-learning-workspace/iteration-7/sandbox/state/raw/details/see-target-40.md"
+    },
+    {
+      "id": 17,
+      "name": "C17 [G3] score=0 下界放行",
+      "passed": true,
+      "evidence": "1-analyze → done；result=failure:score=0:UNKNOWN:fix=#51"
+    },
+    {
+      "id": 18,
+      "name": "C18 无 knowledge 时 knowledgeWritten=0（不虚记）",
+      "passed": true,
+      "evidence": "{\"timestamp\":\"2026-08-15T18:13:23\",\"buildsAnalyzed\":1,\"buildsSkipped\":0,\"failurePairsFound\":1,\"infraFailures\":0,\"knowledgeWritten\":0,\"remaining\":0}"
+    },
+    {
+      "id": 19,
+      "name": "K1 [G5] search-kb 能发现 pair-analyze 写入 details/ 的文件",
+      "passed": true,
+      "evidence": "\"filePath\": \"D:\\\\GIT_dev\\\\Claude_skills\\\\.claude\\\\skills\\\\jenkins-log-auto-learning-workspace\\\\iteration-7\\\\sandbox\\\\kb\\\\raw\\\\details\\\\twe-100-C2061-M"
+    },
+    {
+      "id": 20,
+      "name": "K2 [G5] search-kb 能发现 pair-analyze 写入 scratch/ 的文件",
+      "passed": true,
+      "evidence": "0"
+    },
+    {
+      "id": 21,
+      "name": "K3 [G4] 正文缺 token 时文件名兜底匹配（历史沉底文件可发现）",
+      "passed": true,
+      "evidence": "["
+    },
+    {
+      "id": 22,
+      "name": "K4 [G4] save-knowledge 命名对齐 pair-analyze 口径（{job}-{build}-{code}-{desc}.md）",
+      "passed": true,
+      "evidence": "D:\\GIT_dev\\Claude_skills\\.claude\\skills\\jenkins-log-auto-learning-workspace\\iteration-7\\sandbox\\kb\\raw\\details\\aes6-900-C4180-missing_include_fix.md"
+    },
+    {
+      "id": 23,
+      "name": "K5 [G4] 头部对齐（一级标题含错误码 + Job/Builds 行）",
+      "passed": true,
+      "evidence": "# C4180: missing include fix |  | > **Job**: aes6 | **Date**: 2026-08-15 18:13"
+    },
+    {
+      "id": 24,
+      "name": "K6 [G4] 同码同描述仍追加 Update 段落（行为保持）",
+      "passed": true,
+      "evidence": "D:\\GIT_dev\\Claude_skills\\.claude\\skills\\jenkins-log-auto-learning-workspace\\iteration-7\\sandbox\\kb\\raw\\details\\aes6-900-C4180-missing_include_fix.md"
+    },
+    {
+      "id": 25,
+      "name": "K7 [G5] ue-error-solver 写入的文件能被 search-kb 发现（含新命名）",
+      "passed": true,
+      "evidence": "0"
+    },
+    {
+      "id": 26,
+      "name": "E1 [G5] epic CLI 子命令表含 ask（epic-query.md 的入口存在）",
+      "passed": true,
+      "evidence": "未知子命令: undefined（可用: csrf | ask | answer）"
+    },
+    {
+      "id": 27,
+      "name": "E2 [G5] ask 缺 --question 时明确报错（参数名契约）",
+      "passed": true,
+      "evidence": "缺少 --question 参数"
+    },
+    {
+      "id": 28,
+      "name": "E3 [G5] epic-query.md 的完整 flag 组合被脚本接受（到达网络层而非 usage 拒绝）",
+      "passed": true,
+      "evidence": "{"
+    },
+    {
+      "id": 29,
+      "name": "E4 [G5] 响应字段契约（AgentAnswer/HtmlAnswer/References）在脚本中存在",
+      "passed": true,
+      "evidence": ""
+    }
+  ]
+}

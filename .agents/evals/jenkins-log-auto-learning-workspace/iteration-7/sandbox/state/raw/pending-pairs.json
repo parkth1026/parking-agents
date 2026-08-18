@@ -1,0 +1,53 @@
+{
+  "generatedAt": "2026-08-15T00:00:00",
+  "totalBuilds": 10,
+  "totalFailures": 5,
+  "totalPairs": 5,
+  "pairs": [
+    {
+      "jobName": "cjob",
+      "jobPath": "job/contract/job/cjob",
+      "failBuilds": [
+        10
+      ],
+      "fixBuild": 11,
+      "hasFix": true
+    },
+    {
+      "jobName": "cjob",
+      "jobPath": "job/contract/job/cjob",
+      "failBuilds": [
+        20
+      ],
+      "fixBuild": 21,
+      "hasFix": true
+    },
+    {
+      "jobName": "cjob",
+      "jobPath": "job/contract/job/cjob",
+      "failBuilds": [
+        30
+      ],
+      "fixBuild": 31,
+      "hasFix": true
+    },
+    {
+      "jobName": "cjob",
+      "jobPath": "job/contract/job/cjob",
+      "failBuilds": [
+        40
+      ],
+      "fixBuild": 41,
+      "hasFix": true
+    },
+    {
+      "jobName": "cjob",
+      "jobPath": "job/contract/job/cjob",
+      "failBuilds": [
+        50
+      ],
+      "fixBuild": 51,
+      "hasFix": true
+    }
+  ]
+}

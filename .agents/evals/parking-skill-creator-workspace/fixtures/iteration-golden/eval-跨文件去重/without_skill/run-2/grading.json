@@ -1,0 +1,17 @@
+{
+  "results": [
+    {
+      "name": "合并清单无重复签名",
+      "text": "outputs 输出不满足断言「合并清单无重复签名」",
+      "passed": false,
+      "evidence": "输出缺失对应内容"
+    },
+    {
+      "name": "保留首次出现位置",
+      "text": "outputs 输出不满足断言「保留首次出现位置」",
+      "passed": "yes",
+      "evidence": "输出缺失对应内容"
+    }
+  ],
+  "eval_feedback": ""
+}

@@ -1,0 +1,11 @@
+{
+  "expectations": [
+    {"text": "validate-wiki.mjs script executed", "passed": true, "evidence": "基线 8.5/10 FAIL exit 1 → 修复后 10/10 PASS exit 0"},
+    {"text": "Report includes all 8 validation dimensions", "passed": true, "evidence": "lint-report.md 覆盖 8 维度，报告落在 wiki 外（规避报告被当页面计分）"},
+    {"text": "Broken links identified and fixed", "passed": true, "evidence": "[[Ghost Network]] 按策略#2 去链留文，理由记录（低于建页阈值）"},
+    {"text": "All planted issues fixed (broken/orphan/index/frontmatter/underlinked)", "passed": true, "evidence": "5/5：孤儿页补 frontmatter+入链+编目（入链来自 Neural Network 新 Related 节，同时修复 under-linked）"},
+    {"text": "Re-run until score >= 9.0 and broken = 0", "passed": true, "evidence": "一轮修复收敛，复跑 10/10 exit 0"},
+    {"text": "log.md updated with lint entry", "passed": true, "evidence": "append-only 追加 lint 行"}
+  ],
+  "quantitative": {"validationScoreBefore": 8.5, "validationScoreAfter": 10, "validationPassed": true, "validatorExitCode": 0, "notes": "按技能优先级顺序修复；未发现种子 log 中 Attention Mechanism 的记录失真（without 臂发现了——见对比报告）"}
+}

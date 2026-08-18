@@ -1,0 +1,13 @@
+{
+  "jenkins": {
+    "baseUrl": "http://127.0.0.1:49292"
+  },
+  "trackFile": "D:\\GIT_dev\\Claude_skills\\.claude\\skills\\jenkins-log-auto-learning-workspace\\iteration-2\\sandbox\\state\\track-skill-layer.json",
+  "jobs": [
+    {
+      "enabled": true,
+      "name": "alpha",
+      "path": "job/teamA/job/job-alpha"
+    }
+  ]
+}

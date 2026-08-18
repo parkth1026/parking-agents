@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "pair": {
+    "jobName": "alpha",
+    "jobPath": "job/teamA/job/job-alpha",
+    "failBuilds": [
+      14
+    ],
+    "fixBuild": 16,
+    "hasFix": true
+  },
+  "stage_gates": {
+    "1-analyze": {
+      "status": "error",
+      "closed_at": "2026-08-15T18:12:53"
+    },
+    "2-track": {
+      "status": "done",
+      "closed_at": "2026-08-15T18:12:54"
+    }
+  },
+  "status": "done",
+  "result": "failure:error:timeout",
+  "knowledge_file": null,
+  "success_value": null,
+  "error_reason": "timeout",
+  "claimed_at": "2026-08-15T18:12:53",
+  "claimed_pid": 4464,
+  "finished_at": "2026-08-15T18:12:54",
+  "next_action": "向用户报告本轮结论（阶段 3），然后停止。下次调用从 next 开始。"
+}

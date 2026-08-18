@@ -1,0 +1,35 @@
+{
+  "skill": "golden-demo",
+  "queries": [
+    {
+      "id": "q1",
+      "text": "把 D:/logs/ 下这几个 Jenkins 构建日志里的报错归一下类，整理成表格",
+      "should_trigger": true
+    },
+    {
+      "id": "q2",
+      "text": "帮我统计这批失败构建里反复出现的编译错误都是哪些",
+      "should_trigger": true
+    },
+    {
+      "id": "q3",
+      "text": "这 5 个 build log 的错误模式看着差不多，帮我合并去重出一份清单",
+      "should_trigger": true
+    },
+    {
+      "id": "q4",
+      "text": "帮我把这段报错截图里的英文翻译成中文",
+      "should_trigger": false
+    },
+    {
+      "id": "q5",
+      "text": "给 D:/logs/ 目录写一个按日期清理 30 天前旧日志的脚本",
+      "should_trigger": false
+    },
+    {
+      "id": "q6",
+      "text": "把这些构建日志的报错翻译成英文放报告里",
+      "should_trigger": false
+    }
+  ]
+}

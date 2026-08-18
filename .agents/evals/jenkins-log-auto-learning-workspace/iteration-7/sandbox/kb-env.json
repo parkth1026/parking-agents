@@ -1,0 +1,8 @@
+{
+  "gitRepos": "D:/GIT_dev/Claude_skills/.claude/skills/jenkins-log-auto-learning-workspace/iteration-7/sandbox/repos",
+  "knowledgeBase": {
+    "rawDir": "D:/GIT_dev/Claude_skills/.claude/skills/jenkins-log-auto-learning-workspace/iteration-7/sandbox/kb/raw",
+    "wikiDir": "D:/GIT_dev/Claude_skills/.claude/skills/jenkins-log-auto-learning-workspace/iteration-7/sandbox/kb/wiki"
+  },
+  "tmpDir": "D:/GIT_dev/Claude_skills/.claude/skills/jenkins-log-auto-learning-workspace/iteration-7/sandbox/kb/tmp"
+}

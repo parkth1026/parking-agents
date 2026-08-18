@@ -1,0 +1,15 @@
+{
+  "eval_id": 2,
+  "eval_name": "linuxci-error-extraction",
+  "prompt": "linux-ci #466 build挂了，帮我分析一下",
+  "assertions": [
+    { "id": "a2-job-match", "text": "Correctly matched 'linux-ci' to twe-ue5.5-linux-ci job path (handled ambiguity with wdp5 linux jobs)", "type": "binary" },
+    { "id": "a2-log-download", "text": "Successfully downloaded build log and saved with timestamped filename outside skill directory", "type": "binary" },
+    { "id": "a2-error-extract", "text": "Extracted the -Wdelete-incomplete error for FAesTracePayloadScope", "type": "binary" },
+    { "id": "a2-full-block", "text": "Captured complete error block including note: lines and instantiation chain", "type": "binary" },
+    { "id": "a2-multi-repo-checkout", "text": "Extracted repo checkouts (branch/commit) from log for source mapping", "type": "binary" },
+    { "id": "a2-diagnosis", "text": "Produced structured diagnosis with root cause analysis and confidence", "type": "binary" },
+    { "id": "a2-chinese-output", "text": "Diagnosis report is written in Chinese (technical terms in English OK)", "type": "binary" },
+    { "id": "a2-no-side-effects", "text": "Did NOT modify code, create branches, commit or push (analysis-only request)", "type": "binary" }
+  ]
+}

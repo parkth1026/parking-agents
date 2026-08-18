@@ -1,0 +1,34 @@
+{
+  "last_analyzed": {
+    "job/teamA/job/job-alpha": 16
+  },
+  "analyzed": {
+    "job/teamA/job/job-alpha#10": "success:w=?",
+    "job/teamA/job/job-alpha#13": "success:w=?",
+    "job/teamA/job/job-alpha#15": "skip:ABORTED",
+    "job/teamA/job/job-alpha#16": "success:w=?",
+    "job/teamA/job/job-alpha#11": "failure:score=8:LNK2019:fix=#13",
+    "job/teamA/job/job-alpha#12": "failure:score=8:LNK2019:fix=#13",
+    "job/teamA/job/job-alpha#14": "failure:error:timeout"
+  },
+  "runHistory": [
+    {
+      "timestamp": "2026-08-15T18:12:53",
+      "buildsAnalyzed": 2,
+      "buildsSkipped": 0,
+      "failurePairsFound": 1,
+      "infraFailures": 0,
+      "knowledgeWritten": 1,
+      "remaining": 1
+    },
+    {
+      "timestamp": "2026-08-15T18:12:54",
+      "buildsAnalyzed": 1,
+      "buildsSkipped": 0,
+      "failurePairsFound": 1,
+      "infraFailures": 0,
+      "knowledgeWritten": 0,
+      "remaining": 0
+    }
+  ]
+}

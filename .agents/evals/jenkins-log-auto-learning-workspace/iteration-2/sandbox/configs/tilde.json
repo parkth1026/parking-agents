@@ -1,0 +1,13 @@
+{
+  "jenkins": {
+    "baseUrl": "http://127.0.0.1:49292"
+  },
+  "trackFile": "~/tilde-track/analyzed-builds.json",
+  "jobs": [
+    {
+      "enabled": true,
+      "name": "beta",
+      "path": "job/teamA/job/job-beta"
+    }
+  ]
+}

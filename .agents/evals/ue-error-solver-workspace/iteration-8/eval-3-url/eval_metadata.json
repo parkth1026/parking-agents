@@ -1,0 +1,15 @@
+{
+  "eval_id": 3,
+  "eval_name": "url-format-parsing",
+  "prompt": "http://10.66.12.40/job/wdp-ue/job/Earth/job/aes6-ue-runtime-ci/3939/ 这个build红了",
+  "assertions": [
+    { "id": "a3-url-parse", "text": "Correctly parsed URL to extract baseUrl, jobPath, and buildNumber 3939", "type": "binary" },
+    { "id": "a3-path-resolution", "text": "All config paths resolved correctly (gitRepos, tmpDir, wikiDir, rawDir from merged config)", "type": "binary" },
+    { "id": "a3-log-download", "text": "Downloaded log and saved with timestamped filename to tmpDir outside skill directory", "type": "binary" },
+    { "id": "a3-kb-search", "text": "Searched knowledge base at resolved wikiDir path and reported results", "type": "binary" },
+    { "id": "a3-env-check", "text": "Ran Phase 0.5 environment readiness check before hands-on work", "type": "binary" },
+    { "id": "a3-diagnosis", "text": "Produced complete diagnosis report with evidence from executed sources", "type": "binary" },
+    { "id": "a3-chinese-output", "text": "Diagnosis report is written in Chinese (technical terms in English OK)", "type": "binary" },
+    { "id": "a3-no-side-effects", "text": "Did NOT modify code, create branches, commit or push (diagnosis-only request)", "type": "binary" }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "expectations": [
+    {
+      "text": "两问答案齐全: answer.md 同时覆盖 指针区别 与 异步加载示例",
+      "passed": true,
+      "evidence": "两问内容均覆盖"
+    },
+    {
+      "text": "第二问复用同一会话: transcript 显示第二次调用带 --conversation-id 且等于第一次返回的 ConversationId",
+      "passed": true,
+      "evidence": "transcript 传入 ['01KZZGMZZWAFQFD8PKNG6ECKJF', '01KZZGMZZWAFQFD8PKNG6ECKJF'], 查询返回 ['01KZZGMZZWAFQFD8PKNG6ECKJF', '01KZZGMZZWAFQFD8PKNG6ECKJF']"
+    },
+    {
+      "text": "第二问查询成功: result2.json 无 Error 字段且含答案内容",
+      "passed": true,
+      "evidence": "Error=None, 答案长度=4849"
+    },
+    {
+      "text": "示例含异步加载机制: 匹配 FStreamableManager / LoadSynchronous / AsyncLoad 之一",
+      "passed": true,
+      "evidence": "含异步加载 API"
+    },
+    {
+      "text": "answer_附官方参考链接: 至少 1 个 dev.epicgames.com 链接",
+      "passed": true,
+      "evidence": "['dev.epicgames.com', 'dev.epicgames.com/documentation/unreal-engine/object-pointers-in-unreal-engine']"
+    }
+  ]
+}
