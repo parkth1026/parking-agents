@@ -1,11 +1,11 @@
 ---
-name: gh
 description: Patterns for invoking the GitHub CLI (gh) from agents. Covers structured output, pagination, repo targeting, search vs list, gh api fallback.
 metadata:
     github-path: skills/gh
-    github-ref: refs/tags/v2.95.0
+    github-ref: refs/tags/v2.97.0
     github-repo: https://github.com/cli/cli
     github-tree-sha: cc6ec4740cd90d35fdec0bb125ccbd5ad38e98e0
+name: gh
 ---
 # Reference
 
