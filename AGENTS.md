@@ -22,5 +22,5 @@
 - 仓库脚本一律 `.mjs`（Node 内置模块、零依赖），不新增 PowerShell 脚本。
 - 技能环境配置解析链：`$SKILL_ENV` > `~/.config/parking-agents/skill-env.json`；
   真实环境值（路径、凭据）不进 git，技能目录内 `config.json` 只放占位说明。
-- `.claude/skills/` 是 Claude 侧活跃真源；`skills/dev|pub/` 是跨平台发布侧，
+- `.agents/skills/` 是 开发侧活跃真源；`skills/` 是跨平台发布侧，
   两者改动需经移植流程同步，不视为同一份。
