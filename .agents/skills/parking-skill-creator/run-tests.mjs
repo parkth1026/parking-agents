@@ -36,6 +36,21 @@ function runNode(scriptPath, args = [], opts = {}) {
 const out = (r) => r.stdout + r.stderr;
 const run = (args) => runFile("snapshot-skill.mjs", args);
 
+// ---- 中文 Prompt 术语边界·自身文档契约 ----
+const CREATOR_DIR = dirname(fileURLToPath(import.meta.url));
+const creatorDoc = readFileSync(join(CREATOR_DIR, "SKILL.md"), "utf8");
+const writingGuide = readFileSync(join(CREATOR_DIR, "references", "writing-guide.md"), "utf8");
+const creatorInterface = readFileSync(join(CREATOR_DIR, "agents", "openai.yaml"), "utf8");
+const creatorDescription = creatorDoc.match(/^description:\s*(.+)$/m)?.[1] ?? "";
+console.log("中文 Prompt 术语边界：");
+check("SKILL.md 声明 Chinese-first 与四道 conversion gate", ["中文 Prompt 的语言与术语边界", "Named concept", "Execution impact", "English information gain", "Stable mapping"].every((s) => creatorDoc.includes(s)));
+check("SKILL.md 声明短 Prompt/长文档的转换上限", creatorDoc.includes("最多 2 个 English terms") && creatorDoc.includes("最多 5 个"));
+check("writing guide 固化不凑数和 semantic nucleus", ["转换预算", "硬上限，不是最低配额", "没有值得转换的词就使用 0 个", "semantic nucleus", "双向钢人分析（steelman）", "分歧核心（crux）"].every((s) => writingGuide.includes(s)));
+check("UI default prompt 保持中文且保留 skill name contract", creatorInterface.includes("使用 $parking-skill-creator") && creatorInterface.includes("创建、评测、迭代或打包"));
+check("parking-skill-creator 自身 description 保持中文优先", creatorDescription.length < 450
+  && ["with_skill/without_skill", "description", "subagent", ".skill", "Node"].every((s) => creatorDescription.includes(s))
+  && !creatorDescription.includes("with/without"));
+
 function exists(p) {
   try { readFileSync(p); return true; } catch { return false; }
 }

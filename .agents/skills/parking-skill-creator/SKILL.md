@@ -1,6 +1,6 @@
 ---
 name: parking-skill-creator
-description: 本机技能生产流水线：创建、评测、迭代与打包 agent 技能。用于从零创建新技能（确定性脚手架+六步方法论）、评测既有技能（输出评测 with/without 对照、触发评测同宿主 subagent 探针、浏览器逐例评审）、优化 description 触发准确率、打包 .skill 分发包。用户想建技能、改技能、跑技能评测、优化技能触发描述或打包分发时使用。全部脚本零外部依赖，纯 Node 内置模块。
+description: 本机技能生产流水线：创建、校验、评测、迭代和打包技能。用于用户要新建或修改技能、运行技能评测、检查触发准确率、比较 with_skill/without_skill 结果、优化技能的 description，或生成 .skill 分发包。覆盖确定性脚手架、回归测试、同宿主 subagent 探针评测、浏览器评审和历史成绩沉淀。脚本仅使用 Node 内置模块，不依赖 npm 或 Python。
 ---
 
 # parking-skill-creator：技能生产流水线
@@ -100,6 +100,19 @@ node scripts/init-skill.mjs <技能名> --structure <workflow|task|reference|cap
 - **风格**：祈使句；解释为什么而不是堆 MUST；从反馈泛化而不是过拟合测试例子；写完初稿用新眼光重读一遍。
 
 frontmatter 只允许 name/description（必需）+ license/allowed-tools/metadata/compatibility（可选）。
+
+### 中文 Prompt 的语言与术语边界
+
+本技能自身以及它生成的 skill 文档，默认使用中文。English 不是“看起来更专业”的装饰，而只用于机器契约或少量真正能减少歧义的核心标签。
+
+- 保留中文的自然句子、动作、判断和普通领域词。不要逐句 bilingualize。
+- 保留必须精确匹配的 machine contract：skill `name`、CLI flag、enum、schema field、API、identifier、provider name、path、URL、版本号和脚本命令。这些不是翻译对象。
+- 只有同时满足 `Named concept`、`Execution impact`、`English information gain`、`Stable mapping` 四道 gate，才给核心术语加 English。
+- 短 prompt 或短 `description` 默认最多 2 个 English terms；普通文章或长文档最多 5 个。上限不是配额，不足不要凑数。
+- 优先翻译 semantic nucleus，而不是整句或所有修饰语。例如“钢人分析（steelman）”“分歧核心（crux）”可以保留中文上下文；“问题想清楚”“当前想法”“关键变量”“理由”“下一步行动”通常保持中文。
+- 术语候选不等于行业标准。无法确认时标成 `context-dependent` 或 `unverified`，不要用英文替换制造确定感。
+
+详细规则和示例见 `references/writing-guide.md` 的「中文 Prompt 的术语克制」节；创建或改写中文 skill 时先按该节审一遍。
 
 ## 第 5 步：quick-validate
 

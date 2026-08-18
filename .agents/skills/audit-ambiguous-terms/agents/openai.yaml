@@ -1,0 +1,7 @@
+interface:
+  display_name: "audit-ambiguous-terms"
+  short_description: "极度克制地审查 ambiguous terminology，只转换少量核心 English terms"
+  default_prompt: "使用 $audit-ambiguous-terms 极度克制地审查或最小改写 prompt / skill description，只转换会改变执行的核心 English terms，保留其他中文。"
+
+policy:
+  allow_implicit_invocation: true

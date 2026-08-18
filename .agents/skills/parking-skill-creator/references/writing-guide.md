@@ -69,6 +69,44 @@ cloud-deploy/
   - 校验红线：≤1024 字符、不含尖括号。
 - 除 name/description 外只允许 license/allowed-tools/metadata/compatibility。
 
+## 中文 Prompt 的术语克制
+
+本仓库的 skill 以中文 Prompt 为主。写作时先解决表达和执行边界，再决定是否需要 English label；不要把技术词密度误当成准确度。
+
+### 转换 gate
+
+只有四项都成立才转换一个词：
+
+1. `Named concept`：它是命名的方法、协议、artifact 或稳定领域概念，而不是普通中文短语。
+2. `Execution impact`：误解它可能改变 agent 的目标、路由、输出或验收。
+3. `English information gain`：English 增加边界、检索性或跨工具一致性。
+4. `Stable mapping`：当前上下文存在可靠、可解释的 English mapping。
+
+任一项不成立，就保留中文。`problem framing`、`current hypothesis`、`key decision variables` 等虽然有 English mapping，但如果当前中文已经足够清楚，不要为了“术语化”而替换。
+
+### 转换预算
+
+- 短 prompt、短 `description`：最多 2 个 English terms；
+- 普通文章、长 Prompt 或长文档：最多 5 个 English terms；
+- 这是硬上限，不是最低配额；没有值得转换的词就使用 0 个；
+- 超过上限时按 information gain 排序，只保留最能改变执行的词；
+- 同一个 term 只在首次出现时加一次括号。
+
+### 转换粒度
+
+优先转换 semantic nucleus，保留中文修饰语和句法：
+
+```text
+双向钢人分析（steelman）
+分歧核心（crux）
+```
+
+只有 nucleus 单独不足以表达概念时，才扩展为完整 English phrase。`name`、enum、CLI flag、schema field、API、identifier、path、URL、版本号和命令必须原样保留；它们属于 machine contract，不属于术语润色。
+
+### 输出纪律
+
+如果用户要求术语审计，报告 `conversion budget: used/max`，只列通过 gate 的词，不要为每个普通中文词建立表格。如果用户只要求创建或修改 skill，直接遵守 Chinese-first 规则，不额外制造一篇术语报告。
+
 ## 写作模式
 
 **输出格式模板**——要求稳定结构时直接给模板：

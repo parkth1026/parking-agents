@@ -1,7 +1,7 @@
 interface:
   display_name: "parking-skill-creator"
-  short_description: "Create, evaluate, improve, and package agent skills"
-  default_prompt: "Use $parking-skill-creator to create, evaluate, improve, or package an agent skill."
+  short_description: "创建、评测、迭代和打包 agent skill"
+  default_prompt: "使用 $parking-skill-creator 创建、评测、迭代或打包 agent skill。"
 
 policy:
   allow_implicit_invocation: true
