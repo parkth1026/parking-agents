@@ -1,0 +1,23 @@
+{
+  "results": [
+    {
+      "name": "生成完整技能骨架",
+      "text": "baseline 生成了 SKILL.md、DESIGN.md、脚本和 tests，但没有目标流程要求的 references/design.md、run-tests.mjs 和 agents/openai.yaml 完整骨架。",
+      "passed": false,
+      "evidence": "独立文件清单只有 SKILL.md、DESIGN.md、两个 scripts 和 tests/test-count-lines.mjs；缺少 references/design.md、run-tests.mjs、agents/openai.yaml。"
+    },
+    {
+      "name": "校验、自测和打包均有证据",
+      "text": "baseline 有自定义 validator、回归测试和打包证据，但没有目标流程的 quick-validate 与技能根 run-tests 证据。",
+      "passed": false,
+      "evidence": "verification.md 记录的是自定义 validate-skill.mjs、tests/test-count-lines.mjs 与 Compress-Archive；未执行 parking-skill-creator 的 quick-validate 或 package-skill 流程。"
+    },
+    {
+      "name": "最终分发包可读取",
+      "text": "baseline 最终包可解压、可读取并通过自身验证。",
+      "passed": true,
+      "evidence": "verification.md 记录 Expand-Archive、解包后 validator/tests=0，并列出 5 个包内文件。"
+    }
+  ],
+  "eval_feedback": "baseline 能完成领域任务，但缺少目标 skill 固化的设计、脚手架元数据和统一门禁；该对照能区分 skill 流程价值。"
+}
