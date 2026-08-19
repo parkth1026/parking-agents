@@ -51,6 +51,107 @@
         ]
       },
       "current_best": true
+    },
+    {
+      "date": "2026-08-19T16:56:47+08:00",
+      "iteration_ref": "D:\\GIT_dev\\parking-agents\\.agents\\evals\\log-error-summary-workspace\\iteration-1",
+      "gates": {
+        "with_skill": {
+          "pass_rate": 1,
+          "mean_ms": 41357,
+          "mean_tokens": 83001
+        },
+        "without_skill": {
+          "pass_rate": 0.5,
+          "mean_ms": 47828,
+          "mean_tokens": 76316
+        }
+      },
+      "vs_previous": null
+    },
+    {
+      "date": "2026-08-19T16:58:24+08:00",
+      "iteration_ref": "D:\\GIT_dev\\parking-agents\\.agents\\evals\\log-error-summary-workspace\\iteration-2",
+      "gates": {
+        "with_skill": {
+          "pass_rate": 1,
+          "mean_ms": 20316,
+          "mean_tokens": 66626
+        },
+        "without_skill": {
+          "pass_rate": 0.5,
+          "mean_ms": 58150,
+          "mean_tokens": 59940
+        }
+      },
+      "vs_previous": {
+        "evals_total": 1,
+        "won": 0,
+        "lost": 0,
+        "tie": 1,
+        "detail": [
+          {
+            "eval": "eval-日志错误频次统计",
+            "result": "tie"
+          }
+        ]
+      }
+    },
+    {
+      "date": "2026-08-19T18:33:44+08:00",
+      "iteration_ref": "D:\\GIT_dev\\parking-agents\\.agents\\evals\\log-error-summary-workspace\\iteration-1",
+      "gates": {
+        "with_skill": {
+          "pass_rate": 1,
+          "mean_ms": 41357,
+          "mean_tokens": 83001
+        },
+        "without_skill": {
+          "pass_rate": 0.6667,
+          "mean_ms": 47828,
+          "mean_tokens": 76316
+        }
+      },
+      "vs_previous": {
+        "evals_total": 1,
+        "won": 0,
+        "lost": 0,
+        "tie": 1,
+        "detail": [
+          {
+            "eval": "eval-日志错误频次统计",
+            "result": "tie"
+          }
+        ]
+      }
+    },
+    {
+      "date": "2026-08-19T18:33:45+08:00",
+      "iteration_ref": "D:\\GIT_dev\\parking-agents\\.agents\\evals\\log-error-summary-workspace\\iteration-2",
+      "gates": {
+        "with_skill": {
+          "pass_rate": 1,
+          "mean_ms": 20316,
+          "mean_tokens": 66626
+        },
+        "without_skill": {
+          "pass_rate": 0.6667,
+          "mean_ms": 58150,
+          "mean_tokens": 59940
+        }
+      },
+      "vs_previous": {
+        "evals_total": 1,
+        "won": 0,
+        "lost": 0,
+        "tie": 1,
+        "detail": [
+          {
+            "eval": "eval-日志错误频次统计",
+            "result": "tie"
+          }
+        ]
+      }
     }
   ],
   "current_best": "runs[1]"
