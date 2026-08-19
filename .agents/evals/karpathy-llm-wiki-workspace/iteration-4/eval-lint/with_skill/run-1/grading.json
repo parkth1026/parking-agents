@@ -1,7 +1,0 @@
-{
-  "verdict": "PASS 8.52→10.00/10，一轮修复收敛（exit 0）",
-  "expectations_all_passed": true,
-  "planted_issues_fixed": "5/5（断链/孤儿/缺索引/缺frontmatter/出链不足）",
-  "new_protocol_followed": ["T4：Ghost Network 去链留文 + log 记 pending（新流程逐字照走）", "T9：retro-fill created 用当日 + log 注明", "T8：lint-report.md 与 validation-before/after.txt 全部落 wiki 外"],
-  "friction_informational": ["Phase 0 缺目录时 Lint 是否也停（已按 batch 回退处理且未实际建目录）", "无父页可合并的内容空洞 stub 的处置（保留+标记待用户裁决——合理裁量）"]
-}

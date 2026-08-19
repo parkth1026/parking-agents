@@ -1,6 +1,0 @@
-{
-  "verdict": "PASS 10.00/10（exit 0）",
-  "expectations": "会话三文件/概念页/双向更新/index/log 全 PASS；source 页 FAIL（无 sources/ 页——延续从种子推断的约定）；raw 命名 FAIL（无日期前缀）",
-  "notes": "本次新页放入 concepts/（it3 同任务放 techniques/ 判 9.3 FAIL）——without 臂靠模仿种子现有布局，能力可到 10 分但不稳定",
-  "cross_iteration": "it3 9.3 FAIL → it4 10.0 PASS：同任务同种子，纯运行方差"
-}

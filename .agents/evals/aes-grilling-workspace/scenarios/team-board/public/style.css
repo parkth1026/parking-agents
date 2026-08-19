@@ -1,5 +1,0 @@
-body { font-family: system-ui, sans-serif; margin: 0; }
-.topbar { padding: 12px 16px; border-bottom: 1px solid #ddd; }
-#board { display: flex; gap: 16px; padding: 16px; }
-#board section { flex: 1; background: #f6f6f6; border-radius: 8px; padding: 8px; }
-.card { background: #fff; border-radius: 6px; padding: 8px; margin: 8px 0; list-style: none; }

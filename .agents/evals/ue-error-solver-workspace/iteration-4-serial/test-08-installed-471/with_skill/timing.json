@@ -1,7 +1,0 @@
-{
-  "total_tokens": 61766,
-  "duration_ms": 350000,
-  "total_duration_seconds": 350.0,
-  "tool_calls": 44,
-  "note": "original duration_ms was inflated by idle time, estimated ~350s based on token/tool ratio"
-}

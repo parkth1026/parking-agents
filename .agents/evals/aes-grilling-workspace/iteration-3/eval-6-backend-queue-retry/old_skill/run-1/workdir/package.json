@@ -1,9 +1,0 @@
-{
-  "name": "order-consumer",
-  "version": "1.4.0",
-  "type": "module",
-  "scripts": {
-    "consume": "node src/consumer.mjs",
-    "test": "node test/run-tests.mjs"
-  }
-}

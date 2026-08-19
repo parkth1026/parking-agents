@@ -1,0 +1,72 @@
+{
+  "skill": "karpathy-llm-wiki",
+  "split": {
+    "train": [
+      "q3",
+      "q2",
+      "q9",
+      "q10",
+      "q5",
+      "q7",
+      "q11",
+      "q12",
+      "q16",
+      "q18",
+      "q13",
+      "q15"
+    ],
+    "test": [
+      "q1",
+      "q8",
+      "q4",
+      "q6",
+      "q20",
+      "q17",
+      "q14",
+      "q19"
+    ],
+    "seed": 42,
+    "holdout": 0.4
+  },
+  "rounds": [
+    {
+      "description": "维护一个持久化、互链的 markdown 知识 wiki，覆盖 LLM/AI/深度学习知识。\n提供工作流、页面模板、校验脚本与质量评分，用于搭建 Karpathy 式知识库。\n**在以下场景使用此技能：**\n(1) 创建、充实、更新或查询 LLM/AI/ML 知识 wiki\n(2) 把文章、论文、转录稿或笔记 ingest 进 wiki\n(3) 校验 wikilink、lint 页面、修复断链或检查 wiki 质量\n(4) 用户提到 \"wiki\"、\"知识库\"、\"Karpathy\"、\"整理到wiki\" 或 \"ingest\"",
+      "valid_probes": 57,
+      "train": {
+        "queries": 12,
+        "trigger_rate_on_should": 1,
+        "false_trigger_rate_on_should_not": 0.3333,
+        "correct": 10,
+        "invalid_queries": 0
+      },
+      "test": {
+        "queries": 8,
+        "trigger_rate_on_should": 1,
+        "false_trigger_rate_on_should_not": 0,
+        "correct": 8,
+        "invalid_queries": 0
+      }
+    },
+    {
+      "description": "维护一个持久化、互链的 markdown 知识 wiki，覆盖 LLM/AI/深度学习知识。\n提供工作流、页面模板、校验脚本与质量评分，用于搭建 Karpathy 式知识库。\n**在以下场景使用此技能：**\n(1) 创建、充实、更新或查询 LLM/AI/ML 知识 wiki\n(2) 把文章、论文、转录稿或笔记 ingest 进 wiki\n(3) 校验 wikilink、lint 页面、修复断链或检查 wiki 质量\n(4) 用户提到 \"wiki\"、\"知识库\"、\"Karpathy\"、\"整理到wiki\" 或 \"ingest\"，且要做的是 wiki 操作（整理、录入、查询、校验）——只是翻译这类文章、讲解 wikilink 语法、或把内容保存到 wiki 之外时，不需要本技能",
+      "valid_probes": 53,
+      "train": {
+        "queries": 12,
+        "trigger_rate_on_should": 1,
+        "false_trigger_rate_on_should_not": 0,
+        "correct": 12,
+        "invalid_queries": 0
+      },
+      "test": {
+        "queries": 8,
+        "trigger_rate_on_should": 1,
+        "false_trigger_rate_on_should_not": 0,
+        "correct": 8,
+        "invalid_queries": 0
+      }
+    }
+  ],
+  "best_description": "维护一个持久化、互链的 markdown 知识 wiki，覆盖 LLM/AI/深度学习知识。\n提供工作流、页面模板、校验脚本与质量评分，用于搭建 Karpathy 式知识库。\n**在以下场景使用此技能：**\n(1) 创建、充实、更新或查询 LLM/AI/ML 知识 wiki\n(2) 把文章、论文、转录稿或笔记 ingest 进 wiki\n(3) 校验 wikilink、lint 页面、修复断链或检查 wiki 质量\n(4) 用户提到 \"wiki\"、\"知识库\"、\"Karpathy\"、\"整理到wiki\" 或 \"ingest\"",
+  "valid_probes": 110,
+  "invalid_probes": 10
+}

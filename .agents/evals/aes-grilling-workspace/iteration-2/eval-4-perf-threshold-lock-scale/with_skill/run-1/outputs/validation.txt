@@ -1,7 +1,0 @@
-VALID: G:\GIT\AI_WorkFlow\parking-agents\.claude\skills\aes-grilling-workspace\iteration-2\eval-4-perf-threshold-lock-scale\with_skill\run-1\workdir\docs\goal-contracts\2026-08-07-summary-endpoint-latency.md
-FORMAT: AES Goal Contract B
-STATUS: Ready
-AC_COUNT: 4
-LINE_COUNT: 66
-EXIT CODE: 0
-

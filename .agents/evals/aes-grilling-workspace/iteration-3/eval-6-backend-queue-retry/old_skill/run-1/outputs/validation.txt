@@ -1,9 +1,0 @@
-COMMAND: pwsh -NoProfile -File "G:\GIT\AI_WorkFlow\parking-agents\.claude\skills\aes-grilling-workspace\skill-snapshot-v2\scripts\validate-goal-contract.ps1" -Path "G:\GIT\AI_WorkFlow\parking-agents\.claude\skills\aes-grilling-workspace\iteration-3\eval-6-backend-queue-retry\old_skill\run-1\workdir\docs\goal-contracts\2026-08-07-order-consumer-retry-dead-letter.md"
-
-VALID: G:\GIT\AI_WorkFlow\parking-agents\.claude\skills\aes-grilling-workspace\iteration-3\eval-6-backend-queue-retry\old_skill\run-1\workdir\docs\goal-contracts\2026-08-07-order-consumer-retry-dead-letter.md
-FORMAT: AES Goal Contract B
-STATUS: Ready
-AC_COUNT: 5
-LINE_COUNT: 64
-
-EXIT CODE: 0

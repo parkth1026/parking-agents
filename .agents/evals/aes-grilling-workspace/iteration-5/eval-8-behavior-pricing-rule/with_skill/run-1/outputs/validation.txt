@@ -1,6 +1,0 @@
-VALID: G:\GIT\AI_WorkFlow\parking-agents\.claude\skills\aes-grilling-workspace\iteration-5\eval-8-behavior-pricing-rule\with_skill\run-1\workdir\docs\goal-contracts\2026-08-07-shop-pricing-discount-rule.md
-FORMAT: AES Goal Contract B
-STATUS: Ready
-AC_COUNT: 3
-LINE_COUNT: 62
-EXIT_CODE: 0

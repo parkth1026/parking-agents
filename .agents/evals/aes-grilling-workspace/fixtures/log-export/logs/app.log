@@ -1,6 +1,0 @@
-2026-07-30 08:12:01 INFO service started
-2026-07-30 08:12:05 DEBUG loaded 3 plugins
-2026-07-31 09:40:22 WARN retry queue depth 12
-2026-07-31 09:41:03 ERROR upstream timeout after 30s
-garbage line that does not match the format
-2026-08-01 10:02:44 INFO nightly job finished

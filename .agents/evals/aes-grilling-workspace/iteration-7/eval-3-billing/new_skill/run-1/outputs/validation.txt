@@ -1,3 +1,0 @@
-AC_COUNT: 2
-VALID: G:\GIT\AI_WorkFlow\parking-agents\.claude\skills\aes-grilling-workspace\iteration-7\eval-3-billing\new_skill\run-1\workdir\docs\goal-contracts\2026-08-07-monthly-billing-summary.md
-EXIT CODE: 0

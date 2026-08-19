@@ -1,4 +1,0 @@
-$ node "G:\GIT\AI_WorkFlow\parking-agents\.claude\skills\aes-grilling\scripts\validate-acceptance.mjs" "workflow/board-assignee-filter/work-item.md"
-AC_COUNT: 5
-VALID: G:\GIT\AI_WorkFlow\parking-agents\.claude\skills\aes-grilling-workspace\iteration-6\eval-B-board-filter\new_skill\run-1\workdir\workflow\board-assignee-filter\work-item.md
-EXIT_CODE=0

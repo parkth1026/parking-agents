@@ -1,7 +1,0 @@
-2026-08-15 10:00:01 ERROR job "payment-sync" failed (attempt 3)
-2026-08-15 10:00:05 Error: cannot read config from /etc/app/settings.yaml
-2026-08-15 10:00:06 error connection timeout after 30s to db-primary:5432
-2026-08-15 10:00:30 INFO retry scheduled
-2026-08-15 10:00:31 ERROR job "payment-sync" failed (attempt 4)
-2026-08-15 10:01:00 error connection timeout after 60s to db-primary:5432
-2026-08-15 10:01:44 Error: cannot read config from /etc/app/settings.yaml

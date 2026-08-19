@@ -1,4 +1,0 @@
-# Schema
-## Tags
-- architecture
-- model

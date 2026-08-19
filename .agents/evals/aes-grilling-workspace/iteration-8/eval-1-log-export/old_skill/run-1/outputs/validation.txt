@@ -1,8 +1,0 @@
-$ node G:/GIT/AI_WorkFlow/parking-agents/.claude/skills/aes-grilling-workspace/skill-snapshot-v5/scripts/validate-goal-contract.mjs G:\GIT\AI_WorkFlow\parking-agents\.claude\skills\aes-grilling-workspace\iteration-8\eval-1-log-export\old_skill\run-1\workdir\docs\goal-contracts\2026-08-09-log-export-cli-options.md
-
-AC_COUNT: 4
-VALID: G:\GIT\AI_WorkFlow\parking-agents\.claude\skills\aes-grilling-workspace\iteration-8\eval-1-log-export\old_skill\run-1\workdir\docs\goal-contracts\2026-08-09-log-export-cli-options.md
-
-EXIT_CODE: 0
-
-（无 WARNING，无 ERROR）

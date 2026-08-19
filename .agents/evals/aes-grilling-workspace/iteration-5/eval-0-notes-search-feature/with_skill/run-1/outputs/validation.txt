@@ -1,7 +1,0 @@
-VALID: G:\GIT\AI_WorkFlow\parking-agents\.claude\skills\aes-grilling-workspace\iteration-5\eval-0-notes-search-feature\with_skill\run-1\workdir\docs\goal-contracts\2026-08-07-notes-search.md
-FORMAT: AES Goal Contract B
-STATUS: Ready
-AC_COUNT: 4
-LINE_COUNT: 69
-EXIT_CODE: 0
-

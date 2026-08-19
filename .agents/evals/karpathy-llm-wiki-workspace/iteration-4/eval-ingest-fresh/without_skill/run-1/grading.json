@@ -1,7 +1,0 @@
-{
-  "verdict": "FAIL 2.50/10（exit 1）",
-  "expectations": "SCHEMA/index(规范编目)/log/实体页/raw 沉淀/断链 全 FAIL；概念内容覆盖 PASS（8 主题页+backlog+自有模板，frontmatter 本次齐备）",
-  "quantitative": {"orphanPages": 12, "missingFromIndex": 12, "brokenLinks": 1, "entityPages": 0, "sourcePages": 0, "rawSaved": false},
-  "notes": "平铺结构（Home/pages/templates），相对链接生态，process-log 与模板页也被计入。首跑被内容过滤器误杀（1301，65s）后原样重试成功——记录为 harness 事故非任务失败",
-  "cross_iteration": "it3 同臂 5.0/10 → it4 2.5/10：without 臂方差大，共同点是无 raw 沉淀、无机器可校验结构"
-}

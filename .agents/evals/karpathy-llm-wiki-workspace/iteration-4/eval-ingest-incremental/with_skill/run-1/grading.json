@@ -1,7 +1,0 @@
-{
-  "verdict": "PASS 10.00/10 首跑即过（exit 0）",
-  "expectations_all_passed": true,
-  "notes": "2 建 + 5 更新；建页阈值纪律（Tri Dao/PyTorch 记 pending 不建页）；T10 同名冲突自解（concept FlashAttention / source Flash Attention）；SCHEMA 从 taxonomy 正确补标签（inference/hardware/blog）",
-  "friction_fixed_in_round2": ["T12 确认门 batch 回退", "T10 同名消歧"],
-  "friction_informational": ["用户粘贴摘要型 source 的归类（articles/+blog）为判断项"]
-}

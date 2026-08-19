@@ -9,3 +9,6 @@ reports/*
 node_modules/
 /.zcode/plans
 /.claude/launch.json
+
+# Eval workspaces are scratch; durable records live in each skill dir
+/.agents/evals/

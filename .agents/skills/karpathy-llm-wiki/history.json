@@ -1,0 +1,133 @@
+{
+  "skill": "karpathy-llm-wiki",
+  "runs": [
+    {
+      "date": "2026-08-19T03:44:22+08:00",
+      "iteration_ref": "D:\\GIT_dev\\parking-agents\\.agents\\evals\\karpathy-llm-wiki-workspace\\iteration-6",
+      "gates": {
+        "old_skill": {
+          "pass_rate": 1,
+          "mean_ms": 245289.8,
+          "mean_tokens": 680387.4
+        },
+        "with_skill": {
+          "pass_rate": 1,
+          "mean_ms": 291755.4,
+          "mean_tokens": 819434.8
+        },
+        "without_skill": {
+          "pass_rate": 0.6393,
+          "mean_ms": 189607,
+          "mean_tokens": 282846.2
+        }
+      },
+      "vs_previous": null,
+      "current_best": true
+    },
+    {
+      "date": "2026-08-19T11:33:02+08:00",
+      "iteration_ref": "D:\\GIT_dev\\parking-agents\\.agents\\evals\\karpathy-llm-wiki-workspace\\iteration-7",
+      "gates": {
+        "old_skill": {
+          "pass_rate": 1,
+          "mean_ms": 297139.4,
+          "mean_tokens": 582871
+        },
+        "with_skill": {
+          "pass_rate": 1,
+          "mean_ms": 482192,
+          "mean_tokens": 692574.8
+        }
+      },
+      "vs_previous": {
+        "evals_total": 5,
+        "won": 0,
+        "lost": 0,
+        "tie": 5,
+        "detail": [
+          {
+            "eval": "eval-ingest-fresh",
+            "result": "tie"
+          },
+          {
+            "eval": "eval-ingest-incremental",
+            "result": "tie"
+          },
+          {
+            "eval": "eval-lint",
+            "result": "tie"
+          },
+          {
+            "eval": "eval-query",
+            "result": "tie"
+          },
+          {
+            "eval": "eval-recurrence-loopback",
+            "result": "tie"
+          }
+        ]
+      }
+    },
+    {
+      "date": "2026-08-19T12:56:16+08:00",
+      "iteration_ref": "D:\\GIT_dev\\parking-agents\\.agents\\evals\\karpathy-llm-wiki-workspace\\iteration-8",
+      "gates": {
+        "with_skill": {
+          "pass_rate": 1,
+          "mean_ms": 350865.75,
+          "mean_tokens": 810573
+        },
+        "without_skill": {
+          "pass_rate": 0.9286,
+          "mean_ms": 468148.25,
+          "mean_tokens": 996687.75
+        }
+      },
+      "vs_previous": {
+        "evals_total": 4,
+        "won": 0,
+        "lost": 0,
+        "tie": 0,
+        "detail": [
+          {
+            "eval": "eval-contradiction-ingest",
+            "result": "new"
+          },
+          {
+            "eval": "eval-disambiguation-ingest",
+            "result": "new"
+          },
+          {
+            "eval": "eval-oversize-split",
+            "result": "new"
+          },
+          {
+            "eval": "eval-uncovered-query-honesty",
+            "result": "new"
+          },
+          {
+            "eval": "eval-ingest-fresh",
+            "result": "dropped"
+          },
+          {
+            "eval": "eval-ingest-incremental",
+            "result": "dropped"
+          },
+          {
+            "eval": "eval-lint",
+            "result": "dropped"
+          },
+          {
+            "eval": "eval-query",
+            "result": "dropped"
+          },
+          {
+            "eval": "eval-recurrence-loopback",
+            "result": "dropped"
+          }
+        ]
+      }
+    }
+  ],
+  "current_best": "runs[0]"
+}

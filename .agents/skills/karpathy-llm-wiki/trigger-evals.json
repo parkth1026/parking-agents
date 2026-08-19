@@ -1,0 +1,106 @@
+{
+  "skill": "karpathy-llm-wiki",
+  "description_under_test": "维护一个持久化、互链的 markdown 知识 wiki，覆盖 LLM/AI/深度学习知识。\n提供工作流、页面模板、校验脚本与质量评分，用于搭建 Karpathy 式知识库。\n**在以下场景使用此技能：**\n(1) 创建、充实、更新或查询 LLM/AI/ML 知识 wiki\n(2) 把文章、论文、转录稿或笔记 ingest 进 wiki\n(3) 校验 wikilink、lint 页面、修复断链或检查 wiki 质量\n(4) 用户提到 \"wiki\"、\"知识库\"、\"Karpathy\"、\"整理到wiki\" 或 \"ingest\"",
+  "queries": [
+    {
+      "id": "q1",
+      "text": "帮我把这篇 Karpathy 博客 ingest 到我的知识库：https://karpathy.github.io/2021/03/27/a-transparent-path-to-dnn-future/",
+      "should_trigger": true
+    },
+    {
+      "id": "q2",
+      "text": "wiki 好久没体检了，跑一次 lint，看看有没有断链和孤儿页",
+      "should_trigger": true
+    },
+    {
+      "id": "q3",
+      "text": "我刚看完 Karpathy 的 Intro to LLMs 演讲，把要点整理到 wiki，注意别建重复页",
+      "should_trigger": true
+    },
+    {
+      "id": "q4",
+      "text": "在 wiki 里查一下 Flash Attention 到底改了什么，答案值得留的话帮我存档",
+      "should_trigger": true
+    },
+    {
+      "id": "q5",
+      "text": "我要从零搭一个 LLM 知识 wiki，帮我初始化结构",
+      "should_trigger": true
+    },
+    {
+      "id": "q6",
+      "text": "NAS 上那个知识库哪些页面比原始素材旧了？帮我处理一下",
+      "should_trigger": true
+    },
+    {
+      "id": "q7",
+      "text": "这篇 arxiv 论文帮我录入 wiki，跟已有的 attention 页面互链起来",
+      "should_trigger": true
+    },
+    {
+      "id": "q8",
+      "text": "知识库索引好像漏了几个页面，帮我检查补全",
+      "should_trigger": true
+    },
+    {
+      "id": "q9",
+      "text": "把这个播客转录稿 ingest 进 wiki，按建页门槛来，别见名词就建页",
+      "should_trigger": true
+    },
+    {
+      "id": "q10",
+      "text": "wiki 的质量分还过不过 9 分？校验一下，有问题按优先级修",
+      "should_trigger": true
+    },
+    {
+      "id": "q11",
+      "text": "把这篇 Karpathy 的博客翻译成中文给我",
+      "should_trigger": false
+    },
+    {
+      "id": "q12",
+      "text": "帮我搭一个 RAG 检索问答服务，用向量库存文档",
+      "should_trigger": false
+    },
+    {
+      "id": "q13",
+      "text": "Obsidian 的 [[wikilink]] 双链语法怎么用？教我一下",
+      "should_trigger": false
+    },
+    {
+      "id": "q14",
+      "text": "把这次 Jenkins 构建失败的修复经验记到学习知识库",
+      "should_trigger": false
+    },
+    {
+      "id": "q15",
+      "text": "总结一下这篇论文的创新点，写个中文摘要就行",
+      "should_trigger": false
+    },
+    {
+      "id": "q16",
+      "text": "这段会议录音帮我转成文字稿",
+      "should_trigger": false
+    },
+    {
+      "id": "q17",
+      "text": "评估一下我们检索系统的召回质量，给个报告",
+      "should_trigger": false
+    },
+    {
+      "id": "q18",
+      "text": "把这个网页存成 markdown 保存到桌面",
+      "should_trigger": false
+    },
+    {
+      "id": "q19",
+      "text": "写一个爬虫定期抓 arxiv 新论文列表",
+      "should_trigger": false
+    },
+    {
+      "id": "q20",
+      "text": "我的 Notion 笔记太乱了，帮我设计一套知识管理方案",
+      "should_trigger": false
+    }
+  ]
+}

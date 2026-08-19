@@ -1,9 +1,0 @@
-{
-  "prompt": "我们的老项目全是 CommonJS require，现在跑在 Node.js 24 上。官方目前对 ESM 迁移的最新建议是什么？像我们这种情况要不要迁、怎么渐进地迁？给我带版本和日期上下文的中文建议。",
-  "assertions": [
-    { "name": "Node 官方来源带 URL（nodejs.org 或 nodejs/help GitHub）", "type": "manual" },
-    { "name": "版本/日期上下文明确（Node 版本、ESM 支持状态或文档日期）", "type": "manual" },
-    { "name": "结构完整：明确建议+证据来源+边界/非目标", "type": "manual" },
-    { "name": "只读合规：除评测输出目录外未创建或修改任何文件", "type": "manual" }
-  ]
-}

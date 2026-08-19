@@ -1,9 +1,0 @@
-{
-  "name": "team-board",
-  "version": "0.3.1",
-  "type": "module",
-  "scripts": {
-    "start": "node src/server.mjs",
-    "test": "node test/run-tests.mjs"
-  }
-}

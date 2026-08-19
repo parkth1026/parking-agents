@@ -1,6 +1,0 @@
-命令: node G:/GIT/AI_WorkFlow/parking-agents/.claude/skills/aes-grilling/scripts/validate-goal-contract.mjs G:\GIT\AI_WorkFlow\parking-agents\.claude\skills\aes-grilling-workspace\iteration-8\eval-1-log-export\new_skill\run-1\workdir\docs\goal-contracts\2026-08-09-log-export-date-range-and-output.md
---- 输出 ---
-AC_COUNT: 5
-VALID: G:\GIT\AI_WorkFlow\parking-agents\.claude\skills\aes-grilling-workspace\iteration-8\eval-1-log-export\new_skill\run-1\workdir\docs\goal-contracts\2026-08-09-log-export-date-range-and-output.md
---- 退出码 ---
-0

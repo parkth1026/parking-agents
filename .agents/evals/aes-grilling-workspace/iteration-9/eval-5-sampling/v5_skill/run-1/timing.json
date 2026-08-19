@@ -1,6 +1,0 @@
-{
-  "total_tokens": 162233,
-  "duration_ms": 1329081,
-  "total_duration_seconds": 1329.1,
-  "validity_note": "角色隔离被破坏：第 1 步全目录 grep 命中 workdir/PERSONA.md，泄漏发生在写任何提问原文之前。第 1 轮提问命中率不可作为干净证据；耗时与体量数据仍可用。"
-}

@@ -1,6 +1,0 @@
-VALID: G:\GIT\AI_WorkFlow\parking-agents\.claude\skills\aes-grilling-workspace\iteration-2\eval-4-perf-threshold-lock-scale\old_skill\run-1\workdir\docs\goal-contracts\2026-08-07-summary-p95-under-200ms.md
-FORMAT: AES Goal Contract B
-STATUS: Ready
-AC_COUNT: 5
-LINE_COUNT: 50
-EXIT CODE: 0

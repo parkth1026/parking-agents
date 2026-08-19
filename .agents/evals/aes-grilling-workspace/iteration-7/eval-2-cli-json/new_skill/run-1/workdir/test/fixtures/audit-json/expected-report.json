@@ -1,7 +1,0 @@
-{
-  "ok": false,
-  "findings": [
-    { "rule": "has-name", "level": "error", "message": "missing name" },
-    { "rule": "no-debug", "level": "warn", "message": "debug enabled" }
-  ]
-}

@@ -1,9 +1,0 @@
-{
-  "name": "notes-tool",
-  "version": "0.9.2",
-  "type": "module",
-  "scripts": {
-    "web": "node src/web/server.mjs",
-    "test": "node test/run-tests.mjs"
-  }
-}

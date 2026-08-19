@@ -1,5 +1,0 @@
-VALID: G:\GIT\AI_WorkFlow\parking-agents\.claude\skills\aes-grilling-workspace\iteration-1\log-export-improvement\with_skill\outputs\goal-contract.md
-FORMAT: AES Goal Contract B
-STATUS: Ready
-AC_COUNT: 7
-LINE_COUNT: 52
