@@ -1,6 +1,6 @@
 ---
 name: aes-grilling-web
-description: "使用本地 Web Companion 对齐材料决定，并生成可直接交给执行 Agent 的轻量 Goal Contract。"
+description: "aes-grilling-web"
 disable-model-invocation: true
 ---
 
