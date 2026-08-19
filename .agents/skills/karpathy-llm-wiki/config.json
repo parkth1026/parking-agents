@@ -13,7 +13,8 @@
       "pageSize": 0.1,
       "frontmatter": 0.15
     },
-    "stalenessEnforce": false
+    "stalenessEnforce": false,
+    "ambiguousNamesEnforce": false
   },
   "page": {
     "minOutboundLinks": 2,

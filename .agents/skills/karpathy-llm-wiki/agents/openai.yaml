@@ -1,6 +1,6 @@
 interface:
   display_name: "karpathy-llm-wiki"
-  short_description: "Ingest, query, and validate a structured LLM knowledge wiki"
-  default_prompt: "Use $karpathy-llm-wiki to ingest or query this LLM knowledge wiki."
+  short_description: "把文章/论文/转录稿 ingest 进结构化 LLM 知识 wiki，支持查询与校验"
+  default_prompt: "使用 $karpathy-llm-wiki ingest 或查询这个 LLM 知识 wiki。"
 policy:
   allow_implicit_invocation: false

@@ -1,11 +1,12 @@
-# Page Templates
+# 页面模板
 
-Quick-reference templates for each wiki page type. Copy the relevant template
-when creating a new page.
+各 wiki 页面类型的速查模板，建新页时复制对应模板。模板正文保持英文——
+wiki 页面本身是英文产物，章节标题（Key Facts、How It Works 等）属于
+产物结构的一部分，不要译成中文。
 
-## Entity Page
+## 实体页（entity）
 
-For people, organizations, models, tools — proper nouns.
+人物、组织、模型、工具——专有名词。
 
 ```markdown
 ---
@@ -38,9 +39,9 @@ or change?
 - [[Related Concept 1]]
 ```
 
-## Concept Page
+## 概念页（concept）
 
-For ideas, techniques, architectures — common nouns.
+思想、技术、架构——普通名词。
 
 ```markdown
 ---
@@ -76,9 +77,9 @@ Where the concept came from and how it evolved.
 - [[Key Person or Org]]
 ```
 
-## Source Page
+## 来源页（source）
 
-For summaries of ingested articles, papers, or transcripts.
+已 ingest 的文章、论文或转录稿的摘要页。
 
 ```markdown
 ---
@@ -117,9 +118,9 @@ sources: []
 Any limitations, criticisms, or important caveats about this source.
 ```
 
-## Comparison Page
+## 对比页（comparison）
 
-For side-by-side analyses of related concepts, models, or approaches.
+相关概念、模型或方法的并排对比分析。
 
 ```markdown
 ---
@@ -162,9 +163,9 @@ Brief context for why this comparison matters.
 Based on [[Source 1]], [[Source 2]].
 ```
 
-## Query Page
+## 查询页（query）
 
-For archiving significant answers synthesized from the wiki.
+从 wiki 综合出的重要答案的存档页。
 
 ```markdown
 ---

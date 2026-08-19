@@ -5,6 +5,15 @@
 // 用法: node validate-wiki.mjs --wiki <path/to/wiki> [--config <path/to/config.json>] [--raw <path/to/rawDir>]
 // 退出码: 0 = PASS（总分 >= minScore 且断链为 0），1 = FAIL
 //
+// v6.2 变更（2026-08-19 iteration-8 严格审查后修复）:
+//  12. 自引用检测大小写不敏感：[[transformer]] 在 Transformer.md 内此前既逃过 Self References
+//      又自充 1 条入链（Windows 文件系统大小写不敏感、字符串比较敏感所致）；现与 v5 确立的
+//      页面名匹配口径一致，变体自链同样不计出链、不计断链分母、不计入链
+//  13. 同名 basename 歧义检测：跨目录同名页面（如 concepts/Attention.md + sources/Attention.md）
+//      会让 [[Title]] 解析产生歧义（inbound/orphan/index 计数按 basename 去重静默丢失一方）。
+//      Ambiguous Page Names 节独立报告（不计分），scoring.ambiguousNamesEnforce=true 时 FAIL
+//      ——与 staleness 同过渡策略：先报告清积压，再开执行
+//
 // v6 变更（2026-08-18 真实库只读审计后，见 docs/reports/karpathy-wiki-live-audit-2026-08-18）:
 //   7. staleness 检查：raw 证据日期 vs 页面 updated（--raw > $SKILL_ENV > ~/.config 解析 rawDir；
 //      证据日期取 frontmatter recorded_at/ingested/date，缺省回退文件 mtime；
@@ -16,6 +25,8 @@
 //      声明的扩展目录（替代 v5 硬编码 details/scratch/patterns —— 部署形态由 SCHEMA 声明，
 //      skill 文本与磁盘现实不再两套世界观）
 //  10. SCHEMA 标签收集排除 `## Page Types` / `## Page Directories` 两节（避免扩展声明混入标签集）
+//  11. staleness 证据扫描排除 tmp/ 目录（2026-08-19：raw/tmp 下的 wiki 修复前备份以 mtime
+//      充当证据日期，产生 73 条假 stale 并掩盖真证据 recorded_at——tmp 是工作区不是证据区）
 //
 // v5 变更（2026-08-17 对抗审查后修复，见 docs/reports/wiki-lint-adversarial-review-2026-08-16）:
 //   1. SCHEMA 标签过滤正则允许点号（ue5.5 等版本号标签不再误杀）
@@ -26,7 +37,7 @@
 //   6. EXCLUDED_NAMES / index 完整性匹配大小写不敏感
 
 import { fileURLToPath } from "node:url";
-import { dirname, join, basename, extname } from "node:path";
+import { dirname, join, basename, extname, relative } from "node:path";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 
@@ -77,7 +88,7 @@ function lineCount(content) {
 // ---- 入口 ----
 const { wiki: wikiPath, config: configPath, raw: rawArg } = parseArgs(process.argv.slice(2));
 
-console.log(C.cyan("=== Wiki Validation Script v6 ==="));
+console.log(C.cyan("=== Wiki Validation Script v6.2 ==="));
 if (!existsSync(wikiPath)) {
   console.error(`Wiki path does not exist: ${wikiPath}`);
   process.exit(1);
@@ -89,6 +100,7 @@ let minOutboundLinks = 2;
 let minScore = 9.0;
 let indexCountsAsInbound = true;
 let stalenessEnforce = false;
+let ambiguousNamesEnforce = false;
 const weights = {
   brokenLinks: 0.25, selfReferences: 0.10, orphanPages: 0.10,
   indexCompleteness: 0.15, frontmatter: 0.15, pageSize: 0.10,
@@ -104,6 +116,7 @@ if (configPath && existsSync(configPath)) {
   if (config.scoring?.weights) Object.assign(weights, config.scoring.weights);
   if (typeof config.scoring?.indexCountsAsInbound === "boolean") indexCountsAsInbound = config.scoring.indexCountsAsInbound;
   if (typeof config.scoring?.stalenessEnforce === "boolean") stalenessEnforce = config.scoring.stalenessEnforce;
+  if (typeof config.scoring?.ambiguousNamesEnforce === "boolean") ambiguousNamesEnforce = config.scoring.ambiguousNamesEnforce;
 }
 
 // 收集所有 .md（排除 SCHEMA.md / index.md / log.md / raw 目录；basename 大小写不敏感）
@@ -173,6 +186,27 @@ for (const file of allFiles) {
   inboundCount.set(baseName(file), 0);
 }
 
+// v6.2：同名 basename 歧义收集（跨目录同名让 [[Title]] 解析产生歧义）+
+// 大小写不敏感的规范名映射（入链计数经它归一，变体大小写链接不再丢入链）
+const ambiguousNames = [];
+{
+  const byLower = new Map();
+  for (const file of allFiles) {
+    const low = baseName(file).toLowerCase();
+    if (!byLower.has(low)) byLower.set(low, []);
+    byLower.get(low).push(file);
+  }
+  for (const [low, files] of byLower) {
+    if (files.length > 1) ambiguousNames.push({ Name: low, Files: files.map((f) => relative(wikiPath, f)).sort() });
+  }
+  ambiguousNames.sort((a, b) => a.Name.localeCompare(b.Name));
+}
+const pageByLower = new Map();
+for (const file of allFiles) {
+  const low = baseName(file).toLowerCase();
+  if (!pageByLower.has(low)) pageByLower.set(low, baseName(file));
+}
+
 // v6：链接解析目录 = 规范五目录 + 根 + SCHEMA `## Page Directories` 声明的扩展目录
 // （v5 曾硬编码 details/scratch/patterns —— 部署形态现由 SCHEMA 声明）
 const CANONICAL_DIRS = ["entities", "concepts", "sources", "comparisons", "queries"];
@@ -187,8 +221,9 @@ for (const file of allFiles) {
   for (const link of links) {
     const linkText = link[1];
 
-    // 维度 2: 自引用（不计出链、不计断链分母）
-    if (linkText === baseName(file)) {
+    // 维度 2: 自引用（不计出链、不计断链分母；v6.2 大小写不敏感——[[transformer]]
+    // 在 Transformer.md 内同样是自引用，且不再自充入链）
+    if (linkText.toLowerCase() === baseName(file).toLowerCase()) {
       selfReferences.push({ File: basename(file), Link: linkText });
       continue;
     }
@@ -203,7 +238,8 @@ for (const file of allFiles) {
     }
 
     if (found) {
-      if (inboundCount.has(linkText)) inboundCount.set(linkText, inboundCount.get(linkText) + 1);
+      const canonical = pageByLower.get(linkText.toLowerCase());
+      if (canonical) inboundCount.set(canonical, inboundCount.get(canonical) + 1);
     } else {
       brokenLinks.push({ File: basename(file), Link: linkText });
     }
@@ -221,8 +257,9 @@ if (existsSync(indexPath)) {
     }
     totalLinkSum++;
     if (found) {
-      if (indexCountsAsInbound && inboundCount.has(target)) {
-        inboundCount.set(target, inboundCount.get(target) + 1);
+      const canonical = pageByLower.get(target.toLowerCase());
+      if (indexCountsAsInbound && canonical) {
+        inboundCount.set(canonical, inboundCount.get(canonical) + 1);
       }
     } else {
       brokenLinks.push({ File: "index.md", Link: target });
@@ -308,6 +345,7 @@ if (validTags.length > 0) {
 // rawDir 解析链：--raw > $SKILL_ENV > ~/.config/parking-agents/skill-env.json（knowledgeBase.rawDir）
 // 证据日期：frontmatter recorded_at / ingested / date（YYYY-MM-DD 前缀即可），缺省回退 mtime
 // 匹配：raw 文件名去 recurrence- 前缀后与页面 basename 大小写不敏感比对
+// 范围：tmp/ 目录不参与扫描（工作区备份非证据，见头部变更 11）
 function resolveRawDir(cliRaw) {
   const normalize = (p) => (p && p.startsWith("~")) ? join(homedir(), p.replace(/^~[\\/]/, "")) : p;
   if (cliRaw) return normalize(cliRaw);
@@ -332,7 +370,11 @@ if (rawDir && existsSync(rawDir)) {
       updated: fmM ? (fmM[1].match(/^updated:\s*["']?(\d{4}-\d{2}-\d{2})/m)?.[1] ?? null) : null,
     });
   }
+  // tmp/ 是工作区（tmpDir 落点、wiki 修复前备份等）而非证据区：备份副本无日期字段，
+  // 以 mtime 当证据日期既制造假 stale，又借「同页取最新」掩盖真证据的 recorded_at
+  const isTmpPath = (p) => p.split(/[\\/]+/).includes("tmp");
   for (const rf of walkMd(rawDir)) {
+    if (isTmpPath(rf)) continue;
     rawEvidenceScanned++;
     const target = basename(rf, extname(rf)).replace(/^recurrence-/, "").toLowerCase();
     if (!pageMeta.has(target)) continue;
@@ -464,11 +506,24 @@ if (!rawDir || !existsSync(rawDir)) {
   }
 }
 
+// === v6.2: 同名 basename 歧义报告 ===
+console.log("\n" + C.cyan("=== Ambiguous Page Names (duplicate basenames across directories) ==="));
+if (ambiguousNames.length === 0) {
+  console.log(C.green("  No ambiguous page names — every [[wikilink]] target resolves to exactly one page."));
+} else {
+  console.log(C.yellow(`  Ambiguous Page Names (${ambiguousNames.length}) — [[Title]] resolution is ambiguous:`));
+  for (const a of ambiguousNames) console.log(C.yellow(`    '${a.Name}' used by: ${a.Files.join(", ")}`));
+  if (!ambiguousNamesEnforce) {
+    console.log(C.yellow("  (report-only — set scoring.ambiguousNamesEnforce=true to hard-gate)"));
+  }
+}
+
 // === 最终得分 ===
 console.log("\n" + C.cyan("=== Final Score ==="));
 const totalRounded = Math.round(totalScore * 10) / 10;
 const stalenessFail = stalenessEnforce && stalePages.length > 0;
-const pass = totalRounded >= minScore && brokenLinks.length === 0 && !stalenessFail;
+const ambiguousFail = ambiguousNamesEnforce && ambiguousNames.length > 0;
+const pass = totalRounded >= minScore && brokenLinks.length === 0 && !stalenessFail && !ambiguousFail;
 // 总分展示 2 位小数：避免 9.95 四舍五入显示成 10 误导
 console.log((totalRounded >= 9 ? C.green : totalRounded >= 7 ? C.yellow : C.red)(`  Total: ${totalScore.toFixed(2)} / 10`));
 console.log(C.white(`  Threshold: ${minScore} / 10`));
@@ -476,6 +531,8 @@ if (pass) {
   console.log(C.green("  Status: PASS"));
 } else if (stalenessFail) {
   console.log(C.red(`  Status: FAIL (staleness enforced: ${stalePages.length} stale pages — knowledge must be recompiled to cover newer raw evidence)`));
+} else if (ambiguousFail) {
+  console.log(C.red(`  Status: FAIL (ambiguous page names enforced: ${ambiguousNames.length} name(s) shared by multiple pages — rename one to disambiguate)`));
 } else if (brokenLinks.length > 0 && totalRounded >= minScore) {
   console.log(C.red(`  Status: FAIL (hard gate: broken links must be 0 — found ${brokenLinks.length})`));
 } else {
