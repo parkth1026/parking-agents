@@ -298,6 +298,15 @@ try {
   check("首轮: stdout 趋势 3 行", (r1.stdout.match(/^history: /gm) || []).length === 3);
   check("断言 ac 字段不碍聚合", r1.code === 0 && JSON.parse(readFileSync(join(root6, "ws", "iteration-1", "benchmark.json"), "utf8")).evals.length === 2);
 
+  // output-evals.json 沉淀（题面+断言，随 --history 同通道）
+  const oe1 = JSON.parse(readFileSync(join(skillDir, "output-evals.json"), "utf8"));
+  check("题面沉淀: 首轮 skill/evals/prompt 齐全", oe1.skill === "hist-demo" && oe1.evals.length === 2
+    && oe1.evals.every((e) => e.prompt === "p"));
+  check("题面沉淀: 断言全量含 type/ac", oe1.evals[0].assertions.length === 1
+    && oe1.evals[0].assertions[0].name === "断言" && oe1.evals[0].assertions[0].type === "script"
+    && oe1.evals[0].assertions[0].ac === "AC-1");
+  check("题面沉淀: 记录来源轮次", oe1.source_iteration === "iteration-1");
+
   const r2 = aggH("iteration-2");
   const h2 = JSON.parse(readFileSync(join(skillDir, "history.json"), "utf8"));
   const vs = h2.runs[1].vs_previous;
@@ -307,6 +316,10 @@ try {
   check("次轮: 新增 eval-c 记 new 不计胜负", vs.detail.some((d) => d.eval === "eval-c" && d.result === "new") && vs.evals_total === 2);
   check("次轮: 缺席 eval-a 标 dropped", vs.detail.some((d) => d.eval === "eval-a" && d.result === "dropped"));
   check("次轮: current_best 严格推进", h2.current_best === "runs[1]");
+
+  const oe2 = JSON.parse(readFileSync(join(skillDir, "output-evals.json"), "utf8"));
+  check("题面沉淀: 跟随最新轮整写覆盖", oe2.source_iteration === "iteration-2"
+    && oe2.evals.map((e) => e.name).join(",") === "eval-b,eval-c");
 
   const r3 = aggH("iteration-3");
   const h3 = JSON.parse(readFileSync(join(skillDir, "history.json"), "utf8"));
@@ -367,6 +380,8 @@ try {
   const r7 = agg("iteration-1");
   check("无参数: 不产 history 行不在 iteration 目录建 history", r7.code === 0 && !r7.stdout.includes("history:")
     && !exists(join(root6, "ws", "iteration-1", "history.json")));
+  check("无参数: 不产题面行不建 output-evals.json", !r7.stdout.includes("evals:")
+    && !exists(join(root6, "ws", "iteration-1", "output-evals.json")));
 
   const r8 = agg("iteration-1", ["--history", join(root6, "no-such")]);
   check("拒绝: 目标不可写退出 1 且 benchmark 照常产出", r8.code === 1 && r8.stdout.includes("拒绝")
@@ -380,6 +395,35 @@ try {
     && statSync(join(skillDirD, "history.json")).isDirectory());
 } finally {
   rmSync(root6, { recursive: true, force: true });
+}
+
+// ---- 聚合·output-evals 边界（字符串断言/缺 prompt/目录占用拒绝） ----
+console.log("聚合·题面沉淀边界：");
+const root6b = mkdtempSync(join(tmpdir(), "oevalstest-"));
+try {
+  const mkEval = (ev, metadata) => {
+    const d = join(root6b, "iteration-1", ev, "with_skill", "run-1");
+    mkdirSync(d, { recursive: true });
+    writeFileSync(join(d, "grading.json"), JSON.stringify({ results: [{ name: "x", passed: true }] }));
+    if (metadata !== null) writeFileSync(join(root6b, "iteration-1", ev, "eval_metadata.json"), JSON.stringify(metadata));
+  };
+  mkEval("eval-s", { prompt: "题面", assertions: ["老式字符串断言"] });
+  mkEval("eval-t", null); // 无 eval_metadata.json 的 eval
+
+  const sd = join(root6b, "skill");
+  mkdirSync(sd);
+  const legacy = runFile("aggregate-benchmark.mjs", [join(root6b, "iteration-1"), "--history", sd]);
+  const oe = JSON.parse(readFileSync(join(sd, "output-evals.json"), "utf8"));
+  check("边界: 字符串断言归一为 {name}", legacy.code === 0 && oe.evals[0].assertions[0].name === "老式字符串断言");
+  check("边界: 缺 metadata 的 eval 记空题面并警告", oe.evals[1].prompt === "" && oe.evals[1].assertions.length === 0
+    && legacy.stdout.includes("缺 prompt"));
+
+  const sd2 = join(root6b, "skill-dir");
+  mkdirSync(join(sd2, "output-evals.json"), { recursive: true }); // 题面文件位是目录
+  const dr = runFile("aggregate-benchmark.mjs", [join(root6b, "iteration-1"), "--history", sd2]);
+  check("边界: output-evals.json 是目录 → 拒绝 1", dr.code === 1 && dr.stdout.includes("是目录"));
+} finally {
+  rmSync(root6b, { recursive: true, force: true });
 }
 
 // ---- 聚合·自定义 gate 目录名（gate 可选制） ----

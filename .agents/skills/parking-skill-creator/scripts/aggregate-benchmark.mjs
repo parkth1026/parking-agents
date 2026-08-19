@@ -5,7 +5,8 @@
 // 统计口径: pass_rate/time_ms/tokens 的 mean/stddev(样本 n-1)/min/max；delta = with − baseline。
 // timing 数值为 null 时跳过该 run 对应统计并计入 skipped，不报错。
 // --history <技能目录>: 另把本轮各 gate 指标追加进 <技能目录>/history.json（只追加不覆盖），
-//   与上一 run 按同 eval 名比 won/lost/tie；不带该参数时行为与旧版逐字节一致。
+//   与上一 run 按同 eval 名比 won/lost/tie；同通道整写 <技能目录>/output-evals.json
+//   （本轮题面+断言，clone 接收方不依赖 workspace 即可重建评测用例）。不带该参数时两者都不写。
 // 用法: node aggregate-benchmark.mjs <iter-dir> [--skill-name <名>] [--output <路径>] [--history <技能目录>]
 // 退出码: 0 成功 / 1 无数据或目录不存在（含 --history 目标不可写，聚合产出不回滚）/ 2 用法错
 import { existsSync, readdirSync, statSync, renameSync, readFileSync } from "node:fs";
@@ -71,6 +72,9 @@ export function loadIteration(iterDir, warnings = []) {
       name: evalName,
       prompt: metadata.prompt ?? "",
       assertions: Array.isArray(metadata.assertions) ? metadata.assertions.map((a) => a.name ?? a) : [],
+      assertion_specs: Array.isArray(metadata.assertions)
+        ? metadata.assertions.map((a) => (a && typeof a === "object" ? a : { name: String(a) }))
+        : [],
       configs: {},
     };
 
@@ -187,6 +191,15 @@ export function renderMarkdown(benchmark) {
 }
 
 // ---- history.json（技能目录，只追加） ----
+
+/** 题面沉淀体 output-evals.json：本轮评测用例集（整写覆盖，跨轮内容史由 git 记录） */
+export function buildOutputEvals(evals, skillName, iterationName) {
+  return {
+    skill: skillName || "",
+    source_iteration: iterationName,
+    evals: evals.map((e) => ({ name: e.name, prompt: e.prompt, assertions: e.assertion_specs })),
+  };
+}
 
 /** 主 gate：with_skill 优先，否则按字典序首个（current_best 与 vs_previous 同口径） */
 export function primaryGate(gates) {
@@ -468,5 +481,21 @@ if (historyDir) {
   console.log(`history: 追加 1 条 run（第 ${s.index} 条）→ ${s.vsNote}${s.vsNote.startsWith("won") ? "（vs 上一条，按 eval 名匹配）" : ""}`);
   console.log(`history: current_best ${s.advance ? `推进至 runs[${s.bestIdxAfter}]` : `保持 runs[${s.bestIdxAfter}]`}（${s.reason}）`);
   console.log(`history: → ${historyPath}（runs 共 ${appended.history.runs.length} 条，只追加）`);
+
+  // 同通道沉淀题面：指标与题面一起走，clone 接收方拿齐成绩史+用例集（整写覆盖，史由 git 记录）
+  const outputEvalsPath = join(historyDir, "output-evals.json");
+  if (existsSync(outputEvalsPath) && statSync(outputEvalsPath).isDirectory()) {
+    console.log(`拒绝：output-evals.json 是目录，不是题面文件: ${outputEvalsPath}（本次不沉淀题面，聚合结果照常产出）`);
+    process.exit(1);
+  }
+  try {
+    writeJson(outputEvalsPath, buildOutputEvals(result.evals, skillName || b.skill_name, b.iteration));
+  } catch (err) {
+    console.log(`拒绝：output-evals.json 写入失败: ${err.message}（本次不沉淀题面，聚合结果照常产出）`);
+    process.exit(1);
+  }
+  const noPrompt = result.evals.filter((e) => !e.prompt).length;
+  console.log(`evals: 题面+断言沉淀 ${result.evals.length} 个 eval → ${outputEvalsPath}（整写覆盖，跨轮史由 git 记录）`);
+  if (noPrompt > 0) console.log(`evals: 注意: ${noPrompt} 个 eval 缺 prompt（eval_metadata.json 不全，题面不可完整复现）`);
 }
 process.exit(0);

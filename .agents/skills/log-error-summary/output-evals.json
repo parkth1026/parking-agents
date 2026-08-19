@@ -1,0 +1,41 @@
+{
+  "skill": "log-error-summary",
+  "source_iteration": "iteration-2",
+  "evals": [
+    {
+      "name": "eval-日志错误频次统计",
+      "prompt": "统计这份日志里的错误分布，给我一张错误模式/次数的频次表（markdown）",
+      "assertions": [
+        {
+          "name": "识别出 3 类错误模式",
+          "type": "script",
+          "ac": "AC-1"
+        },
+        {
+          "name": "pull image 同型归并计 8 次",
+          "type": "script",
+          "ac": "AC-4"
+        },
+        {
+          "name": "connection refused 同型归并计 5 次",
+          "type": "script",
+          "ac": "AC-4"
+        },
+        {
+          "name": "NullReferenceException 计 3 次",
+          "type": "script",
+          "ac": "AC-1"
+        },
+        {
+          "name": "INFO/WARNING 行不计入，总错误行 16",
+          "type": "script",
+          "ac": "AC-2"
+        },
+        {
+          "name": "markdown 频次表呈现且按次数降序",
+          "type": "script"
+        }
+      ]
+    }
+  ]
+}

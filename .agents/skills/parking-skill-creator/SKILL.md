@@ -191,7 +191,7 @@ node scripts/quick-validate.mjs <技能目录>
 
    产出 `benchmark.json` + `benchmark.md`：pass_rate/time_ms/tokens 的 mean±stddev（样本方差）+ delta（with − baseline）。配置目录名动态发现（with_skill/without_skill/old_skill/自定义都行）。
 
-   `--history` 是评测数据反向写进技能目录的**唯一通道**（聚合默认不碰技能目录，须显式传参）：把本轮各 gate 指标**追加**一条 run 进 `<技能目录>/history.json`（只追加不覆盖，历史可审计）。**从首轮起每轮聚合都带上它**（用户明说不沉淀除外）——某轮忘带则 history 断档，下一轮的对比会静默跳过断档轮。终端多 3 行趋势摘要。history.json 随 .skill 包分发——workspace 会被 clean，成绩沉淀进技能才留得住；但 `vs_previous` 的逐 eval 对比要**现场重算上一轮 iteration 目录**，所以 clean workspace 前先把该轮聚合并沉淀（跨机/跨会话续跑时旧目录可能已不在，对比会记「不可比」而不是报错）。目标目录不可写时拒绝追加（退出码 1），已产出的 benchmark 不回滚。
+   `--history` 是评测数据反向写进技能目录的**唯一通道**（聚合默认不碰技能目录，须显式传参）：把本轮各 gate 指标**追加**一条 run 进 `<技能目录>/history.json`（只追加不覆盖，历史可审计），并同通道**整写** `<技能目录>/output-evals.json`——本轮全部 eval 的题面（prompt）与断言（含 `ac` 引用），接收方 clone 仓库后不依赖 workspace 就能重建同一套评测用例（跨轮题面变化由 git 记录）。**从首轮起每轮聚合都带上它**（用户明说不沉淀除外）——某轮忘带则 history 断档，下一轮的对比会静默跳过断档轮。终端多 3 行趋势摘要。history.json 随 .skill 包分发——workspace 会被 clean，成绩沉淀进技能才留得住；但 `vs_previous` 的逐 eval 对比要**现场重算上一轮 iteration 目录**，所以 clean workspace 前先把该轮聚合并沉淀（跨机/跨会话续跑时旧目录可能已不在，对比会记「不可比」而不是报错）。目标目录不可写时拒绝追加（退出码 1），已产出的 benchmark 不回滚。
 
    对比与星标口径（防脏数据）：**主 gate** = with_skill，没有 with_skill 时取字典序首个 gate 名。`vs_previous` 与上一条 run 按**同 eval 名**比 won/lost/tie（pass 布尔翻转；本轮新增 eval 计入 total 不计胜负，上轮有本轮没有的 eval 标 dropped）；两轮主 gate 名不同且无共同 with_skill 时记「gate 不连续不可比」，**绝不当失败记 lost**。`current_best` 按主 gate pass_rate 严格更高才推进、平局不推进（防抖）；主 gate 名不同的轮次（纯实验 gate）不参与推进；同一 iteration 重复聚合视为修正——追加一条并在 stdout 提示，星标以该 iteration 最新一条为准（早期半程数据锁不住上限）。`iteration_ref` 存本机绝对路径，仅供本机回溯，跨机时只作轮次标识读。
 3. **分析**：读 benchmark 数据做一轮 analyst pass（读 `agents/analyzer.md` 的 Analyzing Benchmark Results 节）——找聚合看不见的模式：两组全过的无区分度断言、高方差疑似 flaky 的 eval、时间/token 代价。观察写入 benchmark.json 的 `notes` 数组，viewer 会展示。
@@ -326,21 +326,22 @@ subagent 前向测试是把技能当评测面：验证泛化，不是验证另�
 node scripts/package-skill.mjs <技能目录> [输出目录]
 ```
 
-打包前自动跑同一校验器，违规目录拒绝打包（退出码 1）；存在 `run-tests.mjs` 时还会自动执行技能自测，失败即拒绝打包（主观无测试的技能可省略该文件）。`run-tests.mjs`、`references/design.md`（设计依据）、`history.json`（输出评测成绩）、`trigger-evals.json`/`trigger-benchmark.json`（触发题库与成绩）都在技能根、随技能进包（评测产物不进），包消费者可追溯设计到验收的完整证据链。产出 `<技能名>.skill`——标准 zip 格式（STORE 不压缩），条目路径含技能目录名前缀，排除 `evals/`（技能目录根下）、`__pycache__/`、`node_modules/`、`*.pyc`、`.DS_Store`。可用任意 zip 工具或标准库核验内容。
+打包前自动跑同一校验器，违规目录拒绝打包（退出码 1）；存在 `run-tests.mjs` 时还会自动执行技能自测，失败即拒绝打包（主观无测试的技能可省略该文件）。`run-tests.mjs`、`references/design.md`（设计依据）、`history.json`（输出评测成绩）、`output-evals.json`（输出评测题面与断言）、`trigger-evals.json`/`trigger-benchmark.json`（触发题库与成绩）都在技能根、随技能进包（评测产物不进），包消费者可追溯设计到验收的完整证据链。产出 `<技能名>.skill`——标准 zip 格式（STORE 不压缩），条目路径含技能目录名前缀，排除 `evals/`（技能目录根下）、`__pycache__/`、`node_modules/`、`*.pyc`、`.DS_Store`。可用任意 zip 工具或标准库核验内容。
 
 ## 迭代依据的发现约定
 
-任何技能的迭代依据五件套住技能根，Creator（或任何 agent）按约定路径零配置发现，不需要中央索引：
+任何技能的迭代依据六件套住技能根，Creator（或任何 agent）按约定路径零配置发现，不需要中央索引：
 
 | 文件 | 角色 |
 | --- | --- |
 | `run-tests.mjs` | 回归门——升级改动先跑它 |
 | `references/design.md` | 验收锚（AC-N）与迭代记录（只追加） |
 | `history.json` | 输出评测指标史（`--history` 沉淀，含 vs_previous 对比） |
+| `output-evals.json` | 输出评测题面与断言（`--history` 同通道整写，接收方可重建用例） |
 | `trigger-evals.json` | 触发题库（定稿资产，随包分发） |
 | `trigger-benchmark.json` | 触发评测指标史（`--persist` 沉淀） |
 
-git 记内容史（谁改了什么、何时），指标文件记成绩史（机器可读、viewer 可渲染），两者互补不重复。迭代一个陌生技能时，先按这五条路径把依据读齐再动手。
+迭代能力的分布遵循**裁决：能力集中、证据随技能**——评测与迭代管线只在本技能（Creator）维护一份，技能目录不内嵌自迭代流程（防 N 份副本口径漂移、防污染 description 触发面）；技能只携带证据，clone 本仓库即同时拿到 Creator、全部技能与其完整迭代依据。git 记内容史（谁改了什么、何时），指标文件记成绩史（机器可读、viewer 可渲染），两者互补不重复。迭代一个陌生技能时，先按这六条路径把依据读齐再动手。
 
 ## 本仓库使用提示
 

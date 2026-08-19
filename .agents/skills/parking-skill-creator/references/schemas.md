@@ -109,6 +109,39 @@ Append-only eval score ledger. Located at `<skill-dir>/history.json`, distribute
 
 ---
 
+## output-evals.json（技能目录，已实现）
+
+Output-eval case set — the prompts and assertions of the current evaluation round. Durable asset at the skill root (`<skill-dir>/output-evals.json`); ships inside the .skill package. Written **only** by `scripts/aggregate-benchmark.mjs` through the same `--history <技能目录>` channel as history.json, so metrics and their case definitions always persist together (a cloner gets the score ledger **and** the questions it was earned on). Atomic full overwrite per aggregation — cross-round content history is carried by git, mirroring trigger-benchmark.json. Rationale: eval_metadata.json lives only in the gitignored workspace; without this file, a fresh clone sees past scores in history.json but cannot reproduce the eval cases that produced them.
+
+```json
+{
+  "skill": "log-classifier",
+  "source_iteration": "iteration-3",
+  "evals": [
+    {
+      "name": "eval-日志归类表格",
+      "prompt": "把 D:/logs/ 下的失败日志按错误模式归类成表格",
+      "assertions": [
+        { "name": "表格覆盖全部日志文件", "type": "manual", "ac": "AC-1" },
+        { "name": "计数与 grep 结果一致", "type": "script" }
+      ]
+    }
+  ]
+}
+```
+
+**Fields:**
+- `skill`: Skill name (from `--skill-name` or the benchmark's skill_name)
+- `source_iteration`: Directory name of the iteration this case set was aggregated from — identifies which round's evals these are
+- `evals[]`: One entry per eval directory, sorted by name
+  - `name`: Eval directory name (`eval-<描述性名>`) — the join key matched by history.json's `vs_previous.detail[].eval`
+  - `prompt`: The user's task verbatim (empty string when eval_metadata.json was missing — stdout warns "缺 prompt")
+  - `assertions[]`: Verbatim from that eval's eval_metadata.json (`name` / `type` / optional `ac`); legacy string assertions are normalized to `{ "name": <string> }`
+
+**Boundary behavior:** written after the history append within the same `--history` run; if the write fails (or the path is a directory) the script refuses with exit code 1 — the already-written benchmark and history.json are not rolled back. Without `--history` the file is never created or touched. To rebuild a comparable round after cloning: read this file, recreate each `iteration-N/eval-<name>/eval_metadata.json` from it, then follow SKILL.md 6.1 — same prompts and assertions are what make `vs_previous` comparable across machines.
+
+---
+
 ## structure-review.json
 
 Product of the structure-review step (SKILL.md 6.5). Located at `<iteration-dir>/structure-review.json`; auto-discovered by the eval viewer, which renders the suggestion card above the Benchmark table. **Suggestions only — never executed.**

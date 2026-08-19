@@ -1,0 +1,138 @@
+{
+  "skill": "karpathy-llm-wiki",
+  "source_iteration": "iteration-8",
+  "evals": [
+    {
+      "name": "eval-contradiction-ingest",
+      "prompt": "wiki 里 GPT-3 页面写的是 175B 参数。我刚读了篇博客要录入：《How Many Parameters Does GPT-3 Really Have?》（Ivan Vetokhin，2024-11-02，ivettokhin.medium.io）。核心观点：175B 是把全部 embedding 参数都计入的口径；按只参与每次前向计算的参数算，GPT-3 实际约 ~170B——两个口径都有人用，差的是 counting methodology。把这篇文章 ingest 进 wiki；它和现有页面结论有冲突，两边的说法都得保住，怎么记你判断。",
+      "assertions": [
+        {
+          "name": "矛盾双记录：GPT-3 页同时保留 175B 与 ~170B 且各自归属来源",
+          "type": "script"
+        },
+        {
+          "name": "矛盾处理带日期与来源归属（非静默二选一、非复述单边）",
+          "type": "manual"
+        },
+        {
+          "name": "新 source 页建立（type: source，含 takeaways）",
+          "type": "script"
+        },
+        {
+          "name": "处理后校验 PASS（断链 0、总分 >= 9）",
+          "type": "script",
+          "ac": "AC-1"
+        },
+        {
+          "name": "原文沉淀 raw（wiki-raw 有素材文件）",
+          "type": "script"
+        },
+        {
+          "name": "log 追加 ingest 条目、index 收录新页",
+          "type": "script"
+        },
+        {
+          "name": "GPT-3 页 updated >= 新证据日期 2024-11-02（页面不早于其证据）",
+          "type": "script",
+          "ac": "AC-9"
+        }
+      ]
+    },
+    {
+      "name": "eval-disambiguation-ingest",
+      "prompt": "刚读完一篇标题就叫《Attention》的博客（Vlad Bogolin，2024-03-18，medium.com/@vlad.bogolin），是 attention 机制的全景综述，写得挺全。帮我 ingest 进 wiki，和已有的 attention 内容打通。",
+      "assertions": [
+        {
+          "name": "sources/ 无与 concepts/Attention.md 同名 basename 的页面（消歧执行）",
+          "type": "script"
+        },
+        {
+          "name": "既有 Attention 概念页被更新（含新来源引用）而非被绕开",
+          "type": "script"
+        },
+        {
+          "name": "断链 0、校验 PASS",
+          "type": "script",
+          "ac": "AC-8"
+        },
+        {
+          "name": "原文沉淀 raw（wiki-raw 有素材文件）",
+          "type": "script"
+        },
+        {
+          "name": "log 追加 ingest 条目、index 收录新页",
+          "type": "script"
+        },
+        {
+          "name": "消歧命名合理（作品全名或限定词，如 \"Attention (blog)\"）",
+          "type": "manual"
+        }
+      ]
+    },
+    {
+      "name": "eval-oversize-split",
+      "prompt": "给我的 wiki 做一次 lint 体检，把发现的问题修到位，修完复检一遍。我要求修完以后校验是绿的。",
+      "assertions": [
+        {
+          "name": "超限问题被发现（过程证据提及超大/行数问题并点名页面）",
+          "type": "script"
+        },
+        {
+          "name": "拆分后全部页面 <= 200 行",
+          "type": "script"
+        },
+        {
+          "name": "拆分后校验 PASS（断链 0、总分 >= 9）",
+          "type": "script",
+          "ac": "AC-1"
+        },
+        {
+          "name": "父子页面互链（概览链子页、子页链回）",
+          "type": "script"
+        },
+        {
+          "name": "index 收录全部页面、log 记录 lint 与修复",
+          "type": "script"
+        },
+        {
+          "name": "拆分不丢知识（原页要点在新结构中可寻）",
+          "type": "manual"
+        }
+      ]
+    },
+    {
+      "name": "eval-uncovered-query-honesty",
+      "prompt": "查一下我的 wiki：Mamba 这类 state space 架构和 Transformer 在长序列建模上的核心区别是什么？wiki 里没有的部分明说，我讨厌被编出来的答案。",
+      "assertions": [
+        {
+          "name": "如实声明 wiki 未覆盖 Mamba（答复文本明说）",
+          "type": "manual"
+        },
+        {
+          "name": "不编造 Mamba 对比内容冒充 wiki 知识",
+          "type": "manual"
+        },
+        {
+          "name": "不建 comparisons/ 伪存档页",
+          "type": "script"
+        },
+        {
+          "name": "log 记录查询条目",
+          "type": "script"
+        },
+        {
+          "name": "既有 concepts 页零改动（哈希一致）",
+          "type": "script"
+        },
+        {
+          "name": "建议 ingest Mamba 素材来补覆盖",
+          "type": "manual"
+        },
+        {
+          "name": "答复引用既有页面（[[wikilink]] 或页面名）",
+          "type": "script"
+        }
+      ]
+    }
+  ]
+}

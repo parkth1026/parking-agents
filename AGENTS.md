@@ -11,7 +11,7 @@
 |---|---|
 | 纯临时中间物（下载的日志、请求体、草稿、缓存） | `os.tmpdir()`，或技能 config 的 `tmpDir` |
 | 运行生成的报告 / 审计 / 评测 / 分析产物（本机查看，不入库） | `docs/reports/<名称>-<日期>/`（.gitignore 已忽略） |
-| 技能评测 workspace（iteration 产物、快照、探针原始数据） | `.agents/evals/<技能名>-workspace/`（scratch，.gitignore 已忽略）；持久评测依据（history.json、trigger-*.json）住对应技能目录 |
+| 技能评测 workspace（iteration 产物、快照、探针原始数据） | `.agents/evals/<技能名>-workspace/`（scratch，.gitignore 已忽略）；持久评测依据（history.json、output-evals.json、trigger-*.json）住对应技能目录 |
 | 需要跨机共享的数据 | 技能配置指向的 NAS 路径（NAS 只放数据，不放配置） |
 | 要长期留档、随仓库演进的正式文档 | `docs/` 下正常提交进 git |
 

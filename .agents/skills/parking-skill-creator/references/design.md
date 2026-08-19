@@ -15,6 +15,7 @@
 | 评测产物 | `<skill-dir>/../../evals/<skill>-workspace/` | `evals/` 与 `skills/` 平行，产物与技能根隔离，避免 `SKILL.md` 夹具冒充技能 |
 | 设计依据与成绩 | `references/design.md` + `<skill-dir>/history.json` | 验收条件可追溯，跨轮成绩可追加且随包分发 |
 | UI 元数据 | `agents/openai.yaml`，路径相对技能目录 | 技能可独立复制、安装，不绑定宿主扫描根名称 |
+| 迭代能力分布 | 能力集中本技能、证据随技能（六件套），技能不内嵌自迭代流程 | 评测管线只维护一份防口径漂移；clone 仓库即同时拿到管线与全部迭代依据，技能 description 触发面不被「迭代我」类意图污染 |
 
 ## 验收条件
 
@@ -29,6 +30,7 @@
 | AC-7 | 触发评测先校验评测集；坏探针、未知 query 和全无效证据失败关闭，不生成可误读的 0 分报告 | script |
 | AC-8 | viewer 对端口参数做边界校验，并能通过真实 HTTP GET 首页、POST/GET feedback 完成评审闭环 | script |
 | AC-9 | `SKILL.md`、writing guide 和 UI default prompt 明确 Chinese-first；English 只用于 machine contract 或通过四道 gate 的少量核心 term | manual/script |
+| AC-10 | `--history` 沉淀通道同轮整写 `output-evals.json`（题面+断言含 ac），clone 接收方不依赖 workspace 即可重建评测用例；无旗标时不写、写入失败干净拒绝 | script |
 
 ## 迭代记录
 
@@ -39,3 +41,4 @@
 | 2026-08-18 | 将 Chinese-first、四道 conversion gate、短 Prompt 最多 2 个/长文最多 5 个写入 SKILL.md、writing guide 和 UI default prompt | n/a；待跑自测 | 未命中；保持单一流水线技能 |
 | 2026-08-18 | 独立复跑新文档契约和完整流水线回归 | 96 项自测通过；quick-validate 通过 | 未命中；保持单一流水线技能 |
 | 2026-08-18 | 按 Chinese-first 规则重写本技能 frontmatter description，收窄 English 到机器契约和路由必要词 | 97 项自测通过；quick-validate 通过 | 未命中；保持单一流水线技能 |
+| 2026-08-20 | 钢人裁决「迭代能力集中 Creator、技能只带证据」落进发现约定；新增 output-evals.json 题面沉淀（`--history` 同通道整写），补齐 clone 接收方复现评测用例的缺口，五件套扩为六件套 | 109 项自测通过；quick-validate 通过；clone 视图模拟中六件套齐全、题面可重建并被聚合器消费；3 个存量技能已回填 | 未命中；保持单一流水线技能 |
