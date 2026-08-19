@@ -1,0 +1,24 @@
+{
+  "skill": "steelman-analysis",
+  "runs": [
+    {
+      "date": "2026-08-19T15:31:34+08:00",
+      "iteration_ref": "D:\\GIT_dev\\parking-agents\\.agents\\evals\\steelman-analysis-workspace\\iteration-1",
+      "gates": {
+        "with_skill": {
+          "pass_rate": 0.9444,
+          "mean_ms": 150027,
+          "mean_tokens": 81543.6667
+        },
+        "without_skill": {
+          "pass_rate": 0.3333,
+          "mean_ms": 79005.3333,
+          "mean_tokens": 41197
+        }
+      },
+      "vs_previous": null,
+      "current_best": true
+    }
+  ],
+  "current_best": "runs[0]"
+}
