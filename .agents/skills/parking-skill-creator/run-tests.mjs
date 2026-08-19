@@ -454,6 +454,53 @@ try {
   rmSync(root9, { recursive: true, force: true });
 }
 
+// ---- 触发评测聚合·--persist 沉淀进技能目录 ----
+console.log("触发聚合·--persist 沉淀：");
+const root10 = mkdtempSync(join(tmpdir(), "persisttest-"));
+try {
+  const evalSet = {
+    skill: "persist-demo",
+    queries: [
+      { id: "q1", text: "需要使用该技能的任务", should_trigger: true },
+      { id: "q2", text: "另一个需要使用该技能的任务", should_trigger: true },
+      { id: "q3", text: "关键词相似但不该使用该技能", should_trigger: false },
+      { id: "q4", text: "另一个 near-miss", should_trigger: false },
+    ],
+  };
+  const skillDir = join(root10, "persist-demo-skill");
+  const ws = join(root10, "persist-demo-workspace");
+  mkdirSync(skillDir);
+  mkdirSync(ws);
+  writeFileSync(join(skillDir, "trigger-evals.json"), JSON.stringify(evalSet), "utf8");
+  writeFileSync(join(ws, "probe-results.jsonl"), [
+    { query_id: "q1", first_line: "SKILL: persist-demo" },
+    { query_id: "q2", first_line: "SKILL: persist-demo" },
+    { query_id: "q3", first_line: "SKILL: none" },
+    { query_id: "q4", first_line: "SKILL: none" },
+  ].map((row) => JSON.stringify(row)).join("\n") + "\n", "utf8");
+  const persisted = runFile("aggregate-trigger.mjs", [ws, "--persist", skillDir]);
+  const persistedBenchmark = JSON.parse(readFileSync(join(skillDir, "trigger-benchmark.json"), "utf8"));
+  check("触发沉淀: 题库从技能目录读、成绩写到技能目录", persisted.code === 0
+    && persistedBenchmark.skill === "persist-demo" && persistedBenchmark.valid_probes === 4
+    && !exists(join(ws, "trigger-benchmark.json")));
+
+  const missingBank = join(root10, "missing-bank-skill");
+  mkdirSync(missingBank);
+  const noBank = runFile("aggregate-trigger.mjs", [ws, "--persist", missingBank]);
+  check("触发沉淀: 题库未沉淀拒绝退出 1 且不写报告", noBank.code === 1
+    && out(noBank).includes("题库未沉淀到技能目录")
+    && !exists(join(missingBank, "trigger-benchmark.json")));
+
+  const notDir = runFile("aggregate-trigger.mjs", [ws, "--persist", join(root10, "no-such-dir")]);
+  check("触发沉淀: 目标不是目录拒绝退出 1", notDir.code === 1
+    && out(notDir).includes("拒绝: --persist 目标不是可写目录"));
+
+  const noValue = runFile("aggregate-trigger.mjs", [ws, "--persist"]);
+  check("触发沉淀: --persist 缺值按用法错退出 2", noValue.code === 2);
+} finally {
+  rmSync(root10, { recursive: true, force: true });
+}
+
 // ---- 评审页·历史轨迹区与结构审查建议卡片 ----
 console.log("评审页·历史与建议卡片：");
 const root8 = mkdtempSync(join(tmpdir(), "viewtest-"));

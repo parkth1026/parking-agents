@@ -273,7 +273,7 @@ Output from `scripts/aggregate-benchmark.mjs`. Located at `<iteration-dir>/bench
 
 ## trigger-evals.json
 
-Trigger-eval query set (subagent probe mechanism). Located at the default workspace root (`<skill-dir>/../../evals/<skill-name>-workspace/trigger-evals.json`).
+Trigger-eval query set (subagent probe mechanism). Durable, finalized asset at the skill root (`<skill-dir>/trigger-evals.json`); ships inside the .skill package. Once finalized it does not change — changing the set starts a fresh full re-run and must not share a commit with a description change (cross-round comparability depends on a fixed set).
 
 ```json
 {
@@ -298,7 +298,7 @@ Trigger-eval query set (subagent probe mechanism). Located at the default worksp
 
 ## probe-results.jsonl
 
-One line per probe, appended by the orchestrating agent as probes complete. Located at the workspace root.
+One line per probe, appended by the orchestrating agent as probes complete. Located at the workspace root (raw probe replies — scratch, never committed).
 
 ```jsonl
 {"query_id": "q1", "probe": 1, "first_line": "SKILL: log-classifier", "triggered": true, "reason": "日志归类任务", "description": "分类 Jenkins 失败日志…"}
@@ -316,7 +316,7 @@ One line per probe, appended by the orchestrating agent as probes complete. Loca
 
 ## trigger-benchmark.json
 
-Output from `scripts/aggregate-trigger.mjs`. Located at the workspace root.
+Output from `scripts/aggregate-trigger.mjs <workspace> --persist <skill-dir>`. Durable record at the skill root (`<skill-dir>/trigger-benchmark.json`); without `--persist` it is written to the workspace root (one-off runs). Atomic full overwrite — cross-round content history is carried by git.
 
 ```json
 {
@@ -348,7 +348,7 @@ Output from `scripts/aggregate-trigger.mjs`. Located at the workspace root.
 - `valid_probes`: Total protocol-valid, known-query probe rows across all rounds
 - `invalid_probes`: Total malformed JSON lines, non-object/unknown-query rows, or probe lines whose first line did not match the protocol
 
-**Boundary behavior:** `trigger-evals.json` must contain a non-empty skill, unique ids, non-empty text, boolean `should_trigger`, and both positive and negative queries. Invalid evaluation data exits 1. If no probe row is valid, aggregation exits 1 and does not write a benchmark file.
+**Boundary behavior:** `trigger-evals.json` must contain a non-empty skill, unique ids, non-empty text, boolean `should_trigger`, and both positive and negative queries. Invalid evaluation data exits 1. If no probe row is valid, aggregation exits 1 and does not write a benchmark file. With `--persist`, a non-directory target or a missing `trigger-evals.json` at the skill dir refuses with exit 1 — never a silent fallback to a stale workspace copy.
 
 ---
 

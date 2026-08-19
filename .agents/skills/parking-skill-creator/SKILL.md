@@ -124,7 +124,7 @@ node scripts/quick-validate.mjs <技能目录>
 
 ## 第 6 步：输出评测循环
 
-评测结果默认放 `<skill-dir>/../../evals/<技能名>-workspace/`——其中 `<skill-dir>` 指本技能目录，`evals/` 与 `skills/` 平行；workspace 在技能扫描根之外，评测产物/夹具里出现再多的 `SKILL.md` 也不会被宿主识别成技能。若显式沿用扫描根内的旧 workspace，跑完 iteration 要用 `check-shadow-skills` 复查产物有没有冒充技能。按迭代组织（`iteration-1/`、`iteration-2/`…），每个测试用例一个 `eval-<描述性名>/` 目录。目录随用随建，不要预先全铺。
+评测结果默认放 `<skill-dir>/../../evals/<技能名>-workspace/`——其中 `<skill-dir>` 指本技能目录，`evals/` 与 `skills/` 平行；workspace 在技能扫描根之外，评测产物/夹具里出现再多的 `SKILL.md` 也不会被宿主识别成技能。workspace 是 scratch、不入库（.gitignore 已忽略）——持久评测依据住技能目录，clean 前先把成绩沉淀进去（见「迭代依据的发现约定」）。若显式沿用扫描根内的旧 workspace，跑完 iteration 要用 `check-shadow-skills` 复查产物有没有冒充技能。按迭代组织（`iteration-1/`、`iteration-2/`…），每个测试用例一个 `eval-<描述性名>/` 目录。目录随用随建，不要预先全铺。
 
 ### 6.1 起跑前问 gate 集，同一 turn 并行 spawn 全部 run
 
@@ -250,7 +250,7 @@ description 决定技能会不会被调用。技能做完（或触发不准）�
 
 ### 建评测集
 
-约 20 条 query，存 `<workspace>/trigger-evals.json`（schema 见 `references/schemas.md`）：
+约 20 条 query，存 `<技能目录>/trigger-evals.json`（schema 见 `references/schemas.md`）——题库是定稿资产，随 .skill 包分发；定稿后不改：要改就视为新题库、开新一轮全量重跑，且不与 description 改动混进同一提交（跨轮可比性依赖题库固定）：
 
 ```json
 {
@@ -290,7 +290,7 @@ description 决定技能会不会被调用。技能做完（或触发不准）�
 
 首行的护栏句必保：没有它，任务形状的请求会诱使探针真去执行任务（实测 5~10 倍 token 与耗时）或翻到评测文件。**防泄漏红线**：探针 prompt 不得包含 should_trigger 预期答案、评测意图暗示、「我们在测试 X 技能」等信息；评测集与探针结果就放在 workspace，探针浏览文件即泄漏，护栏句已禁止。探针要知道的只有：请求原文、技能清单、首行协议。
 
-每个探针完成后，**逐条追加**进 `<workspace>/probe-results.jsonl`：
+每个探针完成后，**逐条追加**进 `<workspace>/probe-results.jsonl`（原始探针数据，scratch 不入库）：
 
 ```jsonl
 {"query_id": "q1", "probe": 1, "first_line": "SKILL: log-classifier", "triggered": true, "reason": "日志归类任务"}
@@ -301,12 +301,14 @@ description 决定技能会不会被调用。技能做完（或触发不准）�
 ### 聚合
 
 ```bash
-node scripts/aggregate-trigger.mjs <workspace>
+node scripts/aggregate-trigger.mjs <workspace> --persist <技能目录>
 ```
 
 先校验 `skill`、query id/text/should_trigger 和正负两类样本；探针协议不完整、JSONL 坏行、未知 query 或含换行的 `first_line` 都记 invalid，不猜答案。全无有效探针时退出码 1 且不写 `trigger-benchmark.json`，避免把 0 分假报告当成证据。
 
 输出 `trigger-benchmark.json`：train/test 60/40 按 should_trigger 分层切分（官方 run_loop 口径），每 query 3 探针取严格多数，各层触发率/误触发率/invalid 计数；多轮（改写 description 后再跑探针，jsonl 行带 `description` 字段）时按 **test 正确数**选 best_description，防过拟合。结果同时记录 `valid_probes`，每轮记录有效探针数，便于审计证据是否充足。
+
+`--persist <技能目录>` 把题库读取与成绩写出缺省切到技能目录（`trigger-evals.json`/`trigger-benchmark.json` 沉淀进技能根，显式 `--eval-set`/`--output` 仍可覆盖）；技能目录缺题库或目标不是目录时拒绝（退出 1），**绝不静默回退**读 workspace 旧副本——那是跨轮漂移的源头。probe-results.jsonl 始终留 workspace。成绩为原子整写（非追加），跨轮内容史由 git 记录。不带 `--persist` 时与旧行为完全一致，外部技能一次性评测照旧。
 
 ### 迭代 description
 
@@ -324,7 +326,21 @@ subagent 前向测试是把技能当评测面：验证泛化，不是验证另�
 node scripts/package-skill.mjs <技能目录> [输出目录]
 ```
 
-打包前自动跑同一校验器，违规目录拒绝打包（退出码 1）；存在 `run-tests.mjs` 时还会自动执行技能自测，失败即拒绝打包（主观无测试的技能可省略该文件）。`run-tests.mjs`、`references/design.md`（设计依据）与 `history.json`（成绩沉淀）都随技能进包（评测产物不进），包消费者可追溯设计到验收的完整证据链。产出 `<技能名>.skill`——标准 zip 格式（STORE 不压缩），条目路径含技能目录名前缀，排除 `evals/`（技能目录根下）、`__pycache__/`、`node_modules/`、`*.pyc`、`.DS_Store`。可用任意 zip 工具或标准库核验内容。
+打包前自动跑同一校验器，违规目录拒绝打包（退出码 1）；存在 `run-tests.mjs` 时还会自动执行技能自测，失败即拒绝打包（主观无测试的技能可省略该文件）。`run-tests.mjs`、`references/design.md`（设计依据）、`history.json`（输出评测成绩）、`trigger-evals.json`/`trigger-benchmark.json`（触发题库与成绩）都在技能根、随技能进包（评测产物不进），包消费者可追溯设计到验收的完整证据链。产出 `<技能名>.skill`——标准 zip 格式（STORE 不压缩），条目路径含技能目录名前缀，排除 `evals/`（技能目录根下）、`__pycache__/`、`node_modules/`、`*.pyc`、`.DS_Store`。可用任意 zip 工具或标准库核验内容。
+
+## 迭代依据的发现约定
+
+任何技能的迭代依据五件套住技能根，Creator（或任何 agent）按约定路径零配置发现，不需要中央索引：
+
+| 文件 | 角色 |
+| --- | --- |
+| `run-tests.mjs` | 回归门——升级改动先跑它 |
+| `references/design.md` | 验收锚（AC-N）与迭代记录（只追加） |
+| `history.json` | 输出评测指标史（`--history` 沉淀，含 vs_previous 对比） |
+| `trigger-evals.json` | 触发题库（定稿资产，随包分发） |
+| `trigger-benchmark.json` | 触发评测指标史（`--persist` 沉淀） |
+
+git 记内容史（谁改了什么、何时），指标文件记成绩史（机器可读、viewer 可渲染），两者互补不重复。迭代一个陌生技能时，先按这五条路径把依据读齐再动手。
 
 ## 本仓库使用提示
 

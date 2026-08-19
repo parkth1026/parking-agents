@@ -6,9 +6,11 @@
 //   - 每 query 默认 3 探针取严格多数（有效探针中 triggered > 半数才算触发）
 //   - 首行 `SKILL: <名或 none>` 是唯一判定源；解析失败记 invalid 不猜
 //   - best_description 按 test 分数选出（防过拟合）：correct ↑ → 应触发率 ↑ → 误触发率 ↓，全平取先出现有效轮
-// 用法: node aggregate-trigger.mjs <workspace目录> [--eval-set <路径>] [--probes <路径>] [--output <路径>]
-// 退出码: 0 成功 / 1 数据缺失或无有效结果 / 2 用法错
-import { existsSync, readFileSync } from "node:fs";
+// --persist <技能目录>: 题库（trigger-evals.json）读取与成绩（trigger-benchmark.json）写出缺省指向技能目录；
+//   显式 --eval-set/--output 可覆盖；probe-results.jsonl 始终住 workspace（原始探针是 scratch）。
+// 用法: node aggregate-trigger.mjs <workspace目录> [--persist <技能目录>] [--eval-set <路径>] [--probes <路径>] [--output <路径>]
+// 退出码: 0 成功 / 1 数据缺失、无有效结果或 --persist 目标不可写 / 2 用法错
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { readJson, writeJson } from "./lib/jsonio.mjs";
 
@@ -16,8 +18,8 @@ const SPLIT_SEED = 42;
 const HOLDOUT = 0.4;
 
 function usage() {
-  console.log("用法: node aggregate-trigger.mjs <workspace目录> [--eval-set <路径>] [--probes <路径>] [--output <路径>]");
-  console.log("示例: node aggregate-trigger.mjs ../my-skill-workspace");
+  console.log("用法: node aggregate-trigger.mjs <workspace目录> [--persist <技能目录>] [--eval-set <路径>] [--probes <路径>] [--output <路径>]");
+  console.log("示例: node aggregate-trigger.mjs ../my-skill-workspace --persist ../../skills/log-classifier");
   process.exit(2);
 }
 
@@ -269,9 +271,26 @@ const flag = (name) => {
 };
 
 const ws = resolve(wsArg);
-const evalSetPath = flag("--eval-set") ?? join(ws, "trigger-evals.json");
+
+// --persist <技能目录>：题库读取与成绩写出的缺省从 workspace 切到技能目录（持久依据随技能走）。
+// 题库未沉淀时拒绝，绝不静默回退读 workspace 旧副本——那是跨轮漂移的源头。
+const persistIdx = argv.indexOf("--persist");
+if (persistIdx !== -1 && !argv[persistIdx + 1]) usage();
+const persistDir = persistIdx !== -1 ? resolve(argv[persistIdx + 1]) : null;
+if (persistDir) {
+  if (!existsSync(persistDir) || !statSync(persistDir).isDirectory()) {
+    console.log(`拒绝: --persist 目标不是可写目录: ${persistDir}（题库与成绩要沉淀进技能目录）`);
+    process.exit(1);
+  }
+}
+const persistEvalSet = persistDir ? join(persistDir, "trigger-evals.json") : null;
+const evalSetPath = flag("--eval-set") ?? persistEvalSet ?? join(ws, "trigger-evals.json");
 const probesPath = flag("--probes") ?? join(ws, "probe-results.jsonl");
-const outPath = flag("--output") ?? join(ws, "trigger-benchmark.json");
+const outPath = flag("--output") ?? (persistDir ? join(persistDir, "trigger-benchmark.json") : join(ws, "trigger-benchmark.json"));
+if (persistEvalSet && evalSetPath === persistEvalSet && !existsSync(persistEvalSet)) {
+  console.log(`拒绝: 题库未沉淀到技能目录: ${persistEvalSet}（先把 trigger-evals.json 迁入技能目录，或去掉 --persist 走 workspace 口径）`);
+  process.exit(1);
+}
 
 const evalSet = readJson(evalSetPath);
 const evalErrors = validateEvalSet(evalSet);
