@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>需求收敛 · Web</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23201d18'/%3E%3Ctext x='32' y='43' text-anchor='middle' font-size='36' fill='%23f7f5f0'%3E%E6%94%B6%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="identity"><span class="logo" aria-hidden="true">收</span><strong>需求收敛 · Web</strong></div>
+      <nav id="phases" class="phases" aria-label="三阶段进度"></nav>
+      <div class="view-tabs" role="tablist">
+        <button id="flow-tab" class="view-tab active" type="button" role="tab" aria-selected="true">访谈视图</button>
+        <button id="contract-tab" class="view-tab" type="button" role="tab" aria-selected="false">契约视图</button>
+      </div>
+      <span id="ambiguities" class="ambiguities">开放歧义 —</span>
+      <span id="connection" class="connection" data-state="loading">连接中</span>
+    </header>
+
+    <main id="flow-view" class="workspace">
+      <section id="flow" class="flow" aria-live="polite">
+        <div class="loading-card">正在读取本轮状态…</div>
+      </section>
+      <aside class="rail" aria-label="已锁定结论">
+        <p class="eyebrow">LOCKED · 已锁定结论</p>
+        <div id="locked"></div>
+      </aside>
+    </main>
+
+    <main id="contract-view" class="contract-view" hidden>
+      <article id="contract" class="contract-document"></article>
+    </main>
+  </div>
+  <script type="module" src="/app.mjs"></script>
+</body>
+</html>

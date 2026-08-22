@@ -1,0 +1,6 @@
+interface:
+  display_name: "workflow-interview-web"
+  short_description: "在本地 Web 单页完成三阶段访谈与契约确认"
+  default_prompt: "使用 $workflow-interview-web 调查当前任务并在本地浏览器单页完成三阶段需求访谈、原型质疑和契约确认。"
+policy:
+  allow_implicit_invocation: false

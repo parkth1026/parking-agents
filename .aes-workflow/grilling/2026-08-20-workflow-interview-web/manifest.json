@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "slug": "2026-08-20-workflow-interview-web",
+  "created_at": "2026-08-19T20:34:10Z",
+  "updated_at": "2026-08-22T15:27:26Z",
+  "original_request": "开发新技能 workflow-interview-web：复用 workflow-interview 三阶段核心逻辑，所有提问/决策交互/核心内容展示改为本地 Web 单页双向交互（无超时唤醒），体验对标 Claude Design 多提问窗口",
+  "goal_oneline": "workflow-interview-web：workflow-interview 的 Web 入口薄层——三阶段访谈全部在本地浏览器单页双向进行，提交经后台任务退出即时唤醒 agent，detached server 48h 缓冲支持隔天提交，session.mjs/rounds.jsonl 保持唯一真源",
+  "target": null,
+  "stage": "3-contract",
+  "next_action": "契约就绪，可交执行 Agent 实现 workflow-interview-web 技能（交接指令由 finalize 现场生成）",
+  "stage_gates": {
+    "1-interview": {
+      "status": "done",
+      "closed_at": "2026-08-20T15:02:36Z",
+      "self_assessment": {
+        "意图": "已定",
+        "结果": "已定",
+        "边界": "已定",
+        "约束": "已定",
+        "现状": "已定"
+      }
+    },
+    "2-prototype": {
+      "status": "done",
+      "closed_at": "2026-08-20T16:59:10Z",
+      "artifacts_confirmed": [
+        "mock",
+        "behavior",
+        "api-mock",
+        "example-run",
+        "diagram"
+      ]
+    },
+    "3-contract": {
+      "status": "done",
+      "closed_at": "2026-08-22T15:27:26Z"
+    }
+  },
+  "validation": {
+    "status": "valid",
+    "ac_count": 6,
+    "warnings": [],
+    "ran_at": "2026-08-22T15:27:26Z",
+    "verify_tiers": {
+      "A": 3,
+      "B": 1,
+      "C": 1,
+      "D": 1
+    }
+  },
+  "blocked": [],
+  "residual_risk": null,
+  "status": "ready"
+}
