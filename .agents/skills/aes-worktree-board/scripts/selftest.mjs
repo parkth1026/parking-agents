@@ -8,7 +8,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join, resolve, sep } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   collectStatus, DEFAULT_RUNTIME_DIR, loadConfig, SKILL_DIR,
 } from './collect.mjs';
@@ -265,31 +265,95 @@ function processAlive(pid) {
   }
 }
 
-async function waitForProcessExit(pid) {
-  for (let attempt = 0; attempt < 100; attempt += 1) {
+async function waitForProcessExit(pid, timeoutMs = 10_000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
     if (!processAlive(pid)) return;
     await new Promise((resolveWait) => setTimeout(resolveWait, 100));
   }
-  throw new Error(`子进程 ${pid} 未在期限内退出`);
+  throw new Error(`子进程 ${pid} 未在 ${timeoutMs}ms 内退出`);
 }
 
-function startServer(runtimeDir, extraEnv = {}, cwd = ROOT) {
-  const child = spawn(process.execPath, [join(SCRIPT_DIR, 'server.mjs'), '--port', '0'], {
+function createDispatchObserver(runtimeDir) {
+  mkdirSync(runtimeDir, { recursive: true });
+  const observerPath = join(runtimeDir, '.dispatch-observer.mjs');
+  const pidPath = join(runtimeDir, '.dispatch-pids.jsonl');
+  writeFileSync(observerPath, `
+import { appendFileSync } from 'node:fs';
+import { createRequire, syncBuiltinESMExports } from 'node:module';
+
+const require = createRequire(import.meta.url);
+const childProcess = require('node:child_process');
+const originalSpawn = childProcess.spawn;
+childProcess.spawn = function observedSpawn(file, argv, options) {
+  const child = originalSpawn.call(this, file, argv, options);
+  const args = Array.isArray(argv) ? argv.map(String) : [];
+  const isDispatch = options?.detached && args.some((value) => value.toLowerCase().endsWith('dispatch.mjs'));
+  if (isDispatch) {
+    const taskIndex = args.indexOf('--task-id');
+    const taskId = taskIndex >= 0 ? args[taskIndex + 1] : null;
+    appendFileSync(
+      process.env.AES_WORKTREE_BOARD_DISPATCH_PID_FILE,
+      JSON.stringify({ pid: child.pid, taskId }) + '\\n',
+    );
+  }
+  return child;
+};
+syncBuiltinESMExports();
+`);
+  return { observerPath, pidPath };
+}
+
+function observedDispatches(pidPath) {
+  if (!existsSync(pidPath)) return [];
+  return readFileSync(pidPath, 'utf8').split(/\r?\n/).filter(Boolean).flatMap((line) => {
+    try {
+      return [JSON.parse(line)];
+    } catch {
+      return [];
+    }
+  });
+}
+
+async function waitForDispatchWrapper(pidPath, taskId) {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const record = observedDispatches(pidPath).find((value) => value.taskId === taskId);
+    if (record) return record;
+    await waitMilliseconds(100);
+  }
+  throw new Error(`未观察到 detached dispatch wrapper: taskId=${taskId}; pidFile=${pidPath}; records=${JSON.stringify(observedDispatches(pidPath))}`);
+}
+
+function startServer(runtimeDir, extraEnv = {}, cwd = ROOT, { observeDispatch = false } = {}) {
+  const env = boardEnv(runtimeDir, extraEnv);
+  let observer = null;
+  const args = [join(SCRIPT_DIR, 'server.mjs'), '--port', '0'];
+  if (observeDispatch) {
+    observer = createDispatchObserver(runtimeDir);
+    args.unshift('--import', pathToFileURL(observer.observerPath).href);
+    env.AES_WORKTREE_BOARD_DISPATCH_PID_FILE = observer.pidPath;
+  }
+  const child = spawn(process.execPath, args, {
     cwd,
-    env: boardEnv(runtimeDir, extraEnv),
+    env,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   return Promise.race([
     new Promise((resolveServer, reject) => {
       let output = '';
+      let errorOutput = '';
       child.stdout.setEncoding('utf8');
+      child.stderr.setEncoding('utf8');
       child.stdout.on('data', (chunk) => {
         output += chunk;
         const match = output.match(/http:\/\/127\.0\.0\.1:(\d+)\//);
-        if (match) resolveServer({ child, origin: `http://127.0.0.1:${match[1]}` });
+        if (match) resolveServer({ child, origin: `http://127.0.0.1:${match[1]}`, dispatchPidFile: observer?.pidPath });
+      });
+      child.stderr.on('data', (chunk) => {
+        errorOutput += chunk;
       });
       child.on('error', reject);
-      child.on('exit', (code) => reject(new Error(`server 提前退出: ${code}`)));
+      child.on('exit', (code) => reject(new Error(`server 提前退出: ${code}; stdout=${output}; stderr=${errorOutput}`)));
     }),
     new Promise((_, reject) => setTimeout(() => reject(new Error('server 启动超时')), 10_000)),
   ]);
@@ -353,6 +417,7 @@ async function repoRootDomain() {
       runtimeDir,
       { AES_WORKTREE_BOARD_REPO_ROOT: fixture.main },
       ROOT,
+      { observeDispatch: true },
     );
     const response = await fetch(`${server.origin}/api/dispatch`, {
       method: 'POST',
@@ -361,9 +426,11 @@ async function repoRootDomain() {
     });
     const payload = await response.json();
     assert.equal(response.status, 202, JSON.stringify(payload));
+    const dispatchWrapper = await waitForDispatchWrapper(server.dispatchPidFile, payload.taskId);
     const finished = await waitTask(server.origin, payload.taskId);
     assert.equal(finished.task.status, 'done');
     assert.equal(resolve(finished.task.path), resolve(fixture.sibling));
+    await waitForProcessExit(dispatchWrapper.pid, 30_000);
     const status = await waitStatus(runtimeDir, fixture.main);
     assert.deepEqual(status.worktrees.map((worker) => worker.name), [basename(fixture.sibling)]);
   } finally {
@@ -490,6 +557,7 @@ async function dispatchDomain() {
       runtimeDir,
       { AES_WORKTREE_BOARD_REPO_ROOT: fixture.main },
       ROOT,
+      { observeDispatch: true },
     );
     let response = await fetch(`${server.origin}/api/dispatch`, {
       method: 'POST',
@@ -510,6 +578,7 @@ async function dispatchDomain() {
     payload = await response.json();
     assert.deepEqual(Object.keys(payload), ['ok', 'taskId', 'worktree', 'agent']);
     assert.equal(payload.worktree, name);
+    const dispatchWrapper = await waitForDispatchWrapper(server.dispatchPidFile, payload.taskId);
 
     response = await fetch(`${server.origin}/api/dispatch`, {
       method: 'POST',
@@ -521,6 +590,7 @@ async function dispatchDomain() {
     const finished = await waitTask(server.origin, payload.taskId);
     assert.equal(finished.task.status, 'done');
     assert.match(finished.logTail, /prompt received: server dirty confirmed/);
+    await waitForProcessExit(dispatchWrapper.pid, 30_000);
     await waitStatus(runtimeDir, fixture.main, finished.task.endedAt);
     for (const extension of ['json', 'log', 'prompt.txt']) {
       assert.ok(existsSync(join(runtimeDir, 'tasks', `${payload.taskId}.${extension}`)), `缺少任务三件套 .${extension}`);
