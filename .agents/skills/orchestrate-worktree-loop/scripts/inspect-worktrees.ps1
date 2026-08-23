@@ -21,11 +21,24 @@ function Invoke-GitText {
         [switch]$AllowFailure
     )
 
-    $output = & git -C $Repository @Arguments 2>$null
-    $exitCode = $LASTEXITCODE
+    # Capture native stderr as data. With ErrorActionPreference=Stop,
+    # redirecting it to $null can still surface a non-zero probe as a
+    # terminating ErrorRecord before -AllowFailure sees the exit code.
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $nativeOutput = & git -C $Repository @Arguments 2>&1
+        $exitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
     if ($exitCode -ne 0 -and -not $AllowFailure) {
         throw "git -C '$Repository' $($Arguments -join ' ') failed with exit code $exitCode"
     }
+
+    $output = @($nativeOutput | Where-Object {
+        $_ -isnot [System.Management.Automation.ErrorRecord]
+    })
 
     [pscustomobject]@{
         ExitCode = $exitCode

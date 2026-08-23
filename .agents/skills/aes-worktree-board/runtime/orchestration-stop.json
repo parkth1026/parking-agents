@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "status": "orchestration-stop",
+  "recordedAt": "2026-08-23T23:37:20Z",
+  "repo": "G:/GIT/AI_WorkFlow/aes-agents-v2",
+  "reason": "所有非 test worktree 均无可继续的自动线路：dev1/#56 与 dev2/#57 达到三次 reviewer BLOCK 并进入 handoff-required；dev3/#14 与 dev5/#41 为 user-aligned/needs-decision/parked；dev4/#17 已合并但保留未跟踪现场，不能作为干净空闲 worktree 派发。",
+  "activeTasks": [],
+  "worktrees": [
+    {
+      "name": "aes-agents-v2-dev1",
+      "issue": 56,
+      "state": "handoff-required",
+      "blockCount": 3,
+      "nextAction": "等待人工交接"
+    },
+    {
+      "name": "aes-agents-v2-dev2",
+      "issue": 57,
+      "state": "handoff-required",
+      "blockCount": 3,
+      "nextAction": "等待人工交接"
+    },
+    {
+      "name": "aes-agents-v2-dev3",
+      "issue": 14,
+      "state": "parked",
+      "blockCount": 0,
+      "nextAction": "等待用户决策"
+    },
+    {
+      "name": "aes-agents-v2-dev4",
+      "issue": 17,
+      "state": "merged",
+      "blockCount": 0,
+      "nextAction": "不派发，保留未跟踪现场"
+    },
+    {
+      "name": "aes-agents-v2-dev5",
+      "issue": 41,
+      "state": "parked",
+      "blockCount": 0,
+      "nextAction": "等待用户决策"
+    }
+  ],
+  "nextAction": "等待人工交接；不要创建 Task、发送自动修复指令或执行新的 merge"
+}
