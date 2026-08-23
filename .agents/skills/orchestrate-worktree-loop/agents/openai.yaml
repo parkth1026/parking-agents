@@ -1,4 +1,4 @@
 interface:
-  display_name: "Worktree 总管循环"
-  short_description: "审计 worktree 并循环推进 issue 到测试、评审、提交与合并"
-  default_prompt: "使用 $orchestrate-worktree-loop 接管指定 worktree，创建可见 Codex task，并按审计、测试、评审、提交、合并、领取下一 issue 的状态机循环推进。"
+  display_name: "orchestrate-worktree-loop"
+  short_description: "只调度可见 Codex Desktop worker，监督证据并串行合并"
+  default_prompt: "使用 $orchestrate-worktree-loop 仅作为 coordinator：为每个既有 worktree 创建或复用可见 Codex Desktop executor/reviewer session；worker 在目标 worktree 完成 Issue 实现、测试和 review，当前任务只负责监督、更新 tracker、验证事实并 merge。"
