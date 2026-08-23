@@ -1,0 +1,124 @@
+#!/usr/bin/env node
+/**
+ * Fixture test for scripts/install-skills.mjs.
+ *
+ * Builds a fake source tree (one flat, one nested) and a pre-populated target
+ * in a temp dir, then checks every decision the installer can make per name:
+ * create, keep, repoint, convert — plus that foreign entries stay untouched.
+ *
+ * Run: node tests/skills/test-install-skills.mjs
+ */
+
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readlinkSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { installSkills, normalizeLinkTarget } from "../../scripts/install-skills.mjs";
+
+const failures = [];
+const fail = (msg) => failures.push(msg);
+const expect = (cond, msg) => {
+  if (!cond) fail(msg);
+};
+const linkTarget = (p) => normalizeLinkTarget(readlinkSync(p));
+const isLink = (p) => lstatSync(p).isSymbolicLink();
+
+const root = mkdtempSync(join(tmpdir(), "install-skills-test-"));
+
+try {
+  // --- fixtures ---------------------------------------------------------------
+  const srcA = join(root, "src-a"); // flat, like .agents/skills
+  const srcB = join(root, "src-b"); // nested, like skills/<category>/<name>
+  const target = join(root, "target");
+
+  const mkSkill = (base, ...segments) => {
+    const dir = join(base, ...segments);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "SKILL.md"), `---\nname: ${segments.at(-1)}\n---\n`);
+    return dir;
+  };
+
+  const devDir = mkSkill(srcA, "skill-dev");
+  const staleDir = mkSkill(srcA, "skill-stale");
+  const newDir = mkSkill(srcA, "skill-new");
+  const pubDir = mkSkill(srcB, "engineering", "skill-pub");
+
+  mkdirSync(target, { recursive: true });
+  symlinkSync(devDir, join(target, "skill-dev"), "junction"); // already correct
+  symlinkSync(join(srcA, "gone"), join(target, "skill-stale"), "junction"); // stale link
+  mkdirSync(join(target, "skill-pub")); // real copy to convert
+  writeFileSync(join(target, "skill-pub", "SKILL.md"), "stale copy");
+  mkdirSync(join(target, "foreign")); // not ours, must not be touched
+  writeFileSync(join(target, "foreign", "keep.txt"), "keep");
+  symlinkSync(join(root, "nowhere"), join(target, "dead-link"), "junction"); // foreign dead link
+  writeFileSync(join(target, "loose.txt"), "x"); // anomaly: loose file
+  mkdirSync(join(target, "empty-skill")); // anomaly: dir without SKILL.md
+
+  // --- run --------------------------------------------------------------------
+  const result = installSkills({ sources: [srcA, srcB], target, labelBase: root });
+
+  // --- assertions -------------------------------------------------------------
+  expect(result.failures.length === 0, `failures reported: ${result.failures.join("; ")}`);
+  expect(result.created.length === 1 && result.created[0].startsWith("skill-new"), "skill-new not created");
+  expect(result.kept.length === 1 && result.kept[0] === "skill-dev", "skill-dev not kept");
+  expect(result.repointed.length === 1 && result.repointed[0].startsWith("skill-stale"), "skill-stale not repointed");
+  expect(result.converted.length === 1 && result.converted[0].startsWith("skill-pub"), "skill-pub not converted");
+  expect(result.removed.length === 1 && result.removed[0].startsWith("dead-link"), "dead-link not removed");
+  // foreign/ also lacks SKILL.md, so it is a legitimate third anomaly
+  expect(result.anomalies.length === 3, `anomalies: ${result.anomalies.join("; ")}`);
+  const foreignList = result.foreign.slice().sort().join(",");
+  expect(foreignList === "empty-skill,foreign,loose.txt", `foreign entries: ${foreignList}`);
+
+  expect(isLink(join(target, "skill-new")), "skill-new is not a link");
+  expect(linkTarget(join(target, "skill-new")) === normalizeLinkTarget(newDir), "skill-new points wrong");
+  expect(linkTarget(join(target, "skill-dev")) === normalizeLinkTarget(devDir), "skill-dev points wrong");
+  expect(linkTarget(join(target, "skill-stale")) === normalizeLinkTarget(staleDir), "skill-stale still stale");
+  expect(isLink(join(target, "skill-pub")), "skill-pub is not a link");
+  expect(linkTarget(join(target, "skill-pub")) === normalizeLinkTarget(pubDir), "skill-pub points wrong");
+
+  const backupName = readdirSync(root).find((n) => n.startsWith("skills-backup-"));
+  expect(backupName !== undefined, "no skills-backup-<ts> folder created next to target");
+  if (backupName) {
+    const backupPub = join(root, backupName, "skill-pub");
+    expect(existsSync(backupPub), "converted skill-pub not moved into backup");
+    expect(
+      existsSync(join(backupPub, "SKILL.md")),
+      "backup copy of skill-pub lost its contents"
+    );
+  }
+
+  expect(existsSync(join(target, "foreign", "keep.txt")), "foreign entry was touched");
+  expect(!existsSync(join(target, "dead-link")), "dead-link still present after health pass");
+  expect(existsSync(join(target, "loose.txt")), "loose.txt was touched (report only)");
+  expect(existsSync(join(target, "empty-skill")), "empty-skill was touched (report only)");
+
+  // --- missing target directory is created and fully populated ----------------
+  const fresh = join(root, "fresh-target"); // does not exist yet
+  const freshResult = installSkills({ sources: [srcA, srcB], target: fresh });
+  const freshLinks = ["skill-dev", "skill-stale", "skill-new", "skill-pub"].filter((n) =>
+    isLink(join(fresh, n))
+  );
+  expect(freshResult.created.length === 4 && freshLinks.length === 4, "fresh target not fully populated");
+  expect(freshResult.failures.length === 0, `fresh run failures: ${freshResult.failures.join("; ")}`);
+} finally {
+  rmSync(root, { recursive: true, force: true });
+}
+
+// --- Report --------------------------------------------------------------------
+
+if (failures.length > 0) {
+  console.error(`FAIL — ${failures.length} problem(s):\n`);
+  for (const f of failures) console.error(`  ✗ ${f}`);
+  process.exit(1);
+}
+
+console.log("PASS — install-skills: create/keep/repoint/convert/untouched all verified");

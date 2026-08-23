@@ -6,7 +6,9 @@
   "main": ".opencode/plugins/parking-skills.js",
   "scripts": {
     "check:repo": "node skills/making-skills-cross-platform/scripts/check-skill-repo.mjs . --allow skills/claude-to-vscode-skill-converter/,skills/making-skills-cross-platform/references/",
-    "test": "node tests/skills/test-skill-discovery.mjs && node tests/skills/test-no-tool-names.mjs && node tests/hooks/test-session-start.mjs && node --test tests/pi/test-pi-extension.mjs && node --test tests/harnesses/test-harness-manifests.mjs && node scripts/bump-version.mjs --check && node scripts/bump-version.mjs --audit && npm run check:repo"
+    "install:skills:agents": "node scripts/install-skills-agents.mjs",
+    "install:skills:claude": "node scripts/install-skills-claude.mjs",
+    "test": "node tests/skills/test-skill-discovery.mjs && node tests/skills/test-install-skills.mjs && node tests/skills/test-no-tool-names.mjs && node tests/hooks/test-session-start.mjs && node --test tests/pi/test-pi-extension.mjs && node --test tests/harnesses/test-harness-manifests.mjs && node scripts/bump-version.mjs --check && node scripts/bump-version.mjs --audit && npm run check:repo"
   },
   "license": "MIT",
   "author": "piaotonghu <pb763396199@gmail.com>",
