@@ -1,0 +1,26 @@
+{
+  "skill": "workflow-interview-web",
+  "queries": [
+    { "id": "q1", "text": "用 $workflow-interview-web 梳理这个需求：给我们仓库那个 Node CLI 加 --dry-run，老输出格式不能变", "should_trigger": true },
+    { "id": "q2", "text": "$workflow-interview-web 走起，我要访谈清楚报表服务重构的范围，在浏览器里答题", "should_trigger": true },
+    { "id": "q3", "text": "这个停车计费改造需求，用 workflow-interview 的网页版来访谈，我不想在终端里一问一答", "should_trigger": true },
+    { "id": "q4", "text": "用 Web 面板跑 workflow-interview 吧，我习惯在页面上点选项、填长文本", "should_trigger": true },
+    { "id": "q5", "text": "$workflow-interview-web 继续上次没做完的访谈，昨天那个 issue 只问到第二轮", "should_trigger": true },
+    { "id": "q6", "text": "把这次需求访谈搬到本地浏览器里做：你出题、我在页面提交，做完导出一份静态决策档案给我", "should_trigger": true },
+    { "id": "q7", "text": "上次 $workflow-interview-web 开的那个访谈页面还能接着用吗？打开继续问", "should_trigger": true },
+    { "id": "q8", "text": "需求访谈和 Goal Contract 确认都放网页上做，用 $workflow-interview-web 走完整三阶段", "should_trigger": true },
+    { "id": "q9", "text": "用 workflow-interview-web 把这个登录改造的需求问清楚，网页问卷那种，多选题让我自己勾", "should_trigger": true },
+    { "id": "q10", "text": "这次三阶段访谈我想在本地网页上完成，答题记录和最终契约都要能事后导出审阅，别用纯文本问我", "should_trigger": true },
+    { "id": "q11", "text": "用 workflow-interview 访谈这个需求：给 Jenkins 日志加个失败自动归类", "should_trigger": false },
+    { "id": "q12", "text": "帮我把这个新功能的需求访谈一遍，问题列出来我逐条回你", "should_trigger": false },
+    { "id": "q13", "text": "grill me 一下这个技术方案，别客气，往死里问", "should_trigger": false },
+    { "id": "q14", "text": "帮我写个网页问卷收集部门同事的团建意向，要能多选和填空，部署到内网", "should_trigger": false },
+    { "id": "q15", "text": "把这份访谈问卷的问题转成表格，一列问题一列选项", "should_trigger": false },
+    { "id": "q16", "text": "用浏览器打开 localhost:3000 看看这个页面渲染对不对，按钮点了有没有反馈", "should_trigger": false },
+    { "id": "q17", "text": "把上次访谈的结论整理成 spec 发到 issue tracker", "should_trigger": false },
+    { "id": "q18", "text": "aes-interview 走一遍这个数据迁移功能的需求，把歧义问清楚", "should_trigger": false },
+    { "id": "q19", "text": "起一个本地静态服务器把 D:/site 挂上去，端口 8080", "should_trigger": false },
+    { "id": "q20", "text": "把这份需求访谈纪要导出成 docx 发给老板", "should_trigger": false },
+    { "id": "q21", "text": "review 一下 workflow-interview-web 这个技能的 SKILL.md，description 写得行不行，评测流程规范吗", "should_trigger": false }
+  ]
+}

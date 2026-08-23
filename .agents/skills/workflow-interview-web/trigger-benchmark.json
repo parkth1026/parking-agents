@@ -1,0 +1,55 @@
+{
+  "skill": "workflow-interview-web",
+  "split": {
+    "train": [
+      "q3",
+      "q2",
+      "q9",
+      "q10",
+      "q5",
+      "q7",
+      "q17",
+      "q12",
+      "q20",
+      "q21",
+      "q18",
+      "q13",
+      "q16"
+    ],
+    "test": [
+      "q1",
+      "q8",
+      "q4",
+      "q6",
+      "q14",
+      "q11",
+      "q19",
+      "q15"
+    ],
+    "seed": 42,
+    "holdout": 0.4
+  },
+  "rounds": [
+    {
+      "description": "workflow-interview 的本地 Web 双向入口与完整决策档案。仅当用户显式调用 $workflow-interview-web、明确选择 Web 入口时使用；把三阶段问题、原型质疑、结构化多选与契约确认放在同一浏览器单页完成，并支持提交唤醒、跨会话吸收和自包含静态导出。",
+      "valid_probes": 54,
+      "train": {
+        "queries": 13,
+        "trigger_rate_on_should": 1,
+        "false_trigger_rate_on_should_not": 0,
+        "correct": 13,
+        "invalid_queries": 0
+      },
+      "test": {
+        "queries": 8,
+        "trigger_rate_on_should": 1,
+        "false_trigger_rate_on_should_not": 0,
+        "correct": 8,
+        "invalid_queries": 0
+      }
+    }
+  ],
+  "best_description": "workflow-interview 的本地 Web 双向入口与完整决策档案。仅当用户显式调用 $workflow-interview-web、明确选择 Web 入口时使用；把三阶段问题、原型质疑、结构化多选与契约确认放在同一浏览器单页完成，并支持提交唤醒、跨会话吸收和自包含静态导出。",
+  "valid_probes": 54,
+  "invalid_probes": 9
+}

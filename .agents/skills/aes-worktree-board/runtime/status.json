@@ -1,11 +1,11 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-08-23T13:19:24.107Z",
+  "generatedAt": "2026-08-23T18:23:38.849Z",
   "repo": {
     "root": "G:/GIT/AI_WorkFlow/aes-agents-v2",
     "name": "aes-agents-v2",
     "mainBranch": "main",
-    "mainHead": "f0172225",
+    "mainHead": "94c7ae28",
     "issueRepo": "51world-ai-copilot/aes-agent"
   },
   "graph": {
@@ -823,6 +823,32 @@
           "degree": 3,
           "warn": false
         }
+      },
+      {
+        "number": 62,
+        "title": "Web 配对链接重复提交后误显示“配对 token 无效”",
+        "state": "OPEN",
+        "url": "https://github.com/51world-ai-copilot/aes-agent/issues/62",
+        "blockedBy": [],
+        "claimedBy": null,
+        "derived": {
+          "status": "frontier",
+          "degree": 0,
+          "warn": false
+        }
+      },
+      {
+        "number": 63,
+        "title": "fix(web): Workflow equal-columns 面板应保留标准拖拽调宽能力",
+        "state": "OPEN",
+        "url": "https://github.com/51world-ai-copilot/aes-agent/issues/63",
+        "blockedBy": [],
+        "claimedBy": null,
+        "derived": {
+          "status": "frontier",
+          "degree": 0,
+          "warn": false
+        }
       }
     ],
     "edges": [
@@ -903,10 +929,10 @@
       }
     ],
     "stats": {
-      "total": 61,
-      "open": 17,
+      "total": 63,
+      "open": 19,
       "closed": 44,
-      "frontier": 12,
+      "frontier": 14,
       "edges": 15,
       "warned": 1
     }
@@ -916,14 +942,14 @@
       "name": "aes-agents-v2-dev1",
       "path": "G:/GIT/AI_WorkFlow/aes-agents-v2-dev1",
       "branch": "aes-agents-v2-dev1",
-      "head": "f0172225",
-      "headSubject": "合并 dev4：补强 OpenCode typed interaction 的真实模型验收（#35）",
-      "lastCommitAt": "2026-08-21T02:11:42+08:00",
+      "head": "94c7ae28",
+      "headSubject": "docs",
+      "lastCommitAt": "2026-08-24T01:47:21+08:00",
       "ahead": 0,
       "behind": 0,
       "dirty": {
-        "modified": 0,
-        "untracked": 0
+        "modified": 24,
+        "untracked": 2
       },
       "mode": "idle",
       "position": {
@@ -935,11 +961,11 @@
         "conflictFiles": []
       },
       "assessment": {
-        "currentTask": "空闲",
+        "currentTask": "#56 create_thread 修复 reviewer findings",
         "done": null,
         "merge": "not-yet",
-        "reason": "与 main 同步且工作树干净，没有独有任务",
-        "assessedAt": "2026-08-23T13:14:40.606Z",
+        "reason": "reviewer thread=01a02fde-1c79-7a10-ab04-06fcdc5a99df BLOCK；fix executor thread=01a02fe8-27c6-7811-9154-8283b955dc56；model=Sol/high；pnpm-lock 副作用隔离",
+        "assessedAt": "2026-08-23T18:35:46.909Z",
         "assessedBy": "claude-main",
         "stale": false
       },
@@ -950,14 +976,14 @@
       "name": "aes-agents-v2-dev2",
       "path": "G:/GIT/AI_WorkFlow/aes-agents-v2-dev2",
       "branch": "aes-agents-v2-dev2",
-      "head": "f0172225",
-      "headSubject": "合并 dev4：补强 OpenCode typed interaction 的真实模型验收（#35）",
-      "lastCommitAt": "2026-08-21T02:11:42+08:00",
+      "head": "94c7ae28",
+      "headSubject": "docs",
+      "lastCommitAt": "2026-08-24T01:47:21+08:00",
       "ahead": 0,
       "behind": 0,
       "dirty": {
-        "modified": 2,
-        "untracked": 0
+        "modified": 7,
+        "untracked": 2
       },
       "mode": "idle",
       "position": {
@@ -969,11 +995,11 @@
         "conflictFiles": []
       },
       "assessment": {
-        "currentTask": "OpenCode adapter 与真实 MCP 验收有 2 个已暂存修改，进展待确认",
+        "currentTask": "#57 create_thread 执行中",
         "done": null,
         "merge": "not-yet",
-        "reason": "工作树有 2 个未提交修改且无独有 commit，需先弄清现场",
-        "assessedAt": "2026-08-23T13:14:40.944Z",
+        "reason": "thread=01a02fd2-9d9b-78a1-b47f-07ad2fb43edb；worktree 已 fast-forward 到 main 94c7ae28，等待 REVIEW_READY",
+        "assessedAt": "2026-08-23T18:12:22.591Z",
         "assessedBy": "claude-main",
         "stale": false
       },
@@ -988,7 +1014,7 @@
       "headSubject": "合并 aes-agents-v2-dev4 收尾：250ms 重连重试测试两侧同修，以 dev5 更强断言为准",
       "lastCommitAt": "2026-08-20T22:39:23+08:00",
       "ahead": 0,
-      "behind": 6,
+      "behind": 7,
       "dirty": {
         "modified": 16,
         "untracked": 15
@@ -1003,11 +1029,11 @@
         "conflictFiles": []
       },
       "assessment": {
-        "currentTask": "AutoPilot Deep Interview UI 大规模现场，含 16 个修改与 15 个未跟踪项",
+        "currentTask": "#14 parked user-aligned",
         "done": null,
-        "merge": "not-yet",
-        "reason": "落后 main 6 个 commit，31 项未提交且验收状态不明",
-        "assessedAt": "2026-08-23T13:14:41.280Z",
+        "merge": "blocked",
+        "reason": "reviewer thread=01a02fd3-7478-78f1-953d-bc767c581042 BLOCK；存在 UI/Spec 决策与主观验收，进入后置 grilling 队列",
+        "assessedAt": "2026-08-23T18:24:59.128Z",
         "assessedBy": "claude-main",
         "stale": false
       },
@@ -1022,9 +1048,9 @@
       "headSubject": "(#35)fix(workflow): 证实 OpenCode 自管服务可提供 typed interaction",
       "lastCommitAt": "2026-08-21T02:06:43+08:00",
       "ahead": 0,
-      "behind": 5,
+      "behind": 6,
       "dirty": {
-        "modified": 4,
+        "modified": 8,
         "untracked": 1
       },
       "mode": "manual",
@@ -1040,11 +1066,11 @@
         "conflictFiles": []
       },
       "assessment": {
-        "currentTask": "ChatView 与 workflow runtime 后续调整，当前定位在已关闭 #35",
+        "currentTask": "#17 create_thread 修复 reviewer finding",
         "done": null,
         "merge": "not-yet",
-        "reason": "落后 main 5 个 commit，仍有 4 个修改与 1 个未跟踪项，需以现场验收为准",
-        "assessedAt": "2026-08-23T13:15:34.966Z",
+        "reason": "reviewer thread=01a02fd2-b14b-7e40-9d58-f596cd853827 BLOCK；fix executor thread=01a02fde-34f8-7112-b1e1-e8d6517d78b2；model=Luna/max",
+        "assessedAt": "2026-08-23T18:24:59.066Z",
         "assessedBy": "claude-main",
         "stale": false
       },
@@ -1059,9 +1085,9 @@
       "headSubject": "(#41)fix(goal-contract): 确认契约后才允许进入执行",
       "lastCommitAt": "2026-08-21T03:43:38+08:00",
       "ahead": 1,
-      "behind": 6,
+      "behind": 7,
       "dirty": {
-        "modified": 0,
+        "modified": 1,
         "untracked": 0
       },
       "mode": "manual",
@@ -1077,14 +1103,40 @@
         "conflictFiles": []
       },
       "assessment": {
-        "currentTask": "修复 #41：Goal Contract 确认门禁",
-        "done": false,
-        "merge": "not-yet",
-        "reason": "分支领先 1 且 merge-tree clean，但 #41 仍 OPEN、落后 main 6，验收未闭环",
-        "assessedAt": "2026-08-23T13:14:42.431Z",
+        "currentTask": "#41 parked user-aligned",
+        "done": null,
+        "merge": "blocked",
+        "reason": "reviewer BLOCK；存在确认闸/协议/发布边界决策，且 pnpm-lock.yaml dirty，停放不阻塞 autonomous 队列",
+        "assessedAt": "2026-08-23T18:24:59.191Z",
         "assessedBy": "claude-main",
         "stale": false
       },
+      "activeTask": null,
+      "recentTasks": []
+    },
+    {
+      "name": "aes-agents-v2-test",
+      "path": "G:/GIT/AI_WorkFlow/aes-agents-v2-test",
+      "branch": "aes-agents-v2-test",
+      "head": "94c7ae28",
+      "headSubject": "docs",
+      "lastCommitAt": "2026-08-24T01:47:21+08:00",
+      "ahead": 0,
+      "behind": 0,
+      "dirty": {
+        "modified": 0,
+        "untracked": 0
+      },
+      "mode": "idle",
+      "position": {
+        "kind": "none"
+      },
+      "trail": [],
+      "mergeCheck": {
+        "result": "up-to-date",
+        "conflictFiles": []
+      },
+      "assessment": null,
       "activeTask": null,
       "recentTasks": []
     }
