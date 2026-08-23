@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "round": "browser-r1",
+  "stage": "1-interview",
+  "received_at": "2026-08-22T17:04:44.025Z",
+  "answers": [
+    {
+      "q_id": "Q1",
+      "type": "custom",
+      "text": "自定义：保留 48h 缓冲，但重开必须先吸收未消化提交"
+    },
+    {
+      "q_id": "D1",
+      "type": "accept"
+    },
+    {
+      "q_id": "C1",
+      "type": "confirm"
+    }
+  ],
+  "truncated": false
+}

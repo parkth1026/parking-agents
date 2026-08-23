@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<!-- draft v1 | 状态：superseded by v2-diagram.html（视觉基准切换为 design_handoff_issue_starmap）-->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>架构与流程视图 — worktree-board</title>
+<style>
+  :root {
+    --font-ui: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+    --font-mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    --paper:#f5f5f5; --ink:#2d3142; --muted:#4f5d75; --soft:#7a8399;
+    --accent:#eb6c36; --accent-tint:#fdf1ec;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--paper); color:var(--ink); font-family:var(--font-ui); padding:32px 24px 48px; }
+  main { max-width:1000px; margin:0 auto; }
+  h1 { font-size:20px; margin-bottom:4px; }
+  .lede { font-size:12px; color:var(--soft); margin-bottom:24px; }
+  .lede b { color:var(--accent); font-weight:600; }
+  section { margin-bottom:40px; }
+  h2 { font-size:16px; margin-bottom:8px; }
+  .desc { font-size:12px; color:var(--muted); margin-bottom:12px; }
+  svg { width:100%; height:auto; display:block; background:#fff; border:1px solid #e2e2e2; border-radius:8px; }
+  footer { font-size:11px; color:var(--soft); line-height:1.8; border-top:1px solid #e2e2e2; padding-top:12px; }
+  footer h3 { font-size:11px; color:var(--muted); margin:10px 0 2px; }
+  footer code { font-family:var(--font-mono); font-size:10px; }
+</style>
+</head>
+<body>
+<main>
+<h1>worktree-board 架构与流程视图（draft v1）</h1>
+<p class="lede">图例：<b>橙 = 本次新增/变更</b>，灰 = 既有（不动）。表格是契约源（behavior.md / api-mock.md），图是决策面；口径冲突以表为准。</p>
+
+<section>
+<h2>架构视图 · 改后态拓扑</h2>
+<p class="desc">整套系统自包含进项目级 skill 目录（改动 ①）；runtime 契约升到 status.json v2 携带 issue 全景图谱（改动 ②）。</p>
+<svg viewBox="0 0 960 512" role="img" aria-labelledby="ar-title ar-desc">
+  <title id="ar-title">架构视图：主脑作战系统改后态拓扑</title>
+  <desc id="ar-desc">主仓对话与作战图页面两个交互面，驱动自包含在项目级 skill 目录内的采集评估脚本、派发服务脚本与 runtime 契约；外部依赖 GitHub Issues 与同级 worktree。skill 容器与 runtime v2 为本次变更。</desc>
+  <defs>
+    <marker id="ar-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4f5d75"/></marker>
+  </defs>
+
+  <!-- ===== 容器（改动 ①）：项目级 skill 目录，自包含 ===== -->
+  <rect x="240" y="40" width="504" height="432" rx="8" fill="#fdf1ec" stroke="#eb6c36" stroke-width="2"/>
+  <rect x="256" y="52" width="40" height="12" rx="2" fill="#f7dfd3"/>
+  <text x="276" y="61" text-anchor="middle" font-family="var(--font-mono)" font-size="8" fill="#eb6c36" letter-spacing="1">迁移</text>
+  <text x="304" y="62" font-family="var(--font-mono)" font-size="10" fill="#eb6c36">.claude/skills/aes-worktree-board/ · 自包含 · 暂不进 git</text>
+
+  <!-- ===== 连线（先画，z 序在节点下） ===== -->
+  <!-- 主 agent → 采集·评估（同轴直线） -->
+  <path d="M 192,240 H 492" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#ar-arrow)"/>
+  <rect x="212" y="226" width="64" height="12" fill="#fdf1ec"/>
+  <text x="244" y="236" text-anchor="middle" font-family="var(--font-mono)" font-size="8" fill="#4f5d75">巡检·写评估</text>
+  <!-- 主 agent → 派发·服务（肘线） -->
+  <path d="M 120,280 V 392 Q 120,400 128,400 H 488" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#ar-arrow)"/>
+  <rect x="152" y="384" width="72" height="12" fill="#fdf1ec"/>
+  <text x="188" y="394" text-anchor="middle" font-family="var(--font-mono)" font-size="8" fill="#4f5d75">dispatch CLI</text>
+  <!-- 页面 → 派发·服务（绕开采集节点的肘线） -->
+  <path d="M 448,124 H 660 Q 668,124 668,132 V 368 Q 668,376 660,376 H 644" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#ar-arrow)"/>
+  <rect x="672" y="244" width="60" height="12" fill="#fdf1ec"/>
+  <text x="702" y="254" text-anchor="middle" font-family="var(--font-mono)" font-size="8" fill="#4f5d75">/api/*</text>
+  <!-- 页面 → runtime（快照降级，虚线；跨主 agent 横线处加桥） -->
+  <path d="M 330,152 V 224 a 8,8 0 0,1 0,32 V 284" fill="none" stroke="#4f5d75" stroke-width="1.5" stroke-dasharray="4 5" marker-end="url(#ar-arrow)"/>
+  <rect x="336" y="192" width="76" height="12" fill="#fdf1ec"/>
+  <text x="374" y="202" text-anchor="middle" font-family="var(--font-mono)" font-size="8" fill="#4f5d75">快照模式直读</text>
+  <!-- 采集·评估 → runtime（写契约） -->
+  <path d="M 496,232 H 484 Q 476,232 476,240 V 308 Q 476,316 468,316 H 452" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#ar-arrow)"/>
+  <!-- 派发·服务 → 采集·评估（现采，同轴直线） -->
+  <path d="M 568,352 V 252" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#ar-arrow)"/>
+  <!-- 采集·评估 → GitHub（肘线 + 跨线桥让路给 /api 竖线） -->
+  <path d="M 640,208 H 660 a 8,8 0 0,1 16,0 H 764 Q 772,208 772,200 V 104 Q 772,96 780,96" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#ar-arrow)"/>
+  <rect x="684" y="188" width="76" height="12" fill="#fdf1ec"/>
+  <text x="722" y="198" text-anchor="middle" font-family="var(--font-mono)" font-size="8" fill="#4f5d75">issue 全量+依赖</text>
+  <!-- 采集·评估 → worktrees（肘线） -->
+  <path d="M 640,232 H 712 Q 720,232 720,240 V 336 Q 720,344 728,344 H 780" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#ar-arrow)"/>
+  <rect x="726" y="326" width="48" height="12" fill="#fdf1ec"/>
+  <text x="750" y="336" text-anchor="middle" font-family="var(--font-mono)" font-size="8" fill="#4f5d75">git 事实</text>
+  <!-- 派发·服务 → worktrees（同轴直线） -->
+  <path d="M 640,376 H 780" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#ar-arrow)"/>
+  <rect x="652" y="384" width="116" height="12" fill="#fdf1ec"/>
+  <text x="710" y="394" text-anchor="middle" font-family="var(--font-mono)" font-size="8" fill="#4f5d75">spawn headless agent</text>
+
+  <!-- ===== 节点 ===== -->
+  <g><!-- 主仓对话 -->
+    <rect x="48" y="224" width="144" height="56" rx="6" fill="#ffffff" stroke="#4f5d75" stroke-width="1.25"/>
+    <rect x="56" y="232" width="36" height="12" rx="2" fill="#eef1f6"/>
+    <text x="74" y="241" text-anchor="middle" font-family="var(--font-mono)" font-size="8" fill="#4f5d75" letter-spacing="1">主脑</text>
+    <text x="120" y="258" text-anchor="middle" font-size="12" font-weight="600" fill="#2d3142">主仓对话 · 主 agent</text>
+    <text x="120" y="272" text-anchor="middle" font-family="var(--font-mono)" font-size="9" fill="#4f5d75">SKILL.md 驱动</text>
+  </g>
+  <g><!-- 作战图页面 -->
+    <rect x="288" y="96" width="160" height="56" rx="6" fill="#ffffff" stroke="#4f5d75" stroke-width="1.25"/>
+    <rect x="296" y="104" width="36" height="12" rx="2" fill="#eef1f6"/>
+    <text x="314" y="113" text-anchor="middle" font-family="var(--font-mono)" font-size="8" fill="#4f5d75" letter-spacing="1">界面</text>
+    <text x="368" y="130" text-anchor="middle" font-size="12" font-weight="600" fill="#2d3142">作战图页面（浏览器）</text>
+    <text x="368" y="144" text-anchor="middle" font-family="var(--font-mono)" font-size="9" fill="#4f5d75">board.html · wayfinder 星图</text>
+  </g>
+  <g><!-- 采集·评估 -->
+    <rect x="496" y="192" width="144" height="56" rx="6" fill="#ffffff" stroke="#4f5d75" stroke-width="1.25"/>
+    <rect x="504" y="200" width="36" height="12" rx="2" fill="#eef1f6"/>
+    <text x="522" y="209" text-anchor="middle" font-family="var(--font-mono)" font-size="8" fill="#4f5d75" letter-spacing="1">脚本</text>
+    <text x="568" y="226" text-anchor="middle" font-size="12" font-weight="600" fill="#2d3142">采集 · 评估</text>
+    <text x="568" y="240" text-anchor="middle" font-family="var(--font-mono)" font-size="9" fill="#4f5d75">collect.mjs / assess.mjs</text>
+  </g>
+  <g class="changed"><!-- runtime（改动 ②） -->
+    <rect x="288" y="288" width="160" height="56" rx="6" fill="#fdf1ec" stroke="#eb6c36" stroke-width="2"/>
+    <rect x="296" y="296" width="32" height="12" rx="2" fill="#f7dfd3"/>
+    <text x="312" y="305" text-anchor="middle" font-family="var(--font-mono)" font-size="8" fill="#eb6c36" letter-spacing="1">v2</text>
+    <text x="368" y="322" text-anchor="middle" font-size="12" font-weight="600" fill="#2d3142">runtime 契约</text>
+    <text x="368" y="336" text-anchor="middle" font-family="var(--font-mono)" font-size="9" fill="#eb6c36">status.json v2 · graph 全景 · tasks/</text>
+  </g>
+  <g><!-- 派发·服务 -->
+    <rect x="496" y="352" width="144" height="56" rx="6" fill="#ffffff" stroke="#4f5d75" stroke-width="1.25"/>
+    <rect x="504" y="360" width="36" height="12" rx="2" fill="#eef1f6"/>
+    <text x="522" y="369" text-anchor="middle" font-family="var(--font-mono)" font-size="8" fill="#4f5d75" letter-spacing="1">脚本</text>
+    <text x="568" y="386" text-anchor="middle" font-size="12" font-weight="600" fill="#2d3142">派发 · 服务</text>
+    <text x="568" y="400" text-anchor="middle" font-family="var(--font-mono)" font-size="9" fill="#4f5d75">dispatch.mjs / server.mjs :8321</text>
+  </g>
+  <g><!-- GitHub -->
+    <rect x="784" y="64" width="144" height="64" rx="6" fill="#ffffff" stroke="#4f5d75" stroke-width="1.25"/>
+    <rect x="792" y="72" width="36" height="12" rx="2" fill="#eef1f6"/>
+    <text x="810" y="81" text-anchor="middle" font-family="var(--font-mono)" font-size="8" fill="#4f5d75" letter-spacing="1">外部</text>
+    <text x="856" y="99" text-anchor="middle" font-size="12" font-weight="600" fill="#2d3142">GitHub Issues</text>
+    <text x="856" y="114" text-anchor="middle" font-family="var(--font-mono)" font-size="9" fill="#4f5d75">gh CLI · 只读</text>
+  </g>
+  <g><!-- worktrees -->
+    <rect x="784" y="320" width="144" height="64" rx="6" fill="#ffffff" stroke="#4f5d75" stroke-width="1.25"/>
+    <rect x="792" y="328" width="36" height="12" rx="2" fill="#eef1f6"/>
+    <text x="810" y="337" text-anchor="middle" font-family="var(--font-mono)" font-size="8" fill="#4f5d75" letter-spacing="1">外部</text>
+    <text x="856" y="355" text-anchor="middle" font-size="12" font-weight="600" fill="#2d3142">同级 worktree ×5</text>
+    <text x="856" y="370" text-anchor="middle" font-family="var(--font-mono)" font-size="9" fill="#4f5d75">dev1~5 · headless 执行场</text>
+  </g>
+</svg>
+</section>
+
+<section>
+<h2>流程视图 · 派发的 dirty 防线（behavior.md 变化行 4/5 的视图）</h2>
+<p class="desc">新增 dirty 检查与确认步（改动 ①②）；干净 worktree 走下方旁路，行为与 v1 逐字节一致。</p>
+<svg viewBox="0 0 960 312" role="img" aria-labelledby="fl-title fl-desc">
+  <title id="fl-title">流程视图：派发请求经并发锁与 dirty 防线到执行</title>
+  <desc id="fl-desc">派发请求先过并发锁，再过新增的 dirty 检查；dirty 时进入确认步，干净时直接执行；执行后写回任务记录并刷新快照。已有任务时返回 409。</desc>
+  <defs>
+    <marker id="fl-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4f5d75"/></marker>
+  </defs>
+
+  <!-- 连线先画 -->
+  <path d="M 160,124 H 204" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#fl-arrow)"/>
+  <path d="M 336,124 H 380" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#fl-arrow)"/>
+  <rect x="338" y="104" width="40" height="12" fill="#f5f5f5"/>
+  <text x="358" y="114" text-anchor="middle" font-family="var(--font-mono)" font-size="8" fill="#4f5d75">锁空闲</text>
+  <!-- 锁占用分支 -->
+  <path d="M 272,152 V 220" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#fl-arrow)"/>
+  <rect x="280" y="176" width="56" height="12" fill="#f5f5f5"/>
+  <text x="308" y="186" text-anchor="middle" font-family="var(--font-mono)" font-size="8" fill="#4f5d75">已有任务</text>
+  <!-- dirty 分支 → 确认 -->
+  <path d="M 512,124 H 556" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#fl-arrow)"/>
+  <rect x="514" y="104" width="40" height="12" fill="#f5f5f5"/>
+  <text x="534" y="114" text-anchor="middle" font-family="var(--font-mono)" font-size="8" fill="#eb6c36">dirty</text>
+  <!-- 干净旁路（下绕） -->
+  <path d="M 448,152 V 180 Q 448,188 456,188 H 780 Q 788,188 788,180 V 156" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#fl-arrow)"/>
+  <rect x="560" y="192" width="132" height="12" fill="#f5f5f5"/>
+  <text x="626" y="202" text-anchor="middle" font-family="var(--font-mono)" font-size="8" fill="#4f5d75">干净 · 直接执行（=v1 行为）</text>
+  <!-- 确认 → 执行 -->
+  <path d="M 704,124 H 748" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#fl-arrow)"/>
+  <rect x="694" y="104" width="64" height="12" fill="#f5f5f5"/>
+  <text x="726" y="114" text-anchor="middle" font-family="var(--font-mono)" font-size="8" fill="#4f5d75">仍要派发</text>
+  <!-- 执行 → 写回 -->
+  <path d="M 840,152 V 220" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#fl-arrow)"/>
+
+  <!-- 节点 -->
+  <g>
+    <rect x="32" y="96" width="128" height="56" rx="6" fill="#ffffff" stroke="#4f5d75" stroke-width="1.25"/>
+    <text x="96" y="122" text-anchor="middle" font-size="12" font-weight="600" fill="#2d3142">派发请求</text>
+    <text x="96" y="138" text-anchor="middle" font-family="var(--font-mono)" font-size="9" fill="#4f5d75">页面 / 主agent / CLI</text>
+  </g>
+  <g>
+    <rect x="208" y="96" width="128" height="56" rx="6" fill="#ffffff" stroke="#4f5d75" stroke-width="1.25"/>
+    <text x="272" y="122" text-anchor="middle" font-size="12" font-weight="600" fill="#2d3142">并发锁检查</text>
+    <text x="272" y="138" text-anchor="middle" font-family="var(--font-mono)" font-size="9" fill="#4f5d75">PID 存活判定（=v1）</text>
+  </g>
+  <g class="changed">
+    <rect x="384" y="96" width="128" height="56" rx="6" fill="#fdf1ec" stroke="#eb6c36" stroke-width="2"/>
+    <rect x="392" y="102" width="32" height="12" rx="2" fill="#f7dfd3"/>
+    <text x="408" y="111" text-anchor="middle" font-family="var(--font-mono)" font-size="8" fill="#eb6c36" letter-spacing="1">NEW</text>
+    <text x="448" y="126" text-anchor="middle" font-size="12" font-weight="600" fill="#2d3142">dirty 检查</text>
+    <text x="448" y="140" text-anchor="middle" font-family="var(--font-mono)" font-size="9" fill="#eb6c36">变化行 4/5</text>
+  </g>
+  <g class="changed">
+    <rect x="560" y="96" width="144" height="56" rx="6" fill="#fdf1ec" stroke="#eb6c36" stroke-width="2"/>
+    <rect x="568" y="102" width="32" height="12" rx="2" fill="#f7dfd3"/>
+    <text x="584" y="111" text-anchor="middle" font-family="var(--font-mono)" font-size="8" fill="#eb6c36" letter-spacing="1">NEW</text>
+    <text x="632" y="126" text-anchor="middle" font-size="12" font-weight="600" fill="#2d3142">确认步</text>
+    <text x="632" y="140" text-anchor="middle" font-family="var(--font-mono)" font-size="9" fill="#eb6c36">409→confirmDirty / 取消 / 侦查</text>
+  </g>
+  <g>
+    <rect x="752" y="96" width="128" height="56" rx="6" fill="#ffffff" stroke="#4f5d75" stroke-width="1.25"/>
+    <text x="816" y="122" text-anchor="middle" font-size="12" font-weight="600" fill="#2d3142">执行任务</text>
+    <text x="816" y="138" text-anchor="middle" font-family="var(--font-mono)" font-size="9" fill="#4f5d75">headless · stdin prompt</text>
+  </g>
+  <g>
+    <rect x="208" y="224" width="128" height="40" rx="6" fill="#ffffff" stroke="#4f5d75" stroke-width="1.25"/>
+    <text x="272" y="248" text-anchor="middle" font-family="var(--font-mono)" font-size="10" fill="#4f5d75">409 LOCKED（=v1）</text>
+  </g>
+  <g>
+    <rect x="776" y="224" width="128" height="56" rx="6" fill="#ffffff" stroke="#4f5d75" stroke-width="1.25"/>
+    <text x="840" y="250" text-anchor="middle" font-size="12" font-weight="600" fill="#2d3142">写回 · 刷新</text>
+    <text x="840" y="264" text-anchor="middle" font-family="var(--font-mono)" font-size="9" fill="#4f5d75">tasks/ 三件套 + 快照</text>
+  </g>
+</svg>
+</section>
+
+<footer>
+  <h3>Fidelity ledger · 架构视图</h3>
+  Detail: balanced · 源 = 12 类源对象（skill/四脚本/页面/runtime 三件/gh/git/worktree×5/headless agent）→ 绘制 8 节点 / 9 边<br>
+  Merged: collect+assess → 「采集·评估」；dispatch+server → 「派发·服务」（server 现采调用画为内部边）；worktree×5 与其中运行的 headless agent → 「同级 worktree ×5」<br>
+  Collapsed: runtime 内 status.json/status.js/tasks/ → 单节点 sub 行；SKILL.md 收进主 agent 节点 sub 行<br>
+  Dropped: 用户本体（两个交互面已隐含）；test agent 冒烟通道；gh「全量 issue+依赖」采集支路的变更未占 accent 名额（预算 ≤2，已由 runtime v2 节点承载该变更语义，边上仅文字标注）<br>
+  Kept in full: skill 容器边界与「暂不进 git」标注；页面的双数据通道（/api 实线 + 快照虚线）——这是双模式承诺的拓扑形态<br>
+  <h3>Fidelity ledger · 流程视图</h3>
+  Detail: balanced · 源 = behavior.md 变化行 4/5 + 不变清单派发内核条 → 绘制 7 节点 / 7 边<br>
+  Merged: 页面/主 agent/CLI 三个派发入口 → 单一「派发请求」节点<br>
+  Collapsed: 确认步的三个出口（confirmDirty/取消/先侦查）→ 节点 sub 行，仅画「仍要派发」主流向<br>
+  Dropped: 取消与先侦查的去向（终止/另派只读任务，无汇合故不画）；执行失败分支（=v1 行为，不变清单管辖）<br>
+  Kept in full: 干净旁路整条画出并标「=v1 行为」——不变承诺的可视化锚点；409 LOCKED 分支（并发锁语义不变）<br>
+  <h3>删除清单（不占图面）</h3>
+  <code>run.toml</code> 的 board 动词（撤销）· 用户级 skill 副本 <code>~/.claude/skills/aes-worktree-board/</code>（删除）· repo 顶级 <code>worktree-board/</code> 目录（内容迁入 skill 目录后移除）
+</footer>
+</main>
+</body>
+</html>

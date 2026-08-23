@@ -1,0 +1,420 @@
+<!doctype html>
+<!-- 确认版 · 晋升自 drafts/v1-mock.html | 用户确认：2026-08-20（"ok"）
+     不可修改：执行 Agent 改的是产品，不是这份对照物 -->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>需求收敛 · Web — 界面原型 v1</title>
+<style>
+  :root{
+    --paper:#F7F5F0; --ink:#201D18; --accent:#C4501E; --accent-dark:#9E3D12;
+    --sage:#3D7A4E; --sage-bg:#E8F0E9; --hairline:#E6E1D6;
+    --muted:#8A8377; --faint:#B4AC9E; --card:#FFFFFF;
+    --serif:Georgia,"Times New Roman","Noto Serif SC",serif;
+    --sans:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
+    --mono:ui-monospace,"Cascadia Mono",Consolas,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.65}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  .app{display:flex;flex-direction:column;height:100vh}
+
+  /* ── 顶栏 ── */
+  .topbar{height:60px;display:flex;align-items:center;gap:16px;padding:0 20px;border-bottom:1px solid var(--hairline);background:var(--paper);flex:none}
+  .logo{width:32px;height:32px;border-radius:8px;background:var(--ink);color:var(--paper);display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-weight:700;font-size:16px}
+  .brand{font-family:var(--serif);font-weight:700;font-size:16px;white-space:nowrap}
+  .crumbs{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;font-size:12.5px;min-width:0}
+  .crumb{padding:4px 10px;border-radius:999px;white-space:nowrap;color:var(--muted)}
+  .crumb.done{color:var(--sage);background:var(--sage-bg)}
+  .crumb.now{color:var(--ink);font-weight:600;border-bottom:2px solid var(--accent)}
+  .crumb-todo{color:var(--faint)}
+  .crumbs .sep{color:var(--faint)}
+  .ambig{display:flex;align-items:center;gap:6px;font-size:12.5px;padding:5px 12px;border-radius:999px;background:#F8E7DE;color:var(--accent);white-space:nowrap}
+  .ambig.zero{background:var(--sage-bg);color:var(--sage)}
+  .cta{padding:8px 16px;border-radius:8px;border:none;background:var(--faint);color:#fff;font-size:13px;cursor:not-allowed}
+  .cta.ready{background:var(--accent);cursor:pointer}
+  .cta.ready:hover{background:var(--accent-dark)}
+
+  /* ── 主体两栏 ── */
+  .main{flex:1;display:flex;min-height:0}
+  .flow{flex:1.35;overflow-y:auto;padding:24px 20px 80px;scroll-behavior:smooth}
+  .rail{flex:1;border-left:1px solid var(--hairline);overflow-y:auto;padding:20px;background:#F2EFE8}
+  .eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:2.5px;color:var(--muted);text-transform:uppercase;margin-bottom:10px}
+
+  .card{background:var(--card);border:1px solid var(--hairline);border-radius:12px;padding:18px 20px;margin-bottom:16px;animation:fadeUp .3s ease}
+  .round-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:12px}
+  .round-title{font-family:var(--serif);font-size:16px;font-weight:700}
+  .round-tag{font-family:var(--mono);font-size:10px;letter-spacing:2px;color:var(--muted)}
+
+  /* 开场卡（深色反白） */
+  .opening{background:var(--ink);color:#F2EDE4;border:none}
+  .opening .eyebrow{color:var(--faint)}
+  .opening p{font-family:var(--serif);font-size:14.5px}
+  .opening .note{font-family:var(--sans);font-size:12px;color:var(--faint);margin-top:8px}
+
+  /* 问题卡 */
+  .q{border:1px solid var(--hairline);border-radius:10px;padding:14px 16px;margin-bottom:12px;background:#FCFBF8}
+  .q.locked{background:#F4F2EC;opacity:.92}
+  .q-top{display:flex;align-items:flex-start;gap:8px;flex-wrap:wrap}
+  .q-id{font-family:var(--mono);font-size:11px;color:var(--muted);padding-top:3px}
+  .q-text{font-family:var(--serif);font-weight:700;font-size:14.5px;flex:1;min-width:200px}
+  .pill{font-size:11px;padding:2px 9px;border-radius:999px;white-space:nowrap;margin-top:2px}
+  .pill.risk{background:#F8E7DE;color:var(--accent)}
+  .pill.def{background:var(--sage-bg);color:var(--sage)}
+  .pill.seen{background:#ECE9E1;color:var(--muted)}
+  .facts{font-size:12.5px;color:var(--muted);margin:6px 0 10px;padding-left:10px;border-left:2px solid var(--hairline)}
+  .facts b{color:var(--ink);font-weight:600}
+
+  .opts{display:flex;flex-direction:column;gap:8px}
+  .opt{border:1.5px solid var(--hairline);border-radius:999px;padding:7px 14px;display:flex;align-items:center;gap:8px;cursor:pointer;background:var(--card);font-size:13px;transition:all .15s}
+  .opt:hover{border-color:var(--muted)}
+  .opt.sel{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+  .opt .pct{font-family:var(--mono);font-size:11px;color:var(--muted)}
+  .opt.sel .pct{color:var(--faint)}
+  .opt .rec{font-size:11px;color:var(--sage);background:var(--sage-bg);padding:1px 8px;border-radius:999px}
+  .opt.sel .rec{color:var(--sage-bg);background:rgba(232,240,233,.2)}
+  .opt-detail{font-size:12px;color:var(--muted);margin-top:2px}
+  .opt-detail b{color:var(--ink);font-weight:600}
+  .opt-body{flex:1}
+  .other{border:1.5px dashed var(--faint);border-radius:999px;padding:6px 14px;color:var(--muted);cursor:pointer;font-size:13px;background:transparent}
+  .other.on{border-color:var(--accent);color:var(--accent)}
+  .other-row{display:none;margin-top:8px}
+  .other-row.on{display:flex;gap:8px;animation:fadeUp .2s ease}
+  .other-row input{flex:1;border:1px solid var(--hairline);border-radius:8px;padding:7px 10px;font-size:13px;background:var(--card);color:var(--ink)}
+  .other-row input:focus{outline:none;border-color:var(--accent)}
+
+  .q.answered .ans{margin-top:8px;font-size:12.5px;background:var(--sage-bg);color:var(--sage);border-radius:8px;padding:6px 10px}
+  .q.answered .ans.over{background:#F8E7DE;color:var(--accent)}
+
+  /* 默认区/确认区行 */
+  .tier-rows{border:1px dashed var(--hairline);border-radius:10px;padding:10px 14px;margin-bottom:12px;background:#FBFAF6}
+  .tier-label{font-family:var(--mono);font-size:10px;letter-spacing:2px;color:var(--muted);margin-bottom:8px}
+  .trow{display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px dashed var(--hairline);font-size:13px}
+  .trow:last-child{border-bottom:none}
+  .trow .txt{flex:1;color:var(--ink)}
+  .trow .txt .why{color:var(--muted);font-size:12px}
+  .btn-x{font-size:11.5px;border:1px solid var(--hairline);background:var(--card);border-radius:999px;padding:2px 10px;cursor:pointer;color:var(--muted);white-space:nowrap}
+  .btn-x:hover{border-color:var(--accent);color:var(--accent)}
+  .btn-x.vetoed{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn-ok{font-size:11.5px;border:1px solid var(--sage);color:var(--sage);background:var(--card);border-radius:999px;padding:2px 10px;cursor:pointer;white-space:nowrap}
+  .btn-ok.done{background:var(--sage);color:#fff;border-color:var(--sage)}
+  .veto-reason{display:none;margin-top:6px}
+  .veto-reason.on{display:block}
+  .veto-reason input{width:100%;border:1px solid var(--accent);border-radius:8px;padding:6px 10px;font-size:12.5px}
+
+  /* 提交按钮 / 锁定态 */
+  .submit-bar{display:flex;align-items:center;gap:12px;margin-top:4px}
+  .submit{border:none;background:var(--accent);color:#fff;border-radius:10px;padding:10px 22px;font-size:14px;cursor:pointer;font-weight:600}
+  .submit:hover{background:var(--accent-dark)}
+  .submit:disabled{background:var(--faint);cursor:not-allowed}
+  .waiting{display:none;font-size:12.5px;color:var(--muted)}
+  .waiting.on{display:flex;align-items:center;gap:8px}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);animation:pulse 1.2s infinite}
+  @keyframes pulse{0%,100%{opacity:.3}50%{opacity:1}}
+
+  /* 研究间奏 */
+  .interlude{border:1.5px dashed var(--hairline);border-radius:12px;padding:16px 18px;margin-bottom:16px;background:#FBFAF6;animation:fadeUp .3s ease}
+  .interlude .head{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+  .interlude .findings{font-size:13px;color:var(--ink)}
+  .interlude .findings li{margin:4px 0 4px 18px}
+
+  /* 门禁横幅 */
+  .gate{border:1.5px solid var(--hairline);border-radius:12px;padding:14px 18px;margin-bottom:16px;color:var(--muted);font-size:13.5px;background:#FBFAF6;display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .gate.pass{border-color:var(--sage);background:var(--sage-bg);color:var(--sage)}
+  .gate .go{border:none;border-radius:8px;padding:6px 14px;font-size:12.5px;background:var(--sage);color:#fff;cursor:pointer;white-space:nowrap}
+
+  /* 右栏 */
+  .lock-card{background:var(--card);border:1px solid var(--hairline);border-left:3px solid var(--sage);border-radius:8px;padding:10px 12px;margin-bottom:10px;animation:fadeUp .25s ease}
+  .lock-card .q1{font-size:12px;color:var(--muted);margin-bottom:3px}
+  .lock-card .a1{font-size:13px;font-weight:600}
+  .lock-card .src{font-family:var(--mono);font-size:10px;color:var(--faint);margin-top:4px}
+  .rail-hint{font-size:12px;color:var(--faint);border:1.5px dashed var(--hairline);border-radius:10px;padding:12px;text-align:center}
+
+  /* 契约视图 */
+  .final{display:none;padding:24px 40px 80px;overflow-y:auto;flex:1}
+  .final.on{display:block}
+  .flow.off,.rail-finalbar{display:none}
+  .doc{max-width:860px;margin:0 auto}
+  .doc h1{font-family:var(--serif);font-size:24px;margin-bottom:4px}
+  .doc .sub{color:var(--muted);font-size:13px;margin-bottom:20px}
+  .doc section{background:var(--card);border:1px solid var(--hairline);border-radius:12px;padding:18px 22px;margin-bottom:14px}
+  .doc h2{font-family:var(--serif);font-size:16px;margin-bottom:8px}
+  .doc p,.doc li{font-size:13.5px}
+  .doc .basis{font-size:12px;color:var(--muted);border-top:1px dashed var(--hairline);margin-top:10px;padding-top:8px}
+  .doc .basis b{color:var(--sage)}
+  .confirm-bar{position:sticky;bottom:0;display:flex;gap:12px;align-items:center;padding:14px 0;background:linear-gradient(transparent,var(--paper) 30%)}
+  .btn-confirm{border:none;background:var(--sage);color:#fff;border-radius:10px;padding:10px 24px;font-size:14px;cursor:pointer;font-weight:600}
+  .btn-revise{border:1.5px solid var(--accent);color:var(--accent);background:var(--card);border-radius:10px;padding:9px 20px;font-size:13.5px;cursor:pointer}
+  .revise-box{display:none;margin-top:10px}
+  .revise-box.on{display:block}
+  .revise-box textarea{width:100%;min-height:80px;border:1.5px solid var(--accent);border-radius:10px;padding:10px;font-size:13px;font-family:var(--sans);resize:vertical;background:var(--card)}
+  .revise-box .send{margin-top:8px;border:none;background:var(--accent);color:#fff;border-radius:8px;padding:7px 16px;font-size:13px;cursor:pointer}
+
+  .tabs{display:flex;gap:6px}
+  .tab{font-size:12px;padding:4px 12px;border-radius:999px;border:1px solid var(--hairline);background:var(--card);color:var(--muted);cursor:pointer}
+  .tab.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <div class="logo">收</div>
+    <div class="brand">需求收敛 · Web</div>
+    <nav class="crumbs">
+      <span class="crumb done">✓ 访谈·拷问</span><span class="sep">›</span>
+      <span class="crumb now">原型确认</span><span class="sep">›</span>
+      <span class="crumb crumb-todo">交付标准·契约</span>
+    </nav>
+    <div class="tabs">
+      <button class="tab on" onclick="showView('flow')">访谈视图</button>
+      <button class="tab" onclick="showView('final')">契约视图</button>
+    </div>
+    <div class="ambig" id="ambig">开放歧义 1</div>
+    <button class="cta" id="cta" disabled>生成完整方案 ↗</button>
+  </header>
+
+  <div class="main" id="view-flow">
+    <section class="flow" id="flowScroll">
+
+      <div class="card opening">
+        <div class="eyebrow">OPENING · 任务陈述（只读）</div>
+        <p>开发新技能 workflow-interview-web：复用 workflow-interview 三阶段核心逻辑，所有提问/决策交互/核心内容展示改为本地 Web 单页双向交互（无超时唤醒），体验对标 Claude Design 多提问窗口。</p>
+        <div class="note">原文一字不改；要改走追问落盘，不在此处编辑。</div>
+      </div>
+
+      <!-- Round 1 · 已锁定（展示已吸收态） -->
+      <div class="card">
+        <div class="round-head">
+          <span class="round-title">Round 1 · 一次问清</span>
+          <span class="round-tag">ABSORBED</span>
+        </div>
+
+        <div class="q answered locked">
+          <div class="q-top">
+            <span class="q-id">Q0</span>
+            <span class="q-text">Agent 如何被浏览器唤醒？</span>
+            <span class="pill seen">此前已答</span>
+          </div>
+          <div class="ans over">你的选择：自定义 — 「不要超时，过了一天在页面点确认也能继续」 <b>· 推翻了推荐（原推荐 A 有界等待）</b></div>
+        </div>
+
+        <div class="q answered locked">
+          <div class="q-top">
+            <span class="q-id">D1</span>
+            <span class="q-text">技能名 workflow-interview-web</span>
+            <span class="pill def">已带默认</span>
+          </div>
+          <div class="ans">未反对 · 已锁定（默认区）</div>
+        </div>
+      </div>
+
+      <!-- 研究间奏 -->
+      <div class="interlude">
+        <div class="head">
+          <span class="dot"></span>
+          <span class="eyebrow" style="margin:0">DEEP RESEARCH · 唤醒与持久化</span>
+        </div>
+        <ul class="findings">
+          <li>open-design：提交=新用户消息冷启新回合；daemon 随应用死，靠消息先落盘保永不丢</li>
+          <li>Claude Code Remote Control：CLI 须存活，恢复窗口仅约 4h</li>
+          <li>ZCode 后台任务退出即唤起 agent——本宿主唯一合法等价物</li>
+        </ul>
+      </div>
+
+      <!-- Round 2 · 当前作答中 -->
+      <div class="card" id="round2">
+        <div class="round-head">
+          <span class="round-title">Round 2 · 跨天边界与机制采纳</span>
+          <span class="round-tag">PENDING</span>
+        </div>
+
+        <div class="q" data-q="Q1">
+          <div class="q-top">
+            <span class="q-id">Q1</span>
+            <span class="q-text">宿主会话关闭后，Web 服务要不要独立存活支持隔天提交？</span>
+            <span class="pill risk">不可逆 · 值得选</span>
+          </div>
+          <div class="facts"><b>已知事实</b>：open-design daemon 随应用死但消息先落盘；Windows 常驻服务化是坑；ZCode 有后台任务退出唤醒。</div>
+          <div class="opts">
+            <div class="opt" data-choice="A" onclick="pick(this)">
+              <span class="opt-body">
+                A. 修订版A：后台任务唤醒 + detached server 48h 缓冲 + 重开吸收
+                <div class="opt-detail"><b>选什么</b>：关闭时提交入盘不丢；重开先吸收。不含关闭时瞬间唤醒（业界无解）</div>
+                <div class="opt-detail"><b>好处</b>：隔天提交零丢失 · 严格优于 open-design · 无需 Windows 服务化</div>
+                <div class="opt-detail"><b>代价</b>：忘了 stop 留进程到 48h · 收尾纪律进 SKILL.md</div>
+              </span>
+              <span class="rec">推荐</span><span class="pct">65%</span>
+            </div>
+            <div class="opt" data-choice="B" onclick="pick(this)">
+              <span class="opt-body">
+                B. 会话内存活：server 随宿主死（owner 看门狗）
+                <div class="opt-detail"><b>选什么</b>：不覆盖宿主关闭场景。 <b>好处</b>：与 aes-grilling-web 纪律一致。 <b>代价</b>：关宿主后页面变墓碑</div>
+              </span>
+              <span class="pct">35%</span>
+            </div>
+            <button class="other" onclick="toggleOther(this)">Other…</button>
+            <div class="other-row"><input placeholder="写下你的方案（自由文本，整轮提交时一并带上）"></div>
+          </div>
+        </div>
+
+        <!-- 默认区 -->
+        <div class="tier-rows">
+          <div class="tier-label">DEFAULT · 不反对就算定</div>
+          <div class="trow" data-d="D6">
+            <span class="txt">草稿 localStorage 自动保存 — 刷新不丢已填 <span class="why">· 代价：少量前端状态管理</span></span>
+            <button class="btn-x" onclick="veto(this)">翻掉</button>
+            <div class="veto-reason"><input placeholder="为什么翻掉？（一句话）"></div>
+          </div>
+          <div class="trow" data-d="D8">
+            <span class="txt">默认端口 19433 + 粘性端口文件，与 aes-grilling-web 并存 <span class="why">· 代价：无</span></span>
+            <button class="btn-x" onclick="veto(this)">翻掉</button>
+            <div class="veto-reason"><input placeholder="为什么翻掉？（一句话）"></div>
+          </div>
+        </div>
+
+        <!-- 确认区 -->
+        <div class="tier-rows">
+          <div class="tier-label">CONFIRM · 选错了难回头，请确认</div>
+          <div class="trow" data-c="C1">
+            <span class="txt">唤醒机制 = 后台任务退出通知（无超时）+ 降级阶梯 <span class="why">· 代价：绑定有后台任务能力的宿主</span></span>
+            <span class="pill risk">不可逆</span>
+            <button class="btn-ok" onclick="confirmRow(this)">确认</button>
+            <button class="btn-x" onclick="veto(this)">翻掉</button>
+            <div class="veto-reason"><input placeholder="翻掉理由 / 期望的方式"></div>
+          </div>
+        </div>
+
+        <div class="submit-bar">
+          <button class="submit" onclick="submitRound()">提交本轮，生成追问 →</button>
+          <div class="waiting" id="waiting"><span class="dot"></span>已提交，等待 Agent 处理…（Agent 被自动唤醒，无需回终端）</div>
+        </div>
+      </div>
+
+      <div class="gate" id="gate">
+        <span>还差 1 个开放歧义（Q1 待答 + C1 待确认）</span>
+      </div>
+
+    </section>
+
+    <aside class="rail">
+      <div class="eyebrow">LOCKED · 已锁定结论（实时累积）</div>
+      <div class="lock-card">
+        <div class="q1">唤醒模型</div>
+        <div class="a1">自定义：无超时 · 隔天页面确认可用</div>
+        <div class="src">from Round 1 · 推翻推荐</div>
+      </div>
+      <div class="lock-card">
+        <div class="q1">交付范围</div>
+        <div class="a1">完整三阶段 Web 化 + 基础测试</div>
+        <div class="src">from Round 1</div>
+      </div>
+      <div class="lock-card">
+        <div class="q1">契约确认位置</div>
+        <div class="a1">Web 完成所有交互与文本输入</div>
+        <div class="src">from Round 1 · 放宽家族红线</div>
+      </div>
+      <div class="rail-hint">回答（或让默认通过）后结论会累积在这里，随时可翻</div>
+    </aside>
+  </div>
+
+  <!-- 契约终态视图 -->
+  <section class="final" id="view-final">
+    <div class="doc">
+      <h1>目标契约 · workflow-interview-web</h1>
+      <div class="sub">issue 2026-08-20-workflow-interview-web · 三阶段完成 · 校验通过</div>
+
+      <section>
+        <h2>1 · 目标一句话</h2>
+        <p>workflow-interview 的 Web 入口薄层：三阶段访谈全部在本地浏览器单页双向进行。</p>
+        <div class="basis"><b>依据</b> from: Round 1 任务陈述 + 唤醒模型裁决</div>
+      </section>
+      <section>
+        <h2>2 · 唤醒与跨天（核心协议）</h2>
+        <ul>
+          <li>提交 → wait-submit 后台任务退出 → 宿主自动唤起 agent</li>
+          <li>detached server 48h 缓冲：宿主关闭时提交入盘不丢，重开先吸收</li>
+          <li>按 round-id 幂等；重复提交拒绝</li>
+        </ul>
+        <div class="basis"><b>依据</b> from: Deep Research + Q1 选 A + C1 确认</div>
+      </section>
+      <section>
+        <h2>3 · 验收条件（节选）</h2>
+        <ul>
+          <li>[A] run-tests.mjs 全绿（服务生命周期/鉴权/提交/发布校验/wait 路径）</li>
+          <li>[B] 浏览器实点：发布→作答→唤醒闭环（browser-use evidence）</li>
+        </ul>
+        <div class="basis"><b>依据</b> from: 验证基建候选池 + 交付范围裁决</div>
+      </section>
+
+      <div class="confirm-bar">
+        <button class="btn-confirm" onclick="confirmContract(this)">确认交付标准 ✓</button>
+        <button class="btn-revise" onclick="reviseBox()">需要修改</button>
+        <div class="revise-box" id="reviseBox">
+          <textarea placeholder="哪一节要改？怎么改？（自由文本，Agent 被唤醒后逐条处理）"></textarea>
+          <button class="send" onclick="sendRevise()">发送修改意见 →</button>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+// —— mock 交互演示（写死数据，不连后端）——
+function pick(el){
+  el.closest('.opts').querySelectorAll('.opt').forEach(o=>o.classList.remove('sel'));
+  el.classList.add('sel');
+}
+function toggleOther(btn){
+  btn.classList.toggle('on');
+  btn.closest('.opts').querySelector('.other-row').classList.toggle('on');
+}
+function veto(btn){
+  const row=btn.closest('.trow');
+  btn.classList.toggle('vetoed');
+  btn.textContent=btn.classList.contains('vetoed')?'已翻掉':'翻掉';
+  row.querySelector('.veto-reason').classList.toggle('on',btn.classList.contains('vetoed'));
+}
+function confirmRow(btn){
+  btn.classList.add('done'); btn.textContent='已确认 ✓';
+  const v=btn.parentElement.querySelector('.btn-x');
+  if(v){v.style.display='none';const r=row0(v);if(r)r.classList.remove('on');}
+  function row0(x){return x.closest('.trow').querySelector('.veto-reason');}
+}
+function submitRound(){
+  document.getElementById('round2').querySelectorAll('.q,.tier-rows').forEach(e=>e.classList.add('locked'));
+  document.querySelector('#round2 .submit').disabled=true;
+  document.getElementById('waiting').classList.add('on');
+  const g=document.getElementById('gate');
+  g.classList.add('pass');
+  g.innerHTML='<span>✓ 零开放歧义 · 本轮已收口</span><button class="go" onclick="showView(\'final\')">锁定，进入交付标准 →</button>';
+  document.getElementById('ambig').classList.add('zero');
+  document.getElementById('ambig').textContent='开放歧义 0';
+  const cta=document.getElementById('cta');
+  cta.classList.add('ready');cta.disabled=false;
+  cta.onclick=()=>showView('final');
+  document.getElementById('flowScroll').scrollTo({top:1e6,behavior:'smooth'});
+}
+function showView(v){
+  document.getElementById('view-flow').style.display=v==='flow'?'flex':'none';
+  document.getElementById('view-final').classList.toggle('on',v==='final');
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.textContent.includes(v==='flow'?'访谈':'契约')));
+}
+function reviseBox(){document.getElementById('reviseBox').classList.toggle('on');}
+function sendRevise(){
+  document.getElementById('reviseBox').classList.remove('on');
+  alert('修改意见已提交 · Agent 已被唤醒（mock 演示）');
+}
+function confirmContract(btn){
+  btn.textContent='已确认 ✓ 契约锁定';
+  btn.disabled=true;
+}
+</script>
+</body>
+</html>
+<!--
+新增什么：整个单页（顶栏面包屑+歧义计数+CTA；左流程列三档问题卡/研究间奏/门禁横幅；右已锁定结论栏；契约终态视图与确认交互）。
+不变什么：asking.md 三档分诊语义、三段选项结构、pct 徽章、rounds.jsonl/manifest schema、session.mjs 门禁——界面只是载体。
+Mock 定结构/信息/关键交互方向，非像素规范；真实实现含 WS 实时刷新、localStorage 草稿、断线重连，此处不演示。
+-->

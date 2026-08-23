@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "slug": "2026-08-16-scoring-system-fixes",
+  "created_at": "2026-08-16T15:14:42Z",
+  "updated_at": "2026-08-16T17:05:52Z",
+  "original_request": "针对评分体系对抗审查实锤的所有问题，全部修复，输出改进 goal-contract",
+  "goal_oneline": "修复评分体系对抗审查实锤的全部 9 项缺陷：统一 diff 语义（含等效强归因链）、定义 Commit 维度语义、Warning Trend 独立验证信号、:see=/Recurrences 落账纪律、盲评工具与执行、小项勘误；权重与 8/5 阈值不动（只接仪表+写校准触发条件），向后兼容不动存量 14 份",
+  "target": null,
+  "stage": "3-contract",
+  "next_action": "契约就绪待交接：/goal 指令已生成；盲评（AC-007）需用户半天投入",
+  "stage_gates": {
+    "1-interview": {
+      "status": "done",
+      "closed_at": "2026-08-16T15:20:57Z",
+      "self_assessment": {
+        "意图": "已定",
+        "结果": "已定",
+        "边界": "已定",
+        "约束": "已定",
+        "现状": "已定"
+      }
+    },
+    "2-prototype": {
+      "status": "done",
+      "closed_at": "2026-08-16T17:00:29Z",
+      "artifacts_confirmed": [
+        "behavior",
+        "example-run"
+      ]
+    },
+    "3-contract": {
+      "status": "done",
+      "closed_at": "2026-08-16T17:05:52Z"
+    }
+  },
+  "validation": {
+    "status": "valid",
+    "ac_count": 7,
+    "warnings": [],
+    "ran_at": "2026-08-16T17:05:44Z",
+    "verify_tiers": {
+      "A": 6,
+      "B": 0,
+      "C": 1,
+      "D": 0
+    }
+  },
+  "blocked": [],
+  "residual_risk": null,
+  "status": "ready"
+}

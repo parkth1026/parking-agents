@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<!-- draft v3 | published 2026-08-23T01:10:00Z
+     用户意见：提供 docs/uiux/design_handoff_issue_starmap 高保真交接稿（米白纸面 Obsidian 风），
+              图谱视图按其像素还原、全页迁移其 design tokens
+     状态：superseded by v4-mock.html -->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>需求地图 mock v3 — worktree-board</title>
+<style>
+  :root {
+    --bg:#0e1420; --panel:#141d2d; --card:#182335; --line:#243144;
+    --ink:#d7e1f0; --dim:#8595ab; --faint:#57647a;
+    --done:#7fa88b; --done-bg:#14201b; --frontier:#6fc8ff; --claimed:#ffd873;
+    --blocked:#c98585; --run:#ffb020; --warn:#ffcf5e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { height:100%; }
+  body { background:var(--bg); color:var(--ink); overflow:hidden;
+    font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif; font-size:13px; }
+
+  /* ── 顶栏 ── */
+  #top { display:flex; align-items:center; gap:14px; padding:12px 20px 10px; }
+  #top h1 { font-size:15px; font-weight:600; letter-spacing:1px; }
+  .badge { padding:2px 9px; border-radius:999px; font-size:11px; border:1px solid var(--line); }
+  .badge.live { color:#59d99d; border-color:#2a5c46; }
+  .badge.mock { color:#c9a35a; border-color:#5c4a2a; }
+  #views { display:flex; border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+  #views button { border:none; border-radius:0; background:transparent; color:var(--dim); padding:5px 16px; }
+  #views button.active { background:#22304a; color:var(--ink); }
+  #progress { flex:1; max-width:380px; }
+  #progress .bar { height:8px; background:#1a2536; border-radius:4px; overflow:hidden; }
+  #progress .fill { height:100%; width:72%; background:linear-gradient(90deg,#3f6e52,#7fa88b); }
+  #progress .txt { font-size:11px; color:var(--dim); margin-top:3px; }
+  #progress .txt b { color:var(--done); }
+  .chip { font-size:11.5px; padding:3px 10px; border-radius:999px; border:1px solid var(--line); color:var(--dim); }
+  .chip b { font-weight:600; }
+  .chip.f b { color:var(--frontier); } .chip.c b { color:var(--claimed); } .chip.b b { color:var(--blocked); }
+  button { font:inherit; font-size:12px; cursor:pointer; color:var(--ink); background:#1b2739;
+    border:1px solid #2b3a52; padding:5px 13px; border-radius:6px; }
+  button.primary { background:#7c5f1d; border-color:#a8862e; color:#ffedc2; }
+
+  /* ── worker 名册 ── */
+  #roster { display:flex; gap:10px; padding:6px 20px 12px; }
+  .wk { flex:1; max-width:220px; background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:9px 12px; cursor:pointer; transition:border-color .15s, opacity .2s; }
+  .wk:hover { border-color:#3a4c68; }
+  .wk .name { font-weight:600; font-size:13px; display:flex; align-items:center; gap:7px; }
+  .wk .name .st { width:8px; height:8px; border-radius:50%; flex:none; }
+  .st.run { background:var(--run); animation:pulse 1.6s ease-in-out infinite; }
+  .st.manual { background:#7fb3e8; } .st.idle { background:#4a586e; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+  .wk .doing { font-size:11.5px; color:var(--dim); margin-top:3px; }
+  .wk .doing b { color:var(--ink); }
+  .wk .flags { margin-top:5px; display:flex; gap:5px; flex-wrap:wrap; }
+  .mini { font-size:10px; padding:1px 6px; border-radius:3px; }
+  .mini.dirty { background:#4a331466; color:#ff9d3b; }
+  .mini.stale { background:#4a3a1166; color:var(--warn); border:1px dashed #8a6d1f; }
+  .mini.merge-ny { background:#212c3f; color:var(--dim); }
+
+  /* ── 视图 A：四列地图 ── */
+  #map-wrap { position:relative; height:calc(100vh - 128px); overflow:auto; padding:4px 20px 20px; }
+  #map { position:relative; display:grid; grid-template-columns: 232px 1fr 1fr 1fr; gap:16px; min-height:100%; }
+  .col { border:1px solid var(--line); border-radius:12px; background:#10192880; padding:10px; min-width:210px; }
+  .col h2 { font-size:11px; letter-spacing:2px; color:var(--faint); text-transform:uppercase;
+    padding:2px 4px 8px; display:flex; align-items:baseline; gap:8px; }
+  .col h2 b { font-size:15px; letter-spacing:0; }
+  .col.done-col { background:var(--done-bg); border-color:#1d3226; }
+  .col.done-col h2 b { color:var(--done); }
+  .col.claim-col h2 b { color:var(--claimed); }
+  .col.front-col h2 b { color:var(--frontier); }
+  .col.block-col h2 b { color:var(--blocked); }
+  .col h2 .sub { font-size:10px; color:var(--faint); letter-spacing:0; text-transform:none; margin-left:auto; }
+  .done-grid { display:flex; flex-wrap:wrap; gap:5px; }
+  .dchip { font-size:10.5px; font-family:Consolas,ui-monospace,monospace; padding:2px 7px; border-radius:4px;
+    background:#1a2b21; color:var(--done); border:1px solid #24402f; cursor:pointer; }
+  .dchip:hover { border-color:#3d6b4d; }
+  .card { position:relative; background:var(--card); border:1px solid var(--line); border-radius:9px;
+    padding:8px 11px; margin-bottom:9px; cursor:pointer; transition:border-color .15s, opacity .2s; }
+  .card:hover { border-color:#3a4c68; }
+  .card .num { font-family:Consolas,ui-monospace,monospace; font-size:11px; }
+  .card .title { font-size:12.5px; margin-top:2px; line-height:1.4; }
+  .card .meta { font-size:10.5px; color:var(--faint); margin-top:4px; }
+  .front-col .card { border-color:#2b4a63; }
+  .front-col .card .num { color:var(--frontier); }
+  .claim-col .card { border-color:#4a3d1e; }
+  .claim-col .card .num { color:var(--claimed); }
+  .block-col .card { border-color:#43272b; opacity:.85; }
+  .block-col .card .num { color:var(--blocked); }
+  .block-col .card .meta b { color:var(--blocked); font-weight:600; }
+  .wkbadge { display:inline-flex; align-items:center; gap:5px; margin-top:5px; font-size:11px; font-weight:600;
+    padding:2px 8px; border-radius:4px; background:#2b230e; color:var(--claimed); border:1px solid #4a3d1e; }
+  .wkbadge .st { width:7px; height:7px; border-radius:50%; }
+  #edges { position:absolute; inset:0; pointer-events:none; overflow:visible; }
+
+  /* ── 视图 B：知识图谱 ── */
+  #graph-wrap { position:relative; height:calc(100vh - 128px); display:none; }
+  #graph { width:100%; height:100%; cursor:grab; display:block; }
+  #graph.dragging { cursor:grabbing; }
+  .gnode { cursor:pointer; transition:opacity .2s; }
+  .gnode text { font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif; pointer-events:none; }
+  .gwk rect { fill:#2b230e; stroke:#4a3d1e; }
+  .gwk text { fill:var(--claimed); font-size:10px; font-weight:600; }
+  #gedges path { fill:none; stroke-width:1.3; transition:opacity .2s; }
+  #gedges path.sat { stroke:#5f8a6e; opacity:.55; }
+  #gedges path.unsat { stroke:#7d8ca3; stroke-dasharray:4 5; opacity:.4; }
+
+  /* ── Obsidian 式邻域聚焦（两个视图共用）── */
+  body.focusing .card:not(.lit), body.focusing .dchip:not(.lit), body.focusing .wk:not(.lit) { opacity:.22; }
+  body.focusing .gnode:not(.lit), body.focusing .gwk:not(.lit) { opacity:.13; }
+  .card.lit, .dchip.lit { border-color:#8aa5cc !important; opacity:1 !important; }
+  #edges path { opacity:.35; transition:opacity .2s; }
+  #edges path.sat { stroke:#5f8a6e; } #edges path.unsat { stroke:#7d8ca3; stroke-dasharray:4 5; }
+  body.focusing #edges path:not(.lit), body.focusing #gedges path:not(.lit) { opacity:.05; }
+  body.focusing #edges path.lit { opacity:.95; stroke-width:2; }
+  body.focusing #gedges path.lit { opacity:1; stroke-width:2.2; }
+  body.focusing .gnode.lit circle { stroke:#c9d7ec; stroke-width:1.5; }
+
+  /* ── 面板 / 弹层 / toast ── */
+  #panel { position:fixed; top:0; right:0; bottom:0; width:400px; max-width:92vw; z-index:30;
+    background:#101927f2; backdrop-filter:blur(10px); border-left:1px solid var(--line);
+    transform:translateX(105%); transition:transform .25s; display:flex; flex-direction:column; }
+  #panel.open { transform:none; }
+  #panel header { padding:15px 16px 10px; border-bottom:1px solid var(--line); display:flex; gap:10px; align-items:baseline; }
+  #panel header h2 { font-size:16px; }
+  #panel header .x { margin-left:auto; background:none; border:none; color:var(--faint); font-size:17px; }
+  #pbody { overflow-y:auto; padding:13px 16px; flex:1; }
+  .sec { margin-bottom:16px; }
+  .sec h3 { font-size:10.5px; letter-spacing:2px; color:var(--faint); text-transform:uppercase; margin-bottom:7px; }
+  .kv { display:grid; grid-template-columns:86px 1fr; gap:4px 10px; }
+  .kv dt { color:var(--dim); } .kv dd { word-break:break-all; }
+  .tag { display:inline-block; padding:1px 8px; border-radius:4px; font-size:11.5px; }
+  .tag.frontier { background:#153a5266; color:var(--frontier); } .tag.claimed { background:#4a3a1166; color:var(--claimed); }
+  .tag.blocked { background:#4a232366; color:var(--blocked); } .tag.resolved { background:#1c352866; color:var(--done); }
+  .tag.dim { background:#212c3f66; color:var(--dim); }
+  .stale-badge { display:inline-block; padding:1px 8px; border-radius:4px; font-size:11px;
+    background:#5c4a1a; color:#ffe9a8; border:1px dashed #a8862e; margin-left:6px; }
+  textarea { width:100%; min-height:74px; resize:vertical; font:inherit; font-size:12.5px; color:var(--ink);
+    background:#0d1626; border:1px solid #2b3a52; border-radius:8px; padding:8px 10px; }
+  select { font:inherit; font-size:12px; color:var(--ink); background:#1b2739; border:1px solid #2b3a52;
+    border-radius:6px; padding:4px 8px; }
+  .row { display:flex; gap:8px; margin-top:8px; align-items:center; }
+  .hint { color:var(--faint); font-size:11.5px; line-height:1.6; }
+  a { color:var(--frontier); text-decoration:none; border-bottom:1px dotted #2f6a94; }
+  #modal { position:fixed; inset:0; z-index:50; display:none; align-items:center; justify-content:center; background:#04060bcc; }
+  #modal.show { display:flex; }
+  #modal .cardbox { width:380px; max-width:90vw; background:#141d2d; border:1px solid #3a2f18; border-radius:12px; padding:18px; }
+  #modal h3 { font-size:14px; color:#ffe9a8; margin-bottom:10px; }
+  #modal p { font-size:12.5px; line-height:1.7; color:#aeb9cc; }
+  #modal .row { justify-content:flex-end; margin-top:14px; }
+  #toast { position:fixed; bottom:28px; left:50%; transform:translateX(-50%); z-index:60;
+    background:#1b2739f0; border:1px solid #2b3a52; padding:8px 16px; border-radius:8px; font-size:12.5px;
+    opacity:0; transition:opacity .25s; pointer-events:none; }
+  #toast.show { opacity:1; }
+  #note { position:fixed; right:16px; bottom:14px; z-index:20; font-size:10.5px; color:#57647a;
+    background:#0e1420dd; border:1px solid var(--line); border-radius:8px; padding:6px 10px; max-width:290px; line-height:1.5; }
+</style>
+</head>
+<body>
+
+<div id="top">
+  <h1>AES 需求地图</h1>
+  <div id="views">
+    <button id="btn-lanes" class="active" onclick="showView('lanes')">地图</button>
+    <button id="btn-graph" onclick="showView('graph')">图谱</button>
+  </div>
+  <span class="badge live">LIVE</span><span class="badge mock">MOCK</span>
+  <div id="progress">
+    <div class="bar"><div class="fill"></div></div>
+    <div class="txt">已探明 <b>44 / 61</b>（72%）· 剩余 17 个开放项</div>
+  </div>
+  <span class="chip f"><b>6</b> 可开工</span>
+  <span class="chip c"><b>2</b> 进行中</span>
+  <span class="chip b"><b>4</b> 被阻塞</span>
+  <span style="margin-left:auto"></span>
+  <button onclick="toast('mock：重采事实')">刷新</button>
+  <button onclick="toast('mock：重新查询 GitHub')">完整刷新</button>
+</div>
+
+<div id="roster"></div>
+
+<!-- 视图 A：四列进度轴 -->
+<div id="map-wrap">
+  <div id="map">
+    <svg id="edges"></svg>
+    <div class="col done-col"><h2><b>已探明</b>CLOSED<span class="sub">44 项 · 点击可查</span></h2>
+      <div class="done-grid" id="done-grid"></div></div>
+    <div class="col claim-col"><h2><b>进行中</b>有队员认领<span class="sub">worker 徽章钉在卡上</span></h2><div id="col-claimed"></div></div>
+    <div class="col front-col"><h2><b>可开工</b>frontier<span class="sub">依赖全闭 · 无人认领</span></h2><div id="col-frontier"></div></div>
+    <div class="col block-col"><h2><b>被阻塞</b>等依赖<span class="sub">卡上写明等谁</span></h2><div id="col-blocked"></div></div>
+  </div>
+</div>
+
+<!-- 视图 B：知识图谱 -->
+<div id="graph-wrap">
+  <svg id="graph"><g id="gview"><g id="gedges"></g><g id="gnodes"></g></g></svg>
+</div>
+
+<div id="note" >两个视图共用：名册 / 点选邻域高亮（Esc 复位）/ 详情面板。图谱视图：拖拽平移 · 滚轮缩放；核心=依赖网，中环=无依赖开放项，外环=已探明。</div>
+
+<div id="panel">
+  <header><h2 id="ptitle"></h2><span id="ptag"></span><button class="x" onclick="closePanel()">✕</button></header>
+  <div id="pbody"></div>
+</div>
+<div id="modal"><div class="cardbox">
+  <h3>⚠ dev3 有未提交改动</h3>
+  <p>16 处修改 · 15 个未跟踪文件——可能有人正在这个 worktree 里干活。headless 任务会与之并发写文件。</p>
+  <div class="row">
+    <button onclick="closeModal()">取消</button>
+    <button onclick="closeModal();toast('mock：已派只读侦查任务')">先侦查</button>
+    <button class="primary" onclick="closeModal();toast('mock：已确认派发 dev3-2026…')">仍要派发</button>
+  </div>
+</div></div>
+<div id="toast"></div>
+
+<script>
+'use strict';
+/* ============ 数据（同 v2）============ */
+const OPEN = [
+  {num:41, title:"Goal Contract 访谈后未经确认直接进入执行", deps:[38], by:"dev5"},
+  {num:58, title:"契约 finalize 报告排版", deps:[], by:"dev4"},
+  {num:62, title:"访谈轮次可视化时间线", deps:[]},
+  {num:57, title:"goal-contract 冒烟并行化", deps:[]},
+  {num:51, title:"插件 workspace 门禁增量审计", deps:[55]},
+  {num:18, title:"triage 标签自动巡检", deps:[]},
+  {num:60, title:"对照物 fidelity ledger 校验", deps:[]},
+  {num:63, title:"契约模板热更新", deps:[]},
+  {num:61, title:"契约残留风险对账强化", deps:[41,60]},
+  {num:59, title:"多 worktree 验收编排", deps:[41]},
+  {num:54, title:"issue 依赖书写规范落文档", deps:[51]},
+  {num:56, title:"残留风险台账", deps:[57]},
+];
+const CLOSED_TITLED = {38:"访谈五维自评落盘",35:"OpenCode typed interaction",55:"插件 workspace 门禁",24:"typed interaction 能力断裂",43:"run 体系一级动词"};
+const CLOSED = [1,2,3,5,6,7,9,10,11,12,14,15,16,17,19,20,21,22,23,24,25,26,28,29,30,31,32,33,34,35,36,37,38,39,40,42,43,44,45,46,47,48,49,55];
+const WORKERS = [
+  {name:"dev5", at:41, mode:"run",    dirty:0,  merge:"not-yet", task:"修复 #41 访谈跳确认", reason:"issue #41 仍 OPEN、验收未闭环", assessedAt:"08-22 16:05", stale:false,
+   branch:"aes-agents-v2-dev5@6bd40b2e", ahead:1, behind:6, trail:[35,41], job:{id:"dev5-20260823101530",agent:"claude",log:"…按 #41 验收清单补交互测试…"}},
+  {name:"dev4", at:58, mode:"manual", dirty:5,  merge:"not-yet", task:"接手 #58 报告排版", reason:"你在交互会话手动推进，以现场为准", assessedAt:"08-21 09:12", stale:true,
+   branch:"aes-agents-v2-dev4@45700c9c", ahead:0, behind:5, trail:[35,58], job:null},
+  {name:"dev1", at:null, mode:"idle", dirty:0,  merge:null, trail:[24], branch:"aes-agents-v2-dev1@f0172225", ahead:0, behind:0, job:null},
+  {name:"dev2", at:null, mode:"idle", dirty:2,  merge:null, trail:[55], branch:"aes-agents-v2-dev2@f0172225", ahead:0, behind:0, job:null},
+  {name:"dev3", at:null, mode:"idle", dirty:31, merge:null, trail:[],   branch:"aes-agents-v2-dev3@f6d9a1e6", ahead:0, behind:6, job:null},
+];
+const byNum = {}; OPEN.forEach(i=>byNum[i.num]=i);
+const isClosed = n => CLOSED.includes(n);
+OPEN.forEach(i=>{ i.status = i.by ? "claimed" : i.deps.every(isClosed) ? "frontier" : "blocked"; });
+const EDGES = OPEN.flatMap(i=>i.deps.map(d=>({from:d,to:i.num,sat:isClosed(d)})));
+const MODE_ZH = {run:"任务运行中",manual:"手动推进中",idle:"空闲"};
+const STATUS_ZH = {frontier:"可开工",claimed:"进行中",blocked:"被阻塞",resolved:"已探明"};
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+
+/* ============ worker 名册 ============ */
+const rosterEl = document.getElementById("roster");
+WORKERS.forEach(w=>{
+  const el = document.createElement("div");
+  el.className = "wk"; el.id = "wk-"+w.name;
+  const doing = w.at ? `在做 <b>#${w.at}</b> ${byNum[w.at].title.slice(0,10)}…` : `停靠基地 · 待派活`;
+  el.innerHTML = `
+    <div class="name"><span class="st ${w.mode}"></span>${w.name}<span style="font-weight:400;color:var(--faint);font-size:10.5px;margin-left:auto">${MODE_ZH[w.mode]}</span></div>
+    <div class="doing">${doing}</div>
+    <div class="flags">
+      ${w.dirty?`<span class="mini dirty">${w.dirty} 未提交</span>`:""}
+      ${w.stale?`<span class="mini stale">评估过期</span>`:""}
+      ${w.merge?`<span class="mini merge-ny">合并:尚不建议</span>`:""}
+    </div>`;
+  el.onclick = ()=>{ focusWorker(w); openPanel(w,"worker"); };
+  rosterEl.appendChild(el);
+});
+
+/* ============ 视图 A：四列 ============ */
+const doneGrid = document.getElementById("done-grid");
+CLOSED.forEach(n=>{
+  const c = document.createElement("span");
+  c.className = "dchip"; c.id = "n-"+n; c.textContent = "#"+n;
+  c.title = CLOSED_TITLED[n] || ("issue #"+n+"（已关闭）");
+  c.onclick = ()=>{ focusNode(n); openPanel({num:n,title:c.title,status:"resolved"},"issue"); };
+  doneGrid.appendChild(c);
+});
+for (const i of OPEN){
+  const w = WORKERS.find(w=>w.at===i.num);
+  const waiting = i.status==="blocked" ? `<div class="meta">等 ${i.deps.filter(d=>!isClosed(d)).map(d=>"<b>#"+d+"</b>").join(" ")}</div>` : "";
+  const wk = w ? `<div class="wkbadge"><span class="st ${w.mode}"></span>${w.name} · ${MODE_ZH[w.mode]}</div>` : "";
+  const el = document.createElement("div");
+  el.className = "card"; el.id = "n-"+i.num;
+  el.innerHTML = `<div class="num">#${i.num}</div><div class="title">${i.title}</div>${waiting}${wk}`;
+  el.onclick = ()=>{ focusNode(i.num); openPanel(i,"issue"); };
+  document.getElementById("col-"+i.status).appendChild(el);
+}
+const lanesSvg = document.getElementById("edges");
+function drawLaneEdges(){
+  const map = document.getElementById("map"), mr = map.getBoundingClientRect();
+  lanesSvg.setAttribute("width", map.scrollWidth); lanesSvg.setAttribute("height", map.scrollHeight);
+  lanesSvg.innerHTML = "";
+  EDGES.forEach(e=>{
+    const a = document.getElementById("n-"+e.from), b = document.getElementById("n-"+e.to);
+    if(!a||!b) return;
+    const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
+    const x1 = ra.right-mr.left, y1 = ra.top-mr.top+ra.height/2;
+    const x2 = rb.left-mr.left,  y2 = rb.top-mr.top+rb.height/2;
+    const dx = Math.max(40,(x2-x1)*0.45);
+    const p = document.createElementNS("http://www.w3.org/2000/svg","path");
+    p.setAttribute("d",`M ${x1},${y1} C ${x1+dx},${y1} ${x2-dx},${y2} ${x2},${y2}`);
+    p.setAttribute("class",(e.sat?"sat":"unsat"));
+    p.dataset.from=e.from; p.dataset.to=e.to;
+    lanesSvg.appendChild(p);
+  });
+}
+drawLaneEdges();
+addEventListener("resize",drawLaneEdges);
+
+/* ============ 视图 B：知识图谱（确定性力导向，布局一次后静止）============ */
+const GN = [];
+OPEN.forEach(i=>GN.push({num:i.num, closed:false, status:i.status, title:i.title}));
+CLOSED.forEach(n=>GN.push({num:n, closed:true, status:"resolved", title:CLOSED_TITLED[n]||""}));
+const gByNum = {}; GN.forEach(n=>gByNum[n.num]=n);
+const connected = new Set(EDGES.flatMap(e=>[e.from,e.to]));
+(function graphLayout(){
+  const rnd = mulberry32(42);
+  const ring = n => connected.has(n.num) ? 150 : n.closed ? 430 : 280; // 核心=依赖网 中环=孤立开放 外环=已探明
+  GN.forEach(n=>{ const a=rnd()*6.2832, R=ring(n)+ (rnd()-0.5)*60; n.x=Math.cos(a)*R; n.y=Math.sin(a)*R; });
+  for(let it=0; it<340; it++){
+    for(let i=0;i<GN.length;i++)for(let j=i+1;j<GN.length;j++){
+      const a=GN[i],b=GN[j];let dx=a.x-b.x,dy=a.y-b.y;const d2=dx*dx+dy*dy||.01,d=Math.sqrt(d2);
+      const f=(a.closed&&b.closed?1600:3200)/d2; dx/=d;dy/=d;
+      a.x+=dx*f;a.y+=dy*f;b.x-=dx*f;b.y-=dy*f;}
+    EDGES.forEach(e=>{const a=gByNum[e.from],b=gByNum[e.to];let dx=b.x-a.x,dy=b.y-a.y;
+      const d=Math.hypot(dx,dy)||.01,f=(d-140)*.03;dx/=d;dy/=d;
+      a.x+=dx*f;a.y+=dy*f;b.x-=dx*f;b.y-=dy*f;});
+    GN.forEach(n=>{const d=Math.hypot(n.x,n.y)||.01,f=(ring(n)-d)*.05;n.x+=n.x/d*f;n.y+=n.y/d*f;});
+  }
+})();
+const GCOL = {frontier:"#6fc8ff", claimed:"#ffd873", blocked:"#c98585", resolved:"#4f7a5f"};
+const GR   = {frontier:10, claimed:10, blocked:8, resolved:5};
+const gEdgesEl = document.getElementById("gedges"), gNodesEl = document.getElementById("gnodes");
+EDGES.forEach(e=>{
+  const a=gByNum[e.from], b=gByNum[e.to];
+  const p=document.createElementNS("http://www.w3.org/2000/svg","path");
+  p.setAttribute("d",`M ${a.x},${a.y} L ${b.x},${b.y}`);
+  p.setAttribute("class",e.sat?"sat":"unsat");
+  p.dataset.from=e.from; p.dataset.to=e.to;
+  gEdgesEl.appendChild(p);
+});
+// 基地：空闲 worker 的家（图谱中心）
+(function(){
+  const g=document.createElementNS("http://www.w3.org/2000/svg","g");
+  g.innerHTML=`<circle cx="0" cy="0" r="5" fill="#e8d9ac"/><circle cx="0" cy="0" r="14" fill="none" stroke="#8a7c4d" stroke-width="1" stroke-dasharray="2 5"/>
+    <text x="0" y="30" text-anchor="middle" font-size="10" fill="#a99e78">main 基地 · 空闲: ${WORKERS.filter(w=>!w.at).map(w=>w.name).join(" ")}</text>`;
+  gNodesEl.appendChild(g);
+})();
+GN.forEach(n=>{
+  const g=document.createElementNS("http://www.w3.org/2000/svg","g");
+  g.setAttribute("class","gnode"); g.setAttribute("id","gn-"+n.num); g.dataset.num=n.num;
+  const r=GR[n.status], c=GCOL[n.status];
+  const label = n.closed ? `<text x="${n.x}" y="${n.y+r+11}" text-anchor="middle" font-size="8.5" fill="#4f7a5f88" font-family="Consolas,monospace">#${n.num}</text>`
+    : `<text x="${n.x}" y="${n.y+r+13}" text-anchor="middle" font-size="11" fill="#c3d0e2">#${n.num} ${n.title.slice(0,10)}${n.title.length>10?"…":""}</text>`;
+  const wk = (()=>{ const w=WORKERS.find(w=>w.at===n.num); if(!w) return "";
+    const icon = w.mode==="run"?"▶":"✋";
+    return `<g class="gwk"><rect x="${n.x+10}" y="${n.y-26}" width="52" height="16" rx="4"/>
+      <text x="${n.x+36}" y="${n.y-14}" text-anchor="middle">${w.name} ${icon}</text></g>`; })();
+  g.innerHTML = `<circle cx="${n.x}" cy="${n.y}" r="${r}" fill="${c}" opacity="${n.closed?0.55:0.95}"/>${label}${wk}`;
+  g.addEventListener("click",ev=>{ ev.stopPropagation();
+    focusNode(n.num);
+    openPanel(n.closed?{num:n.num,title:n.title||("issue #"+n.num+"（已关闭）"),status:"resolved"}:byNum[n.num],"issue"); });
+  gNodesEl.appendChild(g);
+});
+// 图谱相机：适配 + 拖拽平移 + 滚轮缩放
+const gSvg=document.getElementById("graph"), gView=document.getElementById("gview");
+let gt={x:0,y:0,s:1};
+function gApply(){ gView.setAttribute("transform",`translate(${gt.x},${gt.y}) scale(${gt.s})`); }
+function gFit(){
+  const w=gSvg.clientWidth||innerWidth, h=gSvg.clientHeight||innerHeight-128;
+  let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
+  GN.forEach(n=>{x0=Math.min(x0,n.x);y0=Math.min(y0,n.y);x1=Math.max(x1,n.x);y1=Math.max(y1,n.y);});
+  const s=Math.min(w/(x1-x0+160), h/(y1-y0+160));
+  gt={s, x:w/2-(x0+x1)/2*s, y:h/2-(y0+y1)/2*s}; gApply();
+}
+let gDrag=null;
+gSvg.addEventListener("mousedown",e=>{gDrag={x:e.clientX,y:e.clientY,moved:false};gSvg.classList.add("dragging");});
+addEventListener("mousemove",e=>{if(!gDrag)return;const dx=e.clientX-gDrag.x,dy=e.clientY-gDrag.y;
+  if(Math.abs(dx)+Math.abs(dy)>3)gDrag.moved=true;gt.x+=dx;gt.y+=dy;gDrag.x=e.clientX;gDrag.y=e.clientY;gApply();});
+addEventListener("mouseup",e=>{if(gDrag&&!gDrag.moved&&e.target.closest("#graph")&&!e.target.closest(".gnode"))clearFocus(),closePanel();gDrag=null;gSvg.classList.remove("dragging");});
+gSvg.addEventListener("wheel",e=>{e.preventDefault();const k=e.deltaY<0?1.15:.87,ns=Math.max(.25,Math.min(3,gt.s*k));
+  const r=gSvg.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;
+  gt.x=mx-(mx-gt.x)*ns/gt.s; gt.y=my-(my-gt.y)*ns/gt.s; gt.s=ns; gApply();},{passive:false});
+
+/* ============ 视图切换 ============ */
+let VIEW="lanes";
+function showView(v){
+  VIEW=v;
+  document.getElementById("map-wrap").style.display = v==="lanes"?"block":"none";
+  document.getElementById("graph-wrap").style.display = v==="graph"?"block":"none";
+  document.getElementById("btn-lanes").classList.toggle("active",v==="lanes");
+  document.getElementById("btn-graph").classList.toggle("active",v==="graph");
+  if(v==="graph") gFit(); else drawLaneEdges();
+}
+
+/* ============ 邻域聚焦（两个视图同时点亮）============ */
+function clearFocus(){
+  document.body.classList.remove("focusing");
+  document.querySelectorAll(".lit").forEach(x=>x.classList.remove("lit"));
+}
+function markLit(num){ ["n-","gn-"].forEach(p=>document.getElementById(p+num)?.classList.add("lit")); }
+function focusNode(num){
+  clearFocus(); document.body.classList.add("focusing");
+  const lit=new Set([num]);
+  EDGES.forEach(e=>{ if(e.from===num)lit.add(e.to); if(e.to===num)lit.add(e.from); });
+  lit.forEach(markLit);
+  document.querySelectorAll("#edges path, #gedges path").forEach(p=>{
+    if(+p.dataset.from===num||+p.dataset.to===num)p.classList.add("lit");});
+  const w=WORKERS.find(w=>w.at===num);
+  if(w)document.getElementById("wk-"+w.name).classList.add("lit");
+}
+function focusWorker(w){
+  clearFocus(); document.body.classList.add("focusing");
+  document.getElementById("wk-"+w.name).classList.add("lit");
+  w.trail.forEach(markLit);
+  if(w.at){ markLit(w.at);
+    document.querySelectorAll("#edges path, #gedges path").forEach(p=>{
+      if(+p.dataset.from===w.at||+p.dataset.to===w.at)p.classList.add("lit");});
+    EDGES.forEach(e=>{ if(e.from===w.at)markLit(e.to); if(e.to===w.at)markLit(e.from); });
+  }
+}
+addEventListener("keydown",e=>{ if(e.key==="Escape"){ clearFocus(); closePanel(); closeModal(); }});
+document.getElementById("map-wrap").addEventListener("click",e=>{ if(e.target.id==="map"||e.target.classList.contains("col"))clearFocus(),closePanel(); });
+
+/* ============ 面板 ============ */
+function openPanel(o,kind){
+  const t=document.getElementById("ptitle"),g=document.getElementById("ptag"),b=document.getElementById("pbody");
+  if(kind==="issue"){
+    t.textContent = "Issue #"+o.num;
+    g.innerHTML = `<span class="tag ${o.status}">${STATUS_ZH[o.status]}</span>`;
+    b.innerHTML = issuePanel(o);
+  } else {
+    t.textContent = o.name;
+    g.innerHTML = o.mode!=="idle" ? `<span class="tag claimed">${MODE_ZH[o.mode]} · #${o.at}</span>` : `<span class="tag dim">空闲</span>`;
+    b.innerHTML = workerPanel(o);
+  }
+  document.getElementById("panel").classList.add("open");
+  const d=document.getElementById("go-dirty"); if(d)d.onclick=()=>document.getElementById("modal").classList.add("show");
+}
+function issuePanel(i){
+  const deps = (i.deps&&i.deps.length)
+    ? i.deps.map(d=>`<span class="tag ${isClosed(d)?"resolved":"blocked"}">#${d}${isClosed(d)?" ✓":" 未闭"}</span>`).join(" ")
+    : '<span class="hint">无依赖</span>';
+  const w = WORKERS.find(w=>w.at===i.num);
+  const dispatch = i.status==="frontier" ? `
+    <div class="sec"><h3>从这里派活</h3>
+      <textarea>按 #${i.num} 的验收标准实现，完成后 commit 带 (#${i.num})</textarea>
+      <div class="row">
+        <select><option>dev1（空闲）</option><option>dev2（空闲·2 未提交）</option><option>dev3（空闲·31 未提交⚠）</option></select>
+        <select><option>claude</option><option>codex</option></select>
+        <button class="primary" onclick="toast('mock：已派发 → #${i.num}')">派发</button></div></div>` : "";
+  return `
+    <div class="sec"><h3>标题</h3><div>${i.title}</div></div>
+    <div class="sec"><h3>状态</h3><div class="kv">
+      <dt>阶段</dt><dd>${STATUS_ZH[i.status]}</dd>
+      <dt>依赖</dt><dd>${deps}</dd>
+      <dt>认领</dt><dd>${w?w.name+"（"+MODE_ZH[w.mode]+"）":"无人认领"}</dd>
+      <dt>链接</dt><dd><a href="#">issues/${i.num}</a></dd></div></div>
+    ${dispatch}
+    ${i.status==="resolved"?'<div class="hint">已关闭 issue 只读。</div>':""}`;
+}
+function workerPanel(w){
+  const stale = w.stale?'<span class="stale-badge">已过期 — 事实晚于评估，回主仓重跑巡检</span>':"";
+  const assess = w.merge?`
+    <div class="sec"><h3>主 Agent 评估</h3><div style="border:1px solid var(--line);border-radius:8px;padding:9px 11px;background:#0d1626;line-height:1.6">
+      <div><span class="tag dim">尚不建议合并</span>${stale}</div>
+      <div style="margin-top:6px">${w.task}</div>
+      <div style="margin-top:4px;color:var(--dim)">${w.reason}</div>
+      <div class="hint" style="margin-top:5px">评估于 ${w.assessedAt} · claude-main</div></div></div>`
+    :'<div class="sec"><h3>主 Agent 评估</h3><div class="hint">尚无评估——回主仓跑一次巡检</div></div>';
+  const job = w.job?`
+    <div class="hint">运行中 ${w.job.id} · agent: ${w.job.agent}</div>
+    <pre style="background:#0a0f1a;border:1px solid var(--line);border-radius:8px;padding:8px;font-size:11px;color:#9fb0c8;margin-top:6px">${w.job.log}</pre>`
+    :'<div class="hint">当前无运行中任务</div>';
+  return `
+    <div class="sec"><h3>Git 状态</h3><div class="kv">
+      <dt>分支</dt><dd>${w.branch}</dd>
+      <dt>相对 main</dt><dd>领先 ${w.ahead} · 落后 ${w.behind}</dd>
+      <dt>未提交</dt><dd>${w.dirty?w.dirty+" 项 ⚠":"干净"}</dd>
+      <dt>位置</dt><dd>${w.at?("#"+w.at):"基地"}</dd>
+      <dt>轨迹</dt><dd>${w.trail.length?w.trail.map(t=>"#"+t).join(" → "):"—"}</dd></div></div>
+    ${assess}
+    <div class="sec"><h3>当前任务</h3>${job}</div>
+    <div class="sec"><h3>派发新任务</h3>
+      <textarea placeholder="给 ${w.name} 的任务指令…"></textarea>
+      <div class="row"><select><option>claude</option><option>codex</option><option>test</option></select>
+        ${w.dirty>10?'<button class="primary" id="go-dirty">派发</button>':`<button class="primary" onclick="toast('mock：已派发 → ${w.name}')">派发</button>`}</div>
+      ${w.dirty>10?'<div class="hint" style="margin-top:8px">该 worktree 有大量未提交改动，点派发会先弹确认</div>':""}</div>`;
+}
+function closePanel(){ document.getElementById("panel").classList.remove("open"); }
+function closeModal(){ document.getElementById("modal").classList.remove("show"); }
+function toast(m){ const t=document.getElementById("toast"); t.textContent=m; t.classList.add("show");
+  clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove("show"),2800); }
+window.__mock={OPEN,CLOSED,WORKERS,EDGES,GN,focusNode,focusWorker,showView}; // 验收脚本入口
+</script>
+<!--
+  ============ v3 相对 v2 的变更 ============
+  新增：知识图谱视图（Obsidian 式）——确定性力导向布局（seed 固定、加载即静止不抖动）；
+        地理语义：核心=依赖网、中环=无依赖开放项、外环=已探明暗环；
+        节点色随四列同一套状态色；worker 徽章钉在认领节点旁；中心=main 基地（列出空闲 worker）；
+        拖拽平移+滚轮缩放；点选邻域高亮与四列视图同一套机制、跨视图同步点亮
+  顶栏：新增「地图 / 图谱」切换
+  保留自 v2：四列进度轴视图全部、worker 名册、进度条、侧滑面板、dirty 弹层、评估过期标记
+-->
+</body>
+</html>

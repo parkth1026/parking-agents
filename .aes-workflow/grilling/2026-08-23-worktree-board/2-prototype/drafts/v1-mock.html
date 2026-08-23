@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<!-- draft v1 | published 2026-08-22T17:30:00Z
+     用户意见：星图动画牺牲直观性（坐标系不清/看不清 worker 任务/动画即干扰），要求回到本质：
+              需求地图探到哪 + worker 在做什么，两个信息一眼直观，Obsidian 式可见性第一
+     状态：superseded by v2-mock.html -->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>作战图 mock v1（已废弃，见 v2） — worktree-board</title>
+<style>
+  /* 视觉基准：wayfinder-maps starmap（调色板与动效语言照搬其 theme.js/draw.js） */
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { height:100%; overflow:hidden; background:#05070d; color:#c8d2e0;
+    font-family:"Segoe UI","Microsoft YaHei",ui-sans-serif,system-ui,sans-serif; }
+  canvas { position:fixed; inset:0; display:block; cursor:grab; }
+  canvas.dragging { cursor:grabbing; }
+
+  #hud { position:fixed; top:0; left:0; right:0; z-index:20; display:flex; align-items:center;
+    gap:12px; padding:10px 16px; pointer-events:none;
+    background:linear-gradient(180deg,#05070de8,#05070d00); }
+  #hud > * { pointer-events:auto; }
+  #hud h1 { font-size:15px; font-weight:600; letter-spacing:1.5px; color:#dbe6f5; }
+  .badge { padding:2px 10px; border-radius:999px; font-size:11px; letter-spacing:1px;
+    border:1px solid #223048; }
+  .badge.live { color:#59d99d; border-color:#2a5c46; background:#59d99d12; }
+  .badge.mock { color:#c9a35a; border-color:#5c4a2a; background:#c9a35a12; }
+  .chip { font-size:11.5px; padding:3px 10px; border-radius:999px; border:1px solid #1c2940;
+    color:#8fa0b8; background:#0a1120cc; }
+  .chip b { color:#dbe6f5; font-weight:600; }
+  .chip.frontier b { color:#8ad8ff; } .chip.claimed b { color:#ffd873; }
+  .chip.blocked b { color:#e2a3a3; } .chip.stale b { color:#ffcf5e; }
+  button { font:inherit; font-size:12px; cursor:pointer; color:#d5dfee; background:#141f33;
+    border:1px solid #26364f; padding:5px 13px; border-radius:6px; }
+  button:hover { background:#1b2a44; }
+  button.primary { background:#7c5f1d; border-color:#a8862e; color:#ffedc2; }
+  button.ghost { background:transparent; border-color:#223048; color:#8fa0b8; }
+  #spacer { margin-left:auto; }
+
+  #legend { position:fixed; left:14px; bottom:12px; z-index:20; font-size:11px; color:#8fa0b8;
+    background:#080d18e8; border:1px solid #1c2940; border-radius:10px; padding:9px 13px; line-height:1.9; }
+  #legend .dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:6px; vertical-align:-1px; }
+  #legend .ship { display:inline-block; width:0; height:0; margin-right:6px; vertical-align:-1px;
+    border-left:5px solid transparent; border-right:5px solid transparent; border-bottom:9px solid #ffd873; }
+  #mocknote { position:fixed; right:14px; bottom:12px; z-index:20; font-size:11px; color:#5d6b82;
+    background:#080d18e8; border:1px solid #1c2940; border-radius:10px; padding:8px 12px; max-width:300px; line-height:1.6; }
+  #mocknote b { color:#c9a35a; }
+
+  /* ── 侧滑面板 ── */
+  #panel { position:fixed; top:0; right:0; bottom:0; width:400px; max-width:92vw; z-index:30;
+    background:#0a1120ee; backdrop-filter:blur(12px); border-left:1px solid #1c2940;
+    transform:translateX(105%); transition:transform .25s ease; display:flex; flex-direction:column; }
+  #panel.open { transform:none; }
+  #panel header { padding:15px 16px 10px; border-bottom:1px solid #1c2940; display:flex; gap:10px; align-items:baseline; }
+  #panel header h2 { font-size:16px; color:#e8eefb; }
+  #panel header .x { margin-left:auto; background:none; border:none; color:#67758c; font-size:17px; }
+  #pbody { overflow-y:auto; padding:13px 16px; flex:1; font-size:13px; }
+  .sec { margin-bottom:16px; }
+  .sec h3 { font-size:10.5px; letter-spacing:2px; color:#4d5b73; text-transform:uppercase; margin-bottom:7px; }
+  .kv { display:grid; grid-template-columns:86px 1fr; gap:4px 10px; }
+  .kv dt { color:#7d8ca3; } .kv dd { word-break:break-all; color:#c8d2e0; }
+  .tag { display:inline-block; padding:1px 8px; border-radius:4px; font-size:11.5px; }
+  .tag.frontier { background:#153a5266; color:#8ad8ff; } .tag.claimed { background:#4a3a1166; color:#ffd873; }
+  .tag.blocked { background:#4a232366; color:#e2a3a3; } .tag.resolved { background:#1c352866; color:#b9d6c4; }
+  .tag.warn { background:#4a3a1166; color:#ffcf5e; } .tag.dim { background:#212c3f66; color:#8fa0b8; }
+  .assess { border:1px solid #1c2940; border-radius:8px; padding:9px 11px; background:#0c1526; line-height:1.6; }
+  .stale-badge { display:inline-block; padding:1px 8px; border-radius:4px; font-size:11px;
+    background:#5c4a1a; color:#ffe9a8; border:1px dashed #a8862e; margin-left:6px; }
+  .changed { outline:1px dashed #c9a35a88; outline-offset:3px; position:relative; }
+  .changed::after { content:"新"; position:absolute; top:-9px; right:-6px; font-size:9px;
+    background:#7c5f1d; color:#ffedc2; border-radius:3px; padding:0 4px; }
+  textarea { width:100%; min-height:74px; resize:vertical; font:inherit; font-size:12.5px; color:#d5dfee;
+    background:#0c1526; border:1px solid #26364f; border-radius:8px; padding:8px 10px; }
+  select { font:inherit; font-size:12px; color:#d5dfee; background:#141f33; border:1px solid #26364f;
+    border-radius:6px; padding:4px 8px; }
+  .row { display:flex; gap:8px; margin-top:8px; align-items:center; }
+  .hint { color:#5d6b82; font-size:11.5px; line-height:1.6; }
+  a { color:#8ad8ff; text-decoration:none; border-bottom:1px dotted #2f9be0; }
+
+  /* ── dirty 确认弹层 ── */
+  #modal { position:fixed; inset:0; z-index:50; display:none; align-items:center; justify-content:center;
+    background:#02040acc; }
+  #modal.show { display:flex; }
+  #modal .card { width:380px; max-width:90vw; background:#0d1626; border:1px solid #3a2f18;
+    border-radius:12px; padding:18px; }
+  #modal h3 { font-size:14px; color:#ffe9a8; margin-bottom:10px; }
+  #modal p { font-size:12.5px; line-height:1.7; color:#aeb9cc; }
+  #modal .row { justify-content:flex-end; margin-top:14px; }
+  #toast { position:fixed; bottom:64px; left:50%; transform:translateX(-50%); z-index:60;
+    background:#141f33f0; border:1px solid #26364f; padding:8px 16px; border-radius:8px; font-size:12.5px;
+    opacity:0; transition:opacity .25s; pointer-events:none; }
+  #toast.show { opacity:1; }
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+
+<div id="hud">
+  <h1>AES 作战图</h1>
+  <span class="badge live">LIVE</span>
+  <span class="badge mock">MOCK·写死数据</span>
+  <span class="chip frontier"><b>5</b> frontier</span>
+  <span class="chip claimed"><b>2</b> 在做</span>
+  <span class="chip blocked"><b>3</b> 被阻塞</span>
+  <span class="chip"><b>8</b>/61 resolved 显示</span>
+  <span class="chip stale"><b>1</b> 评估过期</span>
+  <span id="spacer"></span>
+  <button class="ghost" onclick="toast('mock：LIVE 模式下重采事实（fast）')">刷新</button>
+  <button class="ghost" onclick="toast('mock：重新查询 GitHub issue')">完整刷新</button>
+</div>
+
+<div id="legend">
+  <div><span class="dot" style="background:#8ad8ff;box-shadow:0 0 8px #2f9be0"></span>frontier 可开工（呼吸脉动）
+       　<span class="dot" style="background:#ffd873;box-shadow:0 0 6px #ffb020"></span>claimed 有队员在做（轨道环）</div>
+  <div><span class="dot" style="background:#e2c3c3"></span>blocked 被依赖阻塞
+       　<span class="dot" style="background:#b9d6c4;opacity:.7"></span>resolved 已关闭（暗星）
+       　<span class="ship"></span>worktree 队员（绕星=在做 · 停基地=空闲）</div>
+  <div style="color:#5d6b82">拖拽平移 · 滚轮缩放 · 点星/队员看详情 · 实线流动边=依赖已满足 · 虚线=依赖未满足</div>
+</div>
+
+<div id="mocknote">
+  <b>mock 说明</b>：定结构与交互方向，非像素规范。resolved 仅示例 8 颗（真实 44 颗全画，
+  暗星不挤亮星）。面板中带「新」标的是相对 v1 的新增控件。
+</div>
+
+<div id="panel">
+  <header><h2 id="ptitle"></h2><span id="ptag"></span><button class="x" onclick="closePanel()">✕</button></header>
+  <div id="pbody"></div>
+</div>
+
+<div id="modal">
+  <div class="card changed">
+    <h3>⚠ dev3 有未提交改动</h3>
+    <p>16 处修改 · 15 个未跟踪文件 —— 可能有人正在这个 worktree 里干活（比如你上次的会话现场）。
+       headless 任务会与之并发写文件。</p>
+    <div class="row">
+      <button onclick="closeModal()">取消</button>
+      <button class="ghost" onclick="closeModal();toast('mock：已派只读侦查任务弄清现场')">先侦查</button>
+      <button class="primary" onclick="closeModal();toast('mock：已确认派发 dev3-20260823…')">仍要派发</button>
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script>
+'use strict';
+/* ================= 写死示例数据（结构 = status.json v2，见 api-mock）================= */
+const ISSUES = [
+  // frontier（OPEN、依赖全闭、无人认领）
+  {num:62, title:"访谈轮次可视化时间线", state:"OPEN", deps:[],          claimedBy:null},
+  {num:58, title:"契约 finalize 报告排版", state:"OPEN", deps:[],        claimedBy:"dev4"},
+  {num:57, title:"goal-contract 冒烟并行化", state:"OPEN", deps:[],      claimedBy:null},
+  {num:51, title:"插件 workspace 门禁增量审计", state:"OPEN", deps:[55], claimedBy:null},
+  {num:18, title:"triage 标签自动巡检", state:"OPEN", deps:[],           claimedBy:null},
+  {num:60, title:"对照物 fidelity ledger 校验", state:"OPEN", deps:[],   claimedBy:null},
+  // claimed
+  {num:41, title:"Goal Contract 访谈后未经确认直接进入执行", state:"OPEN", deps:[38], claimedBy:"dev5"},
+  // blocked（依赖未闭）
+  {num:61, title:"契约残留风险对账强化", state:"OPEN", deps:[41,60], claimedBy:null},
+  {num:59, title:"多 worktree 验收编排", state:"OPEN", deps:[41],    claimedBy:null},
+  {num:54, title:"issue 依赖书写规范落文档", state:"OPEN", deps:[51], claimedBy:null},
+  // resolved（真实 44 颗，mock 画 8 颗示例）
+  {num:38, title:"访谈五维自评落盘", state:"CLOSED", deps:[],  claimedBy:null},
+  {num:35, title:"OpenCode typed interaction", state:"CLOSED", deps:[24], claimedBy:null},
+  {num:55, title:"插件 workspace 门禁", state:"CLOSED", deps:[], claimedBy:null},
+  {num:24, title:"typed interaction 能力断裂", state:"CLOSED", deps:[], claimedBy:null},
+  {num:43, title:"run 体系一级动词", state:"CLOSED", deps:[], claimedBy:null},
+  {num:47, title:"gate 批次顺延输入", state:"CLOSED", deps:[43], claimedBy:null},
+  {num:50, title:"fixture 消费方审计", state:"CLOSED", deps:[], claimedBy:null},
+  {num:52, title:"热插拔回滚守卫", state:"CLOSED", deps:[55], claimedBy:null},
+];
+const UNITS = [ // worktree 队员
+  {name:"dev5", full:"aes-agents-v2-dev5", at:41,  running:true,  dirty:0,  trail:[35,41],
+   branch:"aes-agents-v2-dev5@6bd40b2e", ahead:1, behind:6,
+   subject:"(#41)fix(goal-contract): 确认契约后才允许进入执行",
+   assess:{merge:"not-yet", task:"修复 #41：访谈后未经确认直接进入执行", reason:"issue #41 仍 OPEN、验收未闭环", at:"08-22 16:05", stale:false},
+   task:{id:"dev5-20260823101530", agent:"claude", log:"…补交互测试中…"}},
+  {name:"dev4", full:"aes-agents-v2-dev4", at:58,  running:false, dirty:5,  trail:[55,58],
+   branch:"aes-agents-v2-dev4@45700c9c", ahead:0, behind:5,
+   subject:"(#35)fix(workflow): 证实 OpenCode 自管服务…",
+   assess:{merge:"not-yet", task:"接手 #58 报告排版", reason:"你在交互会话里手动推进，进度以现场为准", at:"08-21 09:12", stale:true},
+   task:null},
+  {name:"dev1", full:"aes-agents-v2-dev1", at:null, running:false, dirty:0, trail:[24],
+   branch:"aes-agents-v2-dev1@f0172225", ahead:0, behind:0, subject:"合并 dev4…", assess:null, task:null},
+  {name:"dev2", full:"aes-agents-v2-dev2", at:null, running:false, dirty:2, trail:[55],
+   branch:"aes-agents-v2-dev2@f0172225", ahead:0, behind:0, subject:"合并 dev2…", assess:null, task:null},
+  {name:"dev3", full:"aes-agents-v2-dev3", at:null, running:false, dirty:31, trail:[],
+   branch:"aes-agents-v2-dev3@f6d9a1e6", ahead:0, behind:6, subject:"(旧) 合并 dev1…", assess:null, task:null},
+];
+
+/* ============ 状态推导（页面不推导，此处模拟采集器产物 derived.status）============ */
+const byNum = {}; ISSUES.forEach(i => byNum[i.num] = i);
+ISSUES.forEach(i => {
+  const depsClosed = i.deps.every(d => byNum[d] && byNum[d].state === "CLOSED");
+  i.status = i.state === "CLOSED" ? "resolved"
+    : i.claimedBy ? "claimed" : depsClosed ? "frontier" : "blocked";
+  i.rank = i.deps.length ? 1 + Math.max(...i.deps.map(d => byNum[d]?.rank ?? 0)) : 0;
+});
+const EDGES = ISSUES.flatMap(i => i.deps.map(d => ({from:d, to:i.num, satisfied: byNum[d].state==="CLOSED"})));
+
+/* ================= wayfinder 视觉内核（theme/layout/draw 移植）================= */
+const COL = {
+  resolved:{core:"#b9d6c4",glow:"#5b9077",r:5.4,gr:24}, frontier:{core:"#8ad8ff",glow:"#2f9be0",r:8.1,gr:49},
+  claimed:{core:"#ffd873",glow:"#ffb020",r:7.2,gr:36},  blocked:{core:"#e2c3c3",glow:"#9a6f6f",r:4.5,gr:20},
+};
+const LABELCOL = {resolved:"#a2c1ac",frontier:"#b3e5ff",claimed:"#ffe6a0",blocked:"#d0b3b3"};
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const hexA=(h,a)=>h+Math.round(Math.max(0,Math.min(1,a))*255).toString(16).padStart(2,"0");
+const mod=(n,m)=>((n%m)+m)%m;
+
+// 布局：wayfinder 的确定性 rank 环 + 力导向（layout.js 同参数）
+function layout(){
+  const rnd=mulberry32(1337), ringR=r=>130+r*165;
+  ISSUES.forEach(n=>{const a=rnd()*6.2832,j=(rnd()-0.5)*70,R=ringR(n.rank)+j;n.x=Math.cos(a)*R;n.y=Math.sin(a)*R;});
+  for(let it=0;it<420;it++){
+    for(let i=0;i<ISSUES.length;i++)for(let j=i+1;j<ISSUES.length;j++){
+      const a=ISSUES[i],b=ISSUES[j];let dx=a.x-b.x,dy=a.y-b.y;const d2=dx*dx+dy*dy||.01,d=Math.sqrt(d2),f=9000/d2;
+      dx/=d;dy/=d;a.x+=dx*f;a.y+=dy*f;b.x-=dx*f;b.y-=dy*f;}
+    EDGES.forEach(e=>{const a=byNum[e.from],b=byNum[e.to];let dx=b.x-a.x,dy=b.y-a.y;const d=Math.hypot(dx,dy)||.01,f=(d-150)*.02;
+      dx/=d;dy/=d;a.x+=dx*f;a.y+=dy*f;b.x-=dx*f;b.y-=dy*f;});
+    ISSUES.forEach(n=>{const d=Math.hypot(n.x,n.y)||.01,f=(ringR(n.rank)-d)*.05;n.x+=n.x/d*f;n.y+=n.y/d*f;});
+  }
+}
+layout();
+
+const cv=document.getElementById("cv"),ctx=cv.getContext("2d");
+let dpr=devicePixelRatio||1;
+function fit(){dpr=devicePixelRatio||1;cv.width=innerWidth*dpr;cv.height=innerHeight*dpr;}
+fit();addEventListener("resize",fit);
+const cam={x:innerWidth/2,y:innerHeight/2,s:.9},goal={...cam};
+(function fitCam(){let m={x0:1e9,y0:1e9,x1:-1e9,y1:-1e9};ISSUES.forEach(n=>{m.x0=Math.min(m.x0,n.x);m.y0=Math.min(m.y0,n.y);m.x1=Math.max(m.x1,n.x);m.y1=Math.max(m.y1,n.y);});
+  const s=Math.min(innerWidth/(m.x1-m.x0+180),(innerHeight-130)/(m.y1-m.y0+180));goal.s=cam.s=Math.min(s,1.1);
+  goal.x=cam.x=innerWidth/2-(m.x0+m.x1)/2*cam.s;goal.y=cam.y=54+(innerHeight-126)/2-(m.y0+m.y1)/2*cam.s;})();
+
+// 星野（3 层视差 + 闪烁，draw.js 同参数）
+const layers=[];{const rnd=mulberry32(9001);
+  [{f:.15,n:140,sz:.7,a:.45},{f:.3,n:80,sz:1.1,a:.65},{f:.5,n:34,sz:1.7,a:.9}].forEach(sp=>{
+    const st=[];for(let i=0;i<sp.n;i++)st.push({x:rnd(),y:rnd(),t:rnd()});layers.push({...sp,st});});}
+
+let clock=0,selected=null;
+const w2s=n=>({x:n._x*cam.s+cam.x,y:n._y*cam.s+cam.y});
+
+function drawEdge(e){
+  const a=byNum[e.from],b=byNum[e.to];
+  const ax=a._x,ay=a._y,bx=b._x,by=b._y,mx=(ax+bx)/2,my=(ay+by)/2;
+  const dx=bx-ax,dy=by-ay,len=Math.hypot(dx,dy)||1,bow=Math.min(46,len*.13);
+  const cx=mx-dy/len*bow,cy=my+dx/len*bow;
+  ctx.beginPath();ctx.moveTo(ax,ay);ctx.quadraticCurveTo(cx,cy,bx,by);
+  if(e.satisfied){ctx.strokeStyle="rgba(160,192,166,.62)";ctx.lineWidth=1.8;ctx.setLineDash([]);}
+  else{ctx.strokeStyle="rgba(132,146,168,.34)";ctx.lineWidth=1.3;ctx.setLineDash([4,6]);}
+  ctx.stroke();ctx.setLineDash([]);
+  if(e.satisfied)for(let k=0;k<2;k++){const u=mod(clock*.1+k/2+(e.from*.13+e.to*.07),1),m=1-u;
+    const fx=m*m*ax+2*m*u*cx+u*u*bx,fy=m*m*ay+2*m*u*cy+u*u*by;
+    ctx.fillStyle=`rgba(190,225,200,${.16+.44*Math.sin(u*Math.PI)})`;ctx.beginPath();ctx.arc(fx,fy,1.7,0,6.2832);ctx.fill();}
+  const midx=.25*ax+.5*cx+.25*bx,midy=.25*ay+.5*cy+.25*by,al=Math.hypot(dx,dy)||1,ux=dx/al,uy=dy/al;
+  const ah=7,aw=3.8,px=-uy,py=ux,tx=midx+ux*ah*.5,ty=midy+uy*ah*.5;
+  ctx.beginPath();ctx.moveTo(tx,ty);ctx.lineTo(tx-ux*ah+px*aw,ty-uy*ah+py*aw);ctx.lineTo(tx-ux*ah-px*aw,ty-uy*ah-py*aw);
+  ctx.closePath();ctx.fillStyle=e.satisfied?"#aecdb6":"#6f7889";ctx.fill();
+}
+function drawStarNode(n){
+  const c=COL[n.status],x=n._x,y=n._y,beat=.5+.5*Math.sin(clock*2.8);
+  const isF=n.status==="frontier",pulse=isF?.8+.2*beat:1;
+  const gr=isF?c.gr*(.92+.16*beat):c.gr;
+  let g=ctx.createRadialGradient(x,y,0,x,y,gr);
+  g.addColorStop(0,hexA(c.glow,Math.min(1,.85*pulse)));g.addColorStop(.4,hexA(c.glow,.22*pulse));g.addColorStop(1,hexA(c.glow,0));
+  ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,gr,0,6.2832);ctx.fill();
+  const cg=ctx.createRadialGradient(x,y,0,x,y,c.r*1.35);
+  cg.addColorStop(0,hexA(c.core,1));cg.addColorStop(.6,hexA(c.core,.92));cg.addColorStop(.82,hexA(c.core,.45));cg.addColorStop(1,hexA(c.core,0));
+  ctx.fillStyle=cg;ctx.beginPath();ctx.arc(x,y,c.r*1.35,0,6.2832);ctx.fill();
+  if(n.status==="claimed"){ // 轨道环（队员绕行的轨道）
+    ctx.strokeStyle=hexA(c.core,.45+.25*beat);ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(x,y,c.r+5+1.2*beat,0,6.2832);ctx.stroke();
+    ctx.strokeStyle=hexA(c.core,.18+.14*beat);ctx.lineWidth=1;ctx.beginPath();ctx.arc(x,y,c.r+14,0,6.2832);ctx.stroke();}
+  if(selected===n){ctx.strokeStyle="rgba(255,255,255,.85)";ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(x,y,c.r+11,0,6.2832);ctx.stroke();}
+}
+function drawBase(){ // 中心基地：main 主仓（wayfinder 无此物，本系统新增）
+  const x=0,y=0,beat=.5+.5*Math.sin(clock*1.4);
+  let g=ctx.createRadialGradient(x,y,0,x,y,40);
+  g.addColorStop(0,"rgba(255,243,208,.5)");g.addColorStop(.5,"rgba(200,180,120,.12)");g.addColorStop(1,"rgba(0,0,0,0)");
+  ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,40,0,6.2832);ctx.fill();
+  ctx.strokeStyle=`rgba(255,232,170,${.5+.2*beat})`;ctx.lineWidth=1.4;
+  ctx.beginPath();for(let i=0;i<6;i++){const a=i/6*6.2832+clock*.15,px=x+13*Math.cos(a),py=y+13*Math.sin(a);i?ctx.lineTo(px,py):ctx.moveTo(px,py);}ctx.closePath();ctx.stroke();
+  ctx.fillStyle="rgba(255,243,208,.95)";ctx.beginPath();ctx.arc(x,y,4.2,0,6.2832);ctx.fill();
+  ctx.strokeStyle="rgba(255,232,170,.16)";ctx.setLineDash([2,7]);ctx.lineWidth=1;
+  ctx.beginPath();ctx.arc(x,y,52,0,6.2832);ctx.stroke();ctx.setLineDash([]); // 停靠环
+}
+function unitPos(u,idx){ // 队员坐标：绕认领星轨道 / 基地停靠环
+  if(u.at!=null){const t=byNum[u.at],ang=clock*.55+idx*2.1,R=COL.claimed.r+14;
+    return{x:t._x+R*Math.cos(ang),y:t._y+R*Math.sin(ang),ang:ang+Math.PI/2};}
+  const parked=UNITS.filter(v=>v.at==null),k=parked.indexOf(u),ang=-Math.PI/2+k/parked.length*6.2832+clock*.05;
+  return{x:52*Math.cos(ang),y:52*Math.sin(ang),ang:ang+Math.PI/2};
+}
+function drawUnit(u,idx){
+  const p=unitPos(u,idx);u._x=p.x;u._y=p.y;
+  if(u.trail.length){ // 轨迹：走过的 issue 连线
+    ctx.strokeStyle="rgba(255,216,115,.14)";ctx.lineWidth=1;ctx.setLineDash([2,5]);
+    ctx.beginPath();u.trail.forEach((n,i)=>{const t=byNum[n];if(!t)return;i?ctx.lineTo(t._x,t._y):ctx.moveTo(t._x,t._y);});
+    ctx.lineTo(p.x,p.y);ctx.stroke();ctx.setLineDash([]);}
+  const beat=.5+.5*Math.sin(clock*3+idx),col=u.running?"#ffb020":u.at?"#ffd873":"#8fa0b8";
+  if(u.running){let g=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,16);
+    g.addColorStop(0,`rgba(255,176,32,${.5+.3*beat})`);g.addColorStop(1,"rgba(255,176,32,0)");
+    ctx.fillStyle=g;ctx.beginPath();ctx.arc(p.x,p.y,16,0,6.2832);ctx.fill();}
+  ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.ang);
+  ctx.fillStyle=col;ctx.beginPath();ctx.moveTo(0,-5.5);ctx.lineTo(4,4.5);ctx.lineTo(-4,4.5);ctx.closePath();ctx.fill();
+  ctx.restore();
+  if(u.dirty){ctx.fillStyle="#ff9d3b";ctx.strokeStyle="#05070d";ctx.lineWidth=1.2;
+    ctx.beginPath();ctx.arc(p.x+6,p.y-6,2.8,0,6.2832);ctx.fill();ctx.stroke();}
+  if(selected===u){ctx.strokeStyle="rgba(255,255,255,.85)";ctx.lineWidth=1.4;ctx.beginPath();ctx.arc(p.x,p.y,10,0,6.2832);ctx.stroke();}
+}
+function drawLabels(){
+  if(cam.s<.22)return;const numOnly=cam.s<.42,fs=Math.max(8,Math.min(13,11*Math.pow(cam.s,.3)));
+  ctx.setTransform(dpr,0,0,dpr,0,0);ctx.textAlign="center";ctx.font=fs.toFixed(1)+"px ui-sans-serif,system-ui,sans-serif";
+  ctx.shadowColor="rgba(0,0,0,.85)";ctx.shadowBlur=4;
+  ISSUES.forEach(n=>{const s=w2s(n),c=COL[n.status];
+    let l="#"+n.num;if(!numOnly)l+="  "+(n.title.length>16?n.title.slice(0,15)+"…":n.title);
+    ctx.fillStyle=LABELCOL[n.status];ctx.fillText(l,s.x,s.y+c.r*cam.s+fs+3);});
+  ctx.font="600 "+fs.toFixed(1)+"px ui-sans-serif,system-ui,sans-serif";
+  UNITS.forEach(u=>{const s=w2s(u);ctx.fillStyle=u.running?"#ffcf7a":"#aab8cc";ctx.fillText(u.name,s.x,s.y-11);});
+  const b=w2s({_x:0,_y:0});ctx.fillStyle="#e8d9ac";ctx.fillText("main 基地",b.x,b.y+64*cam.s+2);
+  ctx.shadowBlur=0;
+}
+function render(){
+  clock=performance.now()/1000;
+  cam.x+=(goal.x-cam.x)*.28;cam.y+=(goal.y-cam.y)*.28;cam.s+=(goal.s-cam.s)*.28;
+  ctx.setTransform(dpr,0,0,dpr,0,0);ctx.fillStyle="#05070d";ctx.fillRect(0,0,innerWidth,innerHeight);
+  layers.forEach(L=>{for(const s of L.st){const x=mod(s.x*innerWidth+cam.x*L.f,innerWidth),y=mod(s.y*innerHeight+cam.y*L.f,innerHeight);
+    ctx.globalAlpha=L.a*(.65+.35*Math.sin(s.t*6.2832+clock));ctx.fillStyle="#fff";ctx.fillRect(x,y,L.sz,L.sz);}ctx.globalAlpha=1;});
+  ISSUES.forEach((n,i)=>{n._x=n.x+Math.sin(clock*.7+n.num*1.7)*2.4;n._y=n.y+Math.cos(clock*.55+n.num*1.7)*2.4;});
+  ctx.translate(cam.x,cam.y);ctx.scale(cam.s,cam.s);
+  EDGES.forEach(drawEdge);drawBase();ISSUES.forEach(drawStarNode);UNITS.forEach(drawUnit);
+  drawLabels();
+  requestAnimationFrame(render);
+}
+render();
+
+/* ================= 交互：平移缩放 / 点击 / 面板 ================= */
+let drag=null;
+cv.addEventListener("mousedown",e=>{drag={x:e.clientX,y:e.clientY,moved:false};cv.classList.add("dragging");});
+addEventListener("mousemove",e=>{if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;
+  if(Math.abs(dx)+Math.abs(dy)>3)drag.moved=true;goal.x+=dx;goal.y+=dy;cam.x+=dx;cam.y+=dy;drag.x=e.clientX;drag.y=e.clientY;});
+addEventListener("mouseup",e=>{if(drag&&!drag.moved)click(e.clientX,e.clientY);drag=null;cv.classList.remove("dragging");});
+cv.addEventListener("wheel",e=>{e.preventDefault();const k=e.deltaY<0?1.15:.87,ns=Math.max(.15,Math.min(2.2,goal.s*k));
+  goal.x=e.clientX-(e.clientX-goal.x)*ns/goal.s;goal.y=e.clientY-(e.clientY-goal.y)*ns/goal.s;goal.s=ns;},{passive:false});
+function click(px,py){
+  for(const u of UNITS){const s=w2s(u);if(Math.hypot(px-s.x,py-s.y)<13){select(u,"unit");return;}}
+  for(const n of ISSUES){const s=w2s(n);if(Math.hypot(px-s.x,py-s.y)<Math.max(13,COL[n.status].r*cam.s+6)){select(n,"issue");return;}}
+  closePanel();
+}
+addEventListener("keydown",e=>{if(e.key==="Escape"){closeModal();closePanel();}});
+function select(o,kind){selected=o;o._kind=kind;openPanel(o,kind);
+  const s=w2s(o);goal.x+=innerWidth*.38-s.x?0:0; /* mock：不追焦，保持轻交互 */}
+
+const STATUS_ZH={frontier:"frontier 可开工",claimed:"有队员在做",blocked:"被依赖阻塞",resolved:"已关闭"};
+function openPanel(o,kind){
+  const el=document.getElementById("panel"),body=document.getElementById("pbody");
+  document.getElementById("ptitle").textContent=kind==="issue"?("Issue #"+o.num):o.name;
+  document.getElementById("ptag").innerHTML=kind==="issue"
+    ?`<span class="tag ${o.status}">${STATUS_ZH[o.status]}</span>`
+    :(o.running?'<span class="tag claimed">任务运行中</span>':o.at?'<span class="tag claimed">在做 #'+o.at+'</span>':'<span class="tag dim">空闲</span>');
+  body.innerHTML=kind==="issue"?issuePanel(o):unitPanel(o);
+  el.classList.add("open");
+  const btn=document.getElementById("go-dirty");if(btn)btn.onclick=()=>document.getElementById("modal").classList.add("show");
+}
+function issuePanel(n){
+  const claim=n.claimedBy?`<div>由 <b style="color:#ffd873">${n.claimedBy}</b> 认领执行中</div>`:"";
+  const deps=n.deps.length?n.deps.map(d=>`<span class="tag ${byNum[d].state==="CLOSED"?"resolved":"blocked"}">#${d}${byNum[d].state==="CLOSED"?" ✓":" 未闭"}</span>`).join(" "):'<span class="hint">无依赖</span>';
+  const dispatch=n.status==="frontier"?`
+    <div class="sec changed"><h3>从这颗星派活</h3>
+      <textarea placeholder="给队员的任务指令…（自动带上 #${n.num} 上下文与验收要求）">按 #${n.num} 的验收标准实现，完成后 commit 带 (#${n.num})</textarea>
+      <div class="row"><select><option>dev1（空闲）</option><option>dev2（空闲·2 改动）</option><option>dev3（空闲·31 改动⚠）</option></select>
+      <select><option>claude</option><option>codex</option></select>
+      <button class="primary" onclick="toast('mock：已派发 → #${n.num}')">派发</button></div>
+      <div class="hint" style="margin-top:6px">frontier 星才有此区；选 dev3 会触发 dirty 确认（见 dev3 演示）</div></div>`:"";
+  return `
+    <div class="sec"><h3>标题</h3><div>${n.title}</div></div>
+    <div class="sec"><h3>状态</h3><div class="kv">
+      <dt>GitHub</dt><dd>${n.state} · <a href="#">issues/${n.num}</a></dd>
+      <dt>依赖</dt><dd>${deps}</dd>
+      <dt>认领</dt><dd>${n.claimedBy??"无人认领"}</dd></div>${claim}</div>
+    ${dispatch}
+    ${n.status==="resolved"?'<div class="hint">已关闭 issue 只读，不提供派发。</div>':""}`;
+}
+function unitPanel(u){
+  const stale=u.assess&&u.assess.stale?'<span class="stale-badge changed">已过期 — 事实晚于评估，请回主仓重跑巡检</span>':"";
+  const assess=u.assess?`
+    <div class="assess"><div><span class="tag ${u.assess.merge==="recommend"?"claimed":"dim"}">${{recommend:"建议合并","not-yet":"尚不建议合并",blocked:"合并被阻塞"}[u.assess.merge]}</span>${stale}</div>
+    <div style="margin-top:6px">${u.assess.task}</div>
+    <div style="margin-top:4px;color:#7d8ca3">${u.assess.reason}</div>
+    <div class="hint" style="margin-top:5px">评估于 ${u.assess.at} · claude-main</div></div>`
+    :'<div class="hint">尚无评估——回主仓对话跑一次巡检</div>';
+  const task=u.task?`
+    <div class="hint">运行中 ${u.task.id} · agent: ${u.task.agent}</div>
+    <pre style="background:#060a12;border:1px solid #1c2940;border-radius:8px;padding:8px;font-size:11px;color:#9fb0c8;margin-top:6px">${u.task.log}</pre>`
+    :'<div class="hint">当前无运行中任务</div>';
+  return `
+    <div class="sec"><h3>Git 状态</h3><div class="kv">
+      <dt>分支</dt><dd>${u.branch}</dd>
+      <dt>最新提交</dt><dd>${u.subject}</dd>
+      <dt>相对 main</dt><dd>领先 ${u.ahead} · 落后 ${u.behind}</dd>
+      <dt>未提交</dt><dd>${u.dirty?u.dirty+" 项 ⚠":"干净"}</dd>
+      <dt>位置</dt><dd>${u.at?("#"+u.at+" 坐标"):"基地停靠"}</dd>
+      <dt>轨迹</dt><dd>${u.trail.length?u.trail.map(t=>"#"+t).join(" → "):"—"}</dd></div></div>
+    <div class="sec"><h3>主 Agent 评估</h3>${assess}</div>
+    <div class="sec"><h3>当前任务</h3>${task}</div>
+    <div class="sec"><h3>派发新任务</h3>
+      <textarea placeholder="给 ${u.name} 的任务指令…"></textarea>
+      <div class="row"><select><option>claude</option><option>codex</option><option>test</option></select>
+        ${u.dirty?'<button class="primary" id="go-dirty">派发</button>':'<button class="primary" onclick="toast(\'mock：已派发 → '+u.name+'\')">派发</button>'}
+      </div>
+      ${u.dirty?'<div class="hint changed" style="margin-top:8px">该 worktree 有未提交改动，点派发会先弹确认（试试）</div>':""}</div>`;
+}
+function closePanel(){selected=null;document.getElementById("panel").classList.remove("open");}
+function closeModal(){document.getElementById("modal").classList.remove("show");}
+function toast(m){const t=document.getElementById("toast");t.textContent=m;t.classList.add("show");
+  clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("show"),2800);}
+window.__mock={ISSUES,UNITS,EDGES,cam,click,w2s}; // 验收脚本入口
+
+</script>
+<!--
+  ============ 相对 v1 的差异清单（mock 收尾注释）============
+  新增：
+  - 主视图：wayfinder 星图（issue 地形 + 依赖曲线边 + frontier 呼吸 + 缩放平移相机）取代环形图
+  - worktree 队员单位：绕认领星轨道运行 / 基地停靠环；轨迹连线；running 琥珀光晕；dirty 橙点
+  - 中心 main 基地（六边形站 + 停靠环）
+  - frontier 星面板内的「从这颗星派活」区（选空闲队员 + agent + 预填 issue 上下文）
+  - dirty 派发确认弹层（取消 / 先侦查 / 仍要派发 三选）
+  - 评估「已过期」标记
+  - HUD 统计换为 frontier/在做/被阻塞/resolved/评估过期
+  不变：
+  - 侧滑面板形态与信息结构（Git 状态 / 评估 / 任务 / 派发）
+  - LIVE 与快照双模式徽标、刷新/完整刷新按钮
+  - 派发表单（textarea + agent 选择）
+  - 合并只建议不执行：面板无任何 merge 执行按钮
+-->
+</body>
+</html>

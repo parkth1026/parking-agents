@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<!-- draft v1 | published 2026-08-16T17:52:50Z
+     用户意见：整体放行（Q4 裁决绘图归属后「请继续」），视觉细节未逐处点名
+     状态：confirmed（转正为 2-prototype/diagram.html） -->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>workflow-interview 家族 · 产物流转（对照图草稿 v1）</title>
+<style>
+  :root {
+    --paper: #f5f5f5; --ink: #2d3142; --muted: #4f5d75; --soft: #7a8399;
+    --accent: #eb6c36; --accent-tint: #fdf1ec;
+    --font-ui: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+    --font-mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--paper); font-family: var(--font-ui); color: var(--ink); padding: 32px 24px 48px; }
+  .wrap { max-width: 1000px; margin: 0 auto; }
+  .eyebrow { font-family: var(--font-mono); font-size: 11px; letter-spacing: 2px; color: var(--soft); text-transform: uppercase; }
+  h1 { font-size: 24px; font-weight: 600; margin: 6px 0 4px; }
+  h1 .badge { font-family: var(--font-mono); font-size: 11px; font-weight: 500; color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: 2px 8px; vertical-align: 4px; margin-left: 12px; }
+  .lede { font-size: 13px; color: var(--muted); margin-bottom: 20px; }
+  .lede b { color: var(--accent); font-weight: 600; }
+  svg { display: block; width: 100%; height: auto; }
+  svg .name { font-family: var(--font-ui); font-size: 13px; font-weight: 600; fill: var(--ink); }
+  svg .sub { font-family: var(--font-mono); font-size: 10px; fill: var(--muted); }
+  svg .tag-t { font-family: var(--font-mono); font-size: 8px; fill: var(--muted); letter-spacing: 1px; }
+  svg .lbl { font-family: var(--font-mono); font-size: 9px; fill: var(--muted); }
+  svg .legend { font-family: var(--font-mono); font-size: 10px; fill: var(--muted); }
+  svg .accent-lbl { font-family: var(--font-mono); font-size: 9px; fill: var(--accent); }
+  .footnote { font-family: var(--font-mono); font-size: 11px; color: var(--soft); margin-top: 14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">aes-workflow · 影响面对照 · 2026-08-17-diagram-artifact</div>
+  <h1>workflow-interview 家族 · 产物流转 <span class="badge">draft v1</span></h1>
+  <p class="lede"><b>橙色 = 本次新增 / 变更</b>（diagram.html 产物簇 + 例子池消费边）。灰线为既有流转，一字未动。逐处质疑：节点归属、依赖方向、谁受影响。</p>
+
+  <svg viewBox="0 0 960 700" role="img" aria-labelledby="dg-title dg-desc">
+    <title id="dg-title">workflow-interview 家族产物流转架构图</title>
+    <desc id="dg-desc">三阶段技能（aes-interview、aes-prototype、aes-goal-contract）由编排器驱动，各自产出阶段产物，经 session.mjs 闸门写回 manifest。本次变更新增 2-prototype 产物簇中的 diagram.html 与第七面「架构与依赖」，并新增 aes-goal-contract 对对照物的例子池消费规则。</desc>
+    <defs>
+      <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#7a8399"/></marker>
+      <marker id="arrow-accent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#eb6c36"/></marker>
+    </defs>
+
+    <!-- ── 连接线（先画后节点）────────────────────────── -->
+    <g fill="none" stroke="#7a8399" stroke-width="1.5">
+      <path d="M 480,116 V 156 H 175 V 192" marker-end="url(#arrow)"/>
+      <path d="M 480,116 V 192" marker-end="url(#arrow)"/>
+      <path d="M 480,116 V 156 H 785 V 192" marker-end="url(#arrow)"/>
+      <path d="M 175,296 V 392" marker-end="url(#arrow)"/>
+      <path d="M 480,296 V 392" marker-end="url(#arrow)"/>
+      <path d="M 785,296 V 392" marker-end="url(#arrow)"/>
+      <!-- 编排器→闸门：左侧竖向干线，y=156 处跨越横向分支，用半圆桥接 -->
+      <path d="M 370,76 H 310 V 148 A 8 8 0 0 1 310 164 V 632 H 361" marker-end="url(#arrow)"/>
+    </g>
+    <g class="edge-accent" fill="none" stroke="#eb6c36" stroke-width="1.75">
+      <path d="M 670,246 H 632 V 456 H 609" marker-end="url(#arrow-accent)"/>
+    </g>
+    <!-- 连接线标签（纸色底 mask） -->
+    <g>
+      <rect x="198" y="420" width="106" height="14" fill="#f5f5f5"/>
+      <text class="lbl" x="302" y="431" text-anchor="end">命令调用 · 状态写回</text>
+      <rect x="638" y="338" width="200" height="14" fill="#f5f5f5"/>
+      <text class="accent-lbl" x="644" y="349">读对照物 · 例子池（+diagram.html 行）</text>
+    </g>
+
+    <!-- ── 节点 ──────────────────────────────────────── -->
+    <!-- N1 编排器 -->
+    <g>
+      <rect x="370" y="36" width="220" height="80" rx="6" fill="#ffffff" stroke="#4f5d75" stroke-width="1.25"/>
+      <rect x="380" y="46" width="36" height="14" rx="2" fill="#eef1f6"/>
+      <text class="tag-t" x="386" y="56">编排</text>
+      <text class="name" x="380" y="82">workflow-interview</text>
+      <text class="sub" x="380" y="100">三阶段流转 · 回退 · 终态报告</text>
+    </g>
+    <!-- N2 阶段1 -->
+    <g>
+      <rect x="60" y="196" width="230" height="100" rx="6" fill="#ffffff" stroke="#4f5d75" stroke-width="1.25"/>
+      <rect x="70" y="206" width="44" height="14" rx="2" fill="#eef1f6"/>
+      <text class="tag-t" x="76" y="216">阶段 1</text>
+      <text class="name" x="70" y="242">aes-interview</text>
+      <text class="sub" x="70" y="262">锁需求 · 查事实 · 分诊提问</text>
+      <text class="sub" x="70" y="278">rounds 逐轮落盘</text>
+    </g>
+    <!-- N3 阶段2 -->
+    <g>
+      <rect x="365" y="196" width="230" height="100" rx="6" fill="#ffffff" stroke="#4f5d75" stroke-width="1.25"/>
+      <rect x="375" y="206" width="44" height="14" rx="2" fill="#eef1f6"/>
+      <text class="tag-t" x="381" y="216">阶段 2</text>
+      <text class="name" x="375" y="242">aes-prototype</text>
+      <text class="sub" x="375" y="262">锁对照物 · 七面扫描★</text>
+      <text class="sub" x="375" y="278">行为表 / mock / 结构图★</text>
+    </g>
+    <!-- N4 阶段3 -->
+    <g>
+      <rect x="670" y="196" width="230" height="100" rx="6" fill="#ffffff" stroke="#4f5d75" stroke-width="1.25"/>
+      <rect x="680" y="206" width="44" height="14" rx="2" fill="#eef1f6"/>
+      <text class="tag-t" x="686" y="216">阶段 3</text>
+      <text class="name" x="680" y="242">aes-goal-contract</text>
+      <text class="sub" x="680" y="262">锁验收 · 例子池聚类</text>
+      <text class="sub" x="680" y="278">finalize 闸门 · 残留风险对账</text>
+    </g>
+    <!-- N5 产物1 -->
+    <g>
+      <rect x="50" y="396" width="250" height="120" rx="6" fill="#ffffff" stroke="#4f5d75" stroke-width="1.25"/>
+      <rect x="60" y="406" width="44" height="14" rx="2" fill="#eef1f6"/>
+      <text class="tag-t" x="66" y="416">产物 1</text>
+      <text class="name" x="60" y="442">context.md · rounds.jsonl</text>
+      <text class="sub" x="60" y="462">事实分片 · 四分类</text>
+      <text class="sub" x="60" y="478">逐轮问答（分诊 / 提问）</text>
+      <text class="sub" x="60" y="494">五维自评收口</text>
+    </g>
+    <!-- N6 产物2（本次变更） -->
+    <g class="changed">
+      <rect x="355" y="396" width="250" height="120" rx="6" fill="#fdf1ec" stroke="#eb6c36" stroke-width="2"/>
+      <rect x="365" y="406" width="44" height="14" rx="2" fill="#f7dfd3"/>
+      <text class="tag-t" x="371" y="416">产物 2</text>
+      <text class="name" x="365" y="442">impact-surface.md（七面★）</text>
+      <text class="sub" x="365" y="462">behavior · api-mock · example-run</text>
+      <text class="sub" x="365" y="478">mock.html</text>
+      <text class="sub" x="365" y="498" fill="#eb6c36" font-weight="600">diagram.html ★ 架构 / 流程视图</text>
+    </g>
+    <!-- N7 产物3 -->
+    <g>
+      <rect x="660" y="396" width="250" height="120" rx="6" fill="#ffffff" stroke="#4f5d75" stroke-width="1.25"/>
+      <rect x="670" y="406" width="44" height="14" rx="2" fill="#eef1f6"/>
+      <text class="tag-t" x="676" y="416">产物 3</text>
+      <text class="name" x="670" y="442">contract.md</text>
+      <text class="sub" x="670" y="462">目标 / 范围 / 强约束 / 验收条件</text>
+      <text class="sub" x="670" y="478">Verify 档位 [A]–[D]</text>
+      <text class="sub" x="670" y="494">finalize · 交接指令</text>
+    </g>
+    <!-- N8 闸门 -->
+    <g>
+      <rect x="365" y="596" width="230" height="80" rx="6" fill="#ffffff" stroke="#4f5d75" stroke-width="1.25"/>
+      <rect x="375" y="606" width="36" height="14" rx="2" fill="#eef1f6"/>
+      <text class="tag-t" x="381" y="616">闸门</text>
+      <text class="name" x="375" y="642">session.mjs</text>
+      <text class="sub" x="375" y="660">init·round·stage·verify·finalize</text>
+      <text class="sub" x="375" y="676">manifest.json 只由它写</text>
+    </g>
+
+    <!-- ── 图例 ──────────────────────────────────────── -->
+    <g>
+      <line x1="50" y1="668" x2="82" y2="668" stroke="#eb6c36" stroke-width="2"/>
+      <text class="legend" x="88" y="672">本次新增 / 变更</text>
+      <line x1="208" y1="668" x2="240" y2="668" stroke="#7a8399" stroke-width="1.5"/>
+      <text class="legend" x="246" y="672">既有流转（不动）</text>
+    </g>
+  </svg>
+
+  <p class="footnote">detail: balanced · 8 节点 / 8 边 · 单视图（改后态）+ 改动标注，无 JS · 无外链 · 系统字体</p>
+</div>
+
+<!--
+  改动申报（对照 mock.html 惯例）
+  新增：产物 2 簇的 diagram.html（架构视图 / 流程视图）；impact-surface 第七面「架构与依赖」；
+        aes-goal-contract 例子池对 diagram.html 的消费边（图右橙色边）。
+  不变：三阶段流转与回退、rounds / manifest 机制、闸门命令集、behavior / api-mock / example-run / mock.html 既有产物。
+  删除：无。
+
+  Fidelity ledger
+  Detail: balanced · 源 = 4 个技能 + 8 类产物 + 5 个闸门命令 → 绘制 8 节点 / 8 边
+  Merged: context.md + rounds.jsonl → 1 节点；对照物四类 → 产物 2 单簇节点；编排器与三技能对 session.mjs 的调用 → 1 条「命令调用·状态写回」干线
+  Collapsed: session.mjs 五命令 + manifest.json 写入 → 1 节点（sub 标注「只由它写」）
+  Dropped: agents/openai.yaml、evals/evals.json、asking.md（横向方法论）、finalize 内部四步
+  Kept in full: 三阶段产物链、例子池消费边（本次改动正是加在这条边上）
+-->
+</body>
+</html>

@@ -1,0 +1,18 @@
+# verify @ 2026-08-23T12:38:29Z
+# cwd: G:\GIT\AI_WorkFlow\aes-agents-v2
+
+[FAIL] AC-001  exit=1  $ node .claude/skills/aes-worktree-board/scripts/selftest.mjs collect
+         }
+         Node.js v24.19.0
+[FAIL] AC-003  exit=1  $ node .claude/skills/aes-worktree-board/scripts/selftest.mjs dispatch
+         }
+         Node.js v24.19.0
+[FAIL] AC-004  exit=1  $ node .claude/skills/aes-worktree-board/scripts/selftest.mjs server
+         }
+         Node.js v24.19.0
+[FAIL] AC-005  exit=1  $ node .claude/skills/aes-worktree-board/scripts/selftest.mjs layout
+         }
+         Node.js v24.19.0
+
+绿 0 / 红 4 / 跑不起来 0
+另有 2 条非 [A] 档没跑：AC-002 [C]、AC-006 [C]

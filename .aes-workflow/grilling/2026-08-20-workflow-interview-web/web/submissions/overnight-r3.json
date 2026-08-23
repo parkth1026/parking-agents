@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "round": "overnight-r3",
+  "stage": "3-contract",
+  "received_at": "2026-08-22T17:08:28.614Z",
+  "answers": [
+    {
+      "q_id": "Q-OVERNIGHT",
+      "type": "choice",
+      "choice": "A"
+    }
+  ],
+  "truncated": false
+}

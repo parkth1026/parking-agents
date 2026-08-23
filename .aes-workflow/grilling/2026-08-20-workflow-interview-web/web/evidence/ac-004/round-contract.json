@@ -1,0 +1,29 @@
+{
+  "phases": [
+    {"id":"1-interview","label":"访谈·拷问","status":"done"},
+    {"id":"2-prototype","label":"原型确认","status":"done"},
+    {"id":"3-contract","label":"交付标准·契约","status":"active"}
+  ],
+  "open_ambiguities": 0,
+  "round": {
+    "id":"browser-contract-r2",
+    "no":2,
+    "stage":"3-contract",
+    "title":"最终契约确认",
+    "status":"pending",
+    "view":"contract",
+    "items":[
+      {"q_id":"C-FINAL","tier":"confirm","line":"确认这份 Goal Contract 的目标、边界与验收条件"}
+    ]
+  },
+  "final": {
+    "round":"browser-contract-r2",
+    "title":"目标契约 · workflow-interview-web",
+    "subtitle":"三阶段完成 · 等待最终确认",
+    "sections":[
+      {"title":"1 · 目标","body":"三阶段访谈的全部交互在本地浏览器单页双向完成。","basis":"Round 1 任务陈述与唤醒裁决"},
+      {"title":"2 · 跨天协议","bullets":["提交先落盘再回执","后台任务退出通知唤醒","重开先扫描并吸收未消化提交"],"basis":"Deep Research + Q1/C1"},
+      {"title":"3 · 验收条件","bullets":["runtime 黑盒测试退出码 0","浏览器实点与截图匹配确认版结构","模拟宿主关闭后提交仍在盘"],"basis":"契约阶段 Verify 裁决"}
+    ]
+  }
+}

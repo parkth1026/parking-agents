@@ -1,0 +1,195 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+  <style>
+    body { margin: 0; background: #10131a; }
+    a { color: #7dd3fc; } a:hover { color: #bae6fd; }
+  </style>
+</helmet>
+<div style="position: relative; width: 1440px; height: 900px; background: #10131a; overflow: hidden; font-family: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif; color: #d7e1f0">
+
+  <!-- ── 顶栏 ── -->
+  <div style="display: flex; align-items: center; gap: 20px; height: 56px; padding: 0 24px; border-bottom: 1px solid #1c2433">
+    <div style="font-size: 15px; font-weight: 600; letter-spacing: 1px">AES 需求地图</div>
+    <div style="display: flex; border: 1px solid #232e41; border-radius: 8px; overflow: hidden">
+      <div style="padding: 6px 18px; font-size: 12px; background: #22304a; color: #d7e1f0">图谱</div>
+      <div style="padding: 6px 18px; font-size: 12px; color: #8595ab">地图</div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 4px; width: 240px">
+      <div style="height: 6px; background: #1a2233; border-radius: 3px; overflow: hidden">
+        <div style="height: 6px; width: 72%; background: linear-gradient(90deg, #3f6e52, #7fa88b)"></div>
+      </div>
+      <div style="font-size: 11px; color: #8595ab">已探明 <span style="color: #7fa88b; font-weight: 600">44 / 61</span> · 72%</div>
+    </div>
+    <div style="display: flex; gap: 8px">
+      <div style="font-size: 11px; padding: 4px 12px; border-radius: 999px; border: 1px solid #232e41; color: #8595ab">可开工 <span style="color: #7dd3fc; font-weight: 600">6</span></div>
+      <div style="font-size: 11px; padding: 4px 12px; border-radius: 999px; border: 1px solid #232e41; color: #8595ab">进行中 <span style="color: #fbbf24; font-weight: 600">2</span></div>
+      <div style="font-size: 11px; padding: 4px 12px; border-radius: 999px; border: 1px solid #232e41; color: #8595ab">被阻塞 <span style="color: #c98585; font-weight: 600">4</span></div>
+    </div>
+    <div style="margin-left: auto; display: flex; gap: 8px">
+      <div style="font-size: 12px; padding: 6px 16px; border-radius: 7px; background: #1b2534; border: 1px solid #2b3a52; color: #d7e1f0">刷新</div>
+      <div style="font-size: 12px; padding: 6px 16px; border-radius: 7px; border: 1px solid #232e41; color: #8595ab">完整刷新</div>
+    </div>
+  </div>
+
+  <!-- ── worker 名册 ── -->
+  <div style="display: flex; gap: 10px; padding: 12px 24px; border-bottom: 1px solid #1c2433">
+    <div style="flex: 1; display: flex; flex-direction: column; gap: 3px; background: #151c29; border: 1px solid #3d3418; border-radius: 10px; padding: 9px 13px">
+      <div style="display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 600"><span style="width: 8px; height: 8px; border-radius: 50%; background: #fbbf24"></span>dev5<span style="margin-left: auto; font-weight: 400; font-size: 10.5px; color: #fbbf24">▶ 任务运行中</span></div>
+      <div style="font-size: 11.5px; color: #8595ab">在做 <span style="color: #d7e1f0; font-weight: 500">#41</span> 访谈确认门禁</div>
+    </div>
+    <div style="flex: 1; display: flex; flex-direction: column; gap: 3px; background: #151c29; border: 1px solid #23405c; border-radius: 10px; padding: 9px 13px">
+      <div style="display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 600"><span style="width: 8px; height: 8px; border-radius: 50%; background: #7fb3e8"></span>dev4<span style="margin-left: auto; font-weight: 400; font-size: 10.5px; color: #7fb3e8">✋ 手动推进</span></div>
+      <div style="font-size: 11.5px; color: #8595ab">在做 <span style="color: #d7e1f0; font-weight: 500">#58</span> · <span style="color: #ffcf5e; border-bottom: 1px dashed #8a6d1f">评估过期</span></div>
+    </div>
+    <div style="flex: 1; display: flex; flex-direction: column; gap: 3px; background: #151c29; border: 1px solid #232e41; border-radius: 10px; padding: 9px 13px">
+      <div style="display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 600"><span style="width: 8px; height: 8px; border-radius: 50%; background: #46566e"></span>dev1<span style="margin-left: auto; font-weight: 400; font-size: 10.5px; color: #57647a">空闲</span></div>
+      <div style="font-size: 11.5px; color: #57647a">基地待命 · 可接 frontier</div>
+    </div>
+    <div style="flex: 1; display: flex; flex-direction: column; gap: 3px; background: #151c29; border: 1px solid #232e41; border-radius: 10px; padding: 9px 13px">
+      <div style="display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 600"><span style="width: 8px; height: 8px; border-radius: 50%; background: #46566e"></span>dev2<span style="margin-left: auto; font-weight: 400; font-size: 10.5px; color: #57647a">空闲</span></div>
+      <div style="font-size: 11.5px; color: #57647a">基地待命 · 2 未提交</div>
+    </div>
+    <div style="flex: 1; display: flex; flex-direction: column; gap: 3px; background: #151c29; border: 1px solid #232e41; border-radius: 10px; padding: 9px 13px">
+      <div style="display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 600"><span style="width: 8px; height: 8px; border-radius: 50%; background: #46566e"></span>dev3<span style="margin-left: auto; font-weight: 400; font-size: 10.5px; color: #ff9d3b">31 未提交 ⚠</span></div>
+      <div style="font-size: 11.5px; color: #57647a">基地待命 · 现场待侦查</div>
+    </div>
+  </div>
+
+  <!-- ── 图谱区（Obsidian 式：状态即颜色，度数即大小，其余全部克制）── -->
+  <div style="position: relative; width: 1440px; height: 754px">
+
+    <!-- 依赖边：细、低透明度、直线；满足=微绿、未满足=灰虚 -->
+    <svg width="1440" height="754" viewBox="0 0 1440 754" style="position: absolute; left: 0; top: 0">
+      <line x1="470" y1="300" x2="600" y2="340" style="stroke: #5f8a6e; stroke-width: 1.5; opacity: 0.5"></line>
+      <line x1="360" y1="520" x2="490" y2="570" style="stroke: #5f8a6e; stroke-width: 1.5; opacity: 0.5"></line>
+      <line x1="600" y1="340" x2="742" y2="250" style="stroke: #64748b; stroke-width: 1.2; opacity: 0.3; stroke-dasharray: 3 5"></line>
+      <line x1="600" y1="340" x2="770" y2="430" style="stroke: #64748b; stroke-width: 1.2; opacity: 0.3; stroke-dasharray: 3 5"></line>
+      <line x1="920" y1="500" x2="770" y2="430" style="stroke: #64748b; stroke-width: 1.2; opacity: 0.3; stroke-dasharray: 3 5"></line>
+      <line x1="490" y1="570" x2="650" y2="640" style="stroke: #64748b; stroke-width: 1.2; opacity: 0.3; stroke-dasharray: 3 5"></line>
+      <line x1="960" y1="180" x2="1110" y2="250" style="stroke: #64748b; stroke-width: 1.2; opacity: 0.3; stroke-dasharray: 3 5"></line>
+    </svg>
+
+    <!-- 已探明暗点：背景层星座，小而淡，不成机械圆环 -->
+    <div style="position: absolute; left: 106px; top: 106px; width: 8px; height: 8px; border-radius: 50%; background: #3a4a41"></div>
+    <div style="position: absolute; left: 186px; top: 66px; width: 8px; height: 8px; border-radius: 50%; background: #3a4a41"></div>
+    <div style="position: absolute; left: 296px; top: 116px; width: 8px; height: 8px; border-radius: 50%; background: #3a4a41"></div>
+    <div style="position: absolute; left: 86px; top: 226px; width: 8px; height: 8px; border-radius: 50%; background: #3a4a41"></div>
+    <div style="position: absolute; left: 196px; top: 186px; width: 8px; height: 8px; border-radius: 50%; background: #3a4a41"></div>
+    <div style="position: absolute; left: 146px; top: 316px; width: 8px; height: 8px; border-radius: 50%; background: #3a4a41"></div>
+    <div style="position: absolute; left: 76px; top: 426px; width: 8px; height: 8px; border-radius: 50%; background: #3a4a41"></div>
+    <div style="position: absolute; left: 56px; top: 556px; width: 8px; height: 8px; border-radius: 50%; background: #3a4a41"></div>
+    <div style="position: absolute; left: 146px; top: 636px; width: 8px; height: 8px; border-radius: 50%; background: #3a4a41"></div>
+    <div style="position: absolute; left: 246px; top: 696px; width: 8px; height: 8px; border-radius: 50%; background: #3a4a41"></div>
+    <div style="position: absolute; left: 356px; top: 116px; width: 8px; height: 8px; border-radius: 50%; background: #3a4a41"></div>
+    <div style="position: absolute; left: 476px; top: 76px; width: 8px; height: 8px; border-radius: 50%; background: #3a4a41"></div>
+    <div style="position: absolute; left: 616px; top: 56px; width: 8px; height: 8px; border-radius: 50%; background: #3a4a41"></div>
+    <div style="position: absolute; left: 756px; top: 76px; width: 8px; height: 8px; border-radius: 50%; background: #3a4a41"></div>
+    <div style="position: absolute; left: 896px; top: 56px; width: 8px; height: 8px; border-radius: 50%; background: #3a4a41"></div>
+    <div style="position: absolute; left: 1056px; top: 66px; width: 8px; height: 8px; border-radius: 50%; background: #3a4a41"></div>
+    <div style="position: absolute; left: 1196px; top: 76px; width: 8px; height: 8px; border-radius: 50%; background: #3a4a41"></div>
+    <div style="position: absolute; left: 1326px; top: 116px; width: 8px; height: 8px; border-radius: 50%; background: #3a4a41"></div>
+    <div style="position: absolute; left: 1386px; top: 236px; width: 8px; height: 8px; border-radius: 50%; background: #3a4a41"></div>
+    <div style="position: absolute; left: 1366px; top: 396px; width: 8px; height: 8px; border-radius: 50%; background: #3a4a41"></div>
+    <div style="position: absolute; left: 1386px; top: 556px; width: 8px; height: 8px; border-radius: 50%; background: #3a4a41"></div>
+    <div style="position: absolute; left: 1326px; top: 696px; width: 8px; height: 8px; border-radius: 50%; background: #3a4a41"></div>
+    <div style="position: absolute; left: 1196px; top: 716px; width: 8px; height: 8px; border-radius: 50%; background: #3a4a41"></div>
+    <div style="position: absolute; left: 1016px; top: 726px; width: 8px; height: 8px; border-radius: 50%; background: #3a4a41"></div>
+    <div style="position: absolute; left: 288px; top: 130px; font-size: 10px; font-family: 'IBM Plex Mono', Consolas, monospace; color: #566158">#35</div>
+    <div style="position: absolute; left: 138px; top: 330px; font-size: 10px; font-family: 'IBM Plex Mono', Consolas, monospace; color: #566158">#24</div>
+    <div style="position: absolute; left: 1318px; top: 130px; font-size: 10px; font-family: 'IBM Plex Mono', Consolas, monospace; color: #566158">#43</div>
+    <div style="position: absolute; left: 24px; top: 716px; font-size: 11px; color: #566158">· 暗点 = 已探明（已关闭 issue），点击可查</div>
+
+    <!-- 核心依赖网 -->
+    <!-- #38 resolved（在网内，稍大于背景暗点） -->
+    <div style="position: absolute; left: 430px; top: 264px; width: 80px; display: flex; flex-direction: column; align-items: center; gap: 5px">
+      <div style="width: 12px; height: 12px; border-radius: 50%; background: #4a5f53"></div>
+      <div style="font-size: 10px; font-family: 'IBM Plex Mono', Consolas, monospace; color: #566158">#38 ✓</div>
+    </div>
+    <!-- #41 claimed by dev5：琥珀 + worker 标签，度数最高所以最大 -->
+    <div style="position: absolute; left: 560px; top: 296px; width: 80px; display: flex; flex-direction: column; align-items: center; gap: 6px">
+      <div style="display: flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 600; color: #fbbf24"><span style="width: 6px; height: 6px; border-radius: 50%; background: #fbbf24"></span>dev5 ▶</div>
+      <div style="width: 26px; height: 26px; border-radius: 50%; background: #fbbf24; box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.12)"></div>
+      <div style="font-size: 11px; color: #aebacb; text-align: center">#41 访谈确认门禁</div>
+    </div>
+    <!-- #59 blocked -->
+    <div style="position: absolute; left: 702px; top: 218px; width: 80px; display: flex; flex-direction: column; align-items: center; gap: 5px">
+      <div style="width: 16px; height: 16px; border-radius: 50%; background: #6e4a4e"></div>
+      <div style="font-size: 11px; color: #8595ab; text-align: center">#59 验收编排</div>
+    </div>
+    <!-- #61 blocked -->
+    <div style="position: absolute; left: 730px; top: 398px; width: 80px; display: flex; flex-direction: column; align-items: center; gap: 5px">
+      <div style="width: 16px; height: 16px; border-radius: 50%; background: #6e4a4e"></div>
+      <div style="font-size: 11px; color: #8595ab; text-align: center">#61 风险对账</div>
+    </div>
+    <!-- #60 frontier -->
+    <div style="position: absolute; left: 880px; top: 466px; width: 80px; display: flex; flex-direction: column; align-items: center; gap: 5px">
+      <div style="width: 20px; height: 20px; border-radius: 50%; background: #7dd3fc; box-shadow: 0 0 0 4px rgba(125, 211, 252, 0.14)"></div>
+      <div style="font-size: 11px; color: #aebacb; text-align: center">#60 ledger 校验</div>
+    </div>
+    <!-- #55 resolved -->
+    <div style="position: absolute; left: 320px; top: 486px; width: 80px; display: flex; flex-direction: column; align-items: center; gap: 5px">
+      <div style="width: 12px; height: 12px; border-radius: 50%; background: #4a5f53"></div>
+      <div style="font-size: 10px; font-family: 'IBM Plex Mono', Consolas, monospace; color: #566158">#55 ✓</div>
+    </div>
+    <!-- #51 frontier -->
+    <div style="position: absolute; left: 450px; top: 534px; width: 80px; display: flex; flex-direction: column; align-items: center; gap: 5px">
+      <div style="width: 22px; height: 22px; border-radius: 50%; background: #7dd3fc; box-shadow: 0 0 0 4px rgba(125, 211, 252, 0.14)"></div>
+      <div style="font-size: 11px; color: #aebacb; text-align: center">#51 门禁审计</div>
+    </div>
+    <!-- #54 blocked -->
+    <div style="position: absolute; left: 610px; top: 608px; width: 80px; display: flex; flex-direction: column; align-items: center; gap: 5px">
+      <div style="width: 16px; height: 16px; border-radius: 50%; background: #6e4a4e"></div>
+      <div style="font-size: 11px; color: #8595ab; text-align: center">#54 依赖规范</div>
+    </div>
+    <!-- #57 frontier -->
+    <div style="position: absolute; left: 920px; top: 146px; width: 80px; display: flex; flex-direction: column; align-items: center; gap: 5px">
+      <div style="width: 20px; height: 20px; border-radius: 50%; background: #7dd3fc; box-shadow: 0 0 0 4px rgba(125, 211, 252, 0.14)"></div>
+      <div style="font-size: 11px; color: #aebacb; text-align: center">#57 冒烟并行化</div>
+    </div>
+    <!-- #56 blocked -->
+    <div style="position: absolute; left: 1070px; top: 218px; width: 80px; display: flex; flex-direction: column; align-items: center; gap: 5px">
+      <div style="width: 16px; height: 16px; border-radius: 50%; background: #6e4a4e"></div>
+      <div style="font-size: 11px; color: #8595ab; text-align: center">#56 风险台账</div>
+    </div>
+
+    <!-- 孤立开放项（右区） -->
+    <!-- #58 claimed by dev4 -->
+    <div style="position: absolute; left: 1200px; top: 286px; width: 80px; display: flex; flex-direction: column; align-items: center; gap: 6px">
+      <div style="display: flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 600; color: #7fb3e8"><span style="width: 6px; height: 6px; border-radius: 50%; background: #7fb3e8"></span>dev4 ✋</div>
+      <div style="width: 22px; height: 22px; border-radius: 50%; background: #fbbf24; box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.12)"></div>
+      <div style="font-size: 11px; color: #aebacb; text-align: center">#58 报告排版</div>
+    </div>
+    <!-- #62 frontier -->
+    <div style="position: absolute; left: 1100px; top: 406px; width: 80px; display: flex; flex-direction: column; align-items: center; gap: 5px">
+      <div style="width: 20px; height: 20px; border-radius: 50%; background: #7dd3fc; box-shadow: 0 0 0 4px rgba(125, 211, 252, 0.14)"></div>
+      <div style="font-size: 11px; color: #aebacb; text-align: center">#62 访谈时间线</div>
+    </div>
+    <!-- #18 frontier -->
+    <div style="position: absolute; left: 1210px; top: 526px; width: 80px; display: flex; flex-direction: column; align-items: center; gap: 5px">
+      <div style="width: 18px; height: 18px; border-radius: 50%; background: #7dd3fc; box-shadow: 0 0 0 4px rgba(125, 211, 252, 0.14)"></div>
+      <div style="font-size: 11px; color: #aebacb; text-align: center">#18 triage 巡检</div>
+    </div>
+    <!-- #63 frontier -->
+    <div style="position: absolute; left: 1040px; top: 586px; width: 80px; display: flex; flex-direction: column; align-items: center; gap: 5px">
+      <div style="width: 18px; height: 18px; border-radius: 50%; background: #7dd3fc; box-shadow: 0 0 0 4px rgba(125, 211, 252, 0.14)"></div>
+      <div style="font-size: 11px; color: #aebacb; text-align: center">#63 模板热更新</div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"$preview": {"width": 1440, "height": 900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

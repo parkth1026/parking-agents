@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "slug": "2026-08-23-worktree-board",
+  "created_at": "2026-08-22T16:13:17Z",
+  "updated_at": "2026-08-23T12:38:35Z",
+  "original_request": "我需要你写一个skill，专门负责更新当前仓库下所有worktree当前正在干嘛的状态，正在完成哪个issue或者独立任务，是否完成 是否应当merge到main。核心诉求：通过在主仓库中调用这个技能，检查所有sub-worktree的工作状态并判断是否应当合并。任务完全通过一个主Agent去发送（给所有worktree发任务），另一个是监控任务有没有完成、合并状态。用JSON描述每个结点状态，完成任务时更新JSON。HTML静态解析JSON展现状态，点刷新获得当前状态，不需要后端；有后端更好：1.通过Web看到所有issue的图谱 2.通过图谱点击发送指令让对应worktree干活。我在创建的是一套尽可能一个主脑控制所有其他worktree干活的系统，用户交互只有一个主仓库的agent对话+一个页面，就能达到消化所有需求的目标。有些执行细节我会去worktree的对话去详细决定，但核心还是在主worktree中干活。（补充：我们来锁定需求范围，你走太快了）",
+  "goal_oneline": "主脑作战系统：主仓对话+一张wayfinder风格issue全景作战图，worktree作为地图上的队员；巡检状态、frontier派活、headless派发、评估与合并建议，两个界面消化全部需求",
+  "target": null,
+  "stage": "3-contract",
+  "next_action": "契约就绪，用交接指令启动执行 Agent 实施",
+  "stage_gates": {
+    "1-interview": {
+      "status": "done",
+      "closed_at": "2026-08-22T16:37:05Z",
+      "self_assessment": {
+        "意图": "已定",
+        "结果": "已定",
+        "边界": "已定",
+        "约束": "已定",
+        "现状": "已定"
+      }
+    },
+    "2-prototype": {
+      "status": "done",
+      "closed_at": "2026-08-23T12:31:27Z",
+      "artifacts_confirmed": [
+        "mock",
+        "behavior",
+        "api-mock",
+        "example-run",
+        "diagram"
+      ]
+    },
+    "3-contract": {
+      "status": "done",
+      "closed_at": "2026-08-23T12:38:35Z"
+    }
+  },
+  "validation": {
+    "status": "valid",
+    "ac_count": 6,
+    "warnings": [],
+    "ran_at": "2026-08-23T12:38:29Z",
+    "verify_tiers": {
+      "A": 4,
+      "B": 0,
+      "C": 2,
+      "D": 0
+    }
+  },
+  "blocked": [],
+  "residual_risk": null,
+  "status": "ready"
+}
