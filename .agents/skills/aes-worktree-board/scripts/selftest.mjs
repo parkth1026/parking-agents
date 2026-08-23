@@ -7,7 +7,7 @@ import {
   chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { basename, join, resolve } from 'node:path';
+import { basename, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   collectStatus, DEFAULT_RUNTIME_DIR, loadConfig, SKILL_DIR,
@@ -23,49 +23,62 @@ function tempDirectory(label) {
   return mkdtempSync(join(tmpdir(), `aes-worktree-board-${label}-`));
 }
 
-function deferTempCleanup(path) {
-  const cleanupScript = `
-const { rmSync } = require('node:fs');
-const target = process.argv[1];
-for (let attempt = 0; attempt < 600; attempt += 1) {
-  try {
-    rmSync(target, { recursive: true, force: true });
-    process.exit(0);
-  } catch (error) {
-    if (!['EPERM', 'EBUSY', 'ENOTEMPTY'].includes(error.code)) process.exit(1);
+function boundedTempPath(path) {
+  const tempRoot = resolve(tmpdir());
+  const target = resolve(path);
+  const comparableTempRoot = process.platform === 'win32' ? tempRoot.toLowerCase() : tempRoot;
+  const comparableTarget = process.platform === 'win32' ? target.toLowerCase() : target;
+  if (comparableTarget === comparableTempRoot || !comparableTarget.startsWith(`${comparableTempRoot}${sep}`)) {
+    throw new Error(`拒绝清理 TEMP 之外的路径: ${target}`);
   }
-  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 100);
-}
-process.exit(1);
-`;
-  const child = spawn(process.execPath, ['-e', cleanupScript, path], {
-    cwd: ROOT,
-    detached: true,
-    stdio: 'ignore',
-  });
-  child.on('error', () => {});
-  child.unref();
+  return target;
 }
 
-function cleanTemp(path) {
-  if (path && existsSync(path) && path.startsWith(resolve(tmpdir()))) {
+function pathWithin(parent, child) {
+  const parentKey = process.platform === 'win32' ? resolve(parent).toLowerCase() : resolve(parent);
+  const childKey = process.platform === 'win32' ? resolve(child).toLowerCase() : resolve(child);
+  return childKey.startsWith(`${parentKey}${sep}`);
+}
+
+function waitMilliseconds(milliseconds) {
+  return new Promise((resolveWait) => setTimeout(resolveWait, milliseconds));
+}
+
+async function cleanTemp(path) {
+  const target = boundedTempPath(path);
+  assert.match(basename(target), /^aes-worktree-board-/,
+    `拒绝清理非本 selftest fixture: ${target}`);
+  let lastError = null;
+  for (let attempt = 0; attempt < 100; attempt += 1) {
     try {
-      rmSync(path, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
+      rmSync(target, { recursive: true, force: true, maxRetries: 0 });
     } catch (error) {
+      lastError = error;
       if (!['EPERM', 'EBUSY', 'ENOTEMPTY'].includes(error.code)) throw error;
-      deferTempCleanup(path);
     }
+    if (!existsSync(target)) return;
+    await waitMilliseconds(100);
   }
+  const detail = lastError ? ` (${lastError.code}: ${lastError.message})` : '';
+  throw new Error(`临时 fixture 清理失败，路径仍存在: ${target}${detail}`);
 }
 
-function cleanRepositoryFixture(fixture) {
-  if (!fixture) return;
-  if (existsSync(fixture.main)) {
-    spawnSync('git', ['-C', fixture.main, 'worktree', 'remove', '--force', fixture.sibling], {
-      encoding: 'utf8',
-    });
+async function cleanRepositoryFixture(fixture) {
+  const root = boundedTempPath(fixture.root);
+  const main = boundedTempPath(fixture.main);
+  const sibling = boundedTempPath(fixture.sibling);
+  assert.equal(pathWithin(root, main), true, `fixture main 越出临时根目录: ${main}`);
+  assert.equal(pathWithin(root, sibling), true, `fixture sibling 越出临时根目录: ${sibling}`);
+  const removal = spawnSync('git', ['-C', main, 'worktree', 'remove', '--force', sibling], {
+    encoding: 'utf8',
+  });
+  if (removal.status !== 0) {
+    const detail = `${removal.stdout || ''}${removal.stderr || ''}`.trim();
+    throw new Error(`临时 Git worktree 移除失败 (exit ${removal.status}): ${detail}`);
   }
-  cleanTemp(fixture.root);
+  assert.equal(existsSync(sibling), false, `临时 Git worktree 仍存在: ${sibling}`);
+  await cleanTemp(root);
+  assert.equal(existsSync(root), false, `临时 fixture 根目录仍存在: ${root}`);
 }
 
 function gitSync(cwd, args) {
@@ -194,7 +207,7 @@ async function collectDomain() {
     assessment = recollected.worktrees.find((worker) => worker.name === target.name).assessment;
     assert.equal(assessment.stale, false, '新于 commit/task end 的 assessment 不应 stale');
   } finally {
-    cleanTemp(runtimeDir);
+    await cleanTemp(runtimeDir);
   }
 }
 
@@ -359,7 +372,7 @@ async function repoRootDomain() {
       server.child.kill();
       await stopped;
     }
-    cleanRepositoryFixture(fixture);
+    await cleanRepositoryFixture(fixture);
   }
 }
 
@@ -380,15 +393,27 @@ async function waitTask(origin, taskId) {
 
 async function waitStatus(runtimeDir, expectedRoot, notBefore = null) {
   const statusPath = join(runtimeDir, 'status.json');
+  let lastObserved = { state: 'missing' };
   for (let attempt = 0; attempt < 300; attempt += 1) {
     if (existsSync(statusPath)) {
-      const status = JSON.parse(readFileSync(statusPath, 'utf8'));
-      const freshEnough = !notBefore || Date.parse(status.generatedAt) >= Date.parse(notBefore);
-      if (resolve(status.repo.root) === resolve(expectedRoot) && freshEnough) return status;
+      try {
+        const status = JSON.parse(readFileSync(statusPath, 'utf8'));
+        lastObserved = {
+          state: 'read',
+          root: status.repo?.root || null,
+          generatedAt: status.generatedAt || null,
+        };
+        const freshEnough = !notBefore || Date.parse(status.generatedAt) >= Date.parse(notBefore);
+        if (resolve(status.repo.root) === resolve(expectedRoot) && freshEnough) return status;
+      } catch (error) {
+        lastObserved = { state: 'unreadable', error: `${error.code || 'parse'}: ${error.message}` };
+      }
     }
     await new Promise((resolveWait) => setTimeout(resolveWait, 100));
   }
-  throw new Error(`目标仓快照未在期限内写入: ${expectedRoot}`);
+  throw new Error(
+    `目标仓快照未在期限内写入: ${expectedRoot}; statusPath=${statusPath}; lastObserved=${JSON.stringify(lastObserved)}`,
+  );
 }
 
 async function dispatchDomain() {
@@ -506,7 +531,7 @@ async function dispatchDomain() {
       server.child.kill();
       await stopped;
     }
-    cleanRepositoryFixture(fixture);
+    await cleanRepositoryFixture(fixture);
   }
 }
 
@@ -570,12 +595,16 @@ async function serverDomain() {
     assert.equal(response.status, 400);
     assert.equal((await response.json()).code, 'BAD_REQUEST');
   } finally {
-    if (server?.child && !server.child.killed) server.child.kill();
-    cleanTemp(runtimeDir);
+    if (server?.child && server.child.exitCode === null) {
+      const stopped = waitForExit(server.child);
+      server.child.kill();
+      await stopped;
+    }
+    await cleanTemp(runtimeDir);
   }
 }
 
-function layoutDomain() {
+async function layoutDomain() {
   const required = [
     'SKILL.md', 'board.html', 'board.config.json',
     'scripts/collect.mjs', 'scripts/assess.mjs', 'scripts/command.mjs', 'scripts/dispatch.mjs',
@@ -621,7 +650,7 @@ function layoutDomain() {
     assert.equal(result.assessment.merge, 'not-yet');
     assert.match(result.assessment.reason, /需先补 issue/);
   } finally {
-    cleanTemp(assessRuntime);
+    await cleanTemp(assessRuntime);
   }
 }
 
