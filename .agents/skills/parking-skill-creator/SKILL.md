@@ -147,9 +147,12 @@ node scripts/quick-validate.mjs <技能目录>
 - 输入文件: <有则列出，无则 "none">
 - 产物保存到: <workspace>/iteration-<N>/eval-<名>/<gate>/run-1/outputs/
 - 要保存的产物: <用户关心的东西，如 "最终的 .docx 文件">
+- 沙箱纪律: 仅可读写本 run 目录，workspace 其余内容（其他轮次产物、评分器、技能快照）禁读禁写
 ```
 
-目录布局对齐聚合器口径：`<config>/run-<K>/outputs/`（run 序号从 1 起，同一 eval 重跑多个 run 时递增）——聚合器只认 `run-<数字>` 子目录，产物直接放 `<config>/outputs/` 会收不到。
+沙箱纪律一行不得省略：without_skill 臂一旦读到 workspace 里其他轮次的评分器或技能快照，就等于提前知道判罚口径、借用被测技能的工具——基线被污染，delta 失真（karpathy 技能 iteration-8/13 两次实证）。评分侧对 without 臂 process-log 抽查 `grader|snapshot|评分方式` 关键词，发现借用痕迹该臂判罚标注污染、不计入 won-lost 依据。
+
+目录布局对齐聚合器口径：`<config>/run-<K>/outputs/`（run 序号从 1 起，同一 eval 重跑多个 run 时递增）——聚合器只认 `run-<数字>` 子目录，产物直接放 `<config>/outputs/` 会收不到。重要轮次（发版验收、疑似 flaky 的 eval）可在同一 eval 下同轮追加 `run-2` 再跑一臂，聚合器自动池化多 run 统计——同轮方差不用等跨轮才看见。
 
 不带技能的 gate（如 `without_skill`）：同 prompt 去掉「技能路径」一行，产物存对应 gate 目录。改进既有技能的 `old_skill` gate 用改动前快照：`node scripts/snapshot-skill.mjs <技能目录> [<workspace>]`（workspace 缺省为 `<skill-dir>/../../evals/<技能名>-workspace`；快照目录 `skill-snapshot`，已占用自动递增 `-v2`、`-v3`）。脚本会把快照里的 `SKILL.md` 改名 `SKILL.md.bak`——技能扫描器按 `SKILL.md` 文件名认技能，若 workspace 沿用扫描根内的旧同级位置，快照里留活的 `SKILL.md` 会冒出同名双技能、污染触发评测的技能清单；新缺省位置虽在扫描根外，改名仍是双保险。别徒手复制目录造快照。old_skill run 的「技能路径」填快照目录，prompt 注明技能文档读 `SKILL.md.bak`，产物存 `old_skill/run-1/outputs/`。怀疑技能清单混进了快照/评测产物冒充的技能时，运行 `node scripts/check-shadow-skills.mjs <扫描根>` 复查。
 
@@ -180,6 +183,8 @@ node scripts/quick-validate.mjs <技能目录>
 
 数值拿不到就写 `null`（聚合器会跳过并计入 skipped，不报错）。
 
+通知到达时同时核对**产物已落盘**——该 run 的 `outputs/` 有文件、任务要求的关键产物存在。空产物是执行臂故障（agent 报完成但没写盘），不是技能回归：先纠偏续跑或重跑该臂补齐，再进评分；纠偏产生的 timing 按各段累计。
+
 ### 6.4 评分与聚合
 
 1. **评分**：spawn grader subagent（读 `agents/grader.md`）逐断言对照产物，把 `grading.json` 写进每个 run 目录（逐断言 `name/text/passed/evidence`，外加对断言集本身的 `eval_feedback`）。可编程验证的断言写脚本判，别肉眼——更快更稳还能跨迭代复用。
@@ -191,7 +196,7 @@ node scripts/quick-validate.mjs <技能目录>
 
    产出 `benchmark.json` + `benchmark.md`：pass_rate/time_ms/tokens 的 mean±stddev（样本方差）+ delta（with − baseline）。配置目录名动态发现（with_skill/without_skill/old_skill/自定义都行）。
 
-   `--history` 是评测数据反向写进技能目录的**唯一通道**（聚合默认不碰技能目录，须显式传参）：把本轮各 gate 指标**追加**一条 run 进 `<技能目录>/history.json`（只追加不覆盖，历史可审计），并同通道**整写** `<技能目录>/output-evals.json`——本轮全部 eval 的题面（prompt）与断言（含 `ac` 引用），接收方 clone 仓库后不依赖 workspace 就能重建同一套评测用例（跨轮题面变化由 git 记录）。**从首轮起每轮聚合都带上它**（用户明说不沉淀除外）——某轮忘带则 history 断档，下一轮的对比会静默跳过断档轮。终端多 3 行趋势摘要。history.json 随 .skill 包分发——workspace 会被 clean，成绩沉淀进技能才留得住；但 `vs_previous` 的逐 eval 对比要**现场重算上一轮 iteration 目录**，所以 clean workspace 前先把该轮聚合并沉淀（跨机/跨会话续跑时旧目录可能已不在，对比会记「不可比」而不是报错）。目标目录不可写时拒绝追加（退出码 1），已产出的 benchmark 不回滚。
+   `--history` 是评测数据反向写进技能目录的**唯一通道**（聚合默认不碰技能目录，须显式传参）：把本轮各 gate 指标**追加**一条 run 进 `<技能目录>/history.json`（只追加不覆盖，历史可审计），并同通道**整写** `<技能目录>/output-evals.json`——本轮全部 eval 的题面（prompt）与断言（含 `ac` 引用），接收方 clone 仓库后不依赖 workspace 就能重建同一套评测用例（跨轮题面变化由 git 记录）。**专项轮**（只跑题库子集的探针轮）要加 `--keep-evals`：保留题库中本轮未跑的 eval，防止部分场景轮把题库整写成子集；全量轮换代（有意汰换旧场景）不要带该旗标。**从首轮起每轮聚合都带上它**（用户明说不沉淀除外）——某轮忘带则 history 断档，下一轮的对比会静默跳过断档轮。终端多 3 行趋势摘要。history.json 随 .skill 包分发——workspace 会被 clean，成绩沉淀进技能才留得住；但 `vs_previous` 的逐 eval 对比要**现场重算上一轮 iteration 目录**，所以 clean workspace 前先把该轮聚合并沉淀（跨机/跨会话续跑时旧目录可能已不在，对比会记「不可比」而不是报错）。目标目录不可写时拒绝追加（退出码 1），已产出的 benchmark 不回滚。
 
    对比与星标口径（防脏数据）：**主 gate** = with_skill，没有 with_skill 时取字典序首个 gate 名。`vs_previous` 与上一条 run 按**同 eval 名**比 won/lost/tie（pass 布尔翻转；本轮新增 eval 计入 total 不计胜负，上轮有本轮没有的 eval 标 dropped）；两轮主 gate 名不同且无共同 with_skill 时记「gate 不连续不可比」，**绝不当失败记 lost**。`current_best` 按主 gate pass_rate 严格更高才推进、平局不推进（防抖）；主 gate 名不同的轮次（纯实验 gate）不参与推进；同一 iteration 重复聚合视为修正——追加一条并在 stdout 提示，星标以该 iteration 最新一条为准（早期半程数据锁不住上限）。`iteration_ref` 存本机绝对路径，仅供本机回溯，跨机时只作轮次标识读。
 3. **分析**：读 benchmark 数据做一轮 analyst pass（读 `agents/analyzer.md` 的 Analyzing Benchmark Results 节）——找聚合看不见的模式：两组全过的无区分度断言、高方差疑似 flaky 的 eval、时间/token 代价。观察写入 benchmark.json 的 `notes` 数组，viewer 会展示。
@@ -340,6 +345,7 @@ node scripts/package-skill.mjs <技能目录> [输出目录]
 | `output-evals.json` | 输出评测题面与断言（`--history` 同通道整写，接收方可重建用例） |
 | `trigger-evals.json` | 触发题库（定稿资产，随包分发） |
 | `trigger-benchmark.json` | 触发评测指标史（`--persist` 沉淀） |
+| `eval-graders/`（可选） | 输出评测判罚口径（脚本化评分的场景族；版本化冻结，改动=新版本+断代登记，防尺子漂移破坏 pass 史可比性） |
 
 迭代能力的分布遵循**裁决：能力集中、证据随技能**——评测与迭代管线只在本技能（Creator）维护一份，技能目录不内嵌自迭代流程（防 N 份副本口径漂移、防污染 description 触发面）；技能只携带证据，clone 本仓库即同时拿到 Creator、全部技能与其完整迭代依据。git 记内容史（谁改了什么、何时），指标文件记成绩史（机器可读、viewer 可渲染），两者互补不重复。迭代一个陌生技能时，先按这六条路径把依据读齐再动手。
 

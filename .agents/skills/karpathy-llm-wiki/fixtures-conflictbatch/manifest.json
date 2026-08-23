@@ -1,0 +1,25 @@
+{
+  "source": "NAS //nas.51vr.local/x.public/UE5/ue-llm-wiki 只读裁剪（2026-08-23）。批次=多素材冲突形态：C1083×3 同签名不同根因 + C2039×3 同根因家族(editor-only) + C2672 recurrence×1；种子=生产 wiki 自洽子集（496 页裁剪回 recurrence 吸收前、去链闭包有界）。",
+  "raw": {
+    "aes6-1007-1008-C1083-propertyeditor-editor-only-include.md": "57520043f21fd6664a10a059c28b9ac37f8e46e94c13e5fe4831273ee1960268",
+    "aes6-1221-1223-C2039-unguarded-editoronly-changeset-api.md": "90bfae8fd6ba5d4fe397f4640068c7f0578a2d0e4377a7179a394fe444722499",
+    "aes6-1257-1258-C1083-objecttools-editor-include.md": "8715e2c56ddcb97ce095e13363c57523be5978342b383ee36cecc48dde8882d3",
+    "aes6-1556-1558-C2039-utexture-source-editoronly.md": "2ecef0562dd98e92effea107653c1677dcfa00d8fb8b3cf0a75c9a9f0a7eee72",
+    "aes6-1910-1912-C1083-unused-interchange-include.md": "ebb1e080262610431e67fa8914f534a9008b14249dfe09d79044fa276d43383f",
+    "aes6-2223-2225-C2039-mipgensettings-editor-only.md": "e4290c90a8a59cdd8359d598f918cc19c2de1f8f061cfa579c5d0c7eda4e222c",
+    "recurrence-aes6-496-c2672-invoke-flushuptodatetask.md": "237564251b71e747e8208ac4c28ed5a2a9e04e02721c1834a991489a9d13eae0"
+  },
+  "seed": {
+    "details/002-lnk2019-fearthmaterialparametersbakerfragment.md": "b27ba658d32f5d580a3af95af7251b6b4885f77d03db26108be0226ebbfa904d",
+    "details/024-asset-version-mismatch.md": "5b0a807c9493c25fad7213341f7249576bbabd687c3dfe70c2d9661795223280",
+    "details/029-C2664-TypeConversionError-UnrealEngineProperty.md": "6799df91b832aecd84b9bf7413374b4afcfddb84a04ead45f1c5142b7d51b7aa",
+    "details/038-c2660-handle-download-complete-args-mismatch.md": "9649eb77de48219ed9a98ef0ddf0597fe714712b873a5950a23a15a8533ae9ca",
+    "details/aes6-496-c2672-invoke-flushuptodatetask.md": "bba2433e4c8a22268918b26e7755d1b3d7bdbe979a049c07e242a5f1c551d58b",
+    "index.md": "7d27749383bd708661fac27424b0e915d3977384332e4d2d40835eaa4eee01fb",
+    "linux-ld-duplicate-symbol-FAesEditorToolTypeIdGenerator.md": "bb77bc607f310d3900e5df83d3094895a30570df7b33483e3b6b9114845ae5b3",
+    "log.md": "68d726e7ac6e4a2a4ae3d7cb7481796a67447f6ba9b5a4d22cebab03341b9a09",
+    "readme.md": "3f281d4112dc7653a0b00b49fb1f61720013aee61d1f508c5824d0230fe89e2c",
+    "scene-index.md": "bfe05b3ebd125aaf4f8b59bee97f949e539d4520d98ef1cd23aab257f5124bd0",
+    "SCHEMA.md": "68d3aaab680ad949cfc9e6f79476bbe33ef4f74b1481164814eb83a823c4e5da"
+  }
+}

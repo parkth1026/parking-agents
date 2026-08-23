@@ -42,3 +42,5 @@
 | 2026-08-18 | 独立复跑新文档契约和完整流水线回归 | 96 项自测通过；quick-validate 通过 | 未命中；保持单一流水线技能 |
 | 2026-08-18 | 按 Chinese-first 规则重写本技能 frontmatter description，收窄 English 到机器契约和路由必要词 | 97 项自测通过；quick-validate 通过 | 未命中；保持单一流水线技能 |
 | 2026-08-20 | 钢人裁决「迭代能力集中 Creator、技能只带证据」落进发现约定；新增 output-evals.json 题面沉淀（`--history` 同通道整写），补齐 clone 接收方复现评测用例的缺口，五件套扩为六件套 | 109 项自测通过；quick-validate 通过；clone 视图模拟中六件套齐全、题面可重建并被聚合器消费；3 个存量技能已回填 | 未命中；保持单一流水线技能 |
+| 2026-08-20 | karpathy-llm-wiki 两轮历史监控验证（16 执行臂）后按钢人裁决固化两条流程纪律（裁定：三候选缺口均为流程欠账/有意取舍，零代码改动进清单）：6.3 完成通知到达即核对产物落盘、空产物按执行臂故障纠偏续跑（draft 事故教训）；6.1 重要轮次可同轮 run-2 池化采样；另以 analyst pass 后置补跑实测验证其可捕捉 token 离群（1.92× 重尾被 notes 点名） | 109 项自测通过；quick-validate 通过；卫生门禁通过 | 未命中；保持单一流水线技能 |
+| 2026-08-20 | realraw 专项轮暴露 output-evals.json 子集整写缺口（部分场景轮把题库缩写成本轮集合）：buildOutputEvals 支持 keepExisting 合成、CLI 新增 --keep-evals（专项轮保留存量、stdout 明示保留数；全量轮换代默认整写不变），SKILL.md 6.4 与 schemas.md 同步 | 112 项自测通过（+3）；quick-validate 通过 | 未命中；保持单一流水线技能 |

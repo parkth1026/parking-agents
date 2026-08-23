@@ -3,7 +3,7 @@
 // 夹具在运行时生成于 os.tmpdir() 沙箱（不污染技能目录）；SKILL_ENV 指向不存在的
 // 文件保证密封——validator 不回退真实机器配置（~/.config 可能指向 NAS raw）。
 // 退出码 0 = 全过 / 1 = 有失败。升级技能前先跑本文件做回归。
-import { mkdirSync, writeFileSync, rmSync, mkdtempSync } from "node:fs";
+import { mkdirSync, writeFileSync, rmSync, mkdtempSync, readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -321,6 +321,49 @@ function run(args) {
   const rEnf = run(["--wiki", wiki, "--config", ambCfg]);
   check("ambiguousNamesEnforce=true → exit 1", rEnf.code === 1, `got ${rEnf.code}`);
   check("FAIL 原因明示同名歧义", rEnf.stdout.includes("ambiguous page names enforced: 1"));
+}
+
+// ============ 场景 13: eval-graders·merge-grading 对账（缺 manual 警告 / 同名去重 / 正常零警告） ============
+{
+  const mg = join(HERE, "eval-graders", "merge-grading.mjs");
+  const mkIter = (name, withManual, dupName) => {
+    const runDir = join(ROOT, name, "eval-x", "with_skill", "run-1");
+    mkdirSync(runDir, { recursive: true });
+    writeFileSync(join(ROOT, name, "eval-x", "eval_metadata.json"), JSON.stringify({
+      prompt: "p",
+      assertions: [{ name: "断言A", type: "script" }, { name: "断言B", type: "manual" }],
+    }));
+    writeFileSync(join(runDir, "grading-objective.json"), JSON.stringify({
+      results: [{ name: dupName ? "断言B" : "断言A", passed: true, type: "script" }],
+    }));
+    if (withManual) writeFileSync(join(runDir, "grading-manual.json"), JSON.stringify({
+      results: [{ name: "断言B", passed: true, type: "manual" }], eval_feedback: "",
+    }));
+    return join(ROOT, name);
+  };
+  const runMg = (iter) => {
+    try {
+      const stdout = execFileSync("node", [mg, iter], { encoding: "utf8" });
+      return { code: 0, stdout };
+    } catch (e) { return { code: e.status, stdout: e.stdout?.toString() ?? "" }; }
+  };
+  const readGrading = (iter) => JSON.parse(readFileSync(join(iter, "eval-x", "with_skill", "run-1", "grading.json"), "utf8"));
+
+  const iterOk = mkIter("mg-ok", true, false);
+  const rOk = runMg(iterOk);
+  const gOk = readGrading(iterOk);
+  console.log("\n[13] merge-grading 对账");
+  check("正常: objective+manual 合并 2 条且零警告", rOk.code === 0 && gOk.results.length === 2 && !rOk.stdout.includes("警告"));
+
+  const iterMiss = mkIter("mg-missing", false, false);
+  const rMiss = runMg(iterMiss);
+  check("缺 manual: 显式警告防止静默空合并虚高", rMiss.code === 0 && rMiss.stdout.includes("警告") && rMiss.stdout.includes("缺 grading-manual.json") && rMiss.stdout.includes("断言B"));
+
+  const iterDup = mkIter("mg-dup", true, true);
+  const rDup = runMg(iterDup);
+  const gDup = readGrading(iterDup);
+  check("同名断言: 只保留 objective 判罚并警告", rDup.code === 0 && gDup.results.length === 1
+    && rDup.stdout.includes("同名断言") && rDup.stdout.includes("只保留 objective"));
 }
 
 console.log(`\n=== ${pass} passed, ${fail} failed ===`);

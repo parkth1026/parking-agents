@@ -393,6 +393,24 @@ try {
   const r9 = agg("iteration-1", ["--history", skillDirD]);
   check("拒绝: history.json 是目录时不 rename 不追加", r9.code === 1 && r9.stdout.includes("是目录")
     && statSync(join(skillDirD, "history.json")).isDirectory());
+
+  // 题库纪元（bank_epoch）+ 修正条 supersedes：换题面（new/dropped）→ 星标重置为本纪元首轮，不跨纪元比较
+  const skillDirE = join(root6, "skill-epoch");
+  mkdirSync(skillDirE);
+  const aggE = (iter) => runFile("aggregate-benchmark.mjs", [join(root6, "ws", iter), "--skill-name", "hist-demo", "--history", skillDirE]);
+  aggE("iteration-1");
+  const re2 = aggE("iteration-2"); // eval-c new / eval-a dropped → 换纪元
+  const re3 = aggE("iteration-3"); // 同纪元持平
+  const he = JSON.parse(readFileSync(join(skillDirE, "history.json"), "utf8"));
+  check("纪元: 首轮 bank_epoch=1", he.runs[0].bank_epoch === 1);
+  check("纪元: new/dropped 换代 bank_epoch 递增且 stdout 明示", re2.code === 0 && he.runs[1].bank_epoch === 2 && re2.stdout.includes("题库换纪元"));
+  check("纪元: 同题面轮次不递增", he.runs[2].bank_epoch === 2);
+  check("纪元: 换代首轮 current_best 重置为本轮", he.current_best === "runs[1]");
+  check("纪元: 同纪元持平不推进", re3.code === 0 && he.current_best === "runs[1]" && re3.stdout.includes("持平不推进"));
+  const re4 = aggE("iteration-3"); // 重复聚合=修正
+  const he2 = JSON.parse(readFileSync(join(skillDirE, "history.json"), "utf8"));
+  check("修正: supersedes 指向被修正条", he2.runs[3].supersedes === "runs[2]"
+    && re4.stdout.includes("supersedes runs[2]"));
 } finally {
   rmSync(root6, { recursive: true, force: true });
 }
@@ -422,6 +440,27 @@ try {
   mkdirSync(join(sd2, "output-evals.json"), { recursive: true }); // 题面文件位是目录
   const dr = runFile("aggregate-benchmark.mjs", [join(root6b, "iteration-1"), "--history", sd2]);
   check("边界: output-evals.json 是目录 → 拒绝 1", dr.code === 1 && dr.stdout.includes("是目录"));
+
+  // --keep-evals：专项轮只跑题库子集时，题库未被本轮跑到的 eval 保留不缩水
+  const bankDir = join(root6b, "skill-bank");
+  mkdirSync(bankDir);
+  writeFileSync(join(bankDir, "output-evals.json"), JSON.stringify({
+    skill: "hist-demo", source_iteration: "iteration-0",
+    evals: [
+      { name: "eval-s", prompt: "旧题面", assertions: [{ name: "旧断言" }] },
+      { name: "eval-legacy", prompt: "不在本轮的存量", assertions: [] },
+    ],
+  }));
+  const kept = runFile("aggregate-benchmark.mjs", [join(root6b, "iteration-1"), "--skill-name", "hist-demo", "--history", bankDir, "--keep-evals"]);
+  const bank = JSON.parse(readFileSync(join(bankDir, "output-evals.json"), "utf8"));
+  check("keep-evals: 专项轮保留存量 eval 不缩水", kept.code === 0
+    && bank.evals.some((e) => e.name === "eval-legacy")
+    && bank.evals.find((e) => e.name === "eval-s").prompt === "题面"
+    && bank.evals.length === 3);
+  check("keep-evals: stdout 明示保留数量", kept.stdout.includes("保留题库中本轮未跑的 1 个"));
+  const shrink = runFile("aggregate-benchmark.mjs", [join(root6b, "iteration-1"), "--skill-name", "hist-demo", "--history", bankDir]);
+  const shrunk = JSON.parse(readFileSync(join(bankDir, "output-evals.json"), "utf8"));
+  check("无旗标: 全量轮整写语义不变（存量被本轮集合取代）", shrunk.evals.length === 2 && !shrunk.evals.some((e) => e.name === "eval-legacy"));
 } finally {
   rmSync(root6b, { recursive: true, force: true });
 }
@@ -439,6 +478,34 @@ try {
   check("自定义 gate 目录名原样进 configs 正常聚合", g.code === 0 && bj.configs.with_skill_no_refs && bj.configs.with_skill_no_refs.pass_rate.mean === 1);
 } finally {
   rmSync(root7, { recursive: true, force: true });
+}
+
+// ---- 聚合·判罚对账（grading.results 数 ≠ 题库断言数告警，缺/多双向；缺 manual 合并即缺条目形态） ----
+console.log("聚合·判罚对账：");
+const root7b = mkdtempSync(join(tmpdir(), "recontest-"));
+try {
+  const mkCase = (ev, metaCount, resultCount) => {
+    const d = join(root7b, "iteration-1", ev, "with_skill", "run-1");
+    mkdirSync(d, { recursive: true });
+    writeFileSync(join(d, "grading.json"), JSON.stringify({
+      results: Array.from({ length: resultCount }, (_, i) => ({ name: `断言${i + 1}`, passed: true })),
+    }));
+    writeFileSync(join(root7b, "iteration-1", ev, "eval_metadata.json"), JSON.stringify({
+      prompt: "p",
+      assertions: Array.from({ length: metaCount }, (_, i) => ({ name: `断言${i + 1}`, type: "script" })),
+    }));
+  };
+  mkCase("eval-ok", 2, 2);      // 条数相符 → 零告警
+  mkCase("eval-missing", 3, 2); // 缺 1 条（漏交 manual / 评分器少判形态）
+  mkCase("eval-extra", 2, 3);   // 多 1 条（标注误计入 results 形态）
+  mkCase("eval-nometa", 0, 1);  // metadata 断言未登记 → 无从对账，不告警
+  const r = runFile("aggregate-benchmark.mjs", [join(root7b, "iteration-1"), "--skill-name", "recon-demo", "--output", join(root7b, "b.json")]);
+  const w = JSON.parse(readFileSync(join(root7b, "b.json"), "utf8")).warnings;
+  check("对账: 相符与断言未登记的 run 不告警", r.code === 0 && !w.some((s) => s.includes("eval-ok") || s.includes("eval-nometa")));
+  check("对账: 缺条目告警点名差数", w.some((s) => s.includes("eval-missing") && s.includes("2 条 ≠ 题库断言 3 条") && s.includes("缺 1 条")));
+  check("对账: 多条目告警点名差数", w.some((s) => s.includes("eval-extra") && s.includes("3 条 ≠ 题库断言 2 条") && s.includes("多 1 条")));
+} finally {
+  rmSync(root7b, { recursive: true, force: true });
 }
 
 // ---- 触发评测聚合·schema、严格协议与失败关闭 ----

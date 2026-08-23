@@ -127,7 +127,290 @@
           }
         ]
       }
+    },
+    {
+      "date": "2026-08-20T02:33:46+08:00",
+      "iteration_ref": "D:\\GIT_dev\\parking-agents\\.agents\\evals\\karpathy-llm-wiki-workspace\\iteration-9",
+      "gates": {
+        "with_skill": {
+          "pass_rate": 1,
+          "mean_ms": 204312.75,
+          "mean_tokens": 711395.75
+        },
+        "without_skill": {
+          "pass_rate": 0.8869,
+          "mean_ms": 373706,
+          "mean_tokens": 806612.25
+        }
+      },
+      "vs_previous": {
+        "evals_total": 4,
+        "won": 0,
+        "lost": 0,
+        "tie": 4,
+        "detail": [
+          {
+            "eval": "eval-contradiction-ingest",
+            "result": "tie"
+          },
+          {
+            "eval": "eval-disambiguation-ingest",
+            "result": "tie"
+          },
+          {
+            "eval": "eval-oversize-split",
+            "result": "tie"
+          },
+          {
+            "eval": "eval-uncovered-query-honesty",
+            "result": "tie"
+          }
+        ]
+      }
+    },
+    {
+      "date": "2026-08-20T02:53:50+08:00",
+      "iteration_ref": "D:\\GIT_dev\\parking-agents\\.agents\\evals\\karpathy-llm-wiki-workspace\\iteration-10",
+      "gates": {
+        "with_skill": {
+          "pass_rate": 1,
+          "mean_ms": 414869.25,
+          "mean_tokens": 1365602.75
+        },
+        "without_skill": {
+          "pass_rate": 0.9286,
+          "mean_ms": 270155.75,
+          "mean_tokens": 585076.25
+        }
+      },
+      "vs_previous": {
+        "evals_total": 4,
+        "won": 0,
+        "lost": 0,
+        "tie": 4,
+        "detail": [
+          {
+            "eval": "eval-contradiction-ingest",
+            "result": "tie"
+          },
+          {
+            "eval": "eval-disambiguation-ingest",
+            "result": "tie"
+          },
+          {
+            "eval": "eval-oversize-split",
+            "result": "tie"
+          },
+          {
+            "eval": "eval-uncovered-query-honesty",
+            "result": "tie"
+          }
+        ]
+      }
+    },
+    {
+      "date": "2026-08-20T05:27:09+08:00",
+      "iteration_ref": "D:\\GIT_dev\\parking-agents\\.agents\\evals\\karpathy-llm-wiki-workspace\\iteration-11",
+      "gates": {
+        "with_skill": {
+          "pass_rate": 1,
+          "mean_ms": 175212.5,
+          "mean_tokens": 617145.75
+        },
+        "without_skill": {
+          "pass_rate": 0.9643,
+          "mean_ms": 147207,
+          "mean_tokens": 334627.75
+        }
+      },
+      "vs_previous": {
+        "evals_total": 4,
+        "won": 0,
+        "lost": 0,
+        "tie": 2,
+        "detail": [
+          {
+            "eval": "eval-contradiction-ingest-localraw",
+            "result": "new"
+          },
+          {
+            "eval": "eval-disambiguation-ingest-localraw",
+            "result": "new"
+          },
+          {
+            "eval": "eval-oversize-split",
+            "result": "tie"
+          },
+          {
+            "eval": "eval-uncovered-query-honesty",
+            "result": "tie"
+          },
+          {
+            "eval": "eval-contradiction-ingest",
+            "result": "dropped"
+          },
+          {
+            "eval": "eval-disambiguation-ingest",
+            "result": "dropped"
+          }
+        ]
+      }
+    },
+    {
+      "date": "2026-08-20T22:47:31+08:00",
+      "iteration_ref": "D:\\GIT_dev\\parking-agents\\.agents\\evals\\karpathy-llm-wiki-workspace\\iteration-12",
+      "gates": {
+        "with_skill": {
+          "pass_rate": 1,
+          "mean_ms": 830124,
+          "mean_tokens": 2246592
+        },
+        "without_skill": {
+          "pass_rate": 1,
+          "mean_ms": 1060655,
+          "mean_tokens": 2597812
+        }
+      },
+      "vs_previous": {
+        "evals_total": 1,
+        "won": 0,
+        "lost": 0,
+        "tie": 0,
+        "detail": [
+          {
+            "eval": "eval-realraw-ingest",
+            "result": "new"
+          },
+          {
+            "eval": "eval-contradiction-ingest-localraw",
+            "result": "dropped"
+          },
+          {
+            "eval": "eval-disambiguation-ingest-localraw",
+            "result": "dropped"
+          },
+          {
+            "eval": "eval-oversize-split",
+            "result": "dropped"
+          },
+          {
+            "eval": "eval-uncovered-query-honesty",
+            "result": "dropped"
+          }
+        ]
+      }
+    },
+    {
+      "date": "2026-08-21T02:28:50+08:00",
+      "iteration_ref": "D:\\GIT_dev\\parking-agents\\.agents\\evals\\karpathy-llm-wiki-workspace\\iteration-13",
+      "gates": {
+        "with_skill": {
+          "pass_rate": 1,
+          "mean_ms": 288651,
+          "mean_tokens": 1156878.6
+        },
+        "without_skill": {
+          "pass_rate": 0.9492,
+          "mean_ms": 287684.6,
+          "mean_tokens": 1026746.4
+        }
+      },
+      "vs_previous": {
+        "evals_total": 5,
+        "won": 0,
+        "lost": 0,
+        "tie": 1,
+        "detail": [
+          {
+            "eval": "eval-contradiction-ingest-localraw",
+            "result": "new"
+          },
+          {
+            "eval": "eval-disambiguation-ingest-localraw",
+            "result": "new"
+          },
+          {
+            "eval": "eval-oversize-split",
+            "result": "new"
+          },
+          {
+            "eval": "eval-realraw-ingest",
+            "result": "tie"
+          },
+          {
+            "eval": "eval-uncovered-query-honesty",
+            "result": "new"
+          }
+        ]
+      }
+    },
+    {
+      "date": "2026-08-21T02:29:03+08:00",
+      "iteration_ref": "D:\\GIT_dev\\parking-agents\\.agents\\evals\\karpathy-llm-wiki-workspace\\iteration-13",
+      "gates": {
+        "with_skill": {
+          "pass_rate": 1,
+          "mean_ms": 288651,
+          "mean_tokens": 1156878.6
+        },
+        "without_skill": {
+          "pass_rate": 0.9714,
+          "mean_ms": 287684.6,
+          "mean_tokens": 1026746.4
+        }
+      },
+      "vs_previous": null
+    },
+    {
+      "date": "2026-08-23T03:06:52+08:00",
+      "iteration_ref": "D:\\GIT_dev\\parking-agents\\.agents\\evals\\karpathy-llm-wiki-workspace\\iteration-14",
+      "gates": {
+        "with_skill": {
+          "pass_rate": 0.9722,
+          "mean_ms": 186451.3333,
+          "mean_tokens": 630814.6667
+        },
+        "without_skill": {
+          "pass_rate": 0.9762,
+          "mean_ms": 121757.3333,
+          "mean_tokens": 344612
+        }
+      },
+      "vs_previous": {
+        "evals_total": 6,
+        "won": 0,
+        "lost": 1,
+        "tie": 4,
+        "detail": [
+          {
+            "eval": "eval-conflict-batch-ingest",
+            "result": "new"
+          },
+          {
+            "eval": "eval-contradiction-ingest-localraw",
+            "result": "tie"
+          },
+          {
+            "eval": "eval-disambiguation-ingest-localraw",
+            "result": "tie"
+          },
+          {
+            "eval": "eval-oversize-split",
+            "result": "lost"
+          },
+          {
+            "eval": "eval-realraw-ingest",
+            "result": "tie"
+          },
+          {
+            "eval": "eval-uncovered-query-honesty",
+            "result": "tie"
+          }
+        ]
+      },
+      "bank_epoch": 2,
+      "current_best": true
     }
   ],
-  "current_best": "runs[0]"
+  "current_best": "runs[9]"
 }

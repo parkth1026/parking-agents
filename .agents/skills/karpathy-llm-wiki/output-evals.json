@@ -1,10 +1,40 @@
 {
   "skill": "karpathy-llm-wiki",
-  "source_iteration": "iteration-8",
+  "source_iteration": "iteration-14",
   "evals": [
     {
-      "name": "eval-contradiction-ingest",
-      "prompt": "wiki 里 GPT-3 页面写的是 175B 参数。我刚读了篇博客要录入：《How Many Parameters Does GPT-3 Really Have?》（Ivan Vetokhin，2024-11-02，ivettokhin.medium.io）。核心观点：175B 是把全部 embedding 参数都计入的口径；按只参与每次前向计算的参数算，GPT-3 实际约 ~170B——两个口径都有人用，差的是 counting methodology。把这篇文章 ingest 进 wiki；它和现有页面结论有冲突，两边的说法都得保住，怎么记你判断。",
+      "name": "eval-conflict-batch-ingest",
+      "prompt": "我的 wiki（UE 构建错误知识库）raw 层新到了一批 7 份构建修复知识素材（wiki-raw/details/ 下，含 1 份 recurrence 复发记录）。帮我把这批素材整理进 wiki：该建页的建页、该并的并、该回流的回流、index/log 记清楚，整理完校验必须是绿的。（本题素材均在本地沙箱，不需要、也不要做任何在线检索。）",
+      "assertions": [
+        {
+          "name": "6 份新知识素材各有对应承接（error_code+fix 构建号/commit 可追溯，6/6）",
+          "type": "script"
+        },
+        {
+          "name": "recurrence 按回流契约处理：496 页 updated >= 2026-08-17 且复发证据留痕",
+          "type": "script"
+        },
+        {
+          "name": "同根因家族（C2039×3）建立关联：相关页互链、统一 tag 或枢纽页联结",
+          "type": "script"
+        },
+        {
+          "name": "整理后校验 PASS（断链 0、总分 >= 9）",
+          "type": "script"
+        },
+        {
+          "name": "log 追加整理条目、index 收录全部新页",
+          "type": "script"
+        },
+        {
+          "name": "原文沉淀 raw（wiki-raw 保留 7 份素材）",
+          "type": "script"
+        }
+      ]
+    },
+    {
+      "name": "eval-contradiction-ingest-localraw",
+      "prompt": "wiki 里 GPT-3 页面写的是 175B 参数。我读了篇博客觉得有价值，原文全文我已存在本地：material/gpt3-parameter-count-blog.md（本任务输入文件里给出了它的完整路径）。帮我 ingest 进 wiki。它和现有页面结论有冲突，两边的说法都得保住，怎么记你判断。（本题原料已在本地文件，不需要、也不要做任何在线检索。）",
       "assertions": [
         {
           "name": "矛盾双记录：GPT-3 页同时保留 175B 与 ~170B 且各自归属来源",
@@ -39,8 +69,8 @@
       ]
     },
     {
-      "name": "eval-disambiguation-ingest",
-      "prompt": "刚读完一篇标题就叫《Attention》的博客（Vlad Bogolin，2024-03-18，medium.com/@vlad.bogolin），是 attention 机制的全景综述，写得挺全。帮我 ingest 进 wiki，和已有的 attention 内容打通。",
+      "name": "eval-disambiguation-ingest-localraw",
+      "prompt": "刚读完一篇标题就叫《Attention》的博客，原文全文我已存在本地：material/attention-bogolin-blog.md（本任务输入文件里给出了它的完整路径）。帮我 ingest 进 wiki，和已有的 attention 内容打通。（本题原料已在本地文件，不需要、也不要做任何在线检索。）",
       "assertions": [
         {
           "name": "sources/ 无与 concepts/Attention.md 同名 basename 的页面（消歧执行）",
@@ -96,6 +126,46 @@
         },
         {
           "name": "拆分不丢知识（原页要点在新结构中可寻）",
+          "type": "script"
+        }
+      ]
+    },
+    {
+      "name": "eval-realraw-ingest",
+      "prompt": "我的 wiki（UE 构建错误知识库）raw 层新到了 6 份构建修复知识素材（wiki-raw/details/ 下，含 1 份 recurrence 复发记录）。帮我把这批新素材整理进 wiki：该建页的建页、该回流的回流、index/log 记清楚，整理完校验必须是绿的。（本题素材均在本地沙箱，不需要、也不要做任何在线检索。）",
+      "assertions": [
+        {
+          "name": "5 份新知识素材各有对应 details/ 新页（覆盖 5/5）",
+          "type": "script"
+        },
+        {
+          "name": "新页内容可追溯 raw 来源（含 fix 构建号或 primary_fix_commit）",
+          "type": "script"
+        },
+        {
+          "name": "每份新素材的 error_code 在对应新页可寻（LNK2038/LNK2019×2/C1083/MissingPlugin）",
+          "type": "script"
+        },
+        {
+          "name": "recurrence 按回流契约处理：024 页 updated >= 2026-08-20 且复发证据留痕",
+          "type": "script",
+          "ac": "AC-9"
+        },
+        {
+          "name": "整理后校验 PASS（断链 0、总分 >= 9）",
+          "type": "script",
+          "ac": "AC-1"
+        },
+        {
+          "name": "log 追加整理条目、index 收录全部新页",
+          "type": "script"
+        },
+        {
+          "name": "linker 类新页建立关联（互链或统一 linker-error 类 tag）",
+          "type": "script"
+        },
+        {
+          "name": "根因与修法如实转述（抽查 2 份与 raw 一致，未编造未丢关键结论）",
           "type": "manual"
         }
       ]
@@ -106,11 +176,11 @@
       "assertions": [
         {
           "name": "如实声明 wiki 未覆盖 Mamba（答复文本明说）",
-          "type": "manual"
+          "type": "script"
         },
         {
           "name": "不编造 Mamba 对比内容冒充 wiki 知识",
-          "type": "manual"
+          "type": "script"
         },
         {
           "name": "不建 comparisons/ 伪存档页",
@@ -126,7 +196,7 @@
         },
         {
           "name": "建议 ingest Mamba 素材来补覆盖",
-          "type": "manual"
+          "type": "script"
         },
         {
           "name": "答复引用既有页面（[[wikilink]] 或页面名）",

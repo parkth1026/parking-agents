@@ -88,6 +88,13 @@ export function loadIteration(iterDir, warnings = []) {
       for (const runName of runDirs) {
         const metrics = loadRunMetrics(join(cfgDir, runName), warnings);
         if (!metrics) continue;
+        // 判罚对账：grading.results 条数应等于题库断言数（缺 manual 合并、多写标注条都会虚高/失真）；
+        // 题库断言为空（metadata 未登记）时无从对账，跳过不告警
+        const expected = Array.isArray(metadata.assertions) ? metadata.assertions.length : 0;
+        if (expected > 0 && metrics.total !== expected) {
+          const diff = expected - metrics.total;
+          warnings.push(`${evalName}/${cfgName}/${runName}: grading.results ${metrics.total} 条 ≠ 题库断言 ${expected} 条（${diff > 0 ? `缺 ${diff} 条（疑漏交 manual 或评分器少判）` : `多 ${-diff} 条（疑把标注当断言计入）`}）`);
+        }
         (configs[cfgName] ??= []).push(metrics);
         (evalEntry.configs[cfgName] ??= []).push({ run: runName, ...metrics });
       }
@@ -192,12 +199,22 @@ export function renderMarkdown(benchmark) {
 
 // ---- history.json（技能目录，只追加） ----
 
-/** 题面沉淀体 output-evals.json：本轮评测用例集（整写覆盖，跨轮内容史由 git 记录） */
-export function buildOutputEvals(evals, skillName, iterationName) {
+/**
+ * 题面沉淀体 output-evals.json：本轮评测用例集（整写覆盖，跨轮内容史由 git 记录）。
+ * --keep-evals：专项轮（只跑题库子集）用——保留现有题库里本轮未跑的 eval，本轮条目覆盖/追加同名项，
+ *   防止部分场景轮把题库整写成子集（全量轮换代仍用默认整写）。
+ */
+export function buildOutputEvals(evals, skillName, iterationName, keepExisting = null) {
+  const entries = evals.map((e) => ({ name: e.name, prompt: e.prompt, assertions: e.assertion_specs }));
+  if (keepExisting && Array.isArray(keepExisting.evals)) {
+    const names = new Set(entries.map((e) => e.name));
+    for (const old of keepExisting.evals) if (!names.has(old.name)) entries.push(old);
+    entries.sort((a, b) => (a.name < b.name ? -1 : 1));
+  }
   return {
     skill: skillName || "",
     source_iteration: iterationName,
-    evals: evals.map((e) => ({ name: e.name, prompt: e.prompt, assertions: e.assertion_specs })),
+    evals: entries,
   };
 }
 
@@ -311,8 +328,11 @@ function loadHistoryForAppend(historyPath) {
 /**
  * 组装本轮 run 记录并追加进 history（只追加：既有 runs 任何字段不回改；顶层 current_best 为权威指针）。
  * current_best 口径：主 gate（with_skill 优先，否则字典序首个）pass_rate 严格更高才推进，平局不推进（防抖）；
- *   ① 每个 iteration_ref 只认最新一条（重复聚合=修正，旧条不再当候选，防早期脏数据锁死上限）；
- *   ② 主 gate 名不同的轮次（实验 gate/换名）不参与推进——星标只在同名主 gate 的成绩间移动。
+ *   ① 每个 iteration_ref 只认最新一条（重复聚合=修正，旧条不再当候选，防早期脏数据锁死上限；修正条
+ *     记 supersedes 指向被修正的旧条）；
+ *   ② 主 gate 名不同的轮次（实验 gate/换名）不参与推进——星标只在同名主 gate 的成绩间移动；
+ *   ③ 题库纪元（bank_epoch）：vs_previous 出现 new/dropped 即换纪元，星标只在与被认证条同纪元内
+ *     移动；换纪元首轮重置星标为本轮（跨纪元 pass_rate 不可比）。
  * 返回 { history, summary } 供 CLI 打印趋势；写入由调用方决定（失败不吞 benchmark 产出）。
  */
 export function appendHistoryRun({ result, iterDir, skillName, historyPath }) {
@@ -324,7 +344,7 @@ export function appendHistoryRun({ result, iterDir, skillName, historyPath }) {
 
   let vsPrevious = null;
   let vsNote = "首轮无对比";
-  let duplicateOf = history.runs.findIndex((r) => r.iteration_ref === newRef); // 任意历史同 ref 即算重复记录
+  let duplicateOf = history.runs.findLastIndex((r) => r.iteration_ref === newRef); // 最新一条同 ref 记录（supersedes 指向它）
   if (prevRun) {
     if (prevRun.iteration_ref === newRef) {
       vsNote = "同 iteration 重复聚合，无对比";
@@ -339,12 +359,25 @@ export function appendHistoryRun({ result, iterDir, skillName, historyPath }) {
     }
   }
 
+  // 题库纪元：vs_previous 出现 new/dropped（题面换代）即换纪元。current_best 只认证同纪元成绩——
+  // 跨纪元 pass_rate 不可比，星标钉在已汰换旧题库上会误导去留决策；换纪元首轮重置星标为本轮。
+  const epochChanged = !!(vsPrevious && vsPrevious.detail.some((d) => d.result === "new" || d.result === "dropped"));
+  const prevEpoch = prevRun ? (prevRun.bank_epoch ?? 1) : 0;
+  const epoch = prevRun ? (epochChanged ? prevEpoch + 1 : Math.max(prevEpoch, 1)) : 1;
+  if (epochChanged) {
+    const n = vsPrevious.detail.filter((d) => d.result === "new").length;
+    const m = vsPrevious.detail.filter((d) => d.result === "dropped").length;
+    vsNote += `（题库换纪元：${n} new / ${m} dropped）`;
+  }
+
   const run = {
     date: localIsoDate(),
     iteration_ref: newRef,
     gates,
     vs_previous: vsPrevious,
+    bank_epoch: epoch,
   };
+  if (duplicateOf >= 0) run.supersedes = `runs[${duplicateOf}]`; // 重复聚合=修正：指向被修正的旧条
   history.runs.push(run);
   const newRunIdx = history.runs.length - 1;
 
@@ -356,16 +389,23 @@ export function appendHistoryRun({ result, iterDir, skillName, historyPath }) {
   const rateOf = (r) => r.gates[primaryGate(r.gates)]?.pass_rate ?? 0;
   const reaggregated = history.runs.slice(0, newRunIdx).some((r) => r.iteration_ref === newRef);
 
-  // 候选 = 其他 iteration_ref 各自的最新一条、且主 gate 名与本轮一致；
+  // 候选 = 其他 iteration_ref 各自的最新一条、主 gate 名与本轮一致、且与本轮同题库纪元；
   // 本轮 ref 的旧条目已被本轮取代（delete），不当候选——重复聚合=修正，防早期脏数据锁死上限
   const lastIdxPerRef = new Map();
   history.runs.forEach((r, i) => { if (i !== newRunIdx) lastIdxPerRef.set(r.iteration_ref, i); });
   lastIdxPerRef.delete(run.iteration_ref);
   const candidates = [...lastIdxPerRef.values()]
-    .filter((i) => primaryGate(history.runs[i].gates) === newPrimary);
+    .filter((i) => primaryGate(history.runs[i].gates) === newPrimary)
+    .filter((i) => (history.runs[i].bank_epoch ?? 1) === epoch);
 
   let advance, bestIdxAfter, reason;
-  if (candidates.length === 0 && newRunIdx > 0 && !reaggregated) {
+  if (epochChanged && !reaggregated) {
+    advance = true;
+    bestIdxAfter = newRunIdx;
+    const n = vsPrevious.detail.filter((d) => d.result === "new").length;
+    const m = vsPrevious.detail.filter((d) => d.result === "dropped").length;
+    reason = `题库换纪元（${n} new / ${m} dropped），跨纪元不可比，current_best 重置为本纪元首轮`;
+  } else if (candidates.length === 0 && newRunIdx > 0 && !reaggregated) {
     advance = false;
     bestIdxAfter = curBestIdx >= 0 ? curBestIdx : 0;
     reason = `主 gate 不连续（本轮 ${newPrimary} 无同名历史轮），不参与 current_best`;
@@ -405,6 +445,8 @@ export function appendHistoryRun({ result, iterDir, skillName, historyPath }) {
     bestIdxAfter,
     reason,
     duplicateOf,
+    epochChanged,
+    epoch,
     rebuilt: loaded.rebuilt ?? false,
   };
   return { history, summary };
@@ -418,6 +460,7 @@ if (!iterDirArg || argv.includes("--help")) usage();
 const skillNameIdx = argv.indexOf("--skill-name");
 const outputIdx = argv.indexOf("--output");
 const historyIdx = argv.indexOf("--history");
+const keepEvals = argv.includes("--keep-evals");
 if (historyIdx !== -1 && !argv[historyIdx + 1]) usage();
 const skillName = skillNameIdx !== -1 ? argv[skillNameIdx + 1] : "";
 const historyDir = historyIdx !== -1 ? resolve(argv[historyIdx + 1]) : null;
@@ -476,9 +519,10 @@ if (historyDir) {
   }
   const s = appended.summary;
   if (s.duplicateOf >= 0) {
-    console.log(`history: 注意: 该 iteration 此前已记录(runs[${s.duplicateOf}])，本条为重复聚合记录；对比与 current_best 以本条(最新)为准`);
+    console.log(`history: 注意: 该 iteration 此前已记录(runs[${s.duplicateOf}])，本条为重复聚合记录（supersedes runs[${s.duplicateOf}]）；对比与 current_best 以本条(最新)为准`);
   }
   console.log(`history: 追加 1 条 run（第 ${s.index} 条）→ ${s.vsNote}${s.vsNote.startsWith("won") ? "（vs 上一条，按 eval 名匹配）" : ""}`);
+  if (s.epochChanged) console.log(`history: 题库换纪元 → bank_epoch ${s.epoch}，跨纪元不可比，current_best 重置为本纪元首轮`);
   console.log(`history: current_best ${s.advance ? `推进至 runs[${s.bestIdxAfter}]` : `保持 runs[${s.bestIdxAfter}]`}（${s.reason}）`);
   console.log(`history: → ${historyPath}（runs 共 ${appended.history.runs.length} 条，只追加）`);
 
@@ -489,7 +533,12 @@ if (historyDir) {
     process.exit(1);
   }
   try {
-    writeJson(outputEvalsPath, buildOutputEvals(result.evals, skillName || b.skill_name, b.iteration));
+    const existing = keepEvals ? readJson(outputEvalsPath) : null;
+    const bank = buildOutputEvals(result.evals, skillName || b.skill_name, b.iteration, existing);
+    writeJson(outputEvalsPath, bank);
+    if (existing && bank.evals.length > result.evals.length) {
+      console.log(`evals: --keep-evals 保留题库中本轮未跑的 ${bank.evals.length - result.evals.length} 个 eval（专项轮防题库缩水；全量轮换代不要带该旗标）`);
+    }
   } catch (err) {
     console.log(`拒绝：output-evals.json 写入失败: ${err.message}（本次不沉淀题面，聚合结果照常产出）`);
     process.exit(1);

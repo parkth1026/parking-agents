@@ -1,0 +1,20 @@
+{
+  "source": "NAS //nas.51vr.local/x.public/UE5/ue-llm-wiki（2026-08-20 裁剪，此后固定）",
+  "raw": {
+    "aes6-377-379-LNK2038-boost-typeindex-rtti.md": "455f699a88243ef7ddc9c3c2f3ff3a6fe00f36ae9f73425ede9efb2452f56bd4",
+    "aes6-614-619-LNK2019-forceinline-outofline-def.md": "218ec0c098cc76bcef2bb47e676847d91f7ace9eab8bad5f6ff4305a38862eb6",
+    "aes6-563-564-LNK2019-builder-impl-lost-in-module-merge.md": "02bfc8640bb7f335c31f8648fc1771eada52d45ff6bc78baff8d5721f1951cee",
+    "aes6-2125-C1083-filehelpers-include-unguarded.md": "f761ad8726de342c8f25f7093fe3fef7128b4884e7a6d5427e92fde58a041a1d",
+    "aes6-1876-1880-MissingPlugin-chaosvehicles-not-referenced.md": "e067709d5f7c7ca6305545b316526f2635f206899fd4b3eb5471f13d274f27a4",
+    "recurrence-024-asset-version-mismatch.md": "d176e4bcd893969139da60461db757b430113f8a9ff7a0a81b912638059ed66e"
+  },
+  "seed": {
+    "details/024-asset-version-mismatch.md": "5b0a807c9493c25fad7213341f7249576bbabd687c3dfe70c2d9661795223280",
+    "details/002-lnk2019-fearthmaterialparametersbakerfragment.md": "b27ba658d32f5d580a3af95af7251b6b4885f77d03db26108be0226ebbfa904d",
+    "linux-ld-duplicate-symbol-FAesEditorToolTypeIdGenerator.md": "bb77bc607f310d3900e5df83d3094895a30570df7b33483e3b6b9114845ae5b3",
+    "readme.md": "3f281d4112dc7653a0b00b49fb1f61720013aee61d1f508c5824d0230fe89e2c",
+    "scene-index.md": "bfe05b3ebd125aaf4f8b59bee97f949e539d4520d98ef1cd23aab257f5124bd0",
+    "SCHEMA.md": "68d3aaab680ad949cfc9e6f79476bbe33ef4f74b1481164814eb83a823c4e5da",
+    "log.md": "9280a4d8717231efeb79bb3a27696f1b6db59e37f90a66c816fbb4325466a9e6"
+  }
+}
