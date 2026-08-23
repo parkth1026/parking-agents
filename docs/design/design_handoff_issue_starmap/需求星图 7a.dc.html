@@ -1,0 +1,440 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script src="./support.js"></script>
+  </head>
+  <body>
+    <x-dc>
+      <helmet>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&family=Archivo:wght@400;500;600&display=swap"
+          rel="stylesheet"
+        />
+        <style>
+          body {
+            margin: 0;
+            background: #efebe0;
+          }
+          a {
+            color: #a94f2f;
+            text-decoration: none;
+          }
+          a:hover {
+            color: #c15f3c;
+          }
+        </style>
+      </helmet>
+      <div
+        style="
+          min-height: 100vh;
+          display: flex;
+          padding: 24px;
+          box-sizing: border-box;
+          font-family:
+            &quot;Archivo&quot;, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif;
+        "
+      >
+        <div
+          style="
+            width: 1440px;
+            height: 900px;
+            flex: none;
+            margin: auto;
+            background: #faf9f5;
+            border: 1px solid #e0dacb;
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+            box-sizing: border-box;
+            box-shadow: 0 10px 40px rgba(31, 30, 27, 0.08);
+          "
+        >
+          <svg
+            viewBox="0 0 1440 900"
+            style="position: absolute; inset: 0; width: 100%; height: 100%; display: block"
+          >
+            <sc-for list="{{ edges }}" as="e" hint-placeholder-count="0">
+              <path
+                d="{{ e.d }}"
+                fill="none"
+                stroke="{{ e.stroke }}"
+                stroke-width="{{ e.sw }}"
+                stroke-dasharray="{{ e.dash }}"
+                opacity="{{ e.op }}"
+              ></path>
+            </sc-for>
+            <sc-for list="{{ halos }}" as="h" hint-placeholder-count="0">
+              <circle
+                cx="{{ h.cx }}"
+                cy="{{ h.cy }}"
+                r="{{ h.r }}"
+                fill="{{ h.fill }}"
+                stroke="{{ h.stroke }}"
+                stroke-width="{{ h.sw }}"
+                stroke-dasharray="{{ h.dash }}"
+                opacity="{{ h.op }}"
+              ></circle>
+            </sc-for>
+            <sc-for list="{{ nodes }}" as="n" hint-placeholder-count="0">
+              <circle
+                cx="{{ n.cx }}"
+                cy="{{ n.cy }}"
+                r="{{ n.r }}"
+                fill="{{ n.fill }}"
+                stroke="{{ n.stroke }}"
+                stroke-width="{{ n.sw }}"
+                stroke-dasharray="{{ n.dash }}"
+                opacity="{{ n.op }}"
+              ></circle>
+            </sc-for>
+          </svg>
+          <sc-for list="{{ labels }}" as="r" hint-placeholder-count="0">
+            <div
+              style="position:absolute;left:{{ r.x }}px;top:{{ r.y }}px;transform:translate(-50%,0);display:flex;flex-direction:column;align-items:center;gap:1px;white-space:nowrap;pointer-events:none;opacity:{{ r.op }};"
+            >
+              <div style="display: flex; gap: 5px; align-items: baseline">
+                <span
+                  style="font-family:'IBM Plex Mono',monospace;font-size:{{ r.idFs }}px;color:{{ r.idColor }};"
+                  >{{ r.id }}</span
+                >
+                <sc-if value="{{ r.title }}" hint-placeholder-val="{{ false }}"
+                  ><span style="font-size:12px;font-weight:{{ r.w }};color:{{ r.titleColor }};"
+                    >{{ r.title }}</span
+                  ></sc-if
+                >
+              </div>
+              <sc-if value="{{ r.sub }}" hint-placeholder-val="{{ false }}"
+                ><span
+                  style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:{{ r.subColor }};"
+                  >{{ r.sub }}</span
+                ></sc-if
+              >
+            </div>
+          </sc-for>
+          <sc-for list="{{ flags }}" as="f" hint-placeholder-count="0">
+            <div
+              style="position:absolute;left:{{ f.x }}px;top:{{ f.y }}px;transform:translate(-50%,-100%);display:flex;flex-direction:column;align-items:center;pointer-events:none;"
+            >
+              <span
+                style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;color:{{ f.color }};background:{{ f.bg }};border:1px solid {{ f.borderC }};border-radius:6px;padding:4px 9px;white-space:nowrap;box-shadow:0 2px 8px rgba(31,30,27,0.10);"
+                >{{ f.text }}</span
+              >
+              <span style="width:1px;height:9px;background:{{ f.borderC }};"></span>
+            </div>
+          </sc-for>
+          <div
+            style="
+              position: absolute;
+              left: 26px;
+              top: 22px;
+              display: flex;
+              flex-direction: column;
+              gap: 3px;
+              pointer-events: none;
+            "
+          >
+            <div style="display: flex; align-items: center; gap: 9px">
+              <span
+                style="
+                  width: 9px;
+                  height: 9px;
+                  background: #c15f3c;
+                  transform: rotate(45deg);
+                  flex: none;
+                "
+              ></span>
+              <span
+                style="
+                  font-family: &quot;Source Serif 4&quot;, &quot;Songti SC&quot;, serif;
+                  font-size: 18px;
+                  font-weight: 600;
+                  color: #1f1e1b;
+                  white-space: nowrap;
+                "
+                >AES 需求星图</span
+              >
+            </div>
+            <span
+              style="
+                font-family: &quot;IBM Plex Mono&quot;, monospace;
+                font-size: 11.5px;
+                color: #9a948e;
+                padding-left: 18px;
+                white-space: nowrap;
+              "
+              >61 issues · 44 已探明 · 星等 = 依赖连接数</span
+            >
+          </div>
+          <div
+            style="
+              position: absolute;
+              left: 26px;
+              top: 78px;
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              width: 232px;
+              background: #ffffff;
+              border: 1px solid #e0dacb;
+              border-radius: 8px;
+              padding: 7px 12px;
+              box-shadow: 0 2px 8px rgba(31, 30, 27, 0.05);
+            "
+          >
+            <span style="font-size: 13px; color: #9a948e">⌕</span>
+            <span style="font-size: 12.5px; color: #b0aa9c; white-space: nowrap"
+              >搜索 issue / worker…</span
+            >
+          </div>
+          <sc-if value="{{ showLegend }}" hint-placeholder-val="{{ true }}">
+            <div
+              style="
+                position: absolute;
+                left: 26px;
+                bottom: 24px;
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+                background: rgba(255, 255, 255, 0.88);
+                border: 1px solid #e8e2d2;
+                border-radius: 10px;
+                padding: 12px 14px;
+                min-width: 132px;
+              "
+            >
+              <sc-for list="{{ legend }}" as="l" hint-placeholder-count="4">
+                <div
+                  style="
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    font-size: 12px;
+                    color: #6b675c;
+                  "
+                >
+                  <span
+                    style="width:9px;height:9px;border-radius:50%;background:{{ l.bg }};border:{{ l.border }};box-sizing:border-box;flex:none;"
+                  ></span>
+                  <span>{{ l.text }}</span>
+                  <span
+                    style="
+                      font-family: &quot;IBM Plex Mono&quot;, monospace;
+                      font-size: 11px;
+                      color: #9a948e;
+                      margin-left: auto;
+                      padding-left: 14px;
+                    "
+                    >{{ l.n }}</span
+                  >
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+          <sc-if value="{{ showDock }}" hint-placeholder-val="{{ true }}">
+            <div
+              style="
+                position: absolute;
+                right: 22px;
+                top: 22px;
+                width: 250px;
+                background: #ffffff;
+                border: 1px solid #e0dacb;
+                border-radius: 12px;
+                box-shadow: 0 6px 22px rgba(31, 30, 27, 0.08);
+                padding: 14px 16px;
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+                box-sizing: border-box;
+              "
+            >
+              <div style="display: flex; align-items: baseline; gap: 8px">
+                <span style="font-size: 12px; font-weight: 600; color: #1f1e1b; letter-spacing: 1px"
+                  >WORKERS</span
+                >
+                <span
+                  style="
+                    font-family: &quot;IBM Plex Mono&quot;, monospace;
+                    font-size: 11px;
+                    color: #9a948e;
+                  "
+                  >2/5 在场</span
+                >
+              </div>
+              <sc-for list="{{ dock }}" as="w" hint-placeholder-count="5">
+                <div style="display:flex;flex-direction:column;gap:2px;opacity:{{ w.op }};">
+                  <div style="display: flex; align-items: center; gap: 7px">
+                    <span
+                      style="width:7px;height:7px;border-radius:50%;background:{{ w.dot }};flex:none;"
+                    ></span>
+                    <span
+                      style="
+                        font-family: &quot;IBM Plex Mono&quot;, monospace;
+                        font-size: 12.5px;
+                        font-weight: 600;
+                        color: #1f1e1b;
+                        white-space: nowrap;
+                      "
+                      >{{ w.name }}</span
+                    >
+                    <span style="font-size:11px;color:{{ w.statColor }};white-space:nowrap;"
+                      >{{ w.stat }}</span
+                    >
+                    <span
+                      style="margin-left: auto; font-size: 13px; color: #c15f3c; cursor: pointer"
+                      >{{ w.go }}</span
+                    >
+                  </div>
+                  <span
+                    style="font-size:11.5px;color:{{ w.taskColor }};padding-left:14px;white-space:nowrap;"
+                    >{{ w.task }}</span
+                  >
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+          <span
+            style="
+              position: absolute;
+              left: 720px;
+              top: 870px;
+              transform: translate(-50%, -50%);
+              font-family: &quot;IBM Plex Mono&quot;, monospace;
+              font-size: 10.5px;
+              color: #b0a99a;
+              white-space: nowrap;
+              pointer-events: none;
+            "
+            >悬停高亮邻居 · 滚轮缩放 · 拖拽平移</span
+          >
+          <div
+            style="
+              position: absolute;
+              right: 22px;
+              bottom: 22px;
+              display: flex;
+              align-items: center;
+              gap: 2px;
+              background: #ffffff;
+              border: 1px solid #e0dacb;
+              border-radius: 8px;
+              padding: 3px;
+            "
+          >
+            <span style="font-size: 13px; color: #6b675c; padding: 3px 9px; cursor: pointer"
+              >−</span
+            >
+            <span
+              style="
+                font-family: &quot;IBM Plex Mono&quot;, monospace;
+                font-size: 11px;
+                color: #9a948e;
+                padding: 0 4px;
+              "
+              >100%</span
+            >
+            <span style="font-size: 13px; color: #6b675c; padding: 3px 9px; cursor: pointer"
+              >＋</span
+            >
+          </div>
+        </div>
+      </div>
+    </x-dc>
+    <script
+      type="text/x-dc"
+      data-dc-script
+      data-props='{
+  "$preview": {"width": 1488, "height": 948},
+  "demoHover": {"editor": "boolean", "default": false, "tsType": "boolean", "section": "演示状态", "description": "展示悬停 #45 时的邻居高亮态"},
+  "showDock": {"editor": "boolean", "default": true, "tsType": "boolean", "section": "界面"},
+  "showLegend": {"editor": "boolean", "default": true, "tsType": "boolean", "section": "界面"}
+}'
+    >
+      class Component extends DCLogic {
+        renderVals() {
+          const demoHover = this.props.demoHover ?? false;
+          const showDock = this.props.showDock ?? true;
+          const showLegend = this.props.showLegend ?? true;
+          const M = {
+            '30':{x:500,y:300,k:'res',t:'需求澄清'},'23':{x:660,y:215,k:'res',t:'账号体系'},
+            '14':{x:820,y:172,k:'res'},'07':{x:960,y:205,k:'res'},
+            '12':{x:1010,y:345,k:'res',t:'网关就绪'},'26':{x:1108,y:452,k:'res'},
+            '31':{x:360,y:590,k:'res',warn:true},
+            '41':{x:620,y:395,k:'cla',t:'访谈确认门禁'},'37':{x:985,y:540,k:'cla',t:'权限模型收敛'},
+            '45':{x:800,y:330,k:'fro',t:'SSO 回调兜底'},'46':{x:470,y:500,k:'fro',t:'审计日志导出'},
+            '52':{x:925,y:285,k:'fro',t:'图谱性能采样'},'55':{x:1180,y:565,k:'fro',t:'API 限流开关'},
+            '48':{x:1290,y:268,k:'fro',t:'工单模板 v2'},'58':{x:1332,y:418,k:'fro',t:'迁移脚本干跑'},
+            '57':{x:640,y:578,k:'blk',t:'通知渠道聚合'},'59':{x:775,y:480,k:'blk',t:'灰度发布编排'},
+            '60':{x:1105,y:655,k:'blk',t:'多租户配额'},'61':{x:890,y:642,k:'blk',t:'复盘报告生成'}
+          };
+          const E = [['30','23'],['23','14'],['14','07'],['07','12'],['12','26'],['30','41'],['23','41'],['41','45'],['14','45'],['45','52'],['07','52'],['12','37'],['26','37'],['37','55'],['55','58'],['52','48'],['48','58'],['41','57'],['45','59'],['41','59'],['37','60'],['55','60'],['59','61'],['37','61'],['31','46'],['30','46'],['46','57'],['26','55'],['12','52'],['23','45']];
+          const deg = {}; E.forEach(([a,b]) => { deg[a]=(deg[a]||0)+1; deg[b]=(deg[b]||0)+1; });
+          Object.entries(M).forEach(([id,n]) => { n.id=id; const d=deg[id]||0;
+            n.r = n.k==='cla'?9+1.4*d : n.k==='fro'?8+1.4*d : n.k==='blk'?5+1.1*d : 3.5+0.8*d; });
+          let seed=7; const rnd=()=>{seed=(seed*16807)%2147483647;return seed/2147483647;};
+          const mains=Object.values(M); const stars=[]; let guard=0;
+          while(stars.length<26&&guard++<600){const x=60+rnd()*1320,y=60+rnd()*790;
+            if((x<330&&y<320)||(x>1120&&y<380)||(x<330&&y>680)||(x>1120&&y>820)||(y<70&&x>500&&x<940))continue;
+            if(mains.some(n=>Math.hypot(n.x-x,n.y-y)<70))continue;
+            if(stars.some(s=>Math.hypot(s.x-x,s.y-y)<46))continue;
+            stars.push({x,y,r:1.6+rnd()*1.9});}
+          const qd=(a,b,s)=>{const mx=(a.x+b.x)/2,my=(a.y+b.y)/2,dx=b.x-a.x,dy=b.y-a.y,L=Math.hypot(dx,dy)||1,o=L*0.09*s;
+            return 'M '+a.x+' '+a.y+' Q '+(mx-dy/L*o).toFixed(1)+' '+(my+dx/L*o).toFixed(1)+' '+b.x+' '+b.y;};
+          const starEdges=stars.slice(0,10).map(s=>{let best=null,bd=1e9;
+            for(const n of mains){const d=Math.hypot(n.x-s.x,n.y-s.y);if(d<bd){bd=d;best=n;}}
+            return bd<260?{a:s,b:best}:null;}).filter(Boolean);
+          // demoHover: 悬停 #45 的聚焦态
+          const hov='45';
+          const nb={};nb[hov]=1;E.forEach(([a,b])=>{if(a===hov)nb[b]=1;if(b===hov)nb[a]=1;});
+          const nodeOp=n=>!demoHover?1:(nb[n.id]?1:(n.k==='cla'?0.5:0.15));
+          const edges=[],nodes=[],halos=[],labels=[];
+          E.forEach(([a,b],i)=>{const A=M[a],B=M[b];const blk=B.k==='blk';
+            let stroke='#DFD8C7',sw=1.1,dash='',op=0.9;
+            if(blk){stroke='#CE9A83';dash='5 4';sw=1.15;}
+            if(demoHover){const on=(a===hov||b===hov);op=on?1:0.1;if(on){stroke=blk?'#C15F3C':'#B9AF97';sw=1.4;}}
+            edges.push({d:qd(A,B,i%2?1:-1),stroke,sw,dash,op});});
+          starEdges.forEach((e,i)=>edges.push({d:qd(e.a,e.b,i%2?1:-1),stroke:'#E7E1D2',sw:1,dash:'',op:demoHover?0.15:0.55}));
+          Object.values(M).forEach(n=>{const op=nodeOp(n);
+            if(n.k==='fro'){
+              halos.push({cx:n.x,cy:n.y,r:n.r+10,fill:'rgba(193,95,60,0.07)',stroke:'none',sw:0,dash:'',op});
+              halos.push({cx:n.x,cy:n.y,r:n.r+4.5,fill:'none',stroke:'rgba(193,95,60,0.35)',sw:1.1,dash:'',op});
+              nodes.push({cx:n.x,cy:n.y,r:n.r,fill:'#C15F3C',stroke:'none',sw:0,dash:'',op});
+            } else if(n.k==='cla'){
+              halos.push({cx:n.x,cy:n.y,r:n.r+15,fill:'rgba(124,107,174,0.06)',stroke:'none',sw:0,dash:'',op});
+              halos.push({cx:n.x,cy:n.y,r:n.r+9,fill:'none',stroke:'rgba(124,107,174,0.20)',sw:1.1,dash:'',op});
+              halos.push({cx:n.x,cy:n.y,r:n.r+4.5,fill:'none',stroke:'rgba(124,107,174,0.45)',sw:1.2,dash:'',op});
+              nodes.push({cx:n.x,cy:n.y,r:n.r,fill:'#7C6BAE',stroke:'none',sw:0,dash:'',op});
+            } else if(n.k==='blk'){
+              nodes.push({cx:n.x,cy:n.y,r:n.r,fill:'#FAF9F5',stroke:'#A39C8D',sw:1.4,dash:'3 3',op});
+            } else {
+              nodes.push({cx:n.x,cy:n.y,r:n.r,fill:'#B7AF9F',stroke:'none',sw:0,dash:'',op:op*0.95});
+              if(n.warn)halos.push({cx:n.x,cy:n.y,r:n.r+4,fill:'none',stroke:'#B08838',sw:1.1,dash:'2 3',op});
+            }});
+          stars.forEach(s=>nodes.push({cx:s.x,cy:s.y,r:s.r,fill:'#DAD4C5',stroke:'none',sw:0,dash:'',op:demoHover?0.3:0.9}));
+          Object.values(M).forEach(n=>{const op=nodeOp(n);
+            if(n.k==='res'){
+              labels.push({x:n.x,y:n.y+n.r+5,id:'#'+n.id,idFs:10.5,idColor:'#B0A897',title:null,w:400,titleColor:'',sub:n.warn?'⚠ 回归有波动':null,subColor:'#B08838',op:Math.min(op,0.9)});
+              return;}
+            const idColor=n.k==='fro'?'#A94F2F':n.k==='cla'?'#6A5A9E':'#8D867A';
+            labels.push({x:n.x,y:n.y+n.r+6,id:'#'+n.id,idFs:11.5,idColor,title:n.t,w:n.k==='fro'?500:400,titleColor:'#6B675C',sub:null,subColor:'',op});});
+          const flags=[
+            {x:M['41'].x,y:M['41'].y-M['41'].r-6,text:'dev5 ▶ 2h14m',color:'#FFFFFF',bg:'#7C6BAE',borderC:'#6A5A9E'},
+            {x:M['37'].x,y:M['37'].y-M['37'].r-6,text:'dev1 ✋ 等待确认',color:'#8A6A1F',bg:'#F6EDD8',borderC:'#D9C48F'}];
+          const legend=[
+            {bg:'#C15F3C',border:'none',text:'可开工',n:'6'},{bg:'#7C6BAE',border:'none',text:'进行中',n:'2'},
+            {bg:'#FAF9F5',border:'1.5px dashed #A39C8D',text:'被阻塞',n:'4'},{bg:'#B7AF9F',border:'none',text:'已完成',n:'44'}];
+          const dock=[
+            {dot:'#7C6BAE',name:'dev5',stat:'▶ 运行中 2h14m',statColor:'#6A5A9E',task:'#41 访谈确认门禁',taskColor:'#6B675C',go:'⌖',op:1},
+            {dot:'#B08838',name:'dev1',stat:'✋ 等待确认',statColor:'#8A6A1F',task:'#37 权限模型收敛',taskColor:'#6B675C',go:'⌖',op:1},
+            {dot:'#C6C0B2',name:'dev2',stat:'空闲',statColor:'#9A9484',task:'—',taskColor:'#B0AA9C',go:'',op:0.6},
+            {dot:'#C6C0B2',name:'dev3',stat:'空闲',statColor:'#9A9484',task:'—',taskColor:'#B0AA9C',go:'',op:0.6},
+            {dot:'#C6C0B2',name:'dev4',stat:'空闲',statColor:'#9A9484',task:'—',taskColor:'#B0AA9C',go:'',op:0.6}];
+          return { edges, nodes, halos, labels, flags, legend, dock, showDock, showLegend };
+        }
+      }
+    </script>
+  </body>
+</html>
