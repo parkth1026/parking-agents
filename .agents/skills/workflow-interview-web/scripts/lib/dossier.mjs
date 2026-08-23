@@ -233,7 +233,18 @@ function renderMarkdown(source) {
   return `<div class="markdown">${output.join('')}</div>`;
 }
 
-function answerSummary(answer) {
+function booleanLabelsFor(item) {
+  if (item?.response?.type !== 'boolean') return undefined;
+  const options = item.options ?? [];
+  const trueOption = options.find((option, index) => option.value ?? index === 0);
+  const falseOption = options.find((option, index) => !(option.value ?? index === 0));
+  return [
+    trueOption?.text ?? item.response.true_label ?? '是',
+    falseOption?.text ?? item.response.false_label ?? '否',
+  ];
+}
+
+function answerSummary(answer, booleanLabels) {
   if (!answer) return '尚未回答';
   if (answer.type === 'choice') return `选择 ${answer.choice}`;
   if (answer.type === 'multi') return `选择 ${answer.choices.join('、')}${answer.custom ? `；补充：${answer.custom}` : ''}`;
@@ -243,7 +254,7 @@ function answerSummary(answer) {
   if (answer.type === 'date_time') return answer.value;
   if (answer.type === 'ranking') return answer.choices.join(' → ');
   if (answer.type === 'evidence') return answer.values.join('；');
-  if (answer.type === 'boolean') return answer.value ? '是' : '否';
+  if (answer.type === 'boolean') return answer.value ? booleanLabels?.[0] ?? '是' : booleanLabels?.[1] ?? '否';
   if (answer.type === 'confirm') return '明确确认';
   if (answer.type === 'accept') return '未反对，按默认接受';
   return JSON.stringify(answer);
@@ -269,7 +280,7 @@ function renderRound(round, submission) {
         <header><span>${escapeHtml(item.q_id)} · ${escapeHtml(item.tier)}</span><h3>${escapeHtml(item.question ?? item.line)}</h3></header>
         ${item.known_facts ? `<p class="facts">已知事实：${escapeHtml(item.known_facts)}</p>` : ''}
         ${renderOptions(item, answer)}
-        <p class="answer"><strong>用户决定</strong>${escapeHtml(answerSummary(answer))}</p>
+        <p class="answer"><strong>用户决定</strong>${escapeHtml(answerSummary(answer, booleanLabelsFor(item)))}</p>
         ${(item.source_refs?.length || item.triggered_by) ? `<p class="trace">来源：${escapeHtml((item.source_refs ?? [item.triggered_by]).join(' · '))}</p>` : ''}
       </article>`;
     }).join('')}

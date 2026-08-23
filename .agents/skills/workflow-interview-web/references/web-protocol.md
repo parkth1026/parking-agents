@@ -10,6 +10,7 @@ web/
 ├── decision-ledger.jsonl      Web 侧不可变事件链（带前序摘要）
 ├── server-info               当前 URL、token、pid（owner-only）
 ├── .session-token            当前 token（owner-only）
+├── .last-port                上次使用的端口，重启时复用（owner-only）
 ├── submissions/<round>.json  浏览器提交；一轮一个，不覆盖
 ├── consumed/<round>.json     已成功映射回家族 rounds 的标记
 ├── assets/                    发布时复制的只读附件
@@ -100,13 +101,18 @@ localStorage 或外部资源才能阅读。
 | --- | --- | --- |
 | `single_select` | 单选决策 | `options`、`allow_custom` |
 | `multi_select` | 多选范围/能力 | `min`、`max`、`exclusive_keys` |
-| `boolean` | 是/否门禁 | `true_label`、`false_label` |
+| `boolean` | 是/否门禁 | `true_label`、`false_label`，或两个 options |
 | `short_text` | 短文本 | `placeholder` |
 | `long_text` | 长文本/补充语境 | `placeholder` |
 | `number` | 数值约束 | `min`、`max`、`step`、`unit` |
 | `date_time` | 日期或时间点 | `format: date|time|datetime-local` |
 | `ranking` | 优先级排序 | 复用 `options` |
 | `evidence` | 证据/链接清单 | `placeholder` |
+
+`multi_select` 的数量边界写作 `min`/`max`（如上表与示例）；`publish` 接受这两个名字，
+落盘时统一正规化为 `min_selections`/`max_selections`，两者同时给出且不一致会被拒绝。
+`boolean` 不给 `options` 时用 `true_label`/`false_label` 做按钮文案（缺省 是/否）；
+给 `options` 则必须恰好两项。除 `single_select` 外，其他响应类型的选项都不要求 `pct`。
 
 多选示例：
 

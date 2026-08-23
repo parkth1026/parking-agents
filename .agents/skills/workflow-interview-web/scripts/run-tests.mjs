@@ -340,8 +340,45 @@ try {
   assert(malformedPath.response.status === 404, '/files/ 畸形编码没有 404');
   check('/files/ 仅允许 assets basename，越权路径 404');
 
+  const docContractRound = {
+    round: {
+      id: 'r4', no: 4, stage: '1-interview', title: '协议文档契约形态', status: 'pending',
+      items: [
+        { q_id: 'DM1', tier: 'ask', question: '哪些模块进入范围？', required: true, response: { type: 'multi_select', min: 2, max: 2 }, options: [
+          { key: 'A', text: '甲' }, { key: 'B', text: '乙' }, { key: 'C', text: '丙' },
+        ] },
+        { q_id: 'DB1', tier: 'ask', question: '是否启用守护进程？', required: false, response: { type: 'boolean', true_label: '启用', false_label: '停用' } },
+      ],
+    },
+    open_ambiguities: 2,
+  };
+  parseJsonOutput(run(PUBLISH, ['round', '--issue-dir', issueDir, '--file', writeJson('round-r4.json', docContractRound)]), 'publish r4 doc-contract');
+  const normalizedState = JSON.parse(readFileSync(join(issueDir, 'web', 'state.json'), 'utf8'));
+  const normalizedRound = normalizedState.rounds.find((candidate) => candidate.id === 'r4');
+  const normalizedItem = normalizedRound.items.find((item) => item.q_id === 'DM1');
+  assert(normalizedItem.response.min_selections === 2 && normalizedItem.response.max_selections === 2 && normalizedItem.response.min === undefined, '文档 min/max 没有正规化为 min_selections/max_selections');
+  assert(normalizedRound.items.find((item) => item.q_id === 'DB1').options === undefined, 'boolean 无 options 形态不应被塞入 options');
+  const tooFew = await jsonFetch(keyUrl('/api/submit'), {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ round: 'r4', answers: [
+      { q_id: 'DM1', type: 'multi', choices: ['A'] },
+      { q_id: 'DB1', type: 'boolean', value: true },
+    ] }),
+  });
+  assert(tooFew.response.status === 400, '文档 min/max 边界没有被服务端强制');
+  const docSubmit = await jsonFetch(keyUrl('/api/submit'), {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ round: 'r4', answers: [
+      { q_id: 'DM1', type: 'multi', choices: ['A', 'B'] },
+      { q_id: 'DB1', type: 'boolean', value: false },
+    ] }),
+  });
+  assert(docSubmit.response.status === 200, '文档契约形态提交失败');
+  check('文档契约形态（无 pct 多选 + true_label 布尔）可发布，min/max 正规化且服务端强制');
+
   const runtimeSources = ['server.mjs', 'publish.mjs', 'wait-submit.mjs', 'export-static.mjs'].map((name) => readFileSync(join(HERE, name), 'utf8'));
   assert(runtimeSources.every((source) => !/from\s+['"][^'"]*workflow-interview/.test(source)), 'runtime import 了 workflow-interview 家族');
+  assert(!runtimeSources[0].includes('.aes-workflow') && !runtimeSources[0].includes('repoRootFrom'), 'server 仍向 issue 目录外写 .aes-workflow 或保留 repoRootFrom');
   const skill = readFileSync(join(SKILL_ROOT, 'SKILL.md'), 'utf8');
   assert(skill.includes('宿主无后台任务能力 → 回合模式') && skill.includes('Node 不可用 → 纯文本') && skill.includes('浏览器不可用 → 纯文本'), 'SKILL.md 三级降级不完整');
   assert(skill.includes('仅当用户显式调用 $workflow-interview-web') && !skill.includes('disable-model-invocation:'), 'SKILL.md 显式调用边界或标准 frontmatter 不正确');
@@ -350,12 +387,17 @@ try {
   const app = readFileSync(join(HERE, 'web', 'app.mjs'), 'utf8');
   assert(app.includes('localStorage') && app.includes('new WebSocket') && app.includes('contract-revision-input'), '单页缺草稿/WS/契约修改能力');
   assert(app.includes('renderSingleDetails') && app.includes('renderMultiChoice') && app.includes('decision-detail-stack'), '紧凑问卷缺逐题固定详情槽或多选能力');
+  assert(app.includes('true_label') && app.includes('false_label'), 'boolean 无 options 时不读 true_label/false_label');
   assert(app.includes('dossierData?.submissions') && app.includes('renderDossier') && app.includes('markdownBlock(dossierData.context_markdown)'), '提交后没有从权威决策档案回看、缺完整轨迹或上下文仍为原始 Markdown');
   const style = readFileSync(join(HERE, 'web', 'style.css'), 'utf8');
   assert(style.includes('position: sticky') && style.includes('flex-wrap: wrap') && style.includes('max-width: 1180px') && style.includes('.decision-detail-stack'), '紧凑问卷缺 sticky 摘要、pill 换行、阅读宽度上限或逐题固定详情槽');
   assert(style.includes('grid-area: 1 / 1') && style.includes('visibility: hidden'), '详情槽没有通过同格叠放预留最大内容高度');
   assert(app.includes("'/export'") || readFileSync(join(HERE, 'web', 'index.html'), 'utf8').includes('href="/export"'), '页面缺静态导出入口');
   check('薄层依赖、显式调用策略、三级降级、结构化问卷与完整轨迹静态检查');
+
+  const stickyPath = join(issueDir, 'web', '.last-port');
+  assert(existsSync(stickyPath) && Number.parseInt(readFileSync(stickyPath, 'utf8').trim(), 10) === serverInfo.port, 'sticky 端口没有落在 <issue>/web/.last-port');
+  check('sticky 端口写入 issue 自己的 web/，不再外溢 .aes-workflow');
 
   const shutdown = await jsonFetch(keyUrl('/shutdown'));
   assert(shutdown.response.status === 200 && shutdown.body?.stopped === true, 'shutdown 没有成功回执');

@@ -73,6 +73,29 @@ function responseType(item) {
   return item?.response?.type ?? 'single_select';
 }
 
+// 协议文档把多选数量边界写成 min/max；实现与存量 state 用 min_selections/max_selections。
+// 发布时统一正规化为后者，server 与页面无需理解两套名字。
+function normalizeRoundResponses(round) {
+  const errors = [];
+  if (!Array.isArray(round?.items)) return { round, errors };
+  const items = round.items.map((item) => {
+    const response = item?.response;
+    if (response?.type !== 'multi_select') return item;
+    const next = { ...item, response: { ...response } };
+    for (const [documented, canonical] of [['min', 'min_selections'], ['max', 'max_selections']]) {
+      if (next.response[documented] === undefined) continue;
+      if (next.response[canonical] === undefined) next.response[canonical] = next.response[documented];
+      else if (next.response[canonical] !== next.response[documented]) {
+        errors.push(`${item?.q_id ?? 'item'} 的 response.${documented} 与 ${canonical} 同时存在且不一致。`);
+        continue;
+      }
+      delete next.response[documented];
+    }
+    return next;
+  });
+  return { round: { ...round, items }, errors };
+}
+
 function validateResponse(at, item, errors) {
   const type = responseType(item);
   if (!RESPONSE_TYPES.includes(type)) {
@@ -83,7 +106,8 @@ function validateResponse(at, item, errors) {
     errors.push(`${at}.response 必须是对象。`);
     return;
   }
-  if (OPTION_RESPONSE_TYPES.has(type)) {
+  const booleanLabelForm = type === 'boolean' && item.options === undefined;
+  if (OPTION_RESPONSE_TYPES.has(type) && !booleanLabelForm) {
     if (!Array.isArray(item.options) || item.options.length < 2) errors.push(`${at}.options 至少两项。`);
     const keys = new Set();
     let total = 0;
@@ -94,7 +118,7 @@ function validateResponse(at, item, errors) {
         shapeValid = false;
         continue;
       }
-      if (type !== 'ranking' && !Number.isFinite(option?.pct)) {
+      if (type === 'single_select' && !Number.isFinite(option?.pct)) {
         errors.push(`${at}.options[${optionIndex}].pct 要是数字。`);
         shapeValid = false;
       }
@@ -102,7 +126,7 @@ function validateResponse(at, item, errors) {
       keys.add(option.key);
       if (Number.isFinite(option.pct)) total += option.pct;
     }
-    if (shapeValid && type !== 'ranking' && Math.abs(total - 100) > 2) errors.push(`${at}.options 的 pct 加和是 ${total}，必须在 100±2。`);
+    if (shapeValid && type === 'single_select' && Math.abs(total - 100) > 2) errors.push(`${at}.options 的 pct 加和是 ${total}，必须在 100±2。`);
     if (type === 'boolean' && item.options?.length !== 2) errors.push(`${at}.boolean 必须正好两个 options。`);
     if (type === 'multi_select') {
       const min = item.response?.min_selections ?? (item.required === false ? 0 : 1);
@@ -114,6 +138,13 @@ function validateResponse(at, item, errors) {
     }
   } else if (item.options !== undefined && (!Array.isArray(item.options) || item.options.length > 0)) {
     errors.push(`${at}.${type} 不应声明 options。`);
+  }
+  if (booleanLabelForm) {
+    for (const label of ['true_label', 'false_label']) {
+      if (item.response?.[label] !== undefined && !nonEmpty(item.response[label])) {
+        errors.push(`${at}.response.${label} 要是非空字符串。`);
+      }
+    }
   }
   if (type === 'number') {
     if (item.response?.min !== undefined && !Number.isFinite(item.response.min)) errors.push(`${at}.response.min 要是数字。`);
@@ -209,8 +240,9 @@ if (positional[0] !== 'round') die('用法：publish.mjs round --issue-dir <dir>
 const issueDir = issueDirFrom(flags['issue-dir']);
 if (!flags.file) die('缺少 --file。', 2);
 const input = readJson(resolve(String(flags.file)), '--file');
-const round = input.round && typeof input.round === 'object' ? input.round : input;
-const errors = [...validateRound(round), ...validateFinal(input.final ?? round.final)];
+const rawRound = input.round && typeof input.round === 'object' ? input.round : input;
+const { round, errors: normalizeErrors } = normalizeRoundResponses(rawRound);
+const errors = [...normalizeErrors, ...validateRound(round), ...validateFinal(input.final ?? round.final)];
 if (input.phases !== undefined && !validatePhases(input.phases)) errors.push('phases 必须按三阶段顺序给出合法状态。');
 if (input.open_ambiguities !== undefined && (!Number.isInteger(input.open_ambiguities) || input.open_ambiguities < 0)) {
   errors.push('open_ambiguities 要是非负整数。');

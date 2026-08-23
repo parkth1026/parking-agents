@@ -377,7 +377,15 @@ function renderSimpleInput(round, item, answer, locked, type) {
 }
 
 function renderBoolean(round, item, answer, locked) {
-  const options = item.options ?? [{ key: 'yes', text: '是', value: true }, { key: 'no', text: '否', value: false }];
+  const spec = item.response ?? {};
+  const options = item.options ?? [
+    { key: 'yes', text: spec.true_label ?? '是', value: true },
+    { key: 'no', text: spec.false_label ?? '否', value: false },
+  ];
+  const labelFor = (value) => {
+    const match = options.entries().find(([index, option]) => (option.value ?? index === 0) === value);
+    return match ? match[1].text : (value ? '是' : '否');
+  };
   const row = node('div', { class: 'options' });
   for (const [index, option] of options.entries()) {
     const value = option.value ?? index === 0;
@@ -386,7 +394,7 @@ function renderBoolean(round, item, answer, locked) {
     button.addEventListener('click', () => choose(round, item, { type: 'boolean', value }));
     row.append(button);
   }
-  return [row, node('div', { class: 'simple-answer-slot boolean-summary' }, [node('span', { text: answer?.type === 'boolean' ? `当前选择：${answer.value ? '是' : '否'}` : '请选择明确的是或否。' })])];
+  return [row, node('div', { class: 'simple-answer-slot boolean-summary' }, [node('span', { text: answer?.type === 'boolean' ? `当前选择：${labelFor(answer.value)}` : '请选择明确的是或否。' })])];
 }
 
 function renderRanking(round, item, answer, locked) {

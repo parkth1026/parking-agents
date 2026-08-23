@@ -88,16 +88,6 @@ function safeEqual(left, right) {
   return timingSafeEqual(a, b);
 }
 
-function repoRootFrom(issueDir) {
-  let current = issueDir;
-  for (;;) {
-    if (existsSync(join(current, '.git'))) return current;
-    const parent = dirname(current);
-    if (parent === current) return dirname(dirname(dirname(issueDir)));
-    current = parent;
-  }
-}
-
 function readJson(pathname, fallback = null) {
   try { return JSON.parse(readFileSync(pathname, 'utf8')); }
   catch { return fallback; }
@@ -161,10 +151,8 @@ async function start(issueDir, flags) {
   const tokenPath = join(webDir, '.session-token');
   atomicText(tokenPath, `${token}\n`);
 
-  const repoRoot = repoRootFrom(issueDir);
-  const stickyDir = join(repoRoot, '.aes-workflow', 'workflow-interview-web');
-  const stickyPath = join(stickyDir, '.last-port');
-  mkdirSync(stickyDir, { recursive: true });
+  // sticky 端口是本 issue 的运行状态，留在 web/ 内，不向 issue 目录外写任何文件。
+  const stickyPath = join(webDir, '.last-port');
   const stickyPort = Number.parseInt(readFileIfPresent(stickyPath), 10);
   const requestedPort = Number.parseInt(String(flags.port ?? process.env.WI_WEB_PORT ?? stickyPort ?? DEFAULT_PORT), 10);
   const port = Number.isInteger(requestedPort) && requestedPort >= 0 && requestedPort <= 65535
