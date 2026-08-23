@@ -23,10 +23,49 @@ function tempDirectory(label) {
   return mkdtempSync(join(tmpdir(), `aes-worktree-board-${label}-`));
 }
 
+function deferTempCleanup(path) {
+  const cleanupScript = `
+const { rmSync } = require('node:fs');
+const target = process.argv[1];
+for (let attempt = 0; attempt < 600; attempt += 1) {
+  try {
+    rmSync(target, { recursive: true, force: true });
+    process.exit(0);
+  } catch (error) {
+    if (!['EPERM', 'EBUSY', 'ENOTEMPTY'].includes(error.code)) process.exit(1);
+  }
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 100);
+}
+process.exit(1);
+`;
+  const child = spawn(process.execPath, ['-e', cleanupScript, path], {
+    cwd: ROOT,
+    detached: true,
+    stdio: 'ignore',
+  });
+  child.on('error', () => {});
+  child.unref();
+}
+
 function cleanTemp(path) {
   if (path && existsSync(path) && path.startsWith(resolve(tmpdir()))) {
-    rmSync(path, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
+    try {
+      rmSync(path, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
+    } catch (error) {
+      if (!['EPERM', 'EBUSY', 'ENOTEMPTY'].includes(error.code)) throw error;
+      deferTempCleanup(path);
+    }
   }
+}
+
+function cleanRepositoryFixture(fixture) {
+  if (!fixture) return;
+  if (existsSync(fixture.main)) {
+    spawnSync('git', ['-C', fixture.main, 'worktree', 'remove', '--force', fixture.sibling], {
+      encoding: 'utf8',
+    });
+  }
+  cleanTemp(fixture.root);
 }
 
 function gitSync(cwd, args) {
@@ -165,9 +204,9 @@ function worktreeDirty(path) {
   return result.stdout.trim().length > 0;
 }
 
-function dispatchSync(args, runtimeDir, repoRoot = ROOT) {
+function dispatchSync(args, runtimeDir, repoRoot = ROOT, cwd = repoRoot) {
   return spawnSync(process.execPath, [join(SCRIPT_DIR, 'dispatch.mjs'), ...args], {
-    cwd: repoRoot,
+    cwd,
     encoding: 'utf8',
     env: boardEnv(runtimeDir, { AES_WORKTREE_BOARD_REPO_ROOT: repoRoot }),
     timeout: 30_000,
@@ -197,8 +236,28 @@ function waitForLine(child) {
 function waitForExit(child) {
   return new Promise((resolveExit, reject) => {
     child.on('error', reject);
-    child.on('exit', (code) => resolveExit(code));
+    // Windows may still hold the fixture cwd or inherited handles after exit;
+    // close means the child and its stdio resources have been released.
+    child.on('close', (code) => resolveExit(code));
   });
+}
+
+function processAlive(pid) {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error?.code === 'EPERM';
+  }
+}
+
+async function waitForProcessExit(pid) {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    if (!processAlive(pid)) return;
+    await new Promise((resolveWait) => setTimeout(resolveWait, 100));
+  }
+  throw new Error(`子进程 ${pid} 未在期限内退出`);
 }
 
 function startServer(runtimeDir, extraEnv = {}, cwd = ROOT) {
@@ -251,8 +310,8 @@ async function repoRootDomain() {
       join(SCRIPT_DIR, 'dispatch.mjs'), basename(fixture.sibling), '--agent', 'test',
       '--task-id', 'cross-repo-direct', 'cross-repo direct dispatch',
     ], {
-      cwd: fixture.main,
-      env: boardEnv(directRuntime),
+      cwd: ROOT,
+      env: boardEnv(directRuntime, { AES_WORKTREE_BOARD_REPO_ROOT: fixture.main }),
       encoding: 'utf8',
       timeout: 30_000,
     });
@@ -277,7 +336,11 @@ async function repoRootDomain() {
       new RegExp(expectedInvalidRoot.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'),
     );
 
-    server = await startServer(runtimeDir, {}, fixture.main);
+    server = await startServer(
+      runtimeDir,
+      { AES_WORKTREE_BOARD_REPO_ROOT: fixture.main },
+      ROOT,
+    );
     const response = await fetch(`${server.origin}/api/dispatch`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -296,16 +359,19 @@ async function repoRootDomain() {
       server.child.kill();
       await stopped;
     }
-    cleanTemp(fixture.root);
+    cleanRepositoryFixture(fixture);
   }
 }
 
 async function waitTask(origin, taskId) {
-  for (let attempt = 0; attempt < 80; attempt += 1) {
+  for (let attempt = 0; attempt < 300; attempt += 1) {
     const response = await fetch(`${origin}/api/task/${taskId}`);
     if (response.ok) {
       const value = await response.json();
-      if (value.task.status !== 'running') return value;
+      if (value.task.status !== 'running') {
+        await waitForProcessExit(value.task.pid);
+        return value;
+      }
     }
     await new Promise((resolveWait) => setTimeout(resolveWait, 100));
   }
@@ -314,7 +380,7 @@ async function waitTask(origin, taskId) {
 
 async function waitStatus(runtimeDir, expectedRoot, notBefore = null) {
   const statusPath = join(runtimeDir, 'status.json');
-  for (let attempt = 0; attempt < 100; attempt += 1) {
+  for (let attempt = 0; attempt < 300; attempt += 1) {
     if (existsSync(statusPath)) {
       const status = JSON.parse(readFileSync(statusPath, 'utf8'));
       const freshEnough = !notBefore || Date.parse(status.generatedAt) >= Date.parse(notBefore);
@@ -353,6 +419,7 @@ async function dispatchDomain() {
       [short, '--agent', 'test', '--task-id', `selftest-clean-${unique}`, '冒烟'],
       runtimeDir,
       fixture.main,
+      ROOT,
     );
     assert.equal(clean.status, 0, clean.stderr);
     const cleanLines = clean.stdout.trim().split(/\r?\n/).map(JSON.parse);
@@ -370,6 +437,7 @@ async function dispatchDomain() {
       [short, '--agent', 'test', '--task-id', `selftest-refused-${unique}`, 'dirty'],
       runtimeDir,
       fixture.main,
+      ROOT,
     );
     assert.equal(refused.status, 3);
     const refusedJson = parseJsonLine(refused.stderr);
@@ -380,7 +448,7 @@ async function dispatchDomain() {
       join(SCRIPT_DIR, 'dispatch.mjs'), short, '--agent', 'test', '--confirm-dirty',
       '--task-id', `selftest-confirmed-${unique}`, 'dirty confirmed',
     ], {
-      cwd: fixture.main,
+      cwd: ROOT,
       env: boardEnv(runtimeDir, { AES_WORKTREE_BOARD_REPO_ROOT: fixture.main }),
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -388,7 +456,7 @@ async function dispatchDomain() {
     assert.equal(firstLine.ok, true);
     const locked = dispatchSync([
       short, '--agent', 'test', '--confirm-dirty', '--task-id', `selftest-locked-${unique}`, 'locked',
-    ], runtimeDir, fixture.main);
+    ], runtimeDir, fixture.main, ROOT);
     assert.equal(locked.status, 2);
     assert.equal(parseJsonLine(locked.stderr).code, 'LOCKED');
     assert.equal(await waitForExit(confirmed), 0);
@@ -396,7 +464,7 @@ async function dispatchDomain() {
     server = await startServer(
       runtimeDir,
       { AES_WORKTREE_BOARD_REPO_ROOT: fixture.main },
-      fixture.main,
+      ROOT,
     );
     let response = await fetch(`${server.origin}/api/dispatch`, {
       method: 'POST',
@@ -438,7 +506,7 @@ async function dispatchDomain() {
       server.child.kill();
       await stopped;
     }
-    cleanTemp(fixture.root);
+    cleanRepositoryFixture(fixture);
   }
 }
 
