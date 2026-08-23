@@ -1,6 +1,0 @@
-interface:
-  display_name: "aes-grilling-web"
-  short_description: "aes-grilling-web"
-  default_prompt: "使用 $aes-grilling-web：先调查目标仓库事实，再由当前 Agent 用技能自带的 Web runtime 展示首批材料决定；不要让我重复输入 Prompt，不要安装或调用 Superpowers，不要创建第二个 Agent 或循环等待，最后生成短小、可提交 Git、可直接交给强 Agent 执行的 Goal Contract。"
-policy:
-  allow_implicit_invocation: false
