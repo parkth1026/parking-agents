@@ -82,7 +82,7 @@ async function handleDispatch(request, response) {
   }
   if (!config.agents[agent]) return badRequest(response, `未知 agent "${agent}"`);
 
-  const { siblings } = await listWorktrees();
+  const { main, siblings } = await listWorktrees();
   const target = siblings.find((entry) => {
     const name = entry.path.split('/').pop();
     return name === worktree || name.endsWith(`-${worktree}`);
@@ -134,7 +134,7 @@ async function handleDispatch(request, response) {
     detached: true,
     stdio: 'ignore',
     cwd: SKILL_DIR,
-    env: process.env,
+    env: { ...process.env, AES_WORKTREE_BOARD_REPO_ROOT: main.path },
   });
   child.on('error', () => {
     launchingTasks.delete(targetName);

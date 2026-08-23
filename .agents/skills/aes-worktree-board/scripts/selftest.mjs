@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-// Goal Contract 的机械验收入口：collect / dispatch / server / layout。
+// Goal Contract 的机械验收入口：collect / dispatch / server / repo-root / layout。
 import assert from 'node:assert/strict';
 import { execFile, spawn, spawnSync } from 'node:child_process';
 import { promisify } from 'node:util';
 import {
   chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync,
 } from 'node:fs';
-import { homedir, tmpdir } from 'node:os';
+import { tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -23,7 +23,43 @@ function tempDirectory(label) {
 }
 
 function cleanTemp(path) {
-  if (path && existsSync(path) && path.startsWith(resolve(tmpdir()))) rmSync(path, { recursive: true, force: true });
+  if (path && existsSync(path) && path.startsWith(resolve(tmpdir()))) {
+    rmSync(path, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
+  }
+}
+
+function gitSync(cwd, args) {
+  const result = spawnSync('git', args, { cwd, encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  return result.stdout.replace(/\r\n/g, '\n').trimEnd();
+}
+
+function repositoryFixture(label) {
+  const root = tempDirectory(label);
+  const main = join(root, 'fixture-main');
+  const sibling = join(root, 'fixture-dev');
+  mkdirSync(main);
+  gitSync(main, ['init', '-b', 'main']);
+  gitSync(main, ['config', 'user.email', 'selftest@example.invalid']);
+  gitSync(main, ['config', 'user.name', 'AES Worktree Board Selftest']);
+  writeFileSync(join(main, 'fixture.txt'), 'fixture\n');
+  gitSync(main, ['add', 'fixture.txt']);
+  gitSync(main, ['commit', '-m', 'fixture']);
+  gitSync(main, ['worktree', 'add', '-b', 'fixture-dev', sibling]);
+  return { root, main, sibling };
+}
+
+function boardEnv(runtimeDir, extraEnv = {}) {
+  const env = { ...process.env };
+  delete env.AES_WORKTREE_BOARD_REPO_ROOT;
+  return { ...env, AES_WORKTREE_BOARD_RUNTIME_DIR: runtimeDir, ...extraEnv };
+}
+
+function assertFixtureStatus(runtimeDir, fixture) {
+  const status = JSON.parse(readFileSync(join(runtimeDir, 'status.json'), 'utf8'));
+  assert.equal(resolve(status.repo.root), resolve(fixture.main));
+  assert.deepEqual(status.worktrees.map((worker) => worker.name), [basename(fixture.sibling)]);
+  return status;
 }
 
 function parseJsonLine(text) {
@@ -164,10 +200,10 @@ function waitForExit(child) {
   });
 }
 
-function startServer(runtimeDir, extraEnv = {}) {
+function startServer(runtimeDir, extraEnv = {}, cwd = ROOT) {
   const child = spawn(process.execPath, [join(SCRIPT_DIR, 'server.mjs'), '--port', '0'], {
-    cwd: ROOT,
-    env: { ...process.env, AES_WORKTREE_BOARD_RUNTIME_DIR: runtimeDir, ...extraEnv },
+    cwd,
+    env: boardEnv(runtimeDir, extraEnv),
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   return Promise.race([
@@ -186,6 +222,83 @@ function startServer(runtimeDir, extraEnv = {}) {
   ]);
 }
 
+async function repoRootDomain() {
+  const fixture = repositoryFixture('repo-root');
+  const runtimeDir = join(fixture.root, 'runtime');
+  let server = null;
+  try {
+    const collectRuntime = join(fixture.root, 'collect-runtime');
+    const collected = spawnSync(process.execPath, [join(SCRIPT_DIR, 'collect.mjs'), '--no-gh'], {
+      cwd: fixture.main,
+      env: boardEnv(collectRuntime),
+      encoding: 'utf8',
+    });
+    assert.equal(collected.status, 0, collected.stderr);
+    assertFixtureStatus(collectRuntime, fixture);
+
+    const overrideRuntime = join(fixture.root, 'override-runtime');
+    const overridden = spawnSync(process.execPath, [join(SCRIPT_DIR, 'collect.mjs'), '--no-gh'], {
+      cwd: ROOT,
+      env: boardEnv(overrideRuntime, { AES_WORKTREE_BOARD_REPO_ROOT: fixture.main }),
+      encoding: 'utf8',
+    });
+    assert.equal(overridden.status, 0, overridden.stderr);
+    assertFixtureStatus(overrideRuntime, fixture);
+
+    const directRuntime = join(fixture.root, 'direct-runtime');
+    const direct = spawnSync(process.execPath, [
+      join(SCRIPT_DIR, 'dispatch.mjs'), basename(fixture.sibling), '--agent', 'test',
+      '--task-id', 'cross-repo-direct', 'cross-repo direct dispatch',
+    ], {
+      cwd: fixture.main,
+      env: boardEnv(directRuntime),
+      encoding: 'utf8',
+      timeout: 30_000,
+    });
+    assert.equal(direct.status, 0, direct.stderr);
+    const directLines = direct.stdout.trim().split(/\r?\n/).map(JSON.parse);
+    assert.equal(directLines[0].worktree, basename(fixture.sibling));
+    assert.equal(resolve(JSON.parse(readFileSync(
+      join(directRuntime, 'tasks', 'cross-repo-direct.json'), 'utf8',
+    )).path), resolve(fixture.sibling));
+
+    const nonGit = join(fixture.root, 'not-a-git-worktree');
+    mkdirSync(nonGit);
+    const invalid = spawnSync(process.execPath, [join(SCRIPT_DIR, 'collect.mjs'), '--no-gh'], {
+      cwd: nonGit,
+      env: boardEnv(join(fixture.root, 'invalid-runtime')),
+      encoding: 'utf8',
+    });
+    assert.notEqual(invalid.status, 0, '非 Git 目标路径必须失败');
+    const expectedInvalidRoot = resolve(nonGit).replace(/\\/g, '/');
+    assert.match(
+      invalid.stderr.replace(/\\/g, '/'),
+      new RegExp(expectedInvalidRoot.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'),
+    );
+
+    server = await startServer(runtimeDir, {}, fixture.main);
+    const response = await fetch(`${server.origin}/api/dispatch`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ worktree: basename(fixture.sibling), prompt: 'cross-repo server dispatch', agent: 'test' }),
+    });
+    const payload = await response.json();
+    assert.equal(response.status, 202, JSON.stringify(payload));
+    const finished = await waitTask(server.origin, payload.taskId);
+    assert.equal(finished.task.status, 'done');
+    assert.equal(resolve(finished.task.path), resolve(fixture.sibling));
+    const status = await waitStatus(runtimeDir, fixture.main);
+    assert.deepEqual(status.worktrees.map((worker) => worker.name), [basename(fixture.sibling)]);
+  } finally {
+    if (server?.child && server.child.exitCode === null) {
+      const stopped = waitForExit(server.child);
+      server.child.kill();
+      await stopped;
+    }
+    cleanTemp(fixture.root);
+  }
+}
+
 async function waitTask(origin, taskId) {
   for (let attempt = 0; attempt < 80; attempt += 1) {
     const response = await fetch(`${origin}/api/task/${taskId}`);
@@ -196,6 +309,18 @@ async function waitTask(origin, taskId) {
     await new Promise((resolveWait) => setTimeout(resolveWait, 100));
   }
   throw new Error(`任务 ${taskId} 未在期限内结束`);
+}
+
+async function waitStatus(runtimeDir, expectedRoot) {
+  const statusPath = join(runtimeDir, 'status.json');
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    if (existsSync(statusPath)) {
+      const status = JSON.parse(readFileSync(statusPath, 'utf8'));
+      if (resolve(status.repo.root) === resolve(expectedRoot)) return status;
+    }
+    await new Promise((resolveWait) => setTimeout(resolveWait, 100));
+  }
+  throw new Error(`目标仓快照未在期限内写入: ${expectedRoot}`);
 }
 
 async function dispatchDomain() {
@@ -362,9 +487,10 @@ function layoutDomain() {
   assert.equal(existsSync(join(ROOT, 'worktree-board')), false, '顶级 worktree-board/ 必须不存在');
   const diff = spawnSync('git', ['diff', '--quiet', '--', 'run.toml', '.gitignore'], { cwd: ROOT });
   assert.equal(diff.status, 0, 'run.toml 与 .gitignore 必须恢复原样');
-  assert.equal(existsSync(join(homedir(), '.claude', 'skills', 'aes-worktree-board')), false, '用户级 skill 副本必须不存在');
-  const launch = JSON.parse(readFileSync(join(ROOT, '.claude', 'launch.json'), 'utf8'));
-  assert.deepEqual(launch.configurations[0].runtimeArgs, ['.claude/skills/aes-worktree-board/scripts/server.mjs']);
+  const skillSource = readFileSync(join(SKILL_DIR, 'SKILL.md'), 'utf8');
+  assert.match(skillSource, /\.agents\/skills\/aes-worktree-board/);
+  assert.doesNotMatch(skillSource, /\.claude\/skills\/aes-worktree-board/);
+  assert.match(skillSource, /AES_WORKTREE_BOARD_REPO_ROOT/);
   const config = loadConfig();
   for (const key of ['mainBranch', 'issueRepo', 'port', 'defaultAgent', 'agents']) {
     assert.ok(Object.hasOwn(config, key), `board.config.json 缺少既有字段 ${key}`);
@@ -405,6 +531,7 @@ const domains = {
   collect: collectDomain,
   dispatch: dispatchDomain,
   server: serverDomain,
+  'repo-root': repoRootDomain,
   layout: layoutDomain,
 };
 const domain = process.argv[2];

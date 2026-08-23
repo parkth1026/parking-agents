@@ -12,6 +12,9 @@ import { fileURLToPath } from 'node:url';
 const pExecFile = promisify(execFile);
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 export const SKILL_DIR = dirname(SCRIPT_DIR);
+// 默认沿用调用方当前目录，显式环境变量可把看板指向另一个同级 worktree 仓库。
+// skill 本身可以放在独立的工具仓库中，不再把 skill 目录误当成目标仓库根。
+export const REPO_ROOT = resolve(process.env.AES_WORKTREE_BOARD_REPO_ROOT || process.cwd());
 export const DEFAULT_RUNTIME_DIR = join(SKILL_DIR, 'runtime');
 export const RUNTIME_DIR = resolve(process.env.AES_WORKTREE_BOARD_RUNTIME_DIR || DEFAULT_RUNTIME_DIR);
 export const TASKS_DIR = join(RUNTIME_DIR, 'tasks');
@@ -31,7 +34,7 @@ export function loadConfig() {
 
 async function git(args, opts = {}) {
   const { stdout } = await pExecFile('git', args, {
-    cwd: SKILL_DIR,
+    cwd: REPO_ROOT,
     maxBuffer: 16 * 1024 * 1024,
     ...opts,
   });
@@ -60,8 +63,13 @@ function parseWorktreeList(output) {
 
 // 仅保留主仓同级的既有 worktree；Temp、嵌套目录和主仓自身均排除。
 export async function listWorktrees() {
+  let repoRoot;
+  try {
+    repoRoot = norm(await git(['rev-parse', '--show-toplevel']));
+  } catch (error) {
+    throw new Error(`目标仓根不是有效的 Git worktree: ${norm(REPO_ROOT)}`, { cause: error });
+  }
   const entries = parseWorktreeList(await git(['worktree', 'list', '--porcelain']));
-  const repoRoot = norm(await git(['rev-parse', '--show-toplevel']));
   const main = entries.find((entry) => entry.path.toLowerCase() === repoRoot.toLowerCase())
     || entries[0];
   if (!main) throw new Error('git worktree list 没有返回主 worktree');
