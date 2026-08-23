@@ -10,12 +10,14 @@
 <body>
   <div class="app-shell">
     <header class="topbar">
-      <div class="identity"><span class="logo" aria-hidden="true">收</span><strong>需求收敛 · Web</strong></div>
+      <div class="identity"><strong>需求收敛 · Web</strong></div>
       <nav id="phases" class="phases" aria-label="三阶段进度"></nav>
       <div class="view-tabs" role="tablist">
         <button id="flow-tab" class="view-tab active" type="button" role="tab" aria-selected="true">访谈视图</button>
+        <button id="dossier-tab" class="view-tab" type="button" role="tab" aria-selected="false">完整轨迹</button>
         <button id="contract-tab" class="view-tab" type="button" role="tab" aria-selected="false">契约视图</button>
       </div>
+      <a id="export-dossier" class="export-button" href="/export" download>导出完整轨迹</a>
       <span id="ambiguities" class="ambiguities">开放歧义 —</span>
       <span id="connection" class="connection" data-state="loading">连接中</span>
     </header>
@@ -25,7 +27,7 @@
         <div class="loading-card">正在读取本轮状态…</div>
       </section>
       <aside class="rail" aria-label="已锁定结论">
-        <p class="eyebrow">LOCKED · 已锁定结论</p>
+        <p class="eyebrow">已锁定结论</p>
         <div id="locked"></div>
       </aside>
     </main>
@@ -33,6 +35,11 @@
     <main id="contract-view" class="contract-view" hidden>
       <article id="contract" class="contract-document"></article>
     </main>
+
+    <main id="dossier-view" class="dossier-view" hidden>
+      <article id="dossier" class="dossier-document"></article>
+    </main>
+
   </div>
   <script type="module" src="/app.mjs"></script>
 </body>

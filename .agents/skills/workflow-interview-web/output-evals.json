@@ -1,0 +1,36 @@
+{
+  "skill": "workflow-interview-web",
+  "source_iteration": "iteration-2",
+  "evals": [
+    {
+      "name": "eval-web-first-round",
+      "prompt": "为下面的需求执行 workflow-interview 的 Web 首轮：用户要为一个已有 Node CLI 添加 --dry-run，要求保持旧输出兼容并提供自动化测试。在分配的 outputs 目录内创建完全隔离的 issue 工作区；不要修改仓库源码或真实 issue。发布至少一轮有价值的 Web 访谈内容，启动 loopback server，分别验证无凭据与带会话凭据的页面状态读取，然后正常关闭。不要等待真实用户提交。除页面状态和关闭标记外，保存脱敏的 runtime-evidence.json，至少记录监听 host、无凭据状态码、带凭据状态码、state 摘要、shutdown 状态、关闭后 PID 与敏感会话文件状态；保存 repo-evidence.json，记录执行前后 git status 与 diff 摘要，以便复核 outputs 外无新增写入。",
+      "assertions": [
+        {
+          "name": "首轮内容遵守家族三阶段边界且提出有价值问题",
+          "type": "manual",
+          "ac": "AC-1"
+        },
+        {
+          "name": "机器证据证明 loopback 绑定和会话鉴权",
+          "type": "manual",
+          "ac": "AC-3"
+        },
+        {
+          "name": "页面状态完整表达当前 pending round 与必答规则",
+          "type": "manual",
+          "ac": "AC-4"
+        },
+        {
+          "name": "前后状态证据证明产物隔离且仓库无新增修改",
+          "type": "manual"
+        },
+        {
+          "name": "中途显式关闭服务并清理敏感会话文件",
+          "type": "manual",
+          "ac": "AC-8"
+        }
+      ]
+    }
+  ]
+}

@@ -20,6 +20,7 @@ import { basename, dirname, extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
+import { appendLedgerEvent, buildDossier, renderDossierHtml, sha256Json } from './lib/dossier.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const WEB_ASSETS = join(HERE, 'web');
@@ -313,33 +314,89 @@ function validateAndNormalizeSubmission(body, state) {
     }
 
     const type = answer.type;
-    if (!['choice', 'custom', 'accept', 'veto', 'confirm'].includes(type)) {
-      return { status: 400, body: { ok: false, error: 'invalid_answers' } };
-    }
-    if (item.tier === 'ask' && !['choice', 'custom'].includes(type)) {
-      return { status: 400, body: { ok: false, error: 'invalid_answers' } };
-    }
     if (item.tier === 'default' && !['accept', 'veto'].includes(type)) {
       return { status: 400, body: { ok: false, error: 'invalid_answers' } };
     }
     if (item.tier === 'confirm' && !['confirm', 'veto'].includes(type)) {
       return { status: 400, body: { ok: false, error: 'invalid_answers' } };
     }
-    if (type === 'choice' && !(item.options ?? []).some((option) => option.key === answer.choice)) {
+    if (item.tier === 'ask') {
+      const responseType = item.response?.type ?? 'single_select';
+      const optionKeys = new Set((item.options ?? []).map((option) => option.key));
+      if (responseType === 'single_select') {
+        if (type === 'choice' && optionKeys.has(answer.choice)) normalized.push({ q_id: item.q_id, type, choice: answer.choice });
+        else if (type === 'custom' && item.allow_custom !== false && typeof answer.text === 'string' && answer.text.trim()) {
+          const text = answer.text.slice(0, 2000);
+          truncated ||= text.length !== answer.text.length;
+          normalized.push({ q_id: item.q_id, type, text });
+        } else return { status: 400, body: { ok: false, error: 'invalid_answers' } };
+        continue;
+      }
+      if (responseType === 'multi_select') {
+        if (type !== 'multi' || !Array.isArray(answer.choices)) return { status: 400, body: { ok: false, error: 'invalid_answers' } };
+        const choices = [...new Set(answer.choices)];
+        if (choices.length !== answer.choices.length || choices.some((choice) => !optionKeys.has(choice))) return { status: 400, body: { ok: false, error: 'invalid_answers' } };
+        const custom = typeof answer.custom === 'string' ? answer.custom.trim().slice(0, 2000) : '';
+        if (answer.custom !== undefined && item.allow_custom === false) return { status: 400, body: { ok: false, error: 'invalid_answers' } };
+        truncated ||= typeof answer.custom === 'string' && custom.length !== answer.custom.trim().length;
+        const count = choices.length + (custom ? 1 : 0);
+        const min = item.response?.min_selections ?? (item.required === false ? 0 : 1);
+        const max = item.response?.max_selections ?? (item.options?.length ?? 0) + (item.allow_custom === false ? 0 : 1);
+        const exclusive = new Set(item.response?.exclusive_keys ?? []);
+        if (count < min || count > max || (choices.some((choice) => exclusive.has(choice)) && count > 1)) return { status: 400, body: { ok: false, error: 'invalid_answers' } };
+        normalized.push({ q_id: item.q_id, type: 'multi', choices, ...(custom ? { custom } : {}) });
+        continue;
+      }
+      if (responseType === 'boolean') {
+        if (type !== 'boolean' || typeof answer.value !== 'boolean') return { status: 400, body: { ok: false, error: 'invalid_answers' } };
+        normalized.push({ q_id: item.q_id, type, value: answer.value });
+        continue;
+      }
+      if (responseType === 'short_text' || responseType === 'long_text') {
+        if (type !== 'text' || typeof answer.value !== 'string' || !answer.value.trim()) return { status: 400, body: { ok: false, error: 'invalid_answers' } };
+        const maxLength = responseType === 'short_text' ? Math.min(item.response?.max_length ?? 500, 2000) : Math.min(item.response?.max_length ?? 2000, 8000);
+        const value = answer.value.trim().slice(0, maxLength);
+        truncated ||= value.length !== answer.value.trim().length;
+        normalized.push({ q_id: item.q_id, type: 'text', value });
+        continue;
+      }
+      if (responseType === 'number') {
+        if (type !== 'number' || !Number.isFinite(answer.value)) return { status: 400, body: { ok: false, error: 'invalid_answers' } };
+        if (Number.isFinite(item.response?.min) && answer.value < item.response.min) return { status: 400, body: { ok: false, error: 'invalid_answers' } };
+        if (Number.isFinite(item.response?.max) && answer.value > item.response.max) return { status: 400, body: { ok: false, error: 'invalid_answers' } };
+        normalized.push({ q_id: item.q_id, type, value: answer.value, ...(item.response?.unit ? { unit: item.response.unit } : {}) });
+        continue;
+      }
+      if (responseType === 'date_time') {
+        if (type !== 'date_time' || typeof answer.value !== 'string' || !answer.value.trim() || answer.value.length > 80) return { status: 400, body: { ok: false, error: 'invalid_answers' } };
+        normalized.push({ q_id: item.q_id, type, value: answer.value });
+        continue;
+      }
+      if (responseType === 'ranking') {
+        if (type !== 'ranking' || !Array.isArray(answer.choices)) return { status: 400, body: { ok: false, error: 'invalid_answers' } };
+        const choices = [...new Set(answer.choices)];
+        const minRanked = item.response?.min_ranked ?? item.options?.length ?? 0;
+        if (choices.length !== answer.choices.length || choices.length < minRanked || choices.some((choice) => !optionKeys.has(choice))) return { status: 400, body: { ok: false, error: 'invalid_answers' } };
+        normalized.push({ q_id: item.q_id, type, choices });
+        continue;
+      }
+      if (responseType === 'evidence') {
+        if (type !== 'evidence' || !Array.isArray(answer.values)) return { status: 400, body: { ok: false, error: 'invalid_answers' } };
+        const values = answer.values.map((value) => typeof value === 'string' ? value.trim().slice(0, 2000) : '').filter(Boolean);
+        if (values.length === 0 || values.length > 20) return { status: 400, body: { ok: false, error: 'invalid_answers' } };
+        truncated ||= values.some((value, index) => value.length !== String(answer.values[index] ?? '').trim().length);
+        normalized.push({ q_id: item.q_id, type, values });
+        continue;
+      }
       return { status: 400, body: { ok: false, error: 'invalid_answers' } };
     }
-    if (type === 'custom' && item.allow_custom === false) {
-      return { status: 400, body: { ok: false, error: 'invalid_answers' } };
-    }
-    if (type === 'custom' || type === 'veto') {
+    if (type === 'veto') {
       if (typeof answer.text !== 'string' || !answer.text.trim()) {
         return { status: 400, body: { ok: false, error: 'invalid_answers' } };
       }
       const text = answer.text.slice(0, 2000);
       truncated ||= text.length !== answer.text.length;
       normalized.push({ q_id: item.q_id, type, text });
-    } else if (type === 'choice') {
-      normalized.push({ q_id: item.q_id, type, choice: answer.choice });
     } else {
       normalized.push({ q_id: item.q_id, type });
     }
@@ -421,7 +478,7 @@ async function serve(issueDir, flags) {
 
     if (request.method === 'GET' && url.pathname === '/api/state') {
       const state = reconcileState(readJson(join(webDir, 'state.json'), {
-        schema_version: 1,
+        schema_version: 2,
         slug: basename(issueDir),
         phases: [],
         open_ambiguities: 0,
@@ -429,7 +486,20 @@ async function serve(issueDir, flags) {
         locked: [],
         final: null,
       }));
-      jsonResponse(response, 200, { ok: true, state });
+      jsonResponse(response, 200, { ok: true, state, dossier: buildDossier(issueDir) });
+      return;
+    }
+
+    if (request.method === 'GET' && url.pathname === '/export') {
+      const dossier = buildDossier(issueDir, { embedAssets: true });
+      const html = renderDossierHtml(dossier);
+      response.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Content-Disposition': `attachment; filename="${basename(issueDir)}-decision-dossier.html"`,
+        'Cache-Control': 'no-store',
+        'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; base-uri 'none'; form-action 'none'",
+      });
+      response.end(html);
       return;
     }
 
@@ -463,14 +533,23 @@ async function serve(issueDir, flags) {
 
       const receivedAt = new Date().toISOString();
       const submission = {
-        schema_version: 1,
+        schema_version: 2,
         round: body.round,
         stage: result.round.stage,
+        round_revision: result.round.revision ?? 1,
+        round_digest: result.round.digest ?? sha256Json(result.round),
         received_at: receivedAt,
+        actor: { type: 'person', id: 'local-user' },
         answers: result.answers,
         truncated: result.truncated,
       };
       atomicJson(submissionPath, submission);
+      appendLedgerEvent(webDir, {
+        type: 'round_submitted',
+        actor: submission.actor,
+        entity: { kind: 'submission', id: body.round, revision: submission.round_revision, digest: sha256Json(submission) },
+        data: submission,
+      });
       const roundInState = state.rounds.find((candidate) => candidate.id === body.round);
       roundInState.status = 'submitted';
       roundInState.submitted_at = receivedAt;

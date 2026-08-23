@@ -12,9 +12,12 @@ import {
 } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { basename, dirname, extname, join, resolve } from 'node:path';
+import { appendLedgerEvent, sha256Json } from './lib/dossier.mjs';
 
 const STAGES = ['1-interview', '2-prototype', '3-contract'];
 const TIERS = ['ask', 'default', 'confirm'];
+const RESPONSE_TYPES = ['single_select', 'multi_select', 'boolean', 'short_text', 'long_text', 'number', 'date_time', 'ranking', 'evidence'];
+const OPTION_RESPONSE_TYPES = new Set(['single_select', 'multi_select', 'boolean', 'ranking']);
 
 function die(message, code = 1) {
   console.error(`publish: ${message}`);
@@ -66,6 +69,62 @@ function nonEmpty(value) {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
+function responseType(item) {
+  return item?.response?.type ?? 'single_select';
+}
+
+function validateResponse(at, item, errors) {
+  const type = responseType(item);
+  if (!RESPONSE_TYPES.includes(type)) {
+    errors.push(`${at}.response.type 要是 ${RESPONSE_TYPES.join(' / ')} 之一。`);
+    return;
+  }
+  if (item.response !== undefined && (!item.response || typeof item.response !== 'object' || Array.isArray(item.response))) {
+    errors.push(`${at}.response 必须是对象。`);
+    return;
+  }
+  if (OPTION_RESPONSE_TYPES.has(type)) {
+    if (!Array.isArray(item.options) || item.options.length < 2) errors.push(`${at}.options 至少两项。`);
+    const keys = new Set();
+    let total = 0;
+    let shapeValid = true;
+    for (const [optionIndex, option] of (item.options ?? []).entries()) {
+      if (!nonEmpty(option?.key) || !nonEmpty(option?.text)) {
+        errors.push(`${at}.options[${optionIndex}] 要有 key 和 text。`);
+        shapeValid = false;
+        continue;
+      }
+      if (type !== 'ranking' && !Number.isFinite(option?.pct)) {
+        errors.push(`${at}.options[${optionIndex}].pct 要是数字。`);
+        shapeValid = false;
+      }
+      if (keys.has(option.key)) errors.push(`${at}.options key 重复：${option.key}。`);
+      keys.add(option.key);
+      if (Number.isFinite(option.pct)) total += option.pct;
+    }
+    if (shapeValid && type !== 'ranking' && Math.abs(total - 100) > 2) errors.push(`${at}.options 的 pct 加和是 ${total}，必须在 100±2。`);
+    if (type === 'boolean' && item.options?.length !== 2) errors.push(`${at}.boolean 必须正好两个 options。`);
+    if (type === 'multi_select') {
+      const min = item.response?.min_selections ?? (item.required === false ? 0 : 1);
+      const available = (item.options?.length ?? 0) + (item.allow_custom === false ? 0 : 1);
+      const max = item.response?.max_selections ?? available;
+      if (!Number.isInteger(min) || min < 0) errors.push(`${at}.response.min_selections 要是非负整数。`);
+      if (!Number.isInteger(max) || max < min || max > available) errors.push(`${at}.response.max_selections 不合法。`);
+      for (const key of item.response?.exclusive_keys ?? []) if (!keys.has(key)) errors.push(`${at}.response.exclusive_keys 含未知 key：${key}。`);
+    }
+  } else if (item.options !== undefined && (!Array.isArray(item.options) || item.options.length > 0)) {
+    errors.push(`${at}.${type} 不应声明 options。`);
+  }
+  if (type === 'number') {
+    if (item.response?.min !== undefined && !Number.isFinite(item.response.min)) errors.push(`${at}.response.min 要是数字。`);
+    if (item.response?.max !== undefined && !Number.isFinite(item.response.max)) errors.push(`${at}.response.max 要是数字。`);
+    if (Number.isFinite(item.response?.min) && Number.isFinite(item.response?.max) && item.response.min > item.response.max) errors.push(`${at}.response.min 不能大于 max。`);
+  }
+  if (type === 'date_time' && item.response?.format !== undefined && !['date', 'time', 'datetime-local'].includes(item.response.format)) {
+    errors.push(`${at}.response.format 要是 date / time / datetime-local。`);
+  }
+}
+
 function validateRound(round) {
   const errors = [];
   if (!round || typeof round !== 'object') return ['round 必须是对象。'];
@@ -88,21 +147,7 @@ function validateRound(round) {
     }
     if (item.tier === 'ask') {
       if (!nonEmpty(item.question)) errors.push(`${at}.question 不能为空。`);
-      if (!Array.isArray(item.options) || item.options.length < 2) errors.push(`${at}.options 至少两项。`);
-      const keys = new Set();
-      let total = 0;
-      let shapeValid = true;
-      for (const [optionIndex, option] of (item.options ?? []).entries()) {
-        if (!nonEmpty(option?.key) || !nonEmpty(option?.text) || !Number.isFinite(option?.pct)) {
-          errors.push(`${at}.options[${optionIndex}] 要有 key、text 和数字 pct。`);
-          shapeValid = false;
-          continue;
-        }
-        if (keys.has(option.key)) errors.push(`${at}.options key 重复：${option.key}。`);
-        keys.add(option.key);
-        total += option.pct;
-      }
-      if (shapeValid && Math.abs(total - 100) > 2) errors.push(`${at}.options 的 pct 加和是 ${total}，必须在 100±2。`);
+      validateResponse(at, item, errors);
     } else if (!nonEmpty(item.line)) errors.push(`${at}.line 不能为空。`);
   }
   return errors;
@@ -170,6 +215,9 @@ if (input.phases !== undefined && !validatePhases(input.phases)) errors.push('ph
 if (input.open_ambiguities !== undefined && (!Number.isInteger(input.open_ambiguities) || input.open_ambiguities < 0)) {
   errors.push('open_ambiguities 要是非负整数。');
 }
+if (input.dossier !== undefined && (!input.dossier || typeof input.dossier !== 'object' || !nonEmpty(input.dossier.title))) {
+  errors.push('dossier 要是包含非空 title 的对象。');
+}
 if (errors.length > 0) die(`轮次 schema 不合法：\n- ${errors.join('\n- ')}`, 1);
 
 const webDir = join(issueDir, 'web');
@@ -185,10 +233,13 @@ if (existingRound?.status === 'submitted' || existsSync(join(webDir, 'submission
 
 const nextRound = {
   ...round,
+  schema_version: 2,
+  revision: (existingRound?.revision ?? 0) + 1,
   status: 'pending',
   ...(attached.length > 0 ? { attachments: attached } : {}),
 };
 delete nextRound.final;
+nextRound.digest = sha256Json({ ...nextRound, digest: undefined });
 const rounds = (previous?.rounds ?? []).filter((candidate) => candidate.id !== round.id);
 rounds.push(nextRound);
 rounds.sort((a, b) => a.no - b.no);
@@ -196,8 +247,9 @@ const openAmbiguities = input.open_ambiguities
   ?? round.open_ambiguities
   ?? nextRound.items.filter((item) => item.tier === 'ask' || item.tier === 'confirm').length;
 const state = {
-  schema_version: 1,
+  schema_version: 2,
   slug: basename(issueDir),
+  dossier: input.dossier ?? previous?.dossier ?? null,
   opening: input.opening ?? previous?.opening ?? null,
   phases: input.phases ?? previous?.phases ?? defaultPhases(round.stage),
   open_ambiguities: openAmbiguities,
@@ -207,6 +259,19 @@ const state = {
   updated_at: new Date().toISOString(),
 };
 atomicJson(statePath, state);
+appendLedgerEvent(webDir, {
+  type: 'round_published',
+  actor: { type: 'software-agent', id: 'agent' },
+  entity: { kind: 'round', id: nextRound.id, revision: nextRound.revision, digest: nextRound.digest },
+  data: {
+    opening: state.opening,
+    phases: state.phases,
+    open_ambiguities: state.open_ambiguities,
+    locked: state.locked,
+    round: nextRound,
+    final: state.final,
+  },
+});
 console.log(JSON.stringify({
   ok: true,
   round: round.id,

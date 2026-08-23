@@ -18,10 +18,13 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const SERVER = join(HERE, 'server.mjs');
 const PUBLISH = join(HERE, 'publish.mjs');
 const WAIT = join(HERE, 'wait-submit.mjs');
+const EXPORT = join(HERE, 'export-static.mjs');
 const SKILL_ROOT = dirname(HERE);
 const workDir = mkdtempSync(join(tmpdir(), 'workflow-interview-web-'));
 const issueDir = join(workDir, '2026-08-23-runtime-test');
 mkdirSync(issueDir, { recursive: true });
+mkdirSync(join(issueDir, '1-interview'), { recursive: true });
+writeFileSync(join(issueDir, '1-interview', 'context.md'), '# Context Snapshot\n\n## 任务陈述\n\n测试上下文。\n', 'utf8');
 
 let serverInfo = null;
 let checks = 0;
@@ -123,6 +126,7 @@ function badWebSocketUpgrade(port, token) {
 }
 
 const roundOne = {
+  dossier: { title: 'Goal Contract 决策档案 · runtime test', summary: '静态导出后仍能独立阅读' },
   opening: '测试任务原文（只读）',
   phases: [
     { id: '1-interview', label: '访谈·拷问', status: 'active' },
@@ -259,6 +263,75 @@ try {
   assert(timeoutWait.status === 2, '测试 timeout 没返回退出码 2');
   check('文件事件唤醒等待者；测试专用 timeout 退出码 2');
 
+  const roundTypes = {
+    round: {
+      id: 'r3', no: 3, stage: '1-interview', title: '结构化回答类型', status: 'pending',
+      items: [
+        { q_id: 'M1', tier: 'ask', question: '哪些页面进入范围？', response: { type: 'multi_select', min_selections: 1, max_selections: 2, exclusive_keys: ['NONE'] }, options: [
+          { key: 'WEB', text: 'Web', pct: 45, covers: 'Web 页面', pros: ['覆盖主流程'], cons: ['需要浏览器验收'] },
+          { key: 'DESKTOP', text: 'Desktop', pct: 35, covers: 'Desktop 页面', pros: ['覆盖桌面端'], cons: ['需要安装态验收'] },
+          { key: 'NONE', text: '都不包含', pct: 20, covers: '只做协议', pros: ['范围最小'], cons: ['没有界面交付'] },
+        ] },
+        { q_id: 'B1', tier: 'ask', question: '是否允许外部读取？', response: { type: 'boolean' }, options: [
+          { key: 'YES', text: '允许', value: true, pct: 60 }, { key: 'NO', text: '不允许', value: false, pct: 40 },
+        ] },
+        { q_id: 'S1', tier: 'ask', question: '目标命令是什么？', response: { type: 'short_text', max_length: 80 } },
+        { q_id: 'L1', tier: 'ask', question: '补充完整边界', response: { type: 'long_text', max_length: 2000 } },
+        { q_id: 'N1', tier: 'ask', question: '最长等待多少天？', response: { type: 'number', min: 1, max: 30, unit: '天' } },
+        { q_id: 'DT1', tier: 'ask', question: '截止日期', response: { type: 'date_time', format: 'date' } },
+        { q_id: 'R1', tier: 'ask', question: '优先级排序', response: { type: 'ranking' }, options: [
+          { key: 'A', text: '兼容' }, { key: 'B', text: '速度' }, { key: 'C', text: '易用' },
+        ] },
+        { q_id: 'E1', tier: 'ask', question: '证据在哪？', response: { type: 'evidence' } },
+      ],
+    },
+    open_ambiguities: 8,
+  };
+  const typesPublished = parseJsonOutput(run(PUBLISH, ['round', '--issue-dir', issueDir, '--file', writeJson('round-r3.json', roundTypes)]), 'publish r3');
+  assert(typesPublished.round === 'r3' && typesPublished.items === 8, 'v2 结构化 round 未发布');
+  const invalidMulti = await jsonFetch(keyUrl('/api/submit'), {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ round: 'r3', answers: [
+      { q_id: 'M1', type: 'multi', choices: ['NONE', 'WEB'] },
+      { q_id: 'B1', type: 'boolean', value: true }, { q_id: 'S1', type: 'text', value: 'node cli.mjs' },
+      { q_id: 'L1', type: 'text', value: '边界' }, { q_id: 'N1', type: 'number', value: 7 },
+      { q_id: 'DT1', type: 'date_time', value: '2026-09-01' }, { q_id: 'R1', type: 'ranking', choices: ['A', 'B', 'C'] },
+      { q_id: 'E1', type: 'evidence', values: ['docs/evidence.md'] },
+    ] }),
+  });
+  assert(invalidMulti.response.status === 400, '排他多选组合没有被拒绝');
+  const submitTypes = await jsonFetch(keyUrl('/api/submit'), {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ round: 'r3', answers: [
+      { q_id: 'M1', type: 'multi', choices: ['WEB'], custom: 'CLI 摘要页' },
+      { q_id: 'B1', type: 'boolean', value: true }, { q_id: 'S1', type: 'text', value: 'node cli.mjs' },
+      { q_id: 'L1', type: 'text', value: '完整记录必须可离线阅读' }, { q_id: 'N1', type: 'number', value: 7 },
+      { q_id: 'DT1', type: 'date_time', value: '2026-09-01' }, { q_id: 'R1', type: 'ranking', choices: ['A', 'C', 'B'] },
+      { q_id: 'E1', type: 'evidence', values: ['docs/evidence.md', 'https://example.test/proof'] },
+    ] }),
+  });
+  assert(submitTypes.response.status === 200, 'v2 结构化回答提交失败');
+  const typeSubmission = JSON.parse(readFileSync(join(issueDir, 'web', 'submissions', 'r3.json'), 'utf8'));
+  assert(typeSubmission.schema_version === 2 && typeSubmission.answers.find((answer) => answer.q_id === 'M1').choices[0] === 'WEB', 'v2 多选没有正规化落盘');
+  assert(typeSubmission.answers.find((answer) => answer.q_id === 'N1').unit === '天', '数字回答没有保留单位');
+  const dossierState = await jsonFetch(keyUrl('/api/state'));
+  assert(dossierState.body?.dossier?.submissions?.r3?.answers?.length === 8, '/api/state 没有返回权威决策档案');
+  assert(dossierState.body.dossier.title === 'Goal Contract 决策档案 · runtime test', '决策档案没有保留发布标题');
+  assert(dossierState.body.dossier.ledger.some((event) => event.type === 'round_published') && dossierState.body.dossier.ledger.some((event) => event.type === 'round_submitted'), '决策账本缺发布或提交事件');
+  check('v2 多选、布尔、文本、数字、日期、排序与证据回答全链');
+
+  const exportPath = join(workDir, 'decision-dossier.html');
+  const exported = parseJsonOutput(run(EXPORT, ['--issue-dir', issueDir, '--output', exportPath]), 'static export');
+  const exportHtml = readFileSync(exportPath, 'utf8');
+  assert(exported.type === 'decision-dossier-exported' && existsSync(exportPath), '静态导出没有生成');
+  assert(exportHtml.includes('goal-contract-decision-dossier') && exportHtml.includes('decision-dossier-data') && exportHtml.includes('哪些页面进入范围？') && exportHtml.includes('Goal Contract 决策档案 · runtime test'), '静态导出缺标题、完整轨迹或机器 JSON');
+  assert(exportHtml.includes('<div class="markdown"><h2>Context Snapshot') && !exportHtml.includes('<h2>原始请求与上下文</h2><pre>'), '静态档案主上下文仍在展示原始 Markdown 标记');
+  assert(exportHtml.includes('<link rel="icon" href="data:,">') && !exportHtml.includes('<span>%</span>'), '静态档案有无意义的百分号或离线 favicon 请求');
+  assert(exportHtml.includes('prototype fixture') && !exportHtml.includes(serverInfo.token), '静态导出没有内嵌来源或泄露 session token');
+  const exportResponse = await fetch(keyUrl('/export'));
+  assert(exportResponse.status === 200 && /attachment/.test(exportResponse.headers.get('content-disposition') ?? '') && (await exportResponse.text()).includes('追踪矩阵'), '浏览器导出端点不可用');
+  check('自包含静态决策档案、来源内嵌、机器 JSON 与下载端点');
+
   const allowedFile = await fetch(keyUrl('/files/prototype.html'));
   assert(allowedFile.status === 200 && (await allowedFile.text()).includes('prototype fixture'), '白名单附件不可读');
   const traversal = await jsonFetch(keyUrl('/files/%2e%2e%2fsecret.txt'));
@@ -267,13 +340,22 @@ try {
   assert(malformedPath.response.status === 404, '/files/ 畸形编码没有 404');
   check('/files/ 仅允许 assets basename，越权路径 404');
 
-  const runtimeSources = ['server.mjs', 'publish.mjs', 'wait-submit.mjs'].map((name) => readFileSync(join(HERE, name), 'utf8'));
+  const runtimeSources = ['server.mjs', 'publish.mjs', 'wait-submit.mjs', 'export-static.mjs'].map((name) => readFileSync(join(HERE, name), 'utf8'));
   assert(runtimeSources.every((source) => !/from\s+['"][^'"]*workflow-interview/.test(source)), 'runtime import 了 workflow-interview 家族');
   const skill = readFileSync(join(SKILL_ROOT, 'SKILL.md'), 'utf8');
   assert(skill.includes('宿主无后台任务能力 → 回合模式') && skill.includes('Node 不可用 → 纯文本') && skill.includes('浏览器不可用 → 纯文本'), 'SKILL.md 三级降级不完整');
+  assert(skill.includes('仅当用户显式调用 $workflow-interview-web') && !skill.includes('disable-model-invocation:'), 'SKILL.md 显式调用边界或标准 frontmatter 不正确');
+  const openaiMetadata = readFileSync(join(SKILL_ROOT, 'agents', 'openai.yaml'), 'utf8');
+  assert(/allow_implicit_invocation:\s*false/.test(openaiMetadata), 'openai.yaml 没有关闭隐式调用');
   const app = readFileSync(join(HERE, 'web', 'app.mjs'), 'utf8');
   assert(app.includes('localStorage') && app.includes('new WebSocket') && app.includes('contract-revision-input'), '单页缺草稿/WS/契约修改能力');
-  check('薄层依赖断言、三级降级和单页关键能力静态检查');
+  assert(app.includes('renderSingleDetails') && app.includes('renderMultiChoice') && app.includes('decision-detail-stack'), '紧凑问卷缺逐题固定详情槽或多选能力');
+  assert(app.includes('dossierData?.submissions') && app.includes('renderDossier') && app.includes('markdownBlock(dossierData.context_markdown)'), '提交后没有从权威决策档案回看、缺完整轨迹或上下文仍为原始 Markdown');
+  const style = readFileSync(join(HERE, 'web', 'style.css'), 'utf8');
+  assert(style.includes('position: sticky') && style.includes('flex-wrap: wrap') && style.includes('max-width: 1180px') && style.includes('.decision-detail-stack'), '紧凑问卷缺 sticky 摘要、pill 换行、阅读宽度上限或逐题固定详情槽');
+  assert(style.includes('grid-area: 1 / 1') && style.includes('visibility: hidden'), '详情槽没有通过同格叠放预留最大内容高度');
+  assert(app.includes("'/export'") || readFileSync(join(HERE, 'web', 'index.html'), 'utf8').includes('href="/export"'), '页面缺静态导出入口');
+  check('薄层依赖、显式调用策略、三级降级、结构化问卷与完整轨迹静态检查');
 
   const shutdown = await jsonFetch(keyUrl('/shutdown'));
   assert(shutdown.response.status === 200 && shutdown.body?.stopped === true, 'shutdown 没有成功回执');

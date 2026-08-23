@@ -12,6 +12,7 @@ import {
 } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { basename, dirname, join, resolve } from 'node:path';
+import { appendLedgerEvent, sha256Json } from './lib/dossier.mjs';
 
 function die(message, code = 1) {
   console.error(`wait-submit: ${message}`);
@@ -90,11 +91,18 @@ if (flags['mark-consumed']) {
   if (!existsSync(submissionPath)) die(`找不到提交：${round}`);
   const markerPath = join(consumedDir, `${round}.json`);
   if (!existsSync(markerPath)) {
-    atomicJson(markerPath, {
-      schema_version: 1,
+    const marker = {
+      schema_version: 2,
       round,
       submission: basename(submissionPath),
       consumed_at: new Date().toISOString(),
+    };
+    atomicJson(markerPath, marker);
+    appendLedgerEvent(webDir, {
+      type: 'submission_consumed',
+      actor: { type: 'software-agent', id: 'agent' },
+      entity: { kind: 'consumed-submission', id: round, digest: sha256Json(marker) },
+      data: marker,
     });
   }
   console.log(JSON.stringify({ ok: true, round, consumed: true }));

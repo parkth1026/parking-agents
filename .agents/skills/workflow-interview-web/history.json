@@ -1,0 +1,29 @@
+{
+  "skill": "workflow-interview-web",
+  "runs": [
+    {
+      "date": "2026-08-23T02:03:56+08:00",
+      "iteration_ref": "G:\\GIT\\AI_WorkFlow\\parking-agents\\.agents\\evals\\workflow-interview-web-workspace\\iteration-2",
+      "gates": {
+        "old_skill": {
+          "pass_rate": 1,
+          "mean_ms": null,
+          "mean_tokens": null
+        },
+        "with_skill": {
+          "pass_rate": 1,
+          "mean_ms": null,
+          "mean_tokens": null
+        },
+        "without_skill": {
+          "pass_rate": 1,
+          "mean_ms": null,
+          "mean_tokens": null
+        }
+      },
+      "vs_previous": null,
+      "current_best": true
+    }
+  ],
+  "current_best": "runs[0]"
+}
