@@ -183,6 +183,8 @@ const server = createServer(async (request, response) => {
   }
 });
 
+await listWorktrees();
+
 server.listen(port, '127.0.0.1', () => {
   const address = server.address();
   const actualPort = typeof address === 'object' ? address.port : port;

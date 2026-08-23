@@ -223,6 +223,33 @@ function startServer(runtimeDir, extraEnv = {}, cwd = ROOT) {
   ]);
 }
 
+function probeServerStartup(cwd, env, timeoutMs = 750) {
+  return new Promise((resolveProbe, reject) => {
+    const child = spawn(process.execPath, [join(SCRIPT_DIR, 'server.mjs'), '--port', '0'], {
+      cwd,
+      env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.setEncoding('utf8');
+    child.stderr.setEncoding('utf8');
+    child.stdout.on('data', (chunk) => { stdout += chunk; });
+    child.stderr.on('data', (chunk) => { stderr += chunk; });
+    const timer = setTimeout(() => {
+      if (child.exitCode === null) child.kill();
+    }, timeoutMs);
+    child.on('error', (error) => {
+      clearTimeout(timer);
+      reject(error);
+    });
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      resolveProbe({ status: code, stdout, stderr });
+    });
+  });
+}
+
 async function repoRootDomain() {
   const fixture = repositoryFixture('repo-root');
   const runtimeDir = join(fixture.root, 'runtime');
@@ -275,6 +302,24 @@ async function repoRootDomain() {
     assert.match(
       invalid.stderr.replace(/\\/g, '/'),
       new RegExp(expectedInvalidRoot.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'),
+    );
+
+    const invalidServer = await probeServerStartup(
+      nonGit,
+      boardEnv(join(fixture.root, 'invalid-server-runtime')),
+    );
+    const invalidServerOutput = [invalidServer.stdout || '', invalidServer.stderr || '']
+      .join('\n')
+      .replace(/\\/g, '/');
+    assert.equal(
+      invalidServer.status,
+      1,
+      '非 Git 目标启动必须快速失败而不是监听: ' + invalidServerOutput,
+    );
+    assert.ok(!invalidServerOutput.includes('http://127.0.0.1:'), invalidServerOutput);
+    assert.ok(
+      invalidServerOutput.toLowerCase().includes(expectedInvalidRoot.toLowerCase()),
+      '启动错误必须包含解析路径 ' + expectedInvalidRoot + ': ' + invalidServerOutput,
     );
 
     server = await startServer(runtimeDir, {}, fixture.main);
