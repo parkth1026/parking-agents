@@ -12,3 +12,4 @@ node_modules/
 
 # Eval workspaces are scratch; durable records live in each skill dir
 /.agents/evals/
+/.playwright-cli
