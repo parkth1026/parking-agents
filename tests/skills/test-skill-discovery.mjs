@@ -149,8 +149,7 @@ for (const name of skillDirs) {
 
 // Bootstrap moved from a skill (skills/using-parking-skills/, removed) to plain
 // AGENTS.md injection: hooks/session-start reads the repo-root AGENTS.md on every
-// session. AGENTS.md content conventions are gated by test-artifact-hygiene.mjs;
-// here we only pin that the file the hook depends on actually exists.
+// session. Here we only pin that the file the hook depends on actually exists.
 if (!existsSync(join(repoRoot, "AGENTS.md"))) {
 	fail("AGENTS.md missing at repo root — hooks/session-start has nothing to inject");
 }
