@@ -2,5 +2,3 @@ interface:
   display_name: "workflow-interview"
   short_description: "workflow-interview"
   default_prompt: "使用 $workflow-interview 走完整的需求访谈、对照物和 Goal Contract 流程。"
-policy:
-  allow_implicit_invocation: true

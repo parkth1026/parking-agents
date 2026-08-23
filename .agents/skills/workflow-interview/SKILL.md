@@ -1,7 +1,6 @@
 ---
 name: workflow-interview
 description: workflow-interview
-disable-model-invocation: false
 ---
 
 # 问清楚要做什么，以及怎么算做完
