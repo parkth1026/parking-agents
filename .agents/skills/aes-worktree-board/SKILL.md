@@ -7,7 +7,12 @@ description: 在主仓巡检并调度同级既有 worktree：采集全仓 issue 
 
 把主仓对话作为判断与调度入口，把看板作为同一份事实的可视入口。脚本采集事实，主 agent 负责判断；两者只通过 `runtime/status.json` v2 汇合，页面不推导业务状态。
 
-本仓开发侧活跃真源是 `.agents/skills/aes-worktree-board/`。下文 `<skill-dir>` 指向该目录；通过用户级 junction 或跨仓调用时，也可以使用它的绝对路径。
+本仓开发侧活跃真源是 `.agents/skills/aes-worktree-board/`。PowerShell 中先解析用户级 junction；未安装 junction 时，把右侧替换为活跃真源的绝对路径：
+
+```powershell
+$skillDir = "$HOME/.agents/skills/aes-worktree-board"
+$worker = "dev1"
+```
 
 运行脚本前，把当前目录切到要巡检的目标主仓。目标仓根按以下单一 contract 解析：`AES_WORKTREE_BOARD_REPO_ROOT`（显式覆盖）优先，否则使用调用进程的当前目录；skill 的安装目录永远不参与目标仓判定。server 启动 dispatch 时必须把已经解析的目标仓根继续传给子进程。
 
@@ -23,11 +28,11 @@ description: 在主仓巡检并调度同级既有 worktree：采集全仓 issue 
 
 用户问全局状态、issue 星图、队员位置或合并建议时：
 
-1. 在目标主仓运行 `node <skill-dir>/scripts/collect.mjs`。只有明确要快速沿用 issue 快照时才加 `--no-gh`。
+1. 在目标主仓运行 `node "$skillDir/scripts/collect.mjs"`。只有明确要快速沿用 issue 快照时才加 `--no-gh`。
 2. 读取 `runtime/status.json`。对每个 worktree 检查任务记录、分支 ahead/behind、dirty、mergeCheck、关联 issue 与必要的 diff/测试证据；不要把脚本的事实字段当作完成判断。
 3. 对每个节点运行：
 
-   `node <skill-dir>/scripts/assess.mjs <devN> --merge recommend|not-yet|blocked --done true|false|unknown --task "当前任务" --reason "证据与缺口"`
+   `node "$skillDir/scripts/assess.mjs" $worker --merge not-yet --done unknown --task "待确认任务" --reason "证据不足"`
 
 4. 所有同级节点都完成本轮 assessment 后，输出：
 
@@ -50,7 +55,7 @@ description: 在主仓巡检并调度同级既有 worktree：采集全仓 issue 
 
 组织自包含 prompt：写明 issue、目标、范围、验收、禁止事项与交付证据。worktree 内 agent 看不到主仓对话。
 
-- 干净目标：`node <skill-dir>/scripts/dispatch.mjs <devN> --agent claude "<prompt>"`
+- 干净目标：`node "$skillDir/scripts/dispatch.mjs" $worker --agent claude "实现已确认的 issue"`
 - dirty 目标：先向用户报告 `modified + untracked` 并等待确认；确认后在原命令增加 `--confirm-dirty`。
 - 很长的 prompt 使用 `--prompt-file <path>`。agent 可选值来自 `board.config.json`。
 
@@ -58,11 +63,11 @@ description: 在主仓巡检并调度同级既有 worktree：采集全仓 issue 
 
 ## 看板
 
-- LIVE：在目标主仓运行 `node <skill-dir>/scripts/server.mjs`，打开 `http://127.0.0.1:8321/`。页面可刷新、查看日志和派发。
+- LIVE：在目标主仓运行 `node "$skillDir/scripts/server.mjs"`，打开 `http://127.0.0.1:8321/`。页面可刷新、查看日志和派发。
 - 只读快照：先巡检，再直接打开 `board.html`；页面读取 `runtime/status.js`，派发控件会降级为提示。
 
 server 只能绑定 `127.0.0.1`。不要增加外部监听或把页面改成自行推导 `derived`、`mode`、`assessment.stale`。
 
 ## 自检
 
-按改动域运行 `node <skill-dir>/scripts/selftest.mjs collect|dispatch|server|repo-root|layout`。`repo-root` 使用独立 Git fixture 验证跨仓 collect、direct dispatch、server → dispatch 与非法目标路径。页面视觉与交互仍需用真实浏览器对照锁定的 mock 与 handoff，不能由自检替代。
+按改动域运行自检，例如 `node "$skillDir/scripts/selftest.mjs" repo-root`；其他域是 `collect`、`dispatch`、`server` 与 `layout`。`repo-root` 验证跨仓 collect、direct dispatch、server → dispatch 与非法目标路径。页面视觉与交互仍需用真实浏览器对照锁定的 mock 与 handoff，不能由自检替代。
