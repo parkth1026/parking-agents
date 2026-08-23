@@ -22,7 +22,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { installSkills, normalizeLinkTarget } from "../../scripts/install-skills.mjs";
+import { installSkills, normalizeLinkTarget, uninstallSkills } from "../../scripts/install-skills.mjs";
 
 const failures = [];
 const fail = (msg) => failures.push(msg);
@@ -109,6 +109,24 @@ try {
   );
   expect(freshResult.created.length === 4 && freshLinks.length === 4, "fresh target not fully populated");
   expect(freshResult.failures.length === 0, `fresh run failures: ${freshResult.failures.join("; ")}`);
+
+  // --- uninstall removes only links owned by the sources ----------------------
+  symlinkSync(join(target, "foreign"), join(target, "alien-link"), "junction"); // foreign link: must survive
+  const un = uninstallSkills({ sources: [srcA, srcB], target });
+  expect(un.failures.length === 0, `uninstall failures: ${un.failures.join("; ")}`);
+  expect(un.removed.length === 4, `uninstall removed: ${un.removed.join("; ")}`);
+  for (const n of ["skill-dev", "skill-stale", "skill-new", "skill-pub"]) {
+    expect(!existsSync(join(target, n)), `${n} not removed by uninstall`);
+  }
+  expect(existsSync(join(target, "alien-link")), "foreign link removed by uninstall");
+  expect(existsSync(join(target, "foreign", "keep.txt")), "foreign dir touched by uninstall");
+  expect(existsSync(join(target, "loose.txt")), "loose.txt touched by uninstall");
+  expect(existsSync(join(target, "empty-skill")), "empty-skill touched by uninstall");
+  expect(un.backups.length === 1, `backups reported: ${un.backups.join("; ")}`);
+  expect(
+    existsSync(join(root, un.backups[0], "skill-pub", "SKILL.md")),
+    "backup folder deleted or emptied by uninstall"
+  );
 } finally {
   rmSync(root, { recursive: true, force: true });
 }

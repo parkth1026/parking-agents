@@ -33,7 +33,14 @@
  * Every path is derived from this file's location and os.homedir(); nothing
  * is hardcoded, so the repo stays portable across machines and drives.
  *
- * Usage: see install-skills-agents.mjs / install-skills-claude.mjs.
+ * The reverse operation, uninstallSkills(), removes exactly what
+ * installSkills() put in: links whose target lives under one of the source
+ * roots. Real directories, loose files, and links pointing anywhere else
+ * (lark-* chains, other repos) are never touched, and skills-backup-* folders
+ * are only reported, never deleted.
+ *
+ * Usage: see the install-skills-{agents,claude}.mjs and
+ * uninstall-skills-{agents,claude}.mjs entry scripts.
  */
 
 import {
@@ -222,4 +229,76 @@ export function installSkills({ sources, target, labelBase, dryRun = false }) {
   for (const f of failures) console.error(`  ✗ ${f}`);
 
   return { created, kept, repointed, converted, removed, anomalies, foreign, failures };
+}
+
+/**
+ * Remove exactly what installSkills() put into `target`: links whose target
+ * lives under one of `sources`. Real directories, loose files, and links
+ * pointing anywhere else (lark-* chains, other repos) are never touched, and
+ * skills-backup-* folders next to the target are reported but kept.
+ * Returns { removed, remaining, backups, failures }.
+ */
+export function uninstallSkills({ sources, target, dryRun = false }) {
+  const removed = [];
+  const removedNames = new Set();
+  const failures = [];
+
+  if (!existsSync(target)) {
+    console.log(`Target: ${target}\nNothing to uninstall — target does not exist.`);
+    return { removed, remaining: [], backups: [], failures };
+  }
+
+  const ownedRoots = sources.map((s) => normalizeLinkTarget(s));
+
+  for (const entry of readdirSync(target, { withFileTypes: true })) {
+    const entryPath = join(target, entry.name);
+    try {
+      if (!lstatSync(entryPath).isSymbolicLink()) continue; // never touch real entries
+      const current = readlinkSync(entryPath);
+      const abs = isAbsolute(current) ? current : resolve(dirname(entryPath), current);
+      const normalized = normalizeLinkTarget(abs);
+      if (!ownedRoots.some((r) => normalized.startsWith(r + "\\"))) continue; // not ours
+      if (!dryRun) rmSync(entryPath);
+      removedNames.add(entry.name);
+      removed.push(`${entry.name}  ->  ${current}`);
+    } catch (err) {
+      failures.push(`${entry.name}: ${err.message}`);
+    }
+  }
+
+  const remaining = readdirSync(target, { withFileTypes: true })
+    .filter((e) => !removedNames.has(e.name))
+    .map((e) => e.name);
+
+  const backups = readdirSync(dirname(target)).filter((n) => /^skills-backup-/.test(n));
+
+  const section = (title, rows) => {
+    if (rows.length === 0) return;
+    console.log(`\n${title} (${rows.length}):`);
+    for (const row of rows) console.log(`  ${row}`);
+  };
+
+  if (dryRun) console.log("DRY RUN — nothing was changed\n");
+  console.log(`Target: ${target}`);
+  console.log(`Sources: ${sources.join(", ")}`);
+  if (removed.length > 0) {
+    section("removed", removed);
+  } else {
+    console.log("\nNothing owned by this repo found — no links point into the sources.");
+  }
+  console.log(`\nEntries left untouched (${remaining.length}): ${remaining.join(", ") || "none"}`);
+  if (backups.length > 0) {
+    console.log(
+      `\nBackup folders kept (restore from or delete them manually): ` +
+        backups.map((b) => join(dirname(target), b)).join(", ")
+    );
+  }
+  console.log(
+    `\nSummary: ${removed.length} removed, ${remaining.length} untouched` +
+      (backups.length ? `, ${backups.length} backup folder(s) kept` : "") +
+      (failures.length ? `, ${failures.length} FAILED` : "")
+  );
+  for (const f of failures) console.error(`  ✗ ${f}`);
+
+  return { removed, remaining, backups, failures };
 }
