@@ -9,6 +9,7 @@ import { join, resolve, sep } from 'node:path';
 import {
   collectStatus, listWorktrees, loadConfig, RUNTIME_DIR, TASKS_DIR,
 } from './collect.mjs';
+import { resolveCommand } from './command.mjs';
 
 function fail(error, exitCode = 1, extra = {}) {
   console.error(JSON.stringify({ ok: false, error, ...extra }));
@@ -128,21 +129,12 @@ const promptPath = join(TASKS_DIR, `${taskId}.prompt.txt`);
 if (existsSync(taskJsonPath)) fail(`任务 id 已存在: ${taskId}`, 1, { code: 'BAD_REQUEST' });
 writeFileSync(promptPath, prompt);
 
-function resolveCommand(command) {
-  if (process.platform !== 'win32') return command;
-  let resolved;
-  try {
-    resolved = execFileSync('where.exe', [command[0]], { encoding: 'utf8' })
-      .split(/\r?\n/).filter(Boolean)[0];
-  } catch {
-    fail(`找不到命令 "${command[0]}"，请确认已安装并在 PATH 中`, 1, { code: 'BAD_REQUEST' });
-  }
-  return /\.(cmd|bat)$/i.test(resolved)
-    ? ['cmd.exe', '/d', '/s', '/c', resolved, ...command.slice(1)]
-    : [resolved, ...command.slice(1)];
+let finalArgv;
+try {
+  finalArgv = resolveCommand(agentArgv);
+} catch (error) {
+  fail(error.message, 1, { code: 'BAD_REQUEST' });
 }
-
-const finalArgv = resolveCommand(agentArgv);
 const logFd = openSync(logPath, 'a');
 const child = spawn(finalArgv[0], finalArgv.slice(1), {
   cwd: target.path,

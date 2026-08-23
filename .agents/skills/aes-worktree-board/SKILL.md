@@ -70,4 +70,4 @@ server 只能绑定 `127.0.0.1`。不要增加外部监听或把页面改成自�
 
 ## 自检
 
-按改动域运行自检，例如 `node "$skillDir/scripts/selftest.mjs" repo-root`；其他域是 `collect`、`dispatch`、`server` 与 `layout`。`repo-root` 验证跨仓 collect、direct dispatch、server → dispatch 与非法目标路径。页面视觉与交互仍需用真实浏览器对照锁定的 mock 与 handoff，不能由自检替代。
+按改动域运行自检，例如 `node "$skillDir/scripts/selftest.mjs" repo-root`；其他域是 `collect`、`dispatch`、`server` 与 `layout`。`dispatch` 使用独立 Git fixture 验证 Windows 可执行解析、dirty 确认、PID 锁与 server → dispatch；`repo-root` 验证跨仓 collect、direct dispatch、server → dispatch 与非法目标路径。页面视觉与交互仍需用真实浏览器对照锁定的 mock 与 handoff，不能由自检替代。

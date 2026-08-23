@@ -4,14 +4,15 @@ import assert from 'node:assert/strict';
 import { execFile, spawn, spawnSync } from 'node:child_process';
 import { promisify } from 'node:util';
 import {
-  chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync,
+  chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  collectStatus, DEFAULT_RUNTIME_DIR, listWorktrees, loadConfig, SKILL_DIR,
+  collectStatus, DEFAULT_RUNTIME_DIR, loadConfig, SKILL_DIR,
 } from './collect.mjs';
+import { resolveCommand } from './command.mjs';
 
 const pExecFile = promisify(execFile);
 const SCRIPT_DIR = resolve(SKILL_DIR, 'scripts');
@@ -164,11 +165,11 @@ function worktreeDirty(path) {
   return result.stdout.trim().length > 0;
 }
 
-function dispatchSync(args, runtimeDir) {
+function dispatchSync(args, runtimeDir, repoRoot = ROOT) {
   return spawnSync(process.execPath, [join(SCRIPT_DIR, 'dispatch.mjs'), ...args], {
-    cwd: ROOT,
+    cwd: repoRoot,
     encoding: 'utf8',
-    env: { ...process.env, AES_WORKTREE_BOARD_RUNTIME_DIR: runtimeDir },
+    env: boardEnv(runtimeDir, { AES_WORKTREE_BOARD_REPO_ROOT: repoRoot }),
     timeout: 30_000,
   });
 }
@@ -311,12 +312,13 @@ async function waitTask(origin, taskId) {
   throw new Error(`任务 ${taskId} 未在期限内结束`);
 }
 
-async function waitStatus(runtimeDir, expectedRoot) {
+async function waitStatus(runtimeDir, expectedRoot, notBefore = null) {
   const statusPath = join(runtimeDir, 'status.json');
   for (let attempt = 0; attempt < 100; attempt += 1) {
     if (existsSync(statusPath)) {
       const status = JSON.parse(readFileSync(statusPath, 'utf8'));
-      if (resolve(status.repo.root) === resolve(expectedRoot)) return status;
+      const freshEnough = !notBefore || Date.parse(status.generatedAt) >= Date.parse(notBefore);
+      if (resolve(status.repo.root) === resolve(expectedRoot) && freshEnough) return status;
     }
     await new Promise((resolveWait) => setTimeout(resolveWait, 100));
   }
@@ -324,18 +326,34 @@ async function waitStatus(runtimeDir, expectedRoot) {
 }
 
 async function dispatchDomain() {
-  const runtimeDir = tempDirectory('dispatch');
-  let dirtyFile = null;
+  const fixture = repositoryFixture('dispatch');
+  const runtimeDir = join(fixture.root, 'runtime');
   let server = null;
   try {
-    const { siblings } = await listWorktrees();
-    const target = siblings.find((entry) => !worktreeDirty(entry.path));
-    assert.ok(target, '需要一个干净的同级空闲 worktree 执行真实 dirty 握手');
-    const name = basename(target.path);
+    const target = { path: fixture.sibling };
+    assert.equal(worktreeDirty(target.path), false, '隔离 fixture 必须从干净 worktree 开始');
+    const name = basename(fixture.sibling);
     const short = name.replace(/^.*-(dev\d+)$/, '$1');
     const unique = `${process.pid}-${Date.now()}`;
 
-    const clean = dispatchSync([short, '--agent', 'test', '--task-id', `selftest-clean-${unique}`, '冒烟'], runtimeDir);
+    if (process.platform === 'win32') {
+      const shimDir = join(fixture.root, 'command-shim');
+      mkdirSync(shimDir);
+      writeFileSync(join(shimDir, 'board-probe'), 'extensionless shim must not be spawned\n');
+      writeFileSync(join(shimDir, 'board-probe.cmd'), '@echo command-resolution:%*\r\n');
+      const commandEnv = { ...process.env, PATH: `${shimDir};${process.env.PATH}` };
+      const resolved = resolveCommand(['board-probe', 'ok'], { platform: 'win32', env: commandEnv });
+      assert.match(resolved[4], /board-probe\.cmd$/i);
+      const probe = spawnSync(resolved[0], resolved.slice(1), { encoding: 'utf8', env: commandEnv });
+      assert.equal(probe.status, 0, probe.stderr);
+      assert.match(probe.stdout, /command-resolution:ok/);
+    }
+
+    const clean = dispatchSync(
+      [short, '--agent', 'test', '--task-id', `selftest-clean-${unique}`, '冒烟'],
+      runtimeDir,
+      fixture.main,
+    );
     assert.equal(clean.status, 0, clean.stderr);
     const cleanLines = clean.stdout.trim().split(/\r?\n/).map(JSON.parse);
     assert.equal(cleanLines.length, 2);
@@ -344,11 +362,15 @@ async function dispatchDomain() {
     assert.equal(cleanLines[0].worktree, name);
     assert.equal(cleanLines[1].exitCode, 0);
 
-    dirtyFile = join(target.path, `.aes-worktree-board-selftest-${unique}.tmp`);
+    const dirtyFile = join(target.path, `.aes-worktree-board-selftest-${unique}.tmp`);
     assert.ok(resolve(dirtyFile).startsWith(`${resolve(target.path)}${process.platform === 'win32' ? '\\' : '/'}`));
     writeFileSync(dirtyFile, 'selftest dirty handshake\n');
 
-    const refused = dispatchSync([short, '--agent', 'test', '--task-id', `selftest-refused-${unique}`, 'dirty'], runtimeDir);
+    const refused = dispatchSync(
+      [short, '--agent', 'test', '--task-id', `selftest-refused-${unique}`, 'dirty'],
+      runtimeDir,
+      fixture.main,
+    );
     assert.equal(refused.status, 3);
     const refusedJson = parseJsonLine(refused.stderr);
     assert.equal(refusedJson.code, 'DIRTY');
@@ -358,20 +380,24 @@ async function dispatchDomain() {
       join(SCRIPT_DIR, 'dispatch.mjs'), short, '--agent', 'test', '--confirm-dirty',
       '--task-id', `selftest-confirmed-${unique}`, 'dirty confirmed',
     ], {
-      cwd: ROOT,
-      env: { ...process.env, AES_WORKTREE_BOARD_RUNTIME_DIR: runtimeDir },
+      cwd: fixture.main,
+      env: boardEnv(runtimeDir, { AES_WORKTREE_BOARD_REPO_ROOT: fixture.main }),
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     const firstLine = JSON.parse(await waitForLine(confirmed));
     assert.equal(firstLine.ok, true);
     const locked = dispatchSync([
       short, '--agent', 'test', '--confirm-dirty', '--task-id', `selftest-locked-${unique}`, 'locked',
-    ], runtimeDir);
+    ], runtimeDir, fixture.main);
     assert.equal(locked.status, 2);
     assert.equal(parseJsonLine(locked.stderr).code, 'LOCKED');
     assert.equal(await waitForExit(confirmed), 0);
 
-    server = await startServer(runtimeDir);
+    server = await startServer(
+      runtimeDir,
+      { AES_WORKTREE_BOARD_REPO_ROOT: fixture.main },
+      fixture.main,
+    );
     let response = await fetch(`${server.origin}/api/dispatch`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -402,13 +428,17 @@ async function dispatchDomain() {
     const finished = await waitTask(server.origin, payload.taskId);
     assert.equal(finished.task.status, 'done');
     assert.match(finished.logTail, /prompt received: server dirty confirmed/);
+    await waitStatus(runtimeDir, fixture.main, finished.task.endedAt);
     for (const extension of ['json', 'log', 'prompt.txt']) {
       assert.ok(existsSync(join(runtimeDir, 'tasks', `${payload.taskId}.${extension}`)), `缺少任务三件套 .${extension}`);
     }
   } finally {
-    if (server?.child && !server.child.killed) server.child.kill();
-    if (dirtyFile && existsSync(dirtyFile)) unlinkSync(dirtyFile);
-    cleanTemp(runtimeDir);
+    if (server?.child && server.child.exitCode === null) {
+      const stopped = waitForExit(server.child);
+      server.child.kill();
+      await stopped;
+    }
+    cleanTemp(fixture.root);
   }
 }
 
@@ -480,7 +510,7 @@ async function serverDomain() {
 function layoutDomain() {
   const required = [
     'SKILL.md', 'board.html', 'board.config.json',
-    'scripts/collect.mjs', 'scripts/assess.mjs', 'scripts/dispatch.mjs',
+    'scripts/collect.mjs', 'scripts/assess.mjs', 'scripts/command.mjs', 'scripts/dispatch.mjs',
     'scripts/server.mjs', 'scripts/selftest.mjs',
   ];
   for (const path of required) assert.ok(existsSync(join(SKILL_DIR, path)), `缺少 ${path}`);
@@ -495,7 +525,7 @@ function layoutDomain() {
   for (const key of ['mainBranch', 'issueRepo', 'port', 'defaultAgent', 'agents']) {
     assert.ok(Object.hasOwn(config, key), `board.config.json 缺少既有字段 ${key}`);
   }
-  const scripts = ['collect.mjs', 'assess.mjs', 'dispatch.mjs', 'server.mjs', 'selftest.mjs'];
+  const scripts = ['collect.mjs', 'assess.mjs', 'command.mjs', 'dispatch.mjs', 'server.mjs', 'selftest.mjs'];
   for (const script of scripts) {
     const source = readFileSync(join(SCRIPT_DIR, script), 'utf8');
     for (const match of source.matchAll(/from ['"]([^'"]+)['"]/g)) {
