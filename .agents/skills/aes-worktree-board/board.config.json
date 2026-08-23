@@ -1,0 +1,11 @@
+{
+  "mainBranch": "main",
+  "issueRepo": "51world-ai-copilot/aes-agent",
+  "port": 8321,
+  "defaultAgent": "claude",
+  "agents": {
+    "claude": ["claude", "-p", "--dangerously-skip-permissions"],
+    "codex": ["codex", "exec", "--dangerously-bypass-approvals-and-sandbox", "-"],
+    "test": ["node", "-e", "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{console.log('[test-agent] prompt received:',s.trim());setTimeout(()=>console.log('[test-agent] done'),3000)})"]
+  }
+}

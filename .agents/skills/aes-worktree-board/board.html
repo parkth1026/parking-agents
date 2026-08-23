@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AES 需求星图</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Serif+4:wght@600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper:#FAF9F5; --line:#E0DACB; --ink:#1F1E1B; --text:#6B675C;
+  --muted:#9A948E; --faint:#B0AA9C; --orange:#C15F3C; --orange-text:#A94F2F;
+  --purple:#7C6BAE; --purple-text:#6A5A9E; --blocked:#A39C8D; --blocked-text:#8D867A;
+  --resolved:#B7AF9F; --star:#DAD4C5; --warning:#B08838; --card:#FFFFFF;
+  --serif:"Source Serif 4","Songti SC",serif;
+  --ui:Archivo,"PingFang SC","Microsoft YaHei",sans-serif;
+  --mono:"IBM Plex Mono","Cascadia Mono",monospace;
+}
+* { box-sizing:border-box; }
+html, body { width:100%; height:100%; margin:0; overflow:hidden; background:var(--paper); color:var(--ink); font-family:var(--ui); }
+button, input, select, textarea { font:inherit; }
+button { cursor:pointer; }
+.app { width:100%; height:100%; position:relative; background:var(--paper); }
+.canvas { position:absolute; inset:0; width:100%; height:100%; touch-action:none; cursor:grab; }
+.canvas.panning { cursor:grabbing; }
+.brand { position:absolute; left:26px; top:20px; z-index:20; pointer-events:none; }
+.brand-line { display:flex; align-items:center; gap:10px; }
+.brand-mark { width:9px; height:9px; background:var(--orange); transform:rotate(45deg); }
+.brand h1 { font:600 18px/1.2 var(--serif); margin:0; letter-spacing:.1px; }
+.brand-sub { margin:5px 0 0 19px; color:var(--muted); font:400 11.5px/1.4 var(--mono); }
+.search-wrap { position:absolute; left:26px; top:78px; width:232px; z-index:30; }
+.search { width:100%; height:34px; border:1px solid var(--line); border-radius:8px; background:#fff; padding:7px 12px; color:var(--ink); font-size:12.5px; outline:none; box-shadow:0 2px 8px rgba(31,30,27,.025); }
+.search::placeholder { color:var(--faint); }
+.search:focus { border-color:#C8BFAE; box-shadow:0 0 0 3px rgba(193,95,60,.08); }
+.search-results { display:none; margin-top:5px; padding:5px; border:1px solid #E8E2D2; border-radius:9px; background:rgba(255,255,255,.96); box-shadow:0 6px 22px rgba(31,30,27,.08); }
+.search-results.open { display:block; }
+.search-result { border:0; width:100%; background:transparent; text-align:left; padding:7px 8px; border-radius:6px; color:var(--text); font-size:11.5px; }
+.search-result:hover { background:#F5F3EB; color:var(--ink); }
+.search-result b { font:600 10.5px var(--mono); color:var(--orange-text); margin-right:6px; }
+.top-tools { position:absolute; top:21px; left:50%; transform:translateX(-50%); z-index:22; display:flex; align-items:center; gap:10px; }
+.view-toggle { display:flex; padding:3px; border:1px solid var(--line); border-radius:999px; background:rgba(255,255,255,.9); box-shadow:0 2px 8px rgba(31,30,27,.04); }
+.view-toggle button { height:28px; min-width:74px; padding:0 13px; border:0; border-radius:999px; color:var(--muted); background:transparent; font-size:11.5px; }
+.view-toggle button.active { color:#fff; background:var(--ink); }
+.mode-badge, .refresh-btn { height:28px; border:1px solid var(--line); border-radius:999px; background:rgba(255,255,255,.9); padding:0 10px; font:500 10.5px var(--mono); color:var(--muted); }
+.mode-badge.live { color:#56724E; border-color:#CAD8C5; background:#F6FAF4; }
+.mode-badge.snapshot { color:#8A6A1F; border-color:#D9C48F; background:#F6EDD8; }
+.refresh-btn:hover { color:var(--orange-text); border-color:#D7B09F; }
+.progress { position:absolute; top:58px; left:50%; width:250px; transform:translateX(-50%); z-index:20; }
+.progress-meta { display:flex; justify-content:space-between; color:var(--muted); font:500 9.5px var(--mono); margin-bottom:4px; }
+.progress-track { height:3px; border-radius:999px; background:#E7E1D2; overflow:hidden; }
+.progress-fill { height:100%; background:var(--orange); transition:width .6s ease; }
+.legend { position:absolute; left:26px; bottom:24px; z-index:20; width:174px; padding:9px 10px; border:1px solid #E8E2D2; border-radius:10px; background:rgba(255,255,255,.88); backdrop-filter:blur(5px); }
+.legend-row { width:100%; height:26px; display:grid; grid-template-columns:18px 1fr auto; align-items:center; border:0; background:transparent; border-radius:6px; padding:0 6px; color:var(--text); font-size:11px; text-align:left; }
+.legend-row:hover, .legend-row.active { background:#F5F3EB; color:var(--ink); }
+.legend-dot { width:9px; height:9px; border-radius:50%; display:block; }
+.legend-dot.frontier { background:var(--orange); box-shadow:0 0 0 3px rgba(193,95,60,.12); }
+.legend-dot.claimed { background:var(--purple); box-shadow:0 0 0 3px rgba(124,107,174,.12); }
+.legend-dot.blocked { background:var(--paper); border:1.4px dashed var(--blocked); }
+.legend-dot.resolved { width:6px; height:6px; margin-left:2px; background:var(--resolved); }
+.legend-count { color:var(--muted); font:500 10.5px var(--mono); }
+.workers, .details { position:absolute; z-index:25; right:22px; top:22px; width:250px; border:1px solid rgba(224,218,203,.9); border-radius:12px; background:#fff; box-shadow:0 6px 22px rgba(31,30,27,.08); }
+.workers { padding:13px 12px 10px; }
+.workers-head { display:flex; align-items:center; justify-content:space-between; padding:0 4px 8px; color:var(--muted); font:600 10px var(--mono); letter-spacing:.8px; }
+.worker-row { display:grid; grid-template-columns:8px 1fr auto; align-items:center; gap:8px; min-height:47px; padding:7px 4px; border-top:1px solid #F0ECE2; }
+.worker-state { width:7px; height:7px; border-radius:50%; background:var(--resolved); }
+.worker-state.running { background:var(--purple); box-shadow:0 0 0 3px rgba(124,107,174,.13); }
+.worker-state.manual { background:#C79B3E; }
+.worker-name { color:var(--ink); font:600 11.5px var(--mono); }
+.worker-position { margin-top:3px; color:var(--muted); font-size:10.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:155px; }
+.badges { display:flex; gap:4px; margin-top:4px; flex-wrap:wrap; }
+.badge { padding:2px 5px; border-radius:999px; background:#F5F3EB; color:var(--muted); font:500 8.5px var(--mono); }
+.badge.dirty, .badge.stale { color:#8A6A1F; background:#F6EDD8; border:1px dashed #D9C48F; }
+.locate { width:25px; height:25px; border:1px solid var(--line); border-radius:999px; background:#fff; color:var(--muted); font-size:13px; padding:0; }
+.locate:hover:not(:disabled) { color:var(--orange); border-color:#D7B09F; }
+.locate:disabled { opacity:.32; cursor:default; }
+.details { display:none; width:340px; padding:17px 17px 15px; box-shadow:0 8px 28px rgba(31,30,27,.10); max-height:calc(100vh - 44px); overflow:auto; }
+.details.open { display:block; }
+.details-top { display:flex; align-items:center; justify-content:space-between; }
+.issue-kicker { display:flex; align-items:center; gap:8px; font:600 11px var(--mono); color:var(--muted); }
+.status-pill { border-radius:999px; padding:3px 7px; font:600 9px var(--mono); }
+.status-pill.frontier { color:var(--orange-text); background:#FBECE5; }
+.status-pill.claimed { color:var(--purple-text); background:#F0EDF8; }
+.status-pill.blocked { color:var(--blocked-text); background:#F0EEE8; }
+.status-pill.resolved { color:#817A6E; background:#EFEBE2; }
+.close { width:26px; height:26px; border:0; border-radius:50%; background:transparent; color:var(--muted); font-size:17px; }
+.close:hover { background:#F5F3EB; }
+.details h2 { margin:12px 0 14px; font:600 19px/1.28 var(--serif); }
+.kv { display:grid; grid-template-columns:52px 1fr; gap:8px; align-items:start; margin:7px 0; font-size:11.5px; }
+.kv span:first-child { color:var(--muted); }
+.kv span:last-child { color:var(--text); word-break:break-word; }
+.stale-note { margin:11px 0; padding:8px 10px; border:1px dashed #D9C48F; border-radius:7px; color:#8A6A1F; background:#FBF6E9; font-size:10.5px; }
+.unlock { margin-top:13px; padding:10px; border-radius:8px; background:#F5F3EB; }
+.unlock-title { margin-bottom:7px; color:var(--muted); font:600 9.5px var(--mono); letter-spacing:.5px; }
+.chips { display:flex; gap:5px; flex-wrap:wrap; }
+.chip { border:1px dashed #CFC7B6; border-radius:5px; padding:3px 6px; background:#fff; color:var(--text); font:500 9.5px var(--mono); }
+.details-actions { display:grid; grid-template-columns:1fr 1fr; gap:7px; margin-top:12px; }
+.btn { min-height:34px; border-radius:7px; padding:7px 10px; border:1px solid var(--line); background:#fff; color:var(--text); font-size:11px; }
+.btn.primary { color:#fff; border-color:var(--orange); background:var(--orange); }
+.btn:hover:not(:disabled) { filter:brightness(.97); }
+.btn:disabled { opacity:.45; cursor:default; }
+.dispatch-box { margin-top:13px; padding-top:12px; border-top:1px solid #EEE9DE; }
+.dispatch-box h3 { margin:0 0 8px; color:var(--ink); font-size:11px; }
+.dispatch-box textarea { width:100%; height:70px; resize:vertical; border:1px solid var(--line); border-radius:7px; padding:8px; outline:none; color:var(--text); font:400 10.5px/1.45 var(--ui); }
+.dispatch-controls { display:grid; grid-template-columns:1fr 88px; gap:6px; margin-top:6px; }
+.dispatch-controls select { height:31px; border:1px solid var(--line); border-radius:7px; background:#fff; color:var(--text); padding:0 7px; font-size:10.5px; }
+.snapshot-note { padding:9px; border-radius:7px; background:#F6EDD8; color:#8A6A1F; font-size:10.5px; line-height:1.5; }
+.log-view { display:none; margin-top:9px; max-height:160px; overflow:auto; padding:9px; border-radius:7px; background:#292823; color:#E8E2D2; white-space:pre-wrap; font:400 9.5px/1.45 var(--mono); }
+.log-view.open { display:block; }
+.zoom { position:absolute; right:22px; bottom:22px; z-index:20; display:flex; align-items:center; height:34px; border:1px solid var(--line); border-radius:999px; background:#fff; box-shadow:0 2px 8px rgba(31,30,27,.05); overflow:hidden; }
+.zoom button { width:34px; height:100%; border:0; background:transparent; color:var(--text); font-size:16px; }
+.zoom button:hover { background:#F5F3EB; }
+.zoom-value { width:52px; text-align:center; color:var(--muted); font:500 10px var(--mono); }
+.hint { position:absolute; z-index:15; left:50%; bottom:25px; transform:translateX(-50%); color:#B0A99A; font:400 10.5px var(--mono); pointer-events:none; }
+.map-view { display:none; position:absolute; inset:96px 292px 62px 24px; z-index:10; gap:12px; overflow:auto; padding:2px; }
+.map-view.active { display:grid; grid-template-columns:1.15fr .9fr .9fr .9fr; }
+.map-column { min-width:175px; border:1px solid #E5DFD0; border-radius:11px; background:rgba(255,255,255,.52); overflow:auto; }
+.map-head { position:sticky; top:0; z-index:2; display:flex; justify-content:space-between; align-items:center; padding:12px; background:rgba(250,249,245,.95); border-bottom:1px solid #E8E2D2; backdrop-filter:blur(4px); }
+.map-head h3 { margin:0; font:600 11px var(--mono); color:var(--text); }
+.map-head b { color:var(--muted); font:500 10px var(--mono); }
+.map-list { padding:9px; }
+.map-card { position:relative; width:100%; margin-bottom:8px; border:1px solid #E5DFD0; border-radius:8px; background:#fff; padding:9px 9px 8px; text-align:left; color:var(--text); box-shadow:0 2px 5px rgba(31,30,27,.025); }
+.map-card:hover { border-color:#CFC4B0; transform:translateY(-1px); }
+.map-card.warn { border-style:dashed; border-color:#B08838; }
+.map-card.compact { display:inline-flex; width:auto; margin:3px; padding:6px 7px; }
+.map-id { font:600 10px var(--mono); margin-right:6px; }
+.map-title { font-size:10.5px; line-height:1.35; }
+.map-card.frontier .map-id { color:var(--orange-text); }
+.map-card.claimed .map-id { color:var(--purple-text); }
+.map-card.blocked .map-id { color:var(--blocked-text); }
+.map-card.resolved .map-id { color:#938B7D; }
+.map-worker { display:inline-block; margin-top:6px; padding:3px 6px; border-radius:5px; color:#fff; background:var(--purple); font:600 8.5px var(--mono); }
+.map-warn { margin-top:4px; color:var(--warning); font:500 8.5px var(--mono); }
+.modal-backdrop { display:none; position:absolute; inset:0; z-index:100; background:rgba(31,30,27,.24); align-items:center; justify-content:center; }
+.modal-backdrop.open { display:flex; }
+.modal { width:min(430px,calc(100vw - 32px)); border:1px solid var(--line); border-radius:13px; background:#fff; padding:18px; box-shadow:0 18px 60px rgba(31,30,27,.22); }
+.modal h2 { margin:0 0 8px; font:600 18px var(--serif); }
+.modal p { margin:0; color:var(--text); font-size:11.5px; line-height:1.55; }
+.modal code { font:500 10.5px var(--mono); color:#8A6A1F; }
+.modal-actions { display:grid; grid-template-columns:1fr 1fr 1fr; gap:7px; margin-top:15px; }
+.toast { position:absolute; z-index:120; left:50%; bottom:68px; transform:translate(-50%,14px); opacity:0; pointer-events:none; max-width:520px; padding:9px 13px; border-radius:8px; background:#292823; color:#fff; font-size:11px; transition:.2s ease; }
+.toast.show { opacity:1; transform:translate(-50%,0); }
+.graph-hidden { display:none; }
+.background-stars { transition:opacity 150ms ease-out; }
+.edge { fill:none; stroke:#DFD8C7; stroke-width:1.1; stroke-opacity:.9; transition:opacity 150ms ease-out,stroke 150ms ease-out,stroke-width 150ms ease-out; }
+.edge.blocking { stroke:#CE9A83; stroke-width:1.15; stroke-dasharray:5 4; }
+.issue-node { cursor:pointer; }
+.issue-node .node-visual { transition:opacity 150ms ease-out; }
+.issue-node .node-label { pointer-events:none; }
+.issue-node .node-id { font:500 11.5px var(--mono); text-anchor:middle; }
+.issue-node .node-title { font:400 12px var(--ui); fill:var(--text); text-anchor:middle; }
+.issue-node.frontier .node-id { fill:var(--orange-text); }
+.issue-node.frontier .node-title { font-weight:500; }
+.issue-node.claimed .node-id { fill:var(--purple-text); }
+.issue-node.blocked .node-id { fill:var(--blocked-text); }
+.issue-node.resolved .node-id { fill:#B0A897; font-size:10.5px; }
+.resolved-labels-hidden .issue-node.resolved .node-label { display:none; }
+.worker-flag { opacity:1 !important; pointer-events:none; filter:drop-shadow(0 2px 4px rgba(31,30,27,.10)); }
+.worker-flag text { font:600 11px var(--mono); dominant-baseline:middle; text-anchor:middle; }
+.claimed-pulse { transform-box:fill-box; transform-origin:center; animation:beacon 2s ease-in-out infinite; }
+@keyframes beacon { 0%,100% { opacity:.25; transform:scale(.96); } 50% { opacity:.55; transform:scale(1.06); } }
+.search-hit .node-core { animation:searchBlink .45s ease-in-out 4; }
+@keyframes searchBlink { 0%,100% { stroke-width:0; } 50% { stroke:#C15F3C; stroke-width:4px; } }
+@media (prefers-reduced-motion: reduce) { .claimed-pulse, .search-hit .node-core { animation:none; } * { scroll-behavior:auto !important; } }
+@media (max-width:900px) {
+  .workers, .details { right:10px; top:92px; }
+  .top-tools { left:auto; right:12px; transform:none; }
+  .progress { display:none; }
+  .map-view { right:274px; grid-template-columns:1fr 1fr !important; }
+  .brand { left:14px; }
+  .search-wrap { left:14px; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <svg class="canvas" id="graph" aria-label="Issue 知识图谱"></svg>
+  <div class="map-view" id="map-view"></div>
+  <div class="brand"><div class="brand-line"><i class="brand-mark"></i><h1>AES 需求星图</h1></div><p class="brand-sub" id="brand-sub">读取 issue 星图…</p></div>
+  <div class="search-wrap"><input class="search" id="search" placeholder="搜索 issue / worker…" autocomplete="off"><div class="search-results" id="search-results"></div></div>
+  <div class="top-tools">
+    <div class="view-toggle"><button data-view="graph" class="active">图谱视图</button><button data-view="map">地图视图</button></div>
+    <span class="mode-badge snapshot" id="mode-badge">SNAPSHOT</span>
+    <button class="refresh-btn" id="refresh">↻ 刷新</button>
+  </div>
+  <div class="progress"><div class="progress-meta"><span>全仓探明进度</span><b id="progress-label">0 / 0</b></div><div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div></div>
+  <div class="legend" id="legend"></div>
+  <aside class="workers" id="workers"></aside>
+  <aside class="details" id="details"></aside>
+  <div class="zoom" id="zoom"><button data-zoom="out">−</button><span class="zoom-value" id="zoom-value">100%</span><button data-zoom="in">＋</button></div>
+  <div class="hint" id="hint">悬停高亮邻居 · 滚轮缩放 · 拖拽平移</div>
+  <div class="modal-backdrop" id="dirty-modal"><div class="modal"><h2>这个 worktree 有未提交现场</h2><p id="dirty-copy"></p><div class="modal-actions"><button class="btn" data-dirty="cancel">取消</button><button class="btn" data-dirty="inspect">先侦查</button><button class="btn primary" data-dirty="confirm">仍要派发</button></div></div></div>
+  <div class="toast" id="toast"></div>
+</div>
+<script src="runtime/status.js"></script>
+<script>
+(() => {
+  'use strict';
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  const $ = (selector) => document.querySelector(selector);
+  const $$ = (selector) => [...document.querySelectorAll(selector)];
+  const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[char]));
+  const shortName = (name) => String(name || '').replace(/^.*-(dev\d+)$/, '$1');
+  const labels = { frontier:'可开工', claimed:'进行中', blocked:'被阻塞', resolved:'已探明' };
+  const state = {
+    mode:'snapshot', view:'graph', status:null, nodes:[], positions:new Map(),
+    transform:{ x:0, y:0, k:1 }, hovered:null, filter:null, selected:null,
+    dragging:null, pendingDispatch:null, refreshTimer:null,
+  };
+
+  function radius(issue) {
+    const degree = issue.derived.degree;
+    return issue.derived.status === 'frontier' ? 8 + 1.4 * degree
+      : issue.derived.status === 'claimed' ? 9 + 1.4 * degree
+      : issue.derived.status === 'blocked' ? 5 + 1.1 * degree
+      : 3.5 + .8 * degree;
+  }
+
+  function workerFor(issue) {
+    return state.status?.worktrees.find((worker) => worker.name === issue.claimedBy) || null;
+  }
+
+  function elapsed(startedAt) {
+    const milliseconds = Date.now() - Date.parse(startedAt || '');
+    if (!Number.isFinite(milliseconds) || milliseconds < 0) return '0m';
+    const minutes = Math.floor(milliseconds / 60000);
+    return minutes >= 60 ? `${Math.floor(minutes / 60)}h${minutes % 60}m` : `${minutes}m`;
+  }
+
+  function seeded(number) {
+    const value = Math.sin(number * 999.137) * 43758.5453;
+    return value - Math.floor(value);
+  }
+
+  function computeLayout(issues, edges) {
+    const width = innerWidth;
+    const height = innerHeight;
+    const cx = width * .5;
+    const cy = height * .53;
+    const spanX = Math.max(600, width - 180);
+    const spanY = Math.max(520, height - 190);
+    const openIssues = issues.filter((issue) => issue.state === 'OPEN');
+    const openIndex = new Map(openIssues.map((issue, index) => [issue.number, index]));
+    const resolvedIssues = issues.filter((issue) => issue.state === 'CLOSED');
+    const resolvedIndex = new Map(resolvedIssues.map((issue, index) => [issue.number, index]));
+    const points = issues.map((issue, index) => {
+      const previous = state.positions.get(issue.number);
+      if (previous) return { ...previous, issue, vx:0, vy:0, r:radius(issue) };
+      let x; let y;
+      if (issue.state === 'OPEN') {
+        const openI = openIndex.get(issue.number);
+        const angle = -Math.PI / 2 + openI / openIssues.length * Math.PI * 2 + (openI % 2 ? .08 : -.08);
+        const distance = Math.min(spanX, spanY) * (openI % 2 ? .39 : .24);
+        x = cx + Math.cos(angle) * distance * 1.18;
+        y = cy + Math.sin(angle) * distance;
+      } else {
+        const resolvedI = resolvedIndex.get(issue.number);
+        const columns = Math.ceil(Math.sqrt(resolvedIssues.length * width / height));
+        const rows = Math.ceil(resolvedIssues.length / columns);
+        const column = resolvedI % columns; const row = Math.floor(resolvedI / columns);
+        x = 90 + column / Math.max(1, columns - 1) * (width - 180) + (seeded(issue.number) - .5) * 32;
+        y = 130 + row / Math.max(1, rows - 1) * (height - 220) + (seeded(issue.number + 77) - .5) * 28;
+      }
+      return {
+        issue, r:radius(issue), vx:0, vy:0,
+        x, y,
+      };
+    });
+    const byNumber = new Map(points.map((point) => [point.issue.number, point]));
+    for (let tick = 0; tick < 230; tick += 1) {
+      const cooling = 1 - tick / 260;
+      for (let i = 0; i < points.length; i += 1) {
+        const a = points[i];
+        for (let j = i + 1; j < points.length; j += 1) {
+          const b = points[j];
+          let dx = b.x - a.x;
+          let dy = b.y - a.y;
+          const distance2 = Math.max(20, dx * dx + dy * dy);
+          const distance = Math.sqrt(distance2);
+          const bothResolved = a.issue.state === 'CLOSED' && b.issue.state === 'CLOSED';
+          const desired = bothResolved ? a.r + b.r + 20 : a.r + b.r + 105;
+          const repel = distance < desired ? (desired - distance) * .075 : 210 / distance2;
+          dx /= distance; dy /= distance;
+          a.vx -= dx * repel; a.vy -= dy * repel;
+          b.vx += dx * repel; b.vy += dy * repel;
+        }
+      }
+      edges.forEach((edge) => {
+        const a = byNumber.get(edge.from); const b = byNumber.get(edge.to);
+        if (!a || !b) return;
+        const dx = b.x - a.x; const dy = b.y - a.y;
+        const distance = Math.max(1, Math.hypot(dx, dy));
+        const pull = (distance - 155) * .00135;
+        a.vx += dx / distance * pull; a.vy += dy / distance * pull;
+        b.vx -= dx / distance * pull; b.vy -= dy / distance * pull;
+      });
+      points.forEach((point) => {
+        const statusBias = point.issue.derived.status === 'frontier' ? -55
+          : point.issue.derived.status === 'blocked' ? 65 : 0;
+        point.vx += (cx + statusBias - point.x) * .00035;
+        point.vy += (cy - point.y) * .00035;
+        point.vx *= .84; point.vy *= .84;
+        point.x += point.vx * cooling; point.y += point.vy * cooling;
+        point.x = Math.max(90, Math.min(width - 90, point.x));
+        point.y = Math.max(120, Math.min(height - 75, point.y));
+      });
+    }
+    // 标题是视图的一部分：冻结前再做标签盒碰撞，防止力导向只顾圆点不顾可读性。
+    const labeled = points.filter((point) => point.issue.state === 'OPEN' || point.issue.claimedBy);
+    for (let pass = 0; pass < 90; pass += 1) {
+      for (let i = 0; i < labeled.length; i += 1) {
+        for (let j = i + 1; j < labeled.length; j += 1) {
+          const a = labeled[i]; const b = labeled[j];
+          const dx = b.x - a.x; const dy = b.y - a.y;
+          const overlapX = 178 - Math.abs(dx); const overlapY = 44 - Math.abs(dy);
+          if (overlapX <= 0 || overlapY <= 0) continue;
+          if (overlapX / 178 < overlapY / 44) {
+            const shift = overlapX * .27 * (dx >= 0 ? 1 : -1);
+            a.x -= shift; b.x += shift;
+          } else {
+            const shift = overlapY * .34 * (dy >= 0 ? 1 : -1);
+            a.y -= shift; b.y += shift;
+          }
+          a.x = Math.max(90, Math.min(width - 90, a.x)); b.x = Math.max(90, Math.min(width - 90, b.x));
+          a.y = Math.max(120, Math.min(height - 75, a.y)); b.y = Math.max(120, Math.min(height - 75, b.y));
+        }
+      }
+    }
+    state.positions = new Map(points.map((point) => [point.issue.number, { x:point.x, y:point.y }]));
+    return points;
+  }
+
+  function curve(edge, index) {
+    const a = state.positions.get(edge.from); const b = state.positions.get(edge.to);
+    if (!a || !b) return '';
+    const dx = b.x - a.x; const dy = b.y - a.y;
+    const length = Math.max(1, Math.hypot(dx, dy));
+    const sign = index % 2 ? -1 : 1;
+    const offset = length * .09 * sign;
+    const mx = (a.x + b.x) / 2 - dy / length * offset;
+    const my = (a.y + b.y) / 2 + dx / length * offset;
+    return `M ${a.x.toFixed(1)} ${a.y.toFixed(1)} Q ${mx.toFixed(1)} ${my.toFixed(1)} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`;
+  }
+
+  function nodeMarkup(issue) {
+    const point = state.positions.get(issue.number);
+    const r = radius(issue);
+    const status = issue.derived.status;
+    const worker = workerFor(issue);
+    let circles = '';
+    if (status === 'frontier') circles = `<circle r="${r + 10}" fill="rgba(193,95,60,.07)"/><circle r="${r + 4.5}" fill="none" stroke="rgba(193,95,60,.35)" stroke-width="1.1"/><circle class="node-core" r="${r}" fill="#C15F3C"/>`;
+    else if (status === 'claimed') circles = `<circle class="claimed-pulse" r="${r + 15}" fill="rgba(124,107,174,.12)"/><circle r="${r + 9}" fill="none" stroke="rgba(124,107,174,.20)"/><circle r="${r + 4.5}" fill="none" stroke="rgba(124,107,174,.45)"/><circle class="node-core" r="${r}" fill="#7C6BAE"/>`;
+    else if (status === 'blocked') circles = `<circle class="node-core" r="${r}" fill="#FAF9F5" stroke="#A39C8D" stroke-width="1.4" stroke-dasharray="3 3"/>`;
+    else circles = `<circle class="node-core" r="${r}" fill="#B7AF9F" opacity=".95"/>${issue.derived.warn ? `<circle r="${r + 4}" fill="none" stroke="#B08838" stroke-width="1.1" stroke-dasharray="2 3"/>` : ''}`;
+    const title = status === 'resolved' ? '' : `<text class="node-title" y="${r + 23}">${esc(issue.title.length > 20 ? `${issue.title.slice(0, 19)}…` : issue.title)}</text>`;
+    const warning = issue.derived.warn ? `<text y="${r + 18}" text-anchor="middle" fill="#B08838" font-family="var(--mono)" font-size="10">⚠ 回归有波动</text>` : '';
+    let flag = '';
+    if (worker) {
+      const running = worker.mode === 'running';
+      const text = running ? `${shortName(worker.name)} ▶ ${elapsed(worker.activeTask?.startedAt)}` : `${shortName(worker.name)} ✋ 手动推进`;
+      const width = Math.max(76, text.length * 7.1 + 18);
+      const fill = running ? '#7C6BAE' : '#F6EDD8';
+      const stroke = running ? '#6A5A9E' : '#D9C48F';
+      const color = running ? '#FFFFFF' : '#8A6A1F';
+      flag = `<g class="worker-flag" transform="translate(0,${-r - 9})"><line y1="0" y2="-9" stroke="${stroke}"/><g transform="translate(0,-25)"><rect x="${-width / 2}" y="-10" width="${width}" height="22" rx="6" fill="${fill}" stroke="${stroke}"/><text y="1" fill="${color}">${esc(text)}</text></g></g>`;
+    }
+    return `<g class="issue-node ${status}" data-id="${issue.number}" transform="translate(${point.x.toFixed(1)},${point.y.toFixed(1)})"><g class="node-visual"><circle r="${Math.max(18, r + 12)}" fill="transparent"/>${circles}<g class="node-label"><text class="node-id" y="${r + 10}">#${issue.number}</text>${title}${warning}</g></g>${flag}</g>`;
+  }
+
+  function backgroundStars() {
+    let markup = '';
+    for (let index = 0; index < 95; index += 1) {
+      const x = seeded(index + 401) * innerWidth;
+      const y = seeded(index + 821) * innerHeight;
+      const r = 1.6 + seeded(index + 1231) * 1.9;
+      markup += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="#DAD4C5" opacity="${(.28 + seeded(index + 88) * .42).toFixed(2)}"/>`;
+    }
+    return markup;
+  }
+
+  function renderGraph() {
+    if (!state.status) return;
+    const previousPositions = new Map(state.positions);
+    computeLayout(state.status.graph.issues, state.status.graph.edges);
+    const svg = $('#graph');
+    svg.setAttribute('viewBox', `0 0 ${innerWidth} ${innerHeight}`);
+    const edges = state.status.graph.edges.map((edge, index) => {
+      const target = state.status.graph.issues.find((issue) => issue.number === edge.to);
+      const blocking = target?.derived.status === 'blocked' && !edge.satisfied;
+      return `<path class="edge${blocking ? ' blocking' : ''}" data-from="${edge.from}" data-to="${edge.to}" d="${curve(edge, index)}"/>`;
+    }).join('');
+    svg.innerHTML = `<g class="background-stars">${backgroundStars()}</g><g id="viewport" transform="translate(${state.transform.x} ${state.transform.y}) scale(${state.transform.k})"><g class="edges">${edges}</g><g class="nodes">${state.status.graph.issues.map(nodeMarkup).join('')}</g></g>`;
+    $$('.issue-node').forEach((element) => {
+      const id = Number(element.dataset.id);
+      const previous = previousPositions.get(id); const next = state.positions.get(id);
+      if (!previous || !next || Math.hypot(next.x - previous.x, next.y - previous.y) < .5) return;
+      element.setAttribute('transform', `translate(${previous.x.toFixed(1)},${previous.y.toFixed(1)})`);
+      element.style.transition = 'transform 600ms ease';
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        element.setAttribute('transform', `translate(${next.x.toFixed(1)},${next.y.toFixed(1)})`);
+      }));
+    });
+    bindGraph();
+    applyFocus();
+    updateZoom();
+  }
+
+  function bindGraph() {
+    $$('.issue-node').forEach((element) => {
+      const id = Number(element.dataset.id);
+      element.addEventListener('mouseenter', () => { state.hovered = id; applyFocus(); });
+      element.addEventListener('mouseleave', () => { state.hovered = null; applyFocus(); });
+      element.addEventListener('click', (event) => { event.stopPropagation(); selectIssue(id); });
+    });
+  }
+
+  function neighborSet(id) {
+    const result = new Set([id]);
+    state.status.graph.edges.forEach((edge) => {
+      if (edge.from === id) result.add(edge.to);
+      if (edge.to === id) result.add(edge.from);
+    });
+    return result;
+  }
+
+  function applyFocus() {
+    if (!state.status || state.view !== 'graph') return;
+    const focused = state.hovered ? neighborSet(state.hovered) : null;
+    $$('.issue-node').forEach((element) => {
+      const id = Number(element.dataset.id);
+      const issue = state.status.graph.issues.find((item) => item.number === id);
+      const active = focused ? focused.has(id) : state.filter ? issue.derived.status === state.filter : true;
+      const visual = element.querySelector('.node-visual');
+      visual.style.opacity = active ? '1' : issue.claimedBy ? '.5' : '.15';
+      const flag = element.querySelector('.worker-flag');
+      if (flag) flag.style.opacity = '1';
+    });
+    $$('.edge').forEach((element) => {
+      const from = Number(element.dataset.from); const to = Number(element.dataset.to);
+      const filterRelated = state.filter && [from, to].some((id) => state.status.graph.issues.find((issue) => issue.number === id)?.derived.status === state.filter);
+      const related = focused ? focused.has(from) && focused.has(to) : state.filter ? filterRelated : true;
+      element.style.opacity = focused || state.filter ? (related ? '1' : '.1') : '1';
+      element.style.strokeWidth = focused && related ? '1.4' : '';
+      if (focused && related) element.style.stroke = element.classList.contains('blocking') ? '#C15F3C' : '#B9AF97';
+      else element.style.stroke = '';
+    });
+    const stars = $('.background-stars');
+    if (stars) stars.style.opacity = focused || state.filter ? '.3' : '1';
+  }
+
+  function renderLegend() {
+    if (!state.status) return;
+    const counts = Object.fromEntries(Object.keys(labels).map((status) => [status, state.status.graph.issues.filter((issue) => issue.derived.status === status).length]));
+    $('#legend').innerHTML = Object.entries(labels).map(([status, label]) => `<button class="legend-row ${state.filter === status ? 'active' : ''}" data-filter="${status}"><i class="legend-dot ${status}"></i><span>${label}</span><b class="legend-count">${counts[status]}</b></button>`).join('');
+    $$('.legend-row').forEach((button) => button.addEventListener('click', () => {
+      state.filter = state.filter === button.dataset.filter ? null : button.dataset.filter;
+      renderLegend(); applyFocus();
+    }));
+  }
+
+  function renderWorkers() {
+    if (!state.status) return;
+    const present = state.status.worktrees.filter((worker) => worker.position.kind === 'issue').length;
+    $('#workers').innerHTML = `<div class="workers-head"><span>WORKERS</span><b>${present}/${state.status.worktrees.length} 在场</b></div>${state.status.worktrees.map((worker) => {
+      const issue = worker.position.kind === 'issue' ? state.status.graph.issues.find((item) => item.number === worker.position.issue) : null;
+      const dirty = worker.dirty.modified + worker.dirty.untracked;
+      const position = issue ? `#${issue.number} · ${issue.title}` : '未在场';
+      return `<div class="worker-row"><i class="worker-state ${worker.mode}"></i><div><div class="worker-name">${esc(shortName(worker.name))}</div><div class="worker-position">${esc(position)}</div><div class="badges">${dirty ? `<span class="badge dirty">dirty ${worker.dirty.modified}+${worker.dirty.untracked}</span>` : ''}${worker.assessment?.stale ? '<span class="badge stale">评估过期</span>' : ''}${worker.mode === 'running' ? `<span class="badge">▶ ${elapsed(worker.activeTask?.startedAt)}</span>` : ''}</div></div><button class="locate" data-locate="${issue?.number || ''}" ${issue ? '' : 'disabled'} title="定位队员">⌖</button></div>`;
+    }).join('')}`;
+    $$('.locate:not(:disabled)').forEach((button) => button.addEventListener('click', () => flyTo(Number(button.dataset.locate))));
+  }
+
+  function renderMap() {
+    if (!state.status) return;
+    const columns = [
+      ['resolved','已探明'], ['claimed','进行中'], ['frontier','可开工'], ['blocked','被阻塞'],
+    ];
+    $('#map-view').innerHTML = columns.map(([status, title]) => {
+      const issues = state.status.graph.issues.filter((issue) => issue.derived.status === status);
+      const cards = issues.map((issue) => {
+        const worker = workerFor(issue);
+        return `<button class="map-card ${status}${status === 'resolved' ? ' compact' : ''}${issue.derived.warn ? ' warn' : ''}" data-map-issue="${issue.number}"><span class="map-id">#${issue.number}</span>${status === 'resolved' ? '' : `<span class="map-title">${esc(issue.title)}</span>`}${worker ? `<span class="map-worker">${esc(shortName(worker.name))} ${worker.mode === 'running' ? '▶' : '✋'}</span>` : ''}${issue.derived.warn ? '<span class="map-warn">⚠ 回归有波动</span>' : ''}</button>`;
+      }).join('');
+      return `<section class="map-column"><header class="map-head"><h3>${title}</h3><b>${issues.length}</b></header><div class="map-list">${cards || '<div class="snapshot-note">当前没有节点</div>'}</div></section>`;
+    }).join('');
+    $$('[data-map-issue]').forEach((button) => button.addEventListener('click', () => selectIssue(Number(button.dataset.mapIssue))));
+  }
+
+  function renderMeta() {
+    const stats = state.status.graph.stats;
+    $('#brand-sub').textContent = `${stats.total} issues · ${stats.closed} 已探明 · 星等 = 依赖连接数`;
+    $('#progress-label').textContent = `${stats.closed} / ${stats.total}`;
+    $('#progress-fill').style.width = `${stats.total ? stats.closed / stats.total * 100 : 0}%`;
+    $('#mode-badge').textContent = state.mode === 'live' ? 'LIVE' : 'SNAPSHOT';
+    $('#mode-badge').className = `mode-badge ${state.mode}`;
+    $('#refresh').textContent = state.mode === 'live' ? '↻ 刷新' : '只读快照';
+    $('#refresh').disabled = state.mode !== 'live';
+  }
+
+  function renderAll(status) {
+    if (!status || status.schemaVersion !== 2) {
+      toast('需要先运行 collect.mjs 生成 status.json v2'); return;
+    }
+    state.status = status;
+    renderMeta(); renderLegend(); renderWorkers(); renderGraph(); renderMap();
+    if (state.selected) renderDetails();
+  }
+
+  function selectIssue(id) {
+    state.selected = id;
+    renderDetails();
+    $('#workers').style.display = 'none';
+    $('#details').classList.add('open');
+  }
+
+  function closeDetails() {
+    state.selected = null;
+    $('#details').classList.remove('open');
+    $('#workers').style.display = '';
+  }
+
+  function renderDetails() {
+    const issue = state.status?.graph.issues.find((item) => item.number === state.selected);
+    if (!issue) return closeDetails();
+    const worker = workerFor(issue);
+    const downstream = state.status.graph.edges.filter((edge) => edge.from === issue.number).map((edge) => state.status.graph.issues.find((item) => item.number === edge.to)).filter(Boolean);
+    const latestTask = worker?.activeTask || worker?.recentTasks?.[0];
+    const idleWorkers = state.status.worktrees.filter((item) => item.mode === 'idle');
+    const workerOptions = (idleWorkers.length ? idleWorkers : state.status.worktrees).map((item) => `<option value="${esc(item.name)}" ${worker?.name === item.name ? 'selected' : ''}>${esc(shortName(item.name))}${item.dirty.modified + item.dirty.untracked ? ' · dirty' : ''}</option>`).join('');
+    const prompt = `处理 #${issue.number}：${issue.title}\n先读取 issue 正文与仓库规则，按其验收条件完成；不要关闭 issue，不要合并到 main。`;
+    $('#details').innerHTML = `<div class="details-top"><div class="issue-kicker"><span>#${issue.number}</span><span class="status-pill ${issue.derived.status}">${labels[issue.derived.status]}</span></div><button class="close" aria-label="关闭">×</button></div><h2>${esc(issue.title)}</h2><div class="kv"><span>状态</span><span>${labels[issue.derived.status]} · degree ${issue.derived.degree}${issue.derived.warn ? ' · ⚠ 回归有波动' : ''}</span></div><div class="kv"><span>分支</span><span>${esc(worker?.branch || '尚未认领')}</span></div><div class="kv"><span>来路</span><span>${issue.blockedBy.length ? issue.blockedBy.map((number) => `#${number}`).join(' · ') : '无前置依赖'}</span></div>${worker?.assessment?.stale ? '<div class="stale-note">评估已过期：最新 commit 或任务结束晚于 assessedAt，请以现场为准重新评估。</div>' : ''}<div class="unlock"><div class="unlock-title">完成后解锁</div><div class="chips">${downstream.length ? downstream.map((item) => `<span class="chip">#${item.number}</span>`).join('') : '<span class="chip">无直接下游</span>'}</div></div><div class="details-actions"><button class="btn primary" id="view-log" ${state.mode !== 'live' || !latestTask ? 'disabled' : ''}>查看运行日志</button><button class="btn" id="open-issue">打开 issue</button></div><pre class="log-view" id="log-view"></pre><div class="dispatch-box"><h3>${issue.derived.status === 'frontier' ? '从这里派活' : '派发关联任务'}</h3>${state.mode === 'live' ? `<textarea id="dispatch-prompt">${esc(prompt)}</textarea><div class="dispatch-controls"><select id="dispatch-worker">${workerOptions}</select><select id="dispatch-agent"><option>claude</option><option>codex</option><option>test</option></select></div><button class="btn primary" id="dispatch" style="width:100%;margin-top:7px">派发 headless 任务</button>` : '<div class="snapshot-note">file:// 只读快照不能派发。请启动 server.mjs 后从 LIVE 页面操作。</div>'}</div>`;
+    $('.close').addEventListener('click', closeDetails);
+    $('#open-issue').addEventListener('click', () => window.open(issue.url, '_blank', 'noopener'));
+    if ($('#view-log') && !$('#view-log').disabled) $('#view-log').addEventListener('click', () => showLog(latestTask.id));
+    if ($('#dispatch')) $('#dispatch').addEventListener('click', () => dispatchIssue(issue));
+  }
+
+  async function showLog(taskId) {
+    const output = $('#log-view');
+    output.classList.add('open'); output.textContent = '读取日志…';
+    try {
+      const response = await fetch(`/api/task/${encodeURIComponent(taskId)}`);
+      const payload = await response.json();
+      output.textContent = response.ok ? payload.logTail || '日志为空' : payload.error;
+    } catch (error) { output.textContent = error.message; }
+  }
+
+  async function dispatchIssue(issue, confirmDirty = false, inspect = false) {
+    const worktree = $('#dispatch-worker')?.value || state.pendingDispatch?.worktree;
+    const agent = $('#dispatch-agent')?.value || state.pendingDispatch?.agent;
+    let prompt = $('#dispatch-prompt')?.value.trim() || state.pendingDispatch?.prompt;
+    if (!worktree || !prompt) return toast('请选择队员并填写任务指令');
+    if (inspect) prompt = `只读侦查，不修改文件、不提交：先说明当前 worktree 的未提交现场与 #${issue.number} 的关系。\n\n${prompt}`;
+    const body = { worktree, prompt, agent };
+    if (confirmDirty) body.confirmDirty = true;
+    try {
+      const response = await fetch('/api/dispatch', { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify(body) });
+      const payload = await response.json();
+      if (response.status === 409 && payload.code === 'DIRTY') {
+        state.pendingDispatch = { issue, worktree, prompt, agent, dirty:payload.dirty };
+        $('#dirty-copy').innerHTML = `<code>${esc(shortName(worktree))}</code> 有 ${payload.dirty.modified} 处修改 + ${payload.dirty.untracked} 个未跟踪文件，可能是另一个会话的现场。`;
+        $('#dirty-modal').classList.add('open'); return;
+      }
+      if (!response.ok) return toast(`派发失败：${payload.error}`);
+      state.pendingDispatch = null; $('#dirty-modal').classList.remove('open');
+      toast(`已派发 ${payload.taskId}`);
+      setTimeout(() => refresh(true), 500);
+    } catch (error) { toast(`派发失败：${error.message}`); }
+  }
+
+  function searchMatches(query) {
+    const normalized = query.trim().toLowerCase().replace(/^#/, '');
+    if (!normalized) return [];
+    const results = state.status.graph.issues.filter((issue) => String(issue.number) === normalized || issue.title.toLowerCase().includes(normalized) || String(issue.claimedBy || '').toLowerCase().includes(normalized));
+    return results.slice(0, 7);
+  }
+
+  function renderSearch() {
+    const results = searchMatches($('#search').value);
+    const panel = $('#search-results');
+    panel.innerHTML = results.map((issue) => `<button class="search-result" data-search-id="${issue.number}"><b>#${issue.number}</b>${esc(issue.title)}</button>`).join('');
+    panel.classList.toggle('open', results.length > 0);
+    $$('[data-search-id]').forEach((button) => button.addEventListener('click', () => { flyTo(Number(button.dataset.searchId)); panel.classList.remove('open'); }));
+  }
+
+  function flyTo(id) {
+    if (state.view === 'map') setView('graph');
+    const point = state.positions.get(id); if (!point) return;
+    const k = Math.max(1.25, state.transform.k);
+    state.transform = { x:innerWidth / 2 - point.x * k, y:innerHeight / 2 - point.y * k, k };
+    const viewport = $('#viewport');
+    viewport.style.transition = 'transform 450ms ease-in-out';
+    updateTransform();
+    setTimeout(() => { viewport.style.transition = ''; const node = $(`.issue-node[data-id="${id}"]`); node?.classList.add('search-hit'); setTimeout(() => node?.classList.remove('search-hit'), 1900); }, 460);
+  }
+
+  function updateTransform() {
+    const viewport = $('#viewport');
+    if (viewport) viewport.setAttribute('transform', `translate(${state.transform.x} ${state.transform.y}) scale(${state.transform.k})`);
+    $('#graph').classList.toggle('resolved-labels-hidden', state.transform.k < .6);
+    updateZoom();
+  }
+
+  function zoomAt(nextK, x = innerWidth / 2, y = innerHeight / 2) {
+    const oldK = state.transform.k;
+    const k = Math.max(.25, Math.min(4, nextK));
+    const worldX = (x - state.transform.x) / oldK;
+    const worldY = (y - state.transform.y) / oldK;
+    state.transform.x = x - worldX * k; state.transform.y = y - worldY * k; state.transform.k = k;
+    updateTransform();
+  }
+
+  function updateZoom() { $('#zoom-value').textContent = `${Math.round(state.transform.k * 100)}%`; }
+
+  function setView(view) {
+    state.view = view;
+    $$('[data-view]').forEach((button) => button.classList.toggle('active', button.dataset.view === view));
+    $('#graph').classList.toggle('graph-hidden', view !== 'graph');
+    $('#map-view').classList.toggle('active', view === 'map');
+    $('.search-wrap').style.display = view === 'graph' ? '' : 'none';
+    $('#legend').style.display = view === 'graph' ? '' : 'none';
+    $('#zoom').style.display = view === 'graph' ? '' : 'none';
+    $('#hint').textContent = view === 'graph' ? '悬停高亮邻居 · 滚轮缩放 · 拖拽平移' : '四列进度轴 · 点击 issue 查看详情与派活';
+  }
+
+  async function refresh(fast = false) {
+    if (state.mode !== 'live') return;
+    $('#refresh').disabled = true; $('#refresh').textContent = '刷新中…';
+    try {
+      const response = await fetch(`/api/status${fast ? '?fast=1' : ''}`, { cache:'no-store' });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      renderAll(await response.json());
+    } catch (error) { toast(`刷新失败：${error.message}`); }
+    finally { $('#refresh').disabled = false; $('#refresh').textContent = '↻ 刷新'; }
+  }
+
+  function toast(message) {
+    const element = $('#toast'); element.textContent = message; element.classList.add('show');
+    clearTimeout(element.timer); element.timer = setTimeout(() => element.classList.remove('show'), 3200);
+  }
+
+  function bindShell() {
+    $$('[data-view]').forEach((button) => button.addEventListener('click', () => setView(button.dataset.view)));
+    $('#refresh').addEventListener('click', () => refresh(false));
+    $('#search').addEventListener('input', renderSearch);
+    $('#search').addEventListener('keydown', (event) => { if (event.key === 'Enter') { const match = searchMatches(event.target.value)[0]; if (match) flyTo(match.number); } });
+    $('#zoom').addEventListener('click', (event) => { const direction = event.target.dataset.zoom; if (direction) zoomAt(state.transform.k * (direction === 'in' ? 1.25 : .8)); });
+    const svg = $('#graph');
+    svg.addEventListener('wheel', (event) => { event.preventDefault(); zoomAt(state.transform.k * Math.exp(-event.deltaY * .0012), event.clientX, event.clientY); }, { passive:false });
+    svg.addEventListener('pointerdown', (event) => { if (event.target.closest('.issue-node')) return; state.dragging = { x:event.clientX, y:event.clientY, tx:state.transform.x, ty:state.transform.y }; svg.setPointerCapture(event.pointerId); svg.classList.add('panning'); closeDetails(); });
+    svg.addEventListener('pointermove', (event) => { if (!state.dragging) return; state.transform.x = state.dragging.tx + event.clientX - state.dragging.x; state.transform.y = state.dragging.ty + event.clientY - state.dragging.y; updateTransform(); });
+    svg.addEventListener('pointerup', () => { state.dragging = null; svg.classList.remove('panning'); });
+    $('#dirty-modal').addEventListener('click', (event) => {
+      const action = event.target.dataset.dirty; if (!action || !state.pendingDispatch) return;
+      if (action === 'cancel') { state.pendingDispatch = null; $('#dirty-modal').classList.remove('open'); return; }
+      const pending = state.pendingDispatch; dispatchIssue(pending.issue, true, action === 'inspect');
+    });
+    window.addEventListener('resize', () => { if (state.status) renderGraph(); });
+    setInterval(() => { if (state.status) renderWorkers(); if (state.selected) renderDetails(); }, 60000);
+  }
+
+  async function boot() {
+    bindShell();
+    if (location.protocol !== 'file:') {
+      try {
+        const response = await fetch('/api/status?fast=1', { cache:'no-store' });
+        if (response.ok) { state.mode = 'live'; renderAll(await response.json()); return; }
+      } catch { /* 自动降级到 runtime/status.js 快照。 */ }
+    }
+    state.mode = 'snapshot';
+    if (window.WORKBOARD) renderAll(window.WORKBOARD);
+    else toast('没有快照：先运行 collect.mjs');
+  }
+
+  boot();
+})();
+</script>
+</body>
+</html>

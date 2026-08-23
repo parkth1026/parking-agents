@@ -1,0 +1,58 @@
+#!/usr/bin/env node
+// 主 agent 写入对某个 worktree 的评估结论（正在做什么、是否完成、是否建议合并）。
+// 用法：
+//   node assess.mjs <worktree> --merge recommend|not-yet|blocked --done true|false|unknown \
+//     --task "一句话描述当前任务" --reason "判断依据" [--by claude-main]
+// 只更新 status.json 中该节点的 assessment 字段并同步 status.js；事实字段一律不碰。
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { join, dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
+const SKILL_DIR = dirname(SCRIPT_DIR);
+const RUNTIME_DIR = resolve(process.env.AES_WORKTREE_BOARD_RUNTIME_DIR || join(SKILL_DIR, 'runtime'));
+const STATUS_JSON = join(RUNTIME_DIR, 'status.json');
+const STATUS_JS = join(RUNTIME_DIR, 'status.js');
+
+function fail(msg) { console.error(JSON.stringify({ ok: false, error: msg })); process.exit(1); }
+
+const argv = process.argv.slice(2);
+const opts = {};
+const positional = [];
+for (let i = 0; i < argv.length; i += 1) {
+  if (argv[i].startsWith('--')) opts[argv[i].slice(2)] = argv[++i];
+  else positional.push(argv[i]);
+}
+const worktreeArg = positional[0];
+if (!worktreeArg) fail('用法: node assess.mjs <worktree> --merge X --done X --task "…" --reason "…"');
+if (!existsSync(STATUS_JSON)) fail('status.json 不存在，先运行 node collect.mjs');
+if (opts.merge && !['recommend', 'not-yet', 'blocked'].includes(opts.merge)) {
+  fail('--merge 只接受 recommend | not-yet | blocked');
+}
+
+const status = JSON.parse(readFileSync(STATUS_JSON, 'utf8'));
+const target = status.worktrees.find(
+  (w) => w.name === worktreeArg || w.name.endsWith(`-${worktreeArg}`),
+);
+if (!target) fail(`worktree "${worktreeArg}" 不在 status.json 中，可用: ${status.worktrees.map((w) => w.name).join(', ')}`);
+
+let merge = opts.merge ?? target.assessment?.merge ?? 'not-yet';
+let reason = opts.reason ?? target.assessment?.reason ?? null;
+if (merge === 'recommend' && target.ahead > 0 && (target.trail?.length || 0) === 0) {
+  merge = 'not-yet';
+  reason = reason?.includes('需先补 issue') ? reason : `${reason ? `${reason}；` : ''}独立任务分支需先补 issue`;
+}
+
+target.assessment = {
+  currentTask: opts.task ?? target.assessment?.currentTask ?? null,
+  done: opts.done === 'true' ? true : opts.done === 'false' ? false : opts.done === 'unknown' ? null : target.assessment?.done ?? null,
+  merge,
+  reason,
+  assessedAt: new Date().toISOString(),
+  assessedBy: opts.by ?? 'claude-main',
+  stale: false,
+};
+
+writeFileSync(STATUS_JSON, `${JSON.stringify(status, null, 2)}\n`);
+writeFileSync(STATUS_JS, `window.WORKBOARD = ${JSON.stringify(status)};\n`);
+console.log(JSON.stringify({ ok: true, worktree: target.name, assessment: target.assessment }));
