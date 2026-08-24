@@ -163,13 +163,11 @@ async function ghJson(args) {
 async function collectDomain() {
   const runtimeDir = tempDirectory('collect');
   try {
-    const status = await collectStatus({ runtimeDir });
-    const config = loadConfig();
-    const allIssues = await ghJson([
-      'issue', 'list', '--repo', config.issueRepo, '--state', 'all', '--limit', '1000', '--json', 'number',
-    ]);
+    const fixtureIssues = loadIssueFixture(ISSUE_FIXTURE);
+    const fixtureByNumber = new Map(fixtureIssues.map((issue) => [issue.number, issue]));
+    const status = await collectStatus({ runtimeDir, issuesFixture: ISSUE_FIXTURE });
     assert.equal(status.schemaVersion, 3);
-    assert.equal(status.graph.issues.length, allIssues.length, 'issues 数必须等于 gh 全量 OPEN+CLOSED');
+    assert.equal(status.graph.issues.length, fixtureIssues.length, 'issues 数必须等于完整离线 fixture');
 
     const byNumber = new Map(status.graph.issues.map((issue) => [issue.number, issue]));
     const allowedStatuses = new Set(['frontier', 'claimed', 'blocked', 'resolved']);
@@ -192,11 +190,11 @@ async function collectDomain() {
       assert.equal(issue.derived.status, expected, `#${issue.number} derived.status 推导错误`);
       if (issue.derived.warn) {
         assert.equal(issue.state, 'CLOSED', 'warn 只能出现在 CLOSED issue');
-        const pages = await ghJson([
-          'api', '--paginate', '--slurp', `repos/${config.issueRepo}/issues/${issue.number}/timeline`,
-          '-H', 'Accept: application/vnd.github+json',
-        ]);
-        assert.ok(pages.flat().some((event) => event.event === 'reopened'), `#${issue.number} 没有 reopened 历史`);
+        assert.equal(
+          fixtureByNumber.get(issue.number)?.reopenedBeforeClose,
+          true,
+          `#${issue.number} fixture 没有 reopened 历史`,
+        );
       }
     }
 
@@ -240,6 +238,22 @@ async function collectDomain() {
     recollected = await collectStatus({ skipGh: true, runtimeDir });
     assessment = recollected.worktrees.find((worker) => worker.name === target.name).assessment;
     assert.equal(assessment.stale, false, '新于 commit/task end 的 assessment 不应 stale');
+  } finally {
+    await cleanTemp(runtimeDir);
+  }
+}
+
+// 显式 live smoke：允许 GitHub/授权/Issue 变化令它失败，不进入 run-tests 默认门禁。
+async function collectLiveDomain() {
+  const runtimeDir = tempDirectory('collect-live');
+  try {
+    const status = await collectStatus({ runtimeDir });
+    const config = loadConfig();
+    const allIssues = await ghJson([
+      'issue', 'list', '--repo', config.issueRepo, '--state', 'all', '--limit', '1000', '--json', 'number',
+    ]);
+    assert.equal(status.schemaVersion, 3);
+    assert.equal(status.graph.issues.length, allIssues.length, 'live issues 数必须等于 gh 全量 OPEN+CLOSED');
   } finally {
     await cleanTemp(runtimeDir);
   }
@@ -1999,6 +2013,7 @@ async function layoutDomain() {
 
 const domains = {
   collect: collectDomain,
+  'collect-live': collectLiveDomain,
   fixture: fixtureDomain,
   dispatch: dispatchDomain,
   server: serverDomain,

@@ -175,7 +175,7 @@ node "$skillDir/scripts/selftest.mjs" orchestration --scenario boundary
 node "$skillDir/scripts/selftest.mjs" orchestration --scenario contract
 ```
 
-既有七域 `collect / fixture / dispatch / server / repo-root / layout / windows-hide` 必须继续全绿。所有新增 child_process 启动点仍使用 `HEADLESS_CHILD_OPTIONS`。页面视觉与交互必须用真实浏览器逐处对照锁定 mock；自动自检不能替代人工 UI AC。
+默认 `run-tests.mjs` 的 `collect / fixture / dispatch / server / repo-root / layout / windows-hide / orchestration` 全部使用本机或离线 fixture，必须稳定全绿。真实 GitHub 巡检另跑 `node "$skillDir/scripts/selftest.mjs" collect-live`；它是受授权、网络和实时 Issue 变化影响的 live smoke，不进入默认门禁。所有新增 child_process 启动点仍使用 `HEADLESS_CHILD_OPTIONS`。页面视觉与交互必须用真实浏览器逐处对照锁定 mock；自动自检不能替代人工 UI AC。
 
 发布或升级前运行技能根的标准回归入口：
 
