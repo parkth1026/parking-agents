@@ -17,3 +17,4 @@ node_modules/
 # aes-worktree-board runtime (#14: 默认随目标仓根，运行时数据不入库；技能目录旧 runtime 原地留档)
 /.aes-worktree-board/runtime/
 /.agents/skills/aes-worktree-board/runtime/
+/.aes-worktree-board
