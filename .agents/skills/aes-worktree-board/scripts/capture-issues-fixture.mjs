@@ -1,0 +1,113 @@
+#!/usr/bin/env node
+// 把 GitHub issue 星图保存为可离线复现的页面/collect 测试 fixture。
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { dirname, resolve, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { loadConfig, SKILL_DIR } from './collect.mjs';
+import { HEADLESS_CHILD_OPTIONS } from './headless.mjs';
+
+const pExecFile = promisify(execFile);
+const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
+const DEFAULT_OUTPUT = join(SKILL_DIR, 'fixtures', 'aes-agent-issues.json');
+const ISSUE_FIELDS = [
+  'assignees', 'author', 'blockedBy', 'blocking', 'body', 'closed', 'closedAt',
+  'closedByPullRequestsReferences', 'comments', 'createdAt', 'id', 'isPinned',
+  'issueType', 'labels', 'milestone', 'number', 'parent', 'state', 'stateReason',
+  'subIssues', 'title', 'updatedAt', 'url',
+].join(',');
+
+function option(name, fallback) {
+  const index = process.argv.indexOf(name);
+  return index >= 0 && process.argv[index + 1] ? process.argv[index + 1] : fallback;
+}
+
+async function ghJson(args) {
+  const { stdout } = await pExecFile('gh', args, {
+    ...HEADLESS_CHILD_OPTIONS,
+    timeout: 60_000,
+    maxBuffer: 64 * 1024 * 1024,
+  });
+  return JSON.parse(stdout);
+}
+
+async function reopened(issueRepo, number) {
+  const pages = await ghJson([
+    'api', '--paginate', '--slurp', `repos/${issueRepo}/issues/${number}/timeline`,
+    '-H', 'Accept: application/vnd.github+json',
+  ]);
+  return pages.flat().some((event) => event.event === 'reopened');
+}
+
+async function mapConcurrent(items, concurrency, mapper) {
+  const results = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const index = next;
+      next += 1;
+      results[index] = await mapper(items[index], index);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, worker));
+  return results;
+}
+
+function numbers(nodes) {
+  return (Array.isArray(nodes) ? nodes : [])
+    .map((node) => Number(node.number))
+    .filter(Number.isInteger)
+    .sort((a, b) => a - b);
+}
+
+async function main() {
+  const config = loadConfig();
+  const issueRepo = option('--repo', config.issueRepo);
+  const output = resolve(option('--output', DEFAULT_OUTPUT));
+  const listed = await ghJson([
+    'issue', 'list', '--repo', issueRepo, '--state', 'all', '--limit', '1000',
+    '--json', ISSUE_FIELDS,
+  ]);
+  const closed = listed.filter((issue) => issue.state === 'CLOSED');
+  const reopenedFlags = new Map(await mapConcurrent(closed, 6, async (issue) => {
+    try {
+      return [issue.number, await reopened(issueRepo, issue.number)];
+    } catch {
+      return [issue.number, false];
+    }
+  }));
+  const issues = listed
+    .map((issue) => {
+      const blockedByNumbers = numbers(issue.blockedBy?.nodes);
+      const blockingNumbers = numbers(issue.blocking?.nodes);
+      const reopenedBeforeClose = Boolean(reopenedFlags.get(issue.number));
+      return {
+        ...issue,
+        blockedByNumbers,
+        blockingNumbers,
+        reopenedBeforeClose,
+        warn: issue.state === 'CLOSED' && reopenedBeforeClose,
+      };
+    })
+    .sort((left, right) => left.number - right.number);
+  const fixture = {
+    schemaVersion: 1,
+    kind: 'github-issue-fixture',
+    capturedAt: new Date().toISOString(),
+    repo: issueRepo,
+    query: { state: 'all', limit: 1000, fields: ISSUE_FIELDS.split(',') },
+    issueCount: issues.length,
+    issues,
+  };
+  mkdirSync(dirname(output), { recursive: true });
+  writeFileSync(output, `${JSON.stringify(fixture, null, 2)}\n`);
+  console.log(JSON.stringify({ ok: true, output, repo: issueRepo, issueCount: issues.length }));
+}
+
+try {
+  await main();
+} catch (error) {
+  console.error(JSON.stringify({ ok: false, error: error.stack || error.message }));
+  process.exitCode = 1;
+}

@@ -156,9 +156,45 @@ function parseBlockedBy(body, knownNumbers) {
 async function fetchIssueList(issueRepo) {
   const { stdout } = await pExecFile('gh', [
     'issue', 'list', '--repo', issueRepo, '--state', 'all', '--limit', '1000',
-    '--json', 'number,title,state,url,body,closedAt,updatedAt',
-  ], { ...HEADLESS_CHILD_OPTIONS, timeout: 60_000, maxBuffer: 32 * 1024 * 1024 });
+    '--json', 'number,title,state,url,body,closedAt,updatedAt,blockedBy,blocking',
+  ], { ...HEADLESS_CHILD_OPTIONS, timeout: 60_000, maxBuffer: 64 * 1024 * 1024 });
   return JSON.parse(stdout);
+}
+
+function nativeBlockedBy(issue, knownNumbers) {
+  const fixtureNumbers = Array.isArray(issue.blockedByNumbers)
+    ? issue.blockedByNumbers.map(Number).filter((number) => knownNumbers.has(number))
+    : [];
+  if (fixtureNumbers.length) return [...new Set(fixtureNumbers)].sort((a, b) => a - b);
+  const native = Array.isArray(issue.blockedBy?.nodes)
+    ? issue.blockedBy.nodes
+      .map((node) => Number(node.number))
+      .filter((number) => knownNumbers.has(number))
+    : [];
+  return native.length
+    ? [...new Set(native)].sort((a, b) => a - b)
+    : parseBlockedBy(issue.body, knownNumbers);
+}
+
+export function loadIssueFixture(fixturePath) {
+  const path = resolve(fixturePath);
+  const payload = JSON.parse(readFileSync(path, 'utf8'));
+  const listed = Array.isArray(payload) ? payload : payload.issues;
+  if (!Array.isArray(listed) || !listed.length) {
+    throw new Error(`Issue fixture 必须包含非空 issues 数组: ${path}`);
+  }
+  const knownNumbers = new Set(listed.map((issue) => Number(issue.number)));
+  return listed.map((issue) => {
+    const state = String(issue.state || '').toUpperCase();
+    return {
+      ...issue,
+      number: Number(issue.number),
+      state,
+      blockedBy: nativeBlockedBy(issue, knownNumbers)
+        .filter((number) => number !== Number(issue.number)),
+      warn: state === 'CLOSED' && Boolean(issue.warn ?? issue.reopenedBeforeClose),
+    };
+  });
 }
 
 async function timelineHasReopen(issueRepo, number) {
@@ -184,7 +220,8 @@ async function mapConcurrent(items, concurrency, mapper) {
   return results;
 }
 
-async function fetchIssueSources(issueRepo, previous) {
+async function fetchIssueSources(issueRepo, previous, issuesFixture = null) {
+  if (issuesFixture) return loadIssueFixture(issuesFixture);
   const listed = await fetchIssueList(issueRepo);
   const known = new Set(listed.map((issue) => issue.number));
   const previousWarn = new Map(
@@ -200,7 +237,7 @@ async function fetchIssueSources(issueRepo, previous) {
   }));
   return listed.map((issue) => ({
     ...issue,
-    blockedBy: parseBlockedBy(issue.body, known).filter((number) => number !== issue.number),
+    blockedBy: nativeBlockedBy(issue, known).filter((number) => number !== issue.number),
     warn: issue.state === 'CLOSED' && (warned.get(issue.number) || false),
   }));
 }
@@ -334,8 +371,13 @@ function buildTrail(issueNumbers, claimedIssue, sourceByNumber, previousTrail = 
   return [...new Set(base)];
 }
 
-export async function collectStatus({ skipGh = false, runtimeDir = RUNTIME_DIR } = {}) {
+export async function collectStatus({
+  skipGh = false,
+  runtimeDir = RUNTIME_DIR,
+  issuesFixture = null,
+} = {}) {
   const config = loadConfig();
+  const fixturePath = issuesFixture || process.env.AES_WORKTREE_BOARD_ISSUES_FIXTURE || null;
   const { main, siblings } = await listWorktrees();
   const previous = loadPrevious(runtimeDir);
   const previousWorktrees = new Map((previous?.worktrees || []).map((worker) => [worker.name, worker]));
@@ -343,7 +385,9 @@ export async function collectStatus({ skipGh = false, runtimeDir = RUNTIME_DIR }
   const mainHead = await git(['rev-parse', '--short', config.mainBranch]);
 
   let issueSources;
-  if (skipGh) {
+  if (fixturePath) {
+    issueSources = loadIssueFixture(fixturePath);
+  } else if (skipGh) {
     issueSources = cachedIssueSources(previous);
   } else {
     try {
@@ -459,7 +503,10 @@ function positionLabel(worker) {
 
 if (norm(process.argv[1] || '') === norm(fileURLToPath(import.meta.url))) {
   const skipGh = process.argv.includes('--no-gh');
-  const status = await collectStatus({ skipGh });
+  const fixtureIndex = process.argv.indexOf('--issues-fixture');
+  const issuesFixture = fixtureIndex >= 0 ? process.argv[fixtureIndex + 1] : null;
+  if (fixtureIndex >= 0 && !issuesFixture) throw new Error('--issues-fixture 需要路径');
+  const status = await collectStatus({ skipGh, issuesFixture });
   if (process.argv.includes('--json')) {
     console.log(JSON.stringify(status, null, 2));
   } else {

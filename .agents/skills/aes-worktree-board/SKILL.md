@@ -42,6 +42,23 @@ $worker = "dev1"
 
    表后单独列出 `frontier 可开工：#… —— 空闲队员：dev…`；frontier 为空时明确写“无可开工项”。
 
+### Issue 页面测试 fixture
+
+页面和 collect 的离线测试数据保存在 `fixtures/aes-agent-issues.json`，应包含目标 Issue 仓库的全量 OPEN+CLOSED Issue、正文、标签、认领人、时间、原生 blocked-by/blocking 关系和回归 warning。刷新 fixture：
+
+```powershell
+node "$skillDir/scripts/capture-issues-fixture.mjs"
+```
+
+用 fixture 生成 `status.json`/`status.js`，验证页面数据展现而不访问 GitHub：
+
+```powershell
+node "$skillDir/scripts/collect.mjs" --no-gh --issues-fixture "$skillDir/fixtures/aes-agent-issues.json"
+node "$skillDir/scripts/selftest.mjs" fixture
+```
+
+fixture 是可审计的时间点快照，不得把它当作当前线上 Issue 状态；需要真实巡检时仍运行不带 `--no-gh` 的 collect。页面 fixture 测试必须覆盖完整 Issue 数量、OPEN/CLOSED 统计、依赖边、frontier/blocked/resolved 展示和 `runtime/status.js` 快照。
+
 ### headless 子进程窗口策略
 
 所有后台/headless 子进程统一从 `scripts/headless.mjs` 取 `HEADLESS_CHILD_OPTIONS`（`windowsHide: true`）。`detached`、stdio 重定向与 `unref()` 只处理生命周期与 I/O，不能阻止无控制台上下文里的子进程弹出可见控制台窗口；Windows 上只有 CREATE_NO_WINDOW 可以。新增 spawn/spawnSync/execFile/execFileSync 启动点必须带上该 helper；`selftest.mjs windows-hide` 域会机械扫描全部调用点，并用真实可见窗口采样验证 server → dispatch → agent 链路零可见窗口。采样器以窗口标题对照进程树命令行归属，兼容 Windows 11 把新控制台 delegate 给 Windows Terminal 的场景；写入采样器 ps1 必须带 BOM，否则 Windows PowerShell 会按 ANSI 解析中文注释导致脚本失效。
@@ -74,4 +91,4 @@ server 只能绑定 `127.0.0.1`。不要增加外部监听或把页面改成自�
 
 ## 自检
 
-按改动域运行自检，例如 `node "$skillDir/scripts/selftest.mjs" repo-root`；其他域是 `collect`、`dispatch`、`server`、`layout` 与 `windows-hide`。`dispatch` 使用独立 Git fixture 验证 Windows 可执行解析、dirty 确认、PID 锁与 server → dispatch；`repo-root` 验证跨仓 collect、direct dispatch、server → dispatch 与非法目标路径；`windows-hide` 机械断言所有子进程启动点使用统一窗口策略并采样真实运行零可见控制台窗口。页面视觉与交互仍需用真实浏览器对照锁定的 mock 与 handoff，不能由自检替代。
+按改动域运行自检，例如 `node "$skillDir/scripts/selftest.mjs" repo-root`；其他域是 `collect`、`fixture`、`dispatch`、`server`、`layout` 与 `windows-hide`。`fixture` 验证全量 Issue 数据能生成页面使用的 graph/status 快照；`dispatch` 使用独立 Git fixture 验证 Windows 可执行解析、dirty 确认、PID 锁与 server → dispatch；`repo-root` 验证跨仓 collect、direct dispatch、server → dispatch 与非法目标路径；`windows-hide` 机械断言所有子进程启动点使用统一窗口策略并采样真实运行零可见控制台窗口。页面视觉与交互仍需用真实浏览器对照锁定的 mock 与 handoff，不能由自检替代。
