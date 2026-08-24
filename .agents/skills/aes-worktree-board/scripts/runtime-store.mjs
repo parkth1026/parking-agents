@@ -124,6 +124,10 @@ export function emptyRegistry(now = new Date().toISOString()) {
     },
     leases: {},
     tasks: {},
+    actions: {},
+    actionReceipts: {},
+    unclassifiedFinals: {},
+    goal: null,
   };
 }
 
@@ -132,6 +136,10 @@ export function readRegistry(runtimeDir) {
   if (registry.schemaVersion !== 3) throw new Error(`registry.json schemaVersion 必须为 3，实际为 ${registry.schemaVersion}`);
   registry.leases ||= {};
   registry.tasks ||= {};
+  registry.actions ||= {};
+  registry.actionReceipts ||= {};
+  registry.unclassifiedFinals ||= {};
+  registry.goal ||= null;
   registry.orchestration ||= emptyRegistry().orchestration;
   const leases = {};
   for (const [worktree, lease] of Object.entries(registry.leases)) {

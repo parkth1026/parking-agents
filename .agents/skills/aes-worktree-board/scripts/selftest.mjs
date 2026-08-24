@@ -16,7 +16,8 @@ import { resolveCommand } from './command.mjs';
 import { HEADLESS_CHILD_OPTIONS } from './headless.mjs';
 import {
   consumeEvent, CONTROL_STATES, createTask, evaluateStop, heartbeatTask, pendingInbox, putInboxEvent,
-  recordBlock, setVerdict, TASK_STATES, transitionTask,
+  EXECUTOR_FINAL_SCHEMA, nextActions, receiveActionReceipt, recordBlock, setVerdict, startGoal,
+  TASK_STATES, transitionTask,
 } from './orchestrate.mjs';
 import { readJson, readJsonLines, readRegistry, writeJsonAtomic } from './runtime-store.mjs';
 
@@ -1683,6 +1684,270 @@ async function orchestrationVerdictDimensions() {
   }
 }
 
+function continuousStatus(runtimeDir, workers, issues) {
+  writeJsonAtomic(join(runtimeDir, 'status.json'), {
+    schemaVersion: 3,
+    repo: { root: 'C:/fixture/repo', name: 'repo', mainBranch: 'main', mainHead: 'main-head', issueRepo: 'owner/repo' },
+    orchestration: { state: 'running' },
+    graph: {
+      issues: issues.map((issue) => ({
+        number: issue.number, title: issue.title || `Issue ${issue.number}`, state: issue.state || 'OPEN',
+        labels: issue.labels || ['ready-for-agent'], blockedBy: [],
+        derived: { status: issue.status || 'frontier', degree: 0, warn: false },
+      })),
+      edges: [], stats: { total: issues.length, open: issues.length, closed: 0, frontier: issues.filter((issue) => (issue.status || 'frontier') === 'frontier').length },
+    },
+    worktrees: workers.map((name) => ({ name, head: 'base-head', task: null })),
+    transitions: [],
+  });
+}
+
+function executorFinal(commitSha, { manual = false } = {}) {
+  return {
+    schemaVersion: EXECUTOR_FINAL_SCHEMA,
+    outcome: 'COMMITTED',
+    commitSha,
+    tests: { summary: 'targeted host-shaped regression passed', commands: [{ command: 'node targeted.mjs', exitCode: 0 }] },
+    unexecuted: [],
+    manualTestDebt: manual ? [{ scope: 'Desktop visual acceptance', reason: 'integration merge policy permits deferred manual test' }] : [],
+    suggestedNextState: 'committed',
+  };
+}
+
+function putTypedFinal(runtimeDir, task, threadId, eventId, commitSha, options = {}) {
+  putInboxEvent({
+    thread: threadId, task: task.taskId, kind: 'final', 'event-id': eventId,
+    payload: JSON.stringify(executorFinal(commitSha, options)),
+  }, runtimeDir);
+  return consumeEvent(eventId, runtimeDir);
+}
+
+function actionOf(runtimeDir, type, taskId = undefined) {
+  const actions = nextActions(runtimeDir).actions.filter((action) => action.type === type);
+  const action = taskId ? actions.find((candidate) => candidate.taskId === taskId) : actions[0];
+  assert.ok(action, `缺少 ${type}${taskId ? ` for ${taskId}` : ''}: ${JSON.stringify(actions)}`);
+  return action;
+}
+
+function hostCreateReviewer(runtimeDir, task, ordinal) {
+  const create = actionOf(runtimeDir, 'CREATE_REVIEWER', task.taskId);
+  const parent = readRegistry(runtimeDir).tasks[task.taskId];
+  const reviewer = createTask({
+    issue: parent.issue, worktree: parent.worktree, role: 'reviewer', 'parent-task-id': task.taskId,
+    'thread-id': `T-${parent.worktree}-review-${ordinal}`, model: 'sol-high', 'routing-reason': 'host-shaped independent review',
+  }, runtimeDir);
+  const receipt = receiveActionReceipt(create.actionId, 'succeeded', { reviewerTaskId: reviewer.taskId }, runtimeDir);
+  assert.equal(receipt.type, 'CREATE_REVIEWER');
+  assert.equal(readRegistry(runtimeDir).tasks[task.taskId].state, 'reviewing');
+  return reviewer;
+}
+
+function hostApprove(runtimeDir, task, reviewer, eventId) {
+  putInboxEvent({
+    thread: reviewer.task.threadId, task: task.taskId, kind: 'verdict', 'event-id': eventId,
+    payload: JSON.stringify({ verdict: 'APPROVE', commitSha: readRegistry(runtimeDir).tasks[task.taskId].commitSha, summary: 'APPROVE current commit' }),
+  }, runtimeDir);
+  const consumed = consumeEvent(eventId, runtimeDir);
+  assert.deepEqual(consumed.transition, { from: 'reviewing', to: 'approved' });
+}
+
+async function orchestrationContinuousHostChain() {
+  const runtimeDir = tempDirectory('orchestration-continuous-host-chain');
+  try {
+    continuousStatus(runtimeDir, ['dev43'], [
+      { number: 43, status: 'claimed', labels: ['ready-for-agent', 'needs-manual-test'] },
+      { number: 44, status: 'frontier', labels: ['ready-for-agent'] },
+    ]);
+    const task = createTask({
+      issue: 43, worktree: 'dev43', role: 'executor', 'thread-id': 'T-dev43-executor',
+      model: 'luna-max', 'routing-reason': 'continuous full-chain fixture',
+      'head-sha': 'base-head',
+    }, runtimeDir);
+    assert.equal(task.task.interactionClass, 'needs-manual-test', 'Issue label 必须自动锁定 manual-test policy，不能依赖 host 漏传参数');
+    assert.equal(readRegistry(runtimeDir).goal, null, 'one-shot Task/next-actions 不得隐式创建 Goal');
+    nextActions(runtimeDir);
+    assert.equal(readRegistry(runtimeDir).goal, null);
+    const goal = startGoal({ workers: 'dev43', 'manual-test-policy': 'needs-manual-test + explicit debt permits runtime=NOT_RUN' }, runtimeDir);
+    assert.equal(goal.goal.state, 'active');
+    assert.match(goal.goal.objective, /Outcome:|Constraints:|Verification:/);
+
+    const finalResult = putTypedFinal(runtimeDir, task, 'T-dev43-executor', 'E-final-43', 'commit-43', { manual: true });
+    assert.equal(finalResult.nextAction, 'CREATE_REVIEWER');
+    assert.deepEqual(finalResult.transitions.map((transition) => transition.to), ['executing', 'self-qa', 'committed']);
+    assert.equal(readRegistry(runtimeDir).tasks[task.taskId].executorFinalEvidence.commitSha, 'commit-43');
+
+    const reviewer = hostCreateReviewer(runtimeDir, task, 1);
+    hostApprove(runtimeDir, task, reviewer, 'E-approve-43');
+    const gate = actionOf(runtimeDir, 'EVALUATE_MERGE_GATE', task.taskId);
+    receiveActionReceipt(gate.actionId, 'succeeded', {
+      code: 'PASS', runtime: 'NOT_RUN', delivery: 'MERGE_READY', mergeCheck: 'clean', headSha: 'commit-43',
+    }, runtimeDir);
+    assert.equal(readRegistry(runtimeDir).tasks[task.taskId].state, 'merge-ready');
+
+    const merge = actionOf(runtimeDir, 'HOST_MERGE', task.taskId);
+    receiveActionReceipt(merge.actionId, 'started', { integrationHead: 'main-before' }, runtimeDir);
+    const duplicateStarted = receiveActionReceipt(merge.actionId, 'started', { integrationHead: 'main-before' }, runtimeDir);
+    assert.equal(duplicateStarted.result, 'already-recorded');
+    const resumed = actionOf(runtimeDir, 'HOST_MERGE', task.taskId);
+    assert.equal(resumed.actionId, merge.actionId, 'root 重启必须恢复同一 HOST_MERGE 幂等 key');
+    assert.equal(resumed.resume, true);
+    receiveActionReceipt(merge.actionId, 'succeeded', { mergeCommit: 'merge-43' }, runtimeDir);
+
+    const verify = actionOf(runtimeDir, 'POST_MERGE_VERIFY', task.taskId);
+    receiveActionReceipt(verify.actionId, 'succeeded', {
+      tests: [{ command: 'node post-merge-verify.mjs', exitCode: 0 }],
+    }, runtimeDir);
+    assert.equal(readRegistry(runtimeDir).tasks[task.taskId].state, 'merged');
+    assert.equal(readRegistry(runtimeDir).leases.dev43, undefined);
+
+    const claim = actionOf(runtimeDir, 'CLAIM_NEXT_ISSUE', task.taskId);
+    assert.equal(claim.issue, 44);
+    const nextTask = createTask({
+      issue: 44, worktree: 'dev43', role: 'executor', 'thread-id': 'T-dev43-next',
+      model: 'luna-max', 'routing-reason': 'claimed by continuous host loop',
+    }, runtimeDir);
+    const claimReceipt = receiveActionReceipt(claim.actionId, 'succeeded', { nextTaskId: nextTask.taskId }, runtimeDir);
+    assert.equal(claimReceipt.type, 'CLAIM_NEXT_ISSUE');
+    assert.equal(receiveActionReceipt(claim.actionId, 'succeeded', { nextTaskId: nextTask.taskId }, runtimeDir).result, 'already-recorded');
+    assert.equal(readRegistry(runtimeDir).tasks[nextTask.taskId].issue, 44);
+    assert.equal(readRegistry(runtimeDir).goal.state, 'active', '单 lane 继续执行时 Goal 不得提前 complete');
+  } finally {
+    await cleanTemp(runtimeDir);
+  }
+}
+
+async function orchestrationUnclassifiedFinal() {
+  const runtimeDir = tempDirectory('orchestration-continuous-unclassified');
+  try {
+    continuousStatus(runtimeDir, ['dev-unclassified'], []);
+    const task = createTask({
+      issue: 43, worktree: 'dev-unclassified', role: 'executor', 'thread-id': 'T-unclassified',
+      model: 'luna-max', 'routing-reason': 'unclassified final fixture', 'head-sha': 'base-head',
+    }, runtimeDir);
+    putInboxEvent({
+      thread: 'T-unclassified', task: task.taskId, kind: 'final', 'event-id': 'E-unstructured-final',
+      payload: JSON.stringify({ summary: 'done, tests passed, commit abc' }),
+    }, runtimeDir);
+    const first = consumeEvent('E-unstructured-final', runtimeDir);
+    assert.equal(first.code, 'UNCLASSIFIED_FINAL');
+    assert.equal(first.consumed, false);
+    assert.equal(readRegistry(runtimeDir).tasks[task.taskId].state, 'dispatching');
+    assert.equal(pendingInbox(runtimeDir).pending.length, 1, '无结构 final 必须保持 pending');
+    const second = consumeEvent('E-unstructured-final', runtimeDir);
+    assert.equal(second.code, 'UNCLASSIFIED_FINAL');
+    assert.equal(Object.keys(readRegistry(runtimeDir).unclassifiedFinals).length, 1, '重复 reconcile 不得复制未分类记录');
+    const action = actionOf(runtimeDir, 'UNCLASSIFIED_FINAL', task.taskId);
+    assert.equal(action.eventId, 'E-unstructured-final');
+    assert.equal(readRegistry(runtimeDir).orchestration.unclassifiedFinalCount, 1);
+  } finally {
+    await cleanTemp(runtimeDir);
+  }
+}
+
+async function orchestrationHostBlockCircuit() {
+  const runtimeDir = tempDirectory('orchestration-continuous-block-circuit');
+  try {
+    continuousStatus(runtimeDir, ['dev-block'], []);
+    const task = createTask({
+      issue: 43, worktree: 'dev-block', role: 'executor', 'thread-id': 'T-dev-block-executor',
+      model: 'sol-high', 'routing-reason': 'host-shaped BLOCK fixture',
+    }, runtimeDir);
+    for (let ordinal = 1; ordinal <= 3; ordinal += 1) {
+      const commit = `block-commit-${ordinal}`;
+      putTypedFinal(runtimeDir, task, 'T-dev-block-executor', `E-block-final-${ordinal}`, commit);
+      const reviewer = hostCreateReviewer(runtimeDir, task, ordinal);
+      putInboxEvent({
+        thread: reviewer.task.threadId, task: task.taskId, kind: 'verdict', 'event-id': `E-block-verdict-${ordinal}`,
+        payload: JSON.stringify({ verdict: 'BLOCK', commitSha: commit, summary: `must fix ${ordinal}` }),
+      }, runtimeDir);
+      const blocked = consumeEvent(`E-block-verdict-${ordinal}`, runtimeDir);
+      assert.equal(blocked.blockCount, ordinal);
+      if (ordinal < 3) {
+        assert.equal(blocked.nextAction, 'return-to-executor');
+        const returned = actionOf(runtimeDir, 'RETURN_TO_EXECUTOR', task.taskId);
+        receiveActionReceipt(returned.actionId, 'succeeded', { threadId: 'T-dev-block-executor' }, runtimeDir);
+        assert.equal(readRegistry(runtimeDir).tasks[task.taskId].state, 'executing');
+      }
+    }
+    const finalTask = readRegistry(runtimeDir).tasks[task.taskId];
+    assert.equal(finalTask.state, 'handoff-required');
+    assert.equal(finalTask.blockCount, 3);
+    assert.deepEqual(finalTask.blockLedger.map((entry) => entry.commit), ['block-commit-1', 'block-commit-2', 'block-commit-3']);
+  } finally {
+    await cleanTemp(runtimeDir);
+  }
+}
+
+async function orchestrationMergeQueueAndRuntimeBoundary() {
+  const runtimeDir = tempDirectory('orchestration-continuous-merge-queue');
+  const failRuntime = tempDirectory('orchestration-continuous-runtime-fail');
+  const frontierRuntime = tempDirectory('orchestration-continuous-frontier-stop');
+  try {
+    continuousStatus(runtimeDir, ['dev-a', 'dev-b'], []);
+    const ready = [];
+    for (const [index, worktree] of ['dev-a', 'dev-b'].entries()) {
+      const task = createTask({
+        issue: 50 + index, worktree, role: 'executor', 'thread-id': `T-${worktree}-executor`,
+        model: 'sol-high', 'routing-reason': 'parallel approve fixture',
+      }, runtimeDir);
+      putTypedFinal(runtimeDir, task, `T-${worktree}-executor`, `E-${worktree}-final`, `commit-${worktree}`);
+      const reviewer = hostCreateReviewer(runtimeDir, task, 1);
+      hostApprove(runtimeDir, task, reviewer, `E-${worktree}-approve`);
+      const gate = actionOf(runtimeDir, 'EVALUATE_MERGE_GATE', task.taskId);
+      receiveActionReceipt(gate.actionId, 'succeeded', {
+        code: 'PASS', runtime: 'NOT_RUN', delivery: 'MERGE_READY', mergeCheck: 'clean', headSha: `commit-${worktree}`,
+      }, runtimeDir);
+      ready.push(task);
+    }
+    let actions = nextActions(runtimeDir).actions;
+    assert.equal(actions.filter((action) => action.type === 'HOST_MERGE').length, 1, '多 worker APPROVE 只允许一个 integration merge 队首');
+    const firstMerge = actions.find((action) => action.type === 'HOST_MERGE');
+    receiveActionReceipt(firstMerge.actionId, 'started', {}, runtimeDir);
+    receiveActionReceipt(firstMerge.actionId, 'succeeded', { mergeCommit: 'merge-first' }, runtimeDir);
+    actions = nextActions(runtimeDir).actions;
+    assert.equal(actions.filter((action) => action.type === 'HOST_MERGE').length, 0, 'post-merge verification 前不得放出第二个 merge');
+    const firstVerify = actions.find((action) => action.type === 'POST_MERGE_VERIFY');
+    receiveActionReceipt(firstVerify.actionId, 'succeeded', { tests: [{ command: 'node verify-first.mjs', exitCode: 0 }] }, runtimeDir);
+    actions = nextActions(runtimeDir).actions;
+    assert.equal(actions.filter((action) => action.type === 'HOST_MERGE').length, 1, '第一条 post-merge 完成后才释放下一条 merge');
+    assert.notEqual(actions.find((action) => action.type === 'HOST_MERGE').taskId, firstMerge.taskId);
+
+    continuousStatus(failRuntime, ['dev-fail'], []);
+    const task = createTask({
+      issue: 60, worktree: 'dev-fail', role: 'executor', 'thread-id': 'T-dev-fail-executor',
+      model: 'sol-high', 'routing-reason': 'runtime FAIL boundary', 'interaction-class': 'needs-manual-test',
+    }, failRuntime);
+    putTypedFinal(failRuntime, task, 'T-dev-fail-executor', 'E-fail-final', 'commit-fail', { manual: true });
+    const reviewer = hostCreateReviewer(failRuntime, task, 1);
+    hostApprove(failRuntime, task, reviewer, 'E-fail-approve');
+    const gate = actionOf(failRuntime, 'EVALUATE_MERGE_GATE', task.taskId);
+    assert.throws(
+      () => receiveActionReceipt(gate.actionId, 'succeeded', {
+        code: 'PASS', runtime: 'FAIL', delivery: 'MERGE_READY', mergeCheck: 'clean', headSha: 'commit-fail',
+      }, failRuntime),
+      (error) => error.code === 'RUNTIME_BLOCKS_DELIVERY',
+      'needs-manual-test 不得把 runtime FAIL 绕成 merge-ready',
+    );
+    assert.equal(readRegistry(failRuntime).tasks[task.taskId].state, 'approved');
+    assert.equal(readRegistry(failRuntime).actionReceipts[gate.actionId], undefined, '失败 receipt 不得污染幂等账本');
+
+    continuousStatus(frontierRuntime, ['dev-frontier'], [{ number: 77, status: 'frontier', labels: ['ready-for-agent'] }]);
+    const parked = createTask({
+      issue: 70, worktree: 'dev-frontier', role: 'executor', 'thread-id': 'T-frontier-parked',
+      model: 'luna-max', 'routing-reason': 'frontier stop boundary',
+    }, frontierRuntime);
+    transitionTask(parked.taskId, 'parked', { reason: 'explicit manual pause' }, frontierRuntime);
+    const stop = evaluateStop({ write: true }, frontierRuntime);
+    assert.equal(stop.result, 'advanceable');
+    assert.ok(stop.eligibleFrontier.includes(77));
+    assert.equal(readRegistry(frontierRuntime).orchestration.state, 'running', 'eligible frontier 存在时不得 stop/complete');
+  } finally {
+    await cleanTemp(runtimeDir);
+    await cleanTemp(failRuntime);
+    await cleanTemp(frontierRuntime);
+  }
+}
+
 async function orchestrationGlobalStop() {
   const runtimeDir = tempDirectory('orchestration-governance-stop');
   try {
@@ -1709,7 +1974,8 @@ async function orchestrationGlobalStop() {
     });
     evaluated = evaluateStop({ write: true }, runtimeDir);
     assert.equal(evaluated.result, 'advanceable');
-    assert.ok(evaluated.advanceable.some((lane) => lane.worktree === 'dev-idle' && lane.state === 'unregistered'));
+    assert.ok(evaluated.advanceable.some((action) => action.type === 'WAIT_THREADS'
+      && action.targets.some((lane) => lane.worktree === 'dev-idle' && lane.state === 'unregistered')));
     const idle = createTask({
       issue: 99, worktree: 'dev-idle', role: 'executor', 'thread-id': 'T-stop-idle',
       model: 'luna-max', 'routing-reason': 'register every real lane before stop',
@@ -1945,12 +2211,13 @@ async function orchestrationContractMarkers() {
   for (const marker of [
     'Desktop `create_thread`', 'registry.json', 'inbox pending', '三维 verdict',
     'runtime=NOT_RUN', 'stop eval --write', '--fallback-authorized', 'Map / List',
+    'aes.worktree-board.executor-final/v1', 'next-actions', 'action receipt', 'CLAIM_NEXT_ISSUE',
   ]) assert.match(skill, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.doesNotMatch(skill, /派发 headless 任务/);
   assert.doesNotMatch(skill, /只给合并建议，不执行 merge/);
 
   const board = readFileSync(join(SKILL_DIR, 'board.html'), 'utf8');
-  for (const marker of ['id="orch-pill"', 'task-state', 'registry-section', 'transition-history', 'workerTiming', '本轮开始', 'fallback-authorized', 'id="v2-note"', '>Map<', '>List<']) {
+  for (const marker of ['id="orch-pill"', 'GOAL', 'nextAction', '未分类 final', 'task-state', 'registry-section', 'transition-history', 'workerTiming', '本轮开始', 'fallback-authorized', 'id="v2-note"', '>Map<', '>List<']) {
     assert.match(board, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
   // 星图既有高保真核心必须原样存在；控制面只允许在确认的 DOM 挂点增量渲染。
@@ -1975,12 +2242,16 @@ async function orchestrationDomain() {
     { group: 'governance', name: 'circuit-late-event', run: orchestrationCircuitAndLateEvent },
     { group: 'governance', name: 'verdict-dimensions', run: orchestrationVerdictDimensions },
     { group: 'governance', name: 'global-stop', run: orchestrationGlobalStop },
+    { group: 'continuous', name: 'host-final-review-merge-next', run: orchestrationContinuousHostChain },
+    { group: 'continuous', name: 'unclassified-final', run: orchestrationUnclassifiedFinal },
+    { group: 'continuous', name: 'host-block-circuit', run: orchestrationHostBlockCircuit },
+    { group: 'continuous', name: 'merge-queue-runtime-boundary', run: orchestrationMergeQueueAndRuntimeBoundary },
     { group: 'boundary', name: 'server-origin-token', run: orchestrationServerBoundary },
     { group: 'boundary', name: 'config-preflight', run: orchestrationConfigPreflight },
     { group: 'contract', name: 'skill-board-contract', run: orchestrationContractMarkers },
   ];
   const selected = requested ? cases.filter((testCase) => testCase.group === requested) : cases;
-  assert.ok(selected.length, `未知 orchestration scenario: ${requested}; 可用 storage|lifecycle|governance|boundary|contract`);
+  assert.ok(selected.length, `未知 orchestration scenario: ${requested}; 可用 storage|lifecycle|governance|continuous|boundary|contract`);
   let passed = 0;
   for (const testCase of selected) {
     try {

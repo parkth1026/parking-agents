@@ -101,6 +101,68 @@ node "$skillDir/scripts/orchestrate.mjs" consume --event-id E-7f3a
 
 宿主事件有 id 就沿用；否则 eventId 为 thread/kind/payload 摘要的稳定 SHA-1 前 12 位。入箱与消费都校验 thread→Task 直接归属或 reviewer→parent 关联；foreign thread 必须退出 2 `THREAD_TASK_MISMATCH`，不得覆盖 cursor 或 verdict。`approved` 只接受 reviewer `final|verdict` 的显式 `APPROVE|PASS`；普通 commentary/progress 的 `payload.to` 不能冒充裁决。reviewer `BLOCK` consume 在同一 registry 原子更新内完成 commit 校验、去重、计数与 `fixing|handoff-required` 转移，继续返回锁定的 `result=consumed`；显式 `block record` 复用同一逻辑。同一 eventId 再次消费必须返回 `already-consumed`、退出 0、零状态变化。late event 可以落箱和消费，但不得复活 `merged`、`parked` 或 `handoff-required`。
 
+## 显式 Goal 与连续编排闭环
+
+只有用户明确要求“持续自动编排直到无可推进任务”时，root 才创建 Goal；状态巡检、打开看板、
+导出快照等 one-shot 操作不得调用 `goal start`。先运行 fresh collect，再锁定 worker 范围：
+
+```powershell
+node "$skillDir/scripts/orchestrate.mjs" goal start --workers dev1,dev2,dev3 --manual-test-policy "needs-manual-test + explicit debt permits runtime=NOT_RUN"
+```
+
+脚本生成的 Goal 固定目标仓、integration branch、Issue repo、worker、人工验收政策、权限边界，
+并包含可验证的 Outcome / Constraints / Verification。Goal 不扩大权限，也不替代宿主
+`create_thread`、`wait_threads` 或 root 串行 merge。
+
+Goal 活跃时，root 必须持续执行：`reconcile → fan-in all events → drain pending inbox →
+drain typed next-actions → bounded wait → reconcile`。单个 worker 等待、长测、review 或 BLOCK
+不是全局完成/blocked；其他 lane 仍须推进。每轮先查询：
+
+```powershell
+node "$skillDir/scripts/orchestrate.mjs" next-actions
+```
+
+返回 action schema 是 `aes.worktree-board.next-action/v1`，类型闭集为
+`UNCLASSIFIED_FINAL`、`CREATE_REVIEWER`、`RETURN_TO_EXECUTOR`、`EVALUATE_MERGE_GATE`、
+`HOST_MERGE`、`POST_MERGE_VERIFY`、`CLAIM_NEXT_ISSUE`、`WAIT_THREADS`、`STOP`。
+actionId 从事实组合稳定派生；宿主完成动作后用 payload file 写幂等 receipt：
+
+```powershell
+node "$skillDir/scripts/orchestrate.mjs" action receipt --action-id A-... --status succeeded --payload-file receipt.json
+```
+
+`CREATE_REVIEWER` receipt 必须绑定已登记的关联 reviewer Task；`HOST_MERGE` receipt 必须登记
+真实 merge commit；`EVALUATE_MERGE_GATE` receipt 必须证明 HEAD 等于已 review commit 且 mergeCheck
+为 clean/up-to-date；`POST_MERGE_VERIFY` receipt 必须含 integration branch 上至少一条 exitCode=0
+的测试证据；`CLAIM_NEXT_ISSUE` receipt 必须绑定同 worker 的新 executor Task。多 worker 可并行
+执行/review，但只放出一个 `HOST_MERGE`；post-merge verification 前不会放出队列下一项。
+
+Goal/stop 只有在 fresh registry + inbox + Git + Issue frontier 同时证明 pending 为空、无 active /
+reviewing / fixing / merge-ready / post-merge 线路、无 eligible autonomous Issue、全部 lane 均为
+`merged | parked | handoff-required` 时才可 complete。
+
+### executor final v1
+
+executor final 必须直接发送如下结构，不从自然语言正则猜 commit 或 verdict：
+
+```json
+{
+  "schemaVersion": "aes.worktree-board.executor-final/v1",
+  "outcome": "COMMITTED",
+  "commitSha": "abc123",
+  "tests": { "summary": "targeted tests passed", "commands": [{ "command": "node test.mjs", "exitCode": 0 }] },
+  "unexecuted": [],
+  "manualTestDebt": [{ "scope": "Desktop visual acceptance", "reason": "deferred by integration policy" }],
+  "suggestedNextState": "committed"
+}
+```
+
+缺字段、测试非零或无法分类的 executor final 返回可见 `UNCLASSIFIED_FINAL`，保持 inbox pending，
+不写 consumedEventIds、不推进 cursor、不改变 Task state。Git HEAD 相对登记 head 已变化但没有 typed
+final 时，`next-actions` 也会以 `GIT_HEAD_ADVANCED_WITHOUT_TYPED_FINAL` 暴露，不猜测提交含义。
+Task create 会从 fresh Issue labels 自动推导 `needs-manual-test` interaction class；宿主漏传
+`--interaction-class` 也不能绕过 manual debt。`runtime=FAIL|BLOCKED` 始终阻断 merge gate。
+
 ## 状态机、三维 verdict 与熔断
 
 Task 状态按锁定闭集转移：
@@ -141,7 +203,7 @@ node "$skillDir/scripts/orchestrate.mjs" block record --task tk-dev1-56-g1 --com
 node "$skillDir/scripts/orchestrate.mjs" stop eval --write
 ```
 
-仍有可推进线路时退出 1 并点名；无可推进线路时 registry.orchestration 写入 `stopped/no-advanceable-lane`。stop 的读取、重算、复核与写入和 `task create` 共用同一临界区，不能产生 `stopped + active Task`。停止后不再创建 Task、派 Issue 或 merge，也不强杀、reset 或删除现场。collect 重跑必须保留停止记录。
+仍有 pending inbox、typed action、merge/post-merge、eligible frontier 或未收敛 lane 时退出 1 并点名；只有完整 Goal 完成条件成立才写入 `stopped/goal-completion-conditions-satisfied`。stop 的读取、重算、复核与写入和 `task create` 共用同一临界区，不能产生 `stopped + active Task`。停止后不再创建 Task、派 Issue 或 merge，也不强杀、reset 或删除现场。collect 重跑必须保留停止记录。
 
 ## CLI fallback（只在明确授权时）
 
@@ -171,6 +233,7 @@ node "$skillDir/scripts/selftest.mjs" orchestration
 node "$skillDir/scripts/selftest.mjs" orchestration --scenario storage
 node "$skillDir/scripts/selftest.mjs" orchestration --scenario lifecycle
 node "$skillDir/scripts/selftest.mjs" orchestration --scenario governance
+node "$skillDir/scripts/selftest.mjs" orchestration --scenario continuous
 node "$skillDir/scripts/selftest.mjs" orchestration --scenario boundary
 node "$skillDir/scripts/selftest.mjs" orchestration --scenario contract
 ```
