@@ -1,0 +1,122 @@
+{
+  "schemaVersion": 1,
+  "description": "Offline host-shaped wait_threads batches for orchestration selftest.",
+  "batches": {
+    "executorToReview": {
+      "wake": [],
+      "polls": [
+        {
+          "thread": "$executorThread",
+          "kind": "final",
+          "eventId": "E-$prefix-executing",
+          "payload": {
+            "summary": "executor started",
+            "to": "executing",
+            "cursor": "$prefix-executing"
+          }
+        },
+        {
+          "thread": "$executorThread",
+          "kind": "final",
+          "eventId": "E-$prefix-self-qa",
+          "payload": {
+            "summary": "executor self QA complete",
+            "to": "self-qa",
+            "cursor": "$prefix-self-qa"
+          }
+        },
+        {
+          "thread": "$executorThread",
+          "kind": "final",
+          "eventId": "E-$prefix-committed",
+          "payload": {
+            "summary": "executor committed",
+            "to": "committed",
+            "commitSha": "$commitSha",
+            "cursor": "$prefix-committed"
+          }
+        },
+        {
+          "thread": "$executorThread",
+          "kind": "final",
+          "eventId": "E-$prefix-reviewing",
+          "payload": {
+            "summary": "executor requested independent review",
+            "to": "reviewing",
+            "commitSha": "$commitSha",
+            "cursor": "$prefix-reviewing"
+          }
+        }
+      ]
+    },
+    "reviewerApprove": {
+      "wake": [
+        {
+          "thread": "$reviewerThread",
+          "kind": "final",
+          "eventId": "$approvalEventId",
+          "payload": {
+            "summary": "reviewer approved current commit",
+            "verdict": "APPROVE",
+            "commitSha": "$commitSha",
+            "cursor": "$finalCursor"
+          }
+        }
+      ],
+      "polls": [
+        {
+          "thread": "$reviewerThread",
+          "kind": "commentary",
+          "eventId": "$pollEventId",
+          "payload": {
+            "summary": "reviewer poll",
+            "cursor": "$pollCursor"
+          }
+        },
+        {
+          "thread": "$reviewerThread",
+          "kind": "final",
+          "eventId": "$approvalEventId",
+          "payload": {
+            "summary": "reviewer approved current commit",
+            "verdict": "APPROVE",
+            "commitSha": "$commitSha",
+            "cursor": "$finalCursor"
+          }
+        }
+      ]
+    },
+    "reviewerBlock": {
+      "wake": [],
+      "polls": [
+        {
+          "thread": "$reviewerThread",
+          "kind": "verdict",
+          "eventId": "$eventId",
+          "payload": {
+            "summary": "reviewer blocked current commit",
+            "verdict": "BLOCK",
+            "commitSha": "$commitSha",
+            "cursor": "$cursor",
+            "finding": "final reviewer finding"
+          }
+        }
+      ]
+    },
+    "lateEvent": {
+      "wake": [],
+      "polls": [
+        {
+          "thread": "$reviewerThread",
+          "kind": "progress",
+          "eventId": "$eventId",
+          "payload": {
+            "summary": "late reviewer progress",
+            "to": "executing",
+            "cursor": "$cursor"
+          }
+        }
+      ]
+    }
+  }
+}

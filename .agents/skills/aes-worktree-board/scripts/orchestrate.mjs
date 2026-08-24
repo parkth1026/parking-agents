@@ -484,11 +484,18 @@ export function consumeEvent(eventId, runtimeDir = RUNTIME_DIR) {
           commitSha: reviewedCommit, verdict: 'APPROVE', recordedAt: now(),
         };
       }
-      const candidate = { ...task, verdict: { ...task.verdict } };
+      const candidate = {
+        ...task,
+        commitSha: event.payload?.commitSha || task.commitSha,
+        mergeCommit: event.payload?.mergeCommit || task.mergeCommit,
+        verdict: { ...task.verdict },
+      };
       assertTransitionEvidence(registry, task, to, candidate);
       const transitionTimestamp = now();
       task.state = to;
       task.phase = to;
+      if (event.payload?.commitSha) task.commitSha = event.payload.commitSha;
+      if (event.payload?.mergeCommit) task.mergeCommit = event.payload.mergeCommit;
       applyTaskTiming(task, from, to, transitionTimestamp);
       transition = { from, to };
       nextAction = to === 'approved' ? 'merge-gate' : 'continue';
