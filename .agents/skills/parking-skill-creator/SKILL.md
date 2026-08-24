@@ -126,7 +126,7 @@ node scripts/quick-validate.mjs <技能目录>
 
 评测结果默认放 `<skill-dir>/../../evals/<技能名>-workspace/`——其中 `<skill-dir>` 指本技能目录，`evals/` 与 `skills/` 平行；workspace 在技能扫描根之外，评测产物/夹具里出现再多的 `SKILL.md` 也不会被宿主识别成技能。workspace 是 scratch、不入库（.gitignore 已忽略）——持久评测依据住技能目录，clean 前先把成绩沉淀进去（见「迭代依据的发现约定」）。若显式沿用扫描根内的旧 workspace，跑完 iteration 要用 `check-shadow-skills` 复查产物有没有冒充技能。按迭代组织（`iteration-1/`、`iteration-2/`…），每个测试用例一个 `eval-<描述性名>/` 目录。目录随用随建，不要预先全铺。
 
-### 6.1 起跑前问 gate 集，同一 turn 并行 spawn 全部 run
+### 6.1 起跑前问 gate 集，分批并行 spawn run
 
 评测配置叫 **gate**（= 产物目录名，下文统一用 gate 称呼；目录布局模板里的 `<config>` 即 gate 目录名）。起跑前先问用户「**这轮评测跑哪些 gate？**」——默认组合只是建议，用户可增删、可自定义 gate 名：
 
@@ -136,7 +136,7 @@ node scripts/quick-validate.mjs <技能目录>
 
 用户不在场（夜间批跑/自动化流程）或已授权自动时，按默认组合执行并在结果里注明「按默认 gate 集跑」——别卡在问询上。
 
-问完按用户定的 gate 集，对每个测试用例**同一个回合**spawn 各 gate 的 subagent——带技能的与基线的一起。别先跑 with 再回头补 baseline：一起跑完时间对齐、状态一致。
+问完按用户定的 gate 集，把全部 eval × gate 的 run **分批** spawn。批内铁律：**同一个 eval 的各 gate 必须同一批发**——带技能的与基线的一起跑，时间对齐、状态一致；「同回合」服务的是这层对照公平，不是并发越大越好。批间节奏：默认每批 2 个 eval（2 gate 即 4 个、3 gate 即 6 个 subagent 在飞），一批收完（timing 抓完、6.3 产物核完）再发下一批；宿主并发充裕可加大批次，并发受限的宿主（低并发套餐、频发限流）降到每批 1 个 eval 甚至串行——官方 claude-skill-creator 对 Cowork 超时场景同样允许退化为串行。别先跑 with 再回头补 baseline。
 
 带技能 run 的 prompt 模板：
 
@@ -187,7 +187,7 @@ node scripts/quick-validate.mjs <技能目录>
 
 ### 6.4 评分与聚合
 
-1. **评分**：spawn grader subagent（读 `agents/grader.md`）逐断言对照产物，把 `grading.json` 写进每个 run 目录（逐断言 `name/text/passed/evidence`，外加对断言集本身的 `eval_feedback`）。可编程验证的断言写脚本判，别肉眼——更快更稳还能跨迭代复用。
+1. **评分**：spawn grader subagent（读 `agents/grader.md`）逐断言对照产物，把 `grading.json` 写进每个 run 目录（逐断言 `name/text/passed/evidence`，外加对断言集本身的 `eval_feedback`）。多个 grader 同样分批发，同批 ≤4 个在飞（口径同 6.1）。可编程验证的断言写脚本判，别肉眼——更快更稳还能跨迭代复用。
 2. **聚合**：
 
    ```bash
@@ -274,9 +274,9 @@ description 决定技能会不会被调用。技能做完（或触发不准）�
 
 写好后向用户过一遍再跑。
 
-### 并行 spawn 探针
+### 分批并行 spawn 探针
 
-对每条 query spawn 探针 subagent（同宿主、并行、每条默认 3 个探针；宿主支持无工具 agent 类型时探针优先用无工具类型）。探针 prompt 模板：
+对每条 query spawn 探针 subagent（同宿主、每条默认 3 个探针；宿主支持无工具 agent 类型时探针优先用无工具类型）。探针按**整条 query 分批**：默认每批 3 条 query（=9 个探针同回合并发，对齐官方 run_eval.py worker-pool 默认 10 并发的量级），同 query 的 3 个探针同批发、一批收完再发下一批；并发受限的宿主按比例调小批。批怎么切不影响聚合（聚合按 query 多数表决），但别为凑并发把全部约 20 条 × 3 探针一次推出去。探针 prompt 模板：
 
 ```
 你是一个技能路由判断器。你不需要、也不允许实际执行任务、调用任何工具或浏览任何文件——你只做一件事：从下面的技能清单里选出会用到的技能。
