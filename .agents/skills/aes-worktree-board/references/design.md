@@ -10,6 +10,7 @@
 - worker identity 以目标仓 `git worktree list` 为边界，短名和完整 basename 归一到同一租约 key。
 - executor 持有 writer 租约；关联 reviewer 加入同一 generation，但保持只读且不能夺取或释放 writer 租约。
 - Desktop Task 可以先记录 `clientThreadId`，随后原子附加真实 `threadId`；CLI fallback 必须保存用户授权原话。
+- worker 工作周期以 executor Task 登记为起点：`createdAt` 保留首次登记审计时间，`startedAt` / `finishedAt` 记录当前工作周期；reviewer 不重置 worktree 计时，终态冻结，parked 显式恢复时开始新周期。
 - inbox 同时校验 eventId 幂等与 thread→Task 归属。关联 reviewer thread 可以向 parent executor 提交 verdict，其他 foreign thread fail closed。
 - 状态边和交付证据是两层门禁：合法转移不等于证据齐全；有效 verdict、commit、review 和 merge commit 缺一不可进入对应终态。
 - stop 的读取、判断和写入与 Task 创建使用同一临界区，保证 `stopped` 与 active Task 不会并存。
@@ -30,6 +31,7 @@
 | AC-9 | 锁定 HTTP 报文使用 worker 与 500 message；旧 worktree 字段仅作兼容输入。 |
 | AC-10 | collect 在目标 runtime 生成读取同目录 status.js 的快照页面；技能模板不读取历史 runtime。 |
 | AC-11 | 旧七域、自带 orchestration 域、issue graph、真实浏览器 v3/v2 验收全部保持通过。 |
+| AC-12 | registry 中最新 executor Task 是 worker 计时真源；活动时长持续增长，merged/parked/handoff-required 后冻结，reviewer 不重置，parked 恢复后开始新周期。 |
 
 ## 迭代记录
 
@@ -37,3 +39,4 @@
 | --- | --- | --- | --- |
 | 2026-08-24 | 修复独立复核确认的租约、门禁、queued identity、stop TOCTOU、fallback settlement、snapshot、HTTP 与锁释放缺陷，并补 thread 归属和 worker canonicalization。 | 针对性红绿测试 + 全域回归 + 浏览器与双轴复审。 | 控制面原语仍集中在单一 Skill，暂不拆分。 |
 | 2026-08-25 | 默认 collect 改用完整 Issue fixture，并把真实 GitHub 二次对账拆成显式 `collect-live` smoke，消除授权、网络及两次查询间 Issue 变化造成的 flaky。 | 无效 `issueRepo` 下 collect 绿、collect-live 红；八域 `run-tests.mjs` 8/8 通过。 | 这是测试证据分层，不新增技能职责，无需拆分。 |
+| 2026-08-25 | 为 Desktop worker lane 增加可恢复的开始/结束时间投影，统一 registry、collect 与 web 面板的工作时长。 | lifecycle/storage/contract 回归、八域回归与真实浏览器活动/冻结计时验收。 | 复用既有 TaskRecord 与 schema v3，不引入后台计时服务。 |

@@ -9,6 +9,7 @@ const LOCK_NAME = '.control.lock';
 const DEFAULT_LOCK_TIMEOUT_MS = 10_000;
 const STALE_LOCK_MS = 60_000;
 const WAIT_ARRAY = new Int32Array(new SharedArrayBuffer(4));
+export const TERMINAL_TASK_STATES = Object.freeze(['merged', 'parked', 'handoff-required']);
 
 export function canonicalWorktreeKey(value) {
   const raw = String(value || '').trim();
@@ -143,7 +144,14 @@ export function readRegistry(runtimeDir) {
     leases[key] = lease;
   }
   registry.leases = leases;
-  for (const task of Object.values(registry.tasks)) task.worktree = canonicalWorktreeKey(task.worktree);
+  for (const task of Object.values(registry.tasks)) {
+    task.worktree = canonicalWorktreeKey(task.worktree);
+    // v3 additive compatibility: old TaskRecords used createdAt/updatedAt only.
+    task.startedAt ||= task.createdAt || null;
+    if (task.finishedAt === undefined) {
+      task.finishedAt = TERMINAL_TASK_STATES.includes(task.state) ? task.updatedAt || task.startedAt : null;
+    }
+  }
   return registry;
 }
 

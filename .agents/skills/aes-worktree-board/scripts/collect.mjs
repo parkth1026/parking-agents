@@ -10,7 +10,7 @@ import {
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  readJson, readJsonLines, readRegistry, withRuntimeLock, writeJsonAtomic, writeTextAtomic,
+  readJson, readJsonLines, readRegistry, TERMINAL_TASK_STATES, withRuntimeLock, writeJsonAtomic, writeTextAtomic,
 } from './runtime-store.mjs';
 
 const pExecFile = promisify(execFile);
@@ -166,7 +166,8 @@ function loadPrevious(runtimeDir) {
 
 function latestRegistryTask(registry, worktreeName) {
   return Object.values(registry.tasks || {})
-    .filter((task) => task.worktree === worktreeName || worktreeName.endsWith(`-${task.worktree}`))
+    .filter((task) => task.role === 'executor'
+      && (task.worktree === worktreeName || worktreeName.endsWith(`-${task.worktree}`)))
     .sort((left, right) => Number(right.generation) - Number(left.generation) || String(right.updatedAt).localeCompare(String(left.updatedAt)))[0] || null;
 }
 
@@ -512,7 +513,10 @@ export async function collectStatus({
       ahead: worker.ahead,
       behind: worker.behind,
       dirty: worker.dirty,
-      mode: worker.activeTask ? 'running' : hasPosition ? 'manual' : 'idle',
+      mode: (worker.task && !TERMINAL_TASK_STATES.includes(worker.task.state))
+        || (!worker.task && worker.activeTask)
+        ? 'running'
+        : hasPosition ? 'manual' : 'idle',
       position: hasPosition ? { kind: 'issue', issue: worker.claimedIssue } : { kind: 'none' },
       trail: buildTrail(
         worker.issueNumbers,
@@ -563,6 +567,10 @@ export async function collectStatus({
       }
       const task = latestRegistryTask(latestRegistry, worker.name);
       if (task) worker.task = task;
+      worker.mode = (worker.task && !TERMINAL_TASK_STATES.includes(worker.task.state))
+        || (!worker.task && worker.activeTask)
+        ? 'running'
+        : worker.position.kind === 'issue' ? 'manual' : 'idle';
     }
     writeJsonAtomic(paths.statusJson, status);
     writeTextAtomic(paths.statusJs, `window.WORKBOARD = ${JSON.stringify(status)};\n`);

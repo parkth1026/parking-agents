@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { listWorktrees, RUNTIME_DIR } from './collect.mjs';
 import {
   appendJsonLineAtomic, canonicalWorktreeKey, readJson, readJsonLines, readRegistry, updateRegistry,
-  withRuntimeLock, writeJsonAtomic, writeTextAtomic,
+  TERMINAL_TASK_STATES, withRuntimeLock, writeJsonAtomic, writeTextAtomic,
 } from './runtime-store.mjs';
 
 export const TASK_STATES = Object.freeze([
@@ -17,7 +17,7 @@ export const TASK_STATES = Object.freeze([
 ]);
 // 锁定材料称“15 态”：14 个 Task 态 + 1 个全局控制态。orchestration-stop 不可写入 Task.state。
 export const CONTROL_STATES = Object.freeze([...TASK_STATES, 'orchestration-stop']);
-export const TERMINAL_OR_PAUSED = Object.freeze(['merged', 'parked', 'handoff-required']);
+export const TERMINAL_OR_PAUSED = TERMINAL_TASK_STATES;
 export const VERDICT_CODES = Object.freeze(['PASS', 'BLOCK']);
 export const RUNTIME_VERDICTS = Object.freeze(['PASS', 'NOT_RUN', 'BLOCKED', 'FAIL']);
 export const DELIVERY_VERDICTS = Object.freeze(['MERGE_READY', 'PARKED', 'HANDOFF_REQUIRED', 'BLOCKED']);
@@ -56,6 +56,14 @@ function controlError(code, message, details = {}) {
 }
 
 function now() { return new Date().toISOString(); }
+function applyTaskTiming(task, from, to, timestamp) {
+  if (from === 'parked' && to === 'executing') {
+    task.startedAt = timestamp;
+    task.finishedAt = null;
+  } else if (TERMINAL_OR_PAUSED.includes(to)) {
+    task.finishedAt = timestamp;
+  }
+}
 export function canonicalWorktreeId(value) {
   try {
     return canonicalWorktreeKey(value);
@@ -221,7 +229,7 @@ export function createTask(options, runtimeDir = RUNTIME_DIR) {
       blockCount: 0, blockLedger: [], lastProgressAt: timestamp,
       nextAction: options['next-action'] || 'wait for registered thread events',
       fallbackAuthorized, requiresRuntime: options['requires-runtime'] === true || options['requires-runtime'] === 'true',
-      agent, createdAt: timestamp, updatedAt: timestamp,
+      agent, createdAt: timestamp, startedAt: timestamp, finishedAt: null, updatedAt: timestamp,
     };
     registry.tasks[taskId] = task;
     if (role === 'executor') registry.leases[worktree] = { owner: taskId, generation, acquiredAt: timestamp };
@@ -276,10 +284,12 @@ export function transitionTask(taskId, to, details = {}, runtimeDir = RUNTIME_DI
       verdict: { ...task.verdict },
     };
     assertTransitionEvidence(registry, task, to, candidate);
+    const timestamp = now();
     task.state = to;
     task.phase = details.phase || to;
-    task.updatedAt = now();
+    task.updatedAt = timestamp;
     task.lastProgressAt = task.updatedAt;
+    applyTaskTiming(task, from, to, timestamp);
     task.nextAction = details.nextAction ?? task.nextAction;
     if (details.commitSha) task.commitSha = details.commitSha;
     if (details.mergeCommit) task.mergeCommit = details.mergeCommit;
@@ -401,7 +411,8 @@ function applyBlockRecord(registry, runtimeDir, task, event, { commit, finding, 
   task.commitSha = commit;
   task.verdict.code = 'BLOCK';
   task.verdict.delivery = task.blockCount >= 3 ? 'HANDOFF_REQUIRED' : 'BLOCKED';
-  task.updatedAt = now();
+  const timestamp = now();
+  task.updatedAt = timestamp;
   const from = task.state;
   if (task.blockCount < 3) {
     task.state = 'fixing';
@@ -414,6 +425,7 @@ function applyBlockRecord(registry, runtimeDir, task, event, { commit, finding, 
     return { result: 'recorded', blockCount: task.blockCount, state: task.state, transition: { from, to: 'fixing' } };
   }
   task.state = 'handoff-required';
+  applyTaskTiming(task, from, task.state, timestamp);
   task.phase = 'awaiting-human';
   task.nextAction = `人工交接，见 runtime/handoff/${task.taskId}.md`;
   const handoffPath = join(runtimeDir, 'handoff', `${task.taskId}.md`);
@@ -474,8 +486,10 @@ export function consumeEvent(eventId, runtimeDir = RUNTIME_DIR) {
       }
       const candidate = { ...task, verdict: { ...task.verdict } };
       assertTransitionEvidence(registry, task, to, candidate);
+      const transitionTimestamp = now();
       task.state = to;
       task.phase = to;
+      applyTaskTiming(task, from, to, transitionTimestamp);
       transition = { from, to };
       nextAction = to === 'approved' ? 'merge-gate' : 'continue';
       appendTransition(runtimeDir, task, from, to, {
@@ -603,13 +617,15 @@ export function completeFallbackDispatch(taskId, { exitCode, preflightFailure = 
     const from = task.state;
     if (TERMINAL_OR_PAUSED.includes(from)) return { result: 'already-terminal', taskId, state: from };
     const safePreflightFailure = Boolean(preflightFailure && from === 'dispatching');
+    const timestamp = now();
     task.state = 'parked';
     task.phase = exitCode === 0 ? 'awaiting-orchestrator-inspection' : 'cli-fallback-failed';
     task.verdict.delivery = 'PARKED';
     task.nextAction = exitCode === 0 ? 'inspect fallback output before further delivery action' : `inspect failed fallback exit ${exitCode}`;
     task.retryable = safePreflightFailure;
     task.error = error ? String(error).slice(0, 300) : task.error || null;
-    task.updatedAt = now();
+    task.updatedAt = timestamp;
+    applyTaskTiming(task, from, task.state, timestamp);
     // test 与尚未启动 agent 的 preflight failure 都未留下 writer，释放租约；真实已启动 fallback 继续保护现场。
     if ((task.agent === 'test' || safePreflightFailure) && registry.leases[task.worktree]?.owner === taskId) delete registry.leases[task.worktree];
     appendTransition(runtimeDir, task, from, 'parked', { actor: 'dispatch-wrapper', reason: task.nextAction });

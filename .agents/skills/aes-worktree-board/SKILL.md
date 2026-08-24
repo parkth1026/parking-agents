@@ -46,7 +46,7 @@ runtime 选址链保持不变：`AES_WORKTREE_BOARD_RUNTIME_DIR` 优先，否则
 node "$skillDir/scripts/orchestrate.mjs" inbox pending
 ```
 
-逐条消费 pending 后才继续 `wait_threads`。`registry.json` 是判断真源，`status.json` 只是 schema v3 渲染快照；二者冲突时以 registry 为准。`transitions.jsonl` 与 `inbox.jsonl` 是 append-only 审计历史。全部可变写入共用 runtime 互斥并经 tmp+rename 原子替换。
+逐条消费 pending 后才继续 `wait_threads`。`registry.json` 是判断真源，`status.json` 只是 schema v3 渲染快照；二者冲突时以 registry 为准。`transitions.jsonl` 与 `inbox.jsonl` 是 append-only 审计历史。全部可变写入共用 runtime 互斥并经 tmp+rename 原子替换。executor Task 的 `createdAt` 保留首次登记时间，`startedAt` / `finishedAt` 记录当前 worker 工作周期；终态冻结计时，parked 显式恢复时开始新周期，关联 reviewer 不重置计时。
 
 collect 只写 schemaVersion 3，承接既有 assessment、终态和全局停止状态；board 可降级读取 v2，并明确显示“旧快照”，不得报错拒渲。
 
@@ -160,7 +160,7 @@ dirty 现场仍需另加 `--confirm-dirty`。server 看板的 fallback POST 还�
 - fixture 刷新：`node "$skillDir/scripts/capture-issues-fixture.mjs"`。
 - 离线生成：`node "$skillDir/scripts/collect.mjs" --no-gh --issues-fixture "$skillDir/fixtures/aes-agent-issues.json"`。
 
-看板 v3 只在六处增加控制面信息：全局编排胶囊、Workers Task 徽章、详情 Task/transition 区、fallback 授权提示、v2 降级条、Map/List 文案。页面不自行推导业务状态。
+看板 v3 只在既有控制面挂点显示信息：全局编排胶囊、Workers Task/工作时长徽章、详情 Task/时间/transition 区、fallback 授权提示、v2 降级条、Map/List 文案。页面不自行推导业务状态，工作时长只用 status 投影的 registry executor 时间；旧 CLI activeTask 仅在没有 registry Task 时兼容显示。
 
 `POST /api/dispatch` 的锁定字段名是 `worker`；server 为旧调用方兼容接收 `worktree`，但页面与新调用方统一发送 `worker`。500 报文使用 `message`。
 

@@ -225,6 +225,7 @@ button { cursor:pointer; }
   const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[char]));
   const shortName = (name) => String(name || '').replace(/^.*-(dev\d+)$/, '$1');
   const labels = { frontier:'可开工', claimed:'进行中', blocked:'被阻塞', resolved:'已探明' };
+  const terminalTaskStates = new Set(['merged', 'parked', 'handoff-required']);
   const state = {
     mode:'snapshot', view:'graph', status:null, nodes:[], positions:new Map(),
     transform:{ x:0, y:0, k:1 }, hovered:null, filter:null, selected:null,
@@ -243,11 +244,42 @@ button { cursor:pointer; }
     return state.status?.worktrees.find((worker) => worker.name === issue.claimedBy) || null;
   }
 
-  function elapsed(startedAt) {
-    const milliseconds = Date.now() - Date.parse(startedAt || '');
-    if (!Number.isFinite(milliseconds) || milliseconds < 0) return '0m';
+  function elapsed(startedAt, finishedAt = null) {
+    const start = Date.parse(startedAt || '');
+    const finish = finishedAt ? Date.parse(finishedAt) : Date.now();
+    const milliseconds = finish - start;
+    if (!Number.isFinite(milliseconds) || milliseconds < 0) return '—';
     const minutes = Math.floor(milliseconds / 60000);
     return minutes >= 60 ? `${Math.floor(minutes / 60)}h${minutes % 60}m` : `${minutes}m`;
+  }
+
+  function workerTiming(worker) {
+    const task = worker?.task;
+    if (task) {
+      const active = !terminalTaskStates.has(task.state);
+      return {
+        active,
+        startedAt: task.startedAt || task.createdAt || null,
+        finishedAt: active ? null : task.finishedAt || task.updatedAt || null,
+      };
+    }
+    if (worker?.activeTask) {
+      return { active:true, startedAt:worker.activeTask.startedAt || null, finishedAt:null };
+    }
+    return null;
+  }
+
+  function timingLabel(worker) {
+    const timing = workerTiming(worker);
+    if (!timing) return '';
+    const duration = elapsed(timing.startedAt, timing.finishedAt);
+    return duration === '—' ? duration : `${timing.active ? '▶' : '■'} ${duration}`;
+  }
+
+  function timestampLabel(value) {
+    const timestamp = Date.parse(value || '');
+    if (!Number.isFinite(timestamp)) return '—';
+    return new Date(timestamp).toLocaleString('zh-CN', { hour12:false });
   }
 
   function seeded(number) {
@@ -379,8 +411,9 @@ button { cursor:pointer; }
     const warning = issue.derived.warn ? `<text y="${r + 18}" text-anchor="middle" fill="#B08838" font-family="var(--mono)" font-size="10">⚠ 回归有波动</text>` : '';
     let flag = '';
     if (worker) {
-      const running = worker.mode === 'running';
-      const text = running ? `${shortName(worker.name)} ▶ ${elapsed(worker.activeTask?.startedAt)}` : `${shortName(worker.name)} ✋ 手动推进`;
+      const timing = workerTiming(worker);
+      const running = Boolean(timing?.active);
+      const text = timing ? `${shortName(worker.name)} ${timingLabel(worker)}` : `${shortName(worker.name)} ✋ 手动推进`;
       const width = Math.max(76, text.length * 7.1 + 18);
       const fill = running ? '#7C6BAE' : '#F6EDD8';
       const stroke = running ? '#6A5A9E' : '#D9C48F';
@@ -500,7 +533,8 @@ button { cursor:pointer; }
       const issue = worker.position.kind === 'issue' ? state.status.graph.issues.find((item) => item.number === worker.position.issue) : null;
       const dirty = worker.dirty.modified + worker.dirty.untracked;
       const position = issue ? `#${issue.number} · ${issue.title}` : '未在场';
-      return `<div class="worker-row"><i class="worker-state ${worker.mode}"></i><div><div class="worker-name">${esc(shortName(worker.name))}</div><div class="worker-position">${esc(position)}</div>${worker.task ? `<div class="badges">${taskBadges(worker.task)}</div>` : ''}<div class="badges">${dirty ? `<span class="badge dirty">dirty ${worker.dirty.modified}+${worker.dirty.untracked}</span>` : ''}${worker.assessment?.stale ? '<span class="badge stale">评估过期</span>' : ''}${worker.mode === 'running' ? `<span class="badge">▶ ${elapsed(worker.activeTask?.startedAt)}</span>` : ''}</div></div><button class="locate" data-locate="${issue?.number || ''}" ${issue ? '' : 'disabled'} title="定位队员">⌖</button></div>`;
+      const timing = timingLabel(worker);
+      return `<div class="worker-row"><i class="worker-state ${worker.mode}"></i><div><div class="worker-name">${esc(shortName(worker.name))}</div><div class="worker-position">${esc(position)}</div>${worker.task ? `<div class="badges">${taskBadges(worker.task)}</div>` : ''}<div class="badges">${dirty ? `<span class="badge dirty">dirty ${worker.dirty.modified}+${worker.dirty.untracked}</span>` : ''}${worker.assessment?.stale ? '<span class="badge stale">评估过期</span>' : ''}${timing ? `<span class="badge">${esc(timing)}</span>` : ''}</div></div><button class="locate" data-locate="${issue?.number || ''}" ${issue ? '' : 'disabled'} title="定位队员">⌖</button></div>`;
     }).join('')}`;
     $$('.locate:not(:disabled)').forEach((button) => button.addEventListener('click', () => flyTo(Number(button.dataset.locate))));
   }
@@ -568,11 +602,12 @@ button { cursor:pointer; }
     const downstream = state.status.graph.edges.filter((edge) => edge.from === issue.number).map((edge) => state.status.graph.issues.find((item) => item.number === edge.to)).filter(Boolean);
     const latestTask = worker?.activeTask || worker?.recentTasks?.[0];
     const registryTask = worker?.task || null;
+    const timing = workerTiming(worker);
     const transitions = (state.status.transitions || []).filter((item) => item.taskId === registryTask?.taskId).slice(-8);
     const idleWorkers = state.status.worktrees.filter((item) => item.mode === 'idle');
     const workerOptions = (idleWorkers.length ? idleWorkers : state.status.worktrees).map((item) => `<option value="${esc(item.name)}" ${worker?.name === item.name ? 'selected' : ''}>${esc(shortName(item.name))}${item.dirty.modified + item.dirty.untracked ? ' · dirty' : ''}</option>`).join('');
     const prompt = `处理 #${issue.number}：${issue.title}\n先读取 issue 正文与仓库规则，按其验收条件完成；不要关闭 issue，不要合并到 main。`;
-    const registrySection = registryTask ? `<div class="registry-section"><h3>任务（registry）</h3><div class="kv"><span>Task</span><span>${esc(registryTask.taskId)} · ${esc(registryTask.threadId || registryTask.clientThreadId || 'cli-fallback')} · ${esc(registryTask.role)}</span></div><div class="kv"><span>模型</span><span>${esc(registryTask.modelTier || '—')}（${esc(registryTask.routingReason || '未记录') }）</span></div><div class="verdict-chips"><span class="verdict-chip">code ${esc(registryTask.verdict?.code || '—')}</span><span class="verdict-chip">runtime ${esc(registryTask.verdict?.runtime || '—')}</span><span class="verdict-chip">delivery ${esc(registryTask.verdict?.delivery || '—')}</span></div><div class="kv"><span>转移</span><span>${transitions.length ? '' : '暂无历史'}</span></div>${transitions.length ? `<ol class="transition-history">${transitions.map((item) => `<li>${esc(item.ts?.slice(11,16))} ${esc(item.from)} → ${esc(item.to)}${item.eventId ? ` · ${esc(item.eventId)}` : ''}</li>`).join('')}</ol>` : ''}</div>` : '';
+    const registrySection = registryTask ? `<div class="registry-section"><h3>任务（registry）</h3><div class="kv"><span>Task</span><span>${esc(registryTask.taskId)} · ${esc(registryTask.threadId || registryTask.clientThreadId || 'cli-fallback')} · ${esc(registryTask.role)}</span></div><div class="kv"><span>工作时长</span><span>${esc(timingLabel(worker) || '—')}</span></div><div class="kv"><span>本轮开始</span><span>${esc(timestampLabel(timing?.startedAt))}</span></div><div class="kv"><span>本轮结束</span><span>${esc(timing?.active ? '进行中' : timestampLabel(timing?.finishedAt))}</span></div><div class="kv"><span>模型</span><span>${esc(registryTask.modelTier || '—')}（${esc(registryTask.routingReason || '未记录') }）</span></div><div class="verdict-chips"><span class="verdict-chip">code ${esc(registryTask.verdict?.code || '—')}</span><span class="verdict-chip">runtime ${esc(registryTask.verdict?.runtime || '—')}</span><span class="verdict-chip">delivery ${esc(registryTask.verdict?.delivery || '—')}</span></div><div class="kv"><span>转移</span><span>${transitions.length ? '' : '暂无历史'}</span></div>${transitions.length ? `<ol class="transition-history">${transitions.map((item) => `<li>${esc(item.ts?.slice(11,16))} ${esc(item.from)} → ${esc(item.to)}${item.eventId ? ` · ${esc(item.eventId)}` : ''}</li>`).join('')}</ol>` : ''}</div>` : '';
     $('#details').innerHTML = `<div class="details-top"><div class="issue-kicker"><span>#${issue.number}</span><span class="status-pill ${issue.derived.status}">${labels[issue.derived.status]}</span></div><button class="close" aria-label="关闭">×</button></div><h2>${esc(issue.title)}</h2><div class="kv"><span>状态</span><span>${labels[issue.derived.status]} · degree ${issue.derived.degree}${issue.derived.warn ? ' · ⚠ 回归有波动' : ''}</span></div><div class="kv"><span>分支</span><span>${esc(worker?.branch || '尚未认领')}</span></div><div class="kv"><span>来路</span><span>${issue.blockedBy.length ? issue.blockedBy.map((number) => `#${number}`).join(' · ') : '无前置依赖'}</span></div>${worker?.assessment?.stale ? '<div class="stale-note">评估已过期：最新 commit 或任务结束晚于 assessedAt，请以现场为准重新评估。</div>' : ''}${registrySection}<div class="unlock"><div class="unlock-title">完成后解锁</div><div class="chips">${downstream.length ? downstream.map((item) => `<span class="chip">#${item.number}</span>`).join('') : '<span class="chip">无直接下游</span>'}</div></div><div class="details-actions"><button class="btn primary" id="view-log" ${state.mode !== 'live' || !latestTask ? 'disabled' : ''}>查看运行日志</button><button class="btn" id="open-issue">打开 issue</button></div><pre class="log-view" id="log-view"></pre><div class="dispatch-box"><h3>${issue.derived.status === 'frontier' ? '从这里派活' : '派发关联任务'}</h3>${state.mode === 'live' ? `<textarea id="dispatch-prompt">${esc(prompt)}</textarea><div class="dispatch-controls"><select id="dispatch-worker">${workerOptions}</select><select id="dispatch-agent"><option>claude</option><option>codex</option><option>test</option></select></div><div class="auth-note">cli-fallback 需显式授权；正常路径是 Desktop create_thread。真实 fallback 必须记录用户授权原话，token 由页面自动携带。</div><input class="fallback-auth" id="fallback-authorized" placeholder="粘贴用户授权原话（test 假 agent 豁免）"><button class="btn primary" id="dispatch" style="width:100%;margin-top:7px">派发 cli-fallback 任务</button>` : '<div class="snapshot-note">file:// 只读快照不能派发。请启动 server.mjs 后从 LIVE 页面操作。</div>'}</div>`;
     $('.close').addEventListener('click', closeDetails);
     $('#open-issue').addEventListener('click', () => window.open(issue.url, '_blank', 'noopener'));
@@ -704,7 +739,7 @@ button { cursor:pointer; }
       const pending = state.pendingDispatch; dispatchIssue(pending.issue, true, action === 'inspect');
     });
     window.addEventListener('resize', () => { if (state.status) renderGraph(); });
-    setInterval(() => { if (state.status) renderWorkers(); if (state.selected) renderDetails(); }, 60000);
+    setInterval(() => { if (state.status) { renderWorkers(); renderGraph(); } if (state.selected) renderDetails(); }, 60000);
   }
 
   async function boot() {

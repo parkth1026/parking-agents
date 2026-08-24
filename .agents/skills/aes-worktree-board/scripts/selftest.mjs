@@ -15,7 +15,7 @@ import {
 import { resolveCommand } from './command.mjs';
 import { HEADLESS_CHILD_OPTIONS } from './headless.mjs';
 import {
-  consumeEvent, CONTROL_STATES, createTask, evaluateStop, pendingInbox, putInboxEvent,
+  consumeEvent, CONTROL_STATES, createTask, evaluateStop, heartbeatTask, pendingInbox, putInboxEvent,
   recordBlock, setVerdict, TASK_STATES, transitionTask,
 } from './orchestrate.mjs';
 import { readJson, readJsonLines, readRegistry, writeJsonAtomic } from './runtime-store.mjs';
@@ -1230,12 +1230,28 @@ async function orchestrationStorageCompatibility() {
       model: 'luna-max', 'routing-reason': 'storage compatibility fixture',
     }, runtimeDir);
     transitionTask(created.taskId, 'parked', { reason: 'storage terminal preservation probe' }, runtimeDir);
+    const frozenAt = readRegistry(runtimeDir).tasks[created.taskId].finishedAt;
+    assert.ok(frozenAt, 'parked 必须冻结 worker 工作周期');
     const collected = await collectStatus({ runtimeDir, issuesFixture: ISSUE_FIXTURE });
     assert.equal(collected.schemaVersion, 3);
     const persistedWorker = collected.worktrees.find((item) => item.name === worker.name);
     assert.equal(persistedWorker.assessment.currentTask, 'v2-assessment-preserved');
     assert.equal(persistedWorker.task.state, 'parked');
+    assert.equal(persistedWorker.task.finishedAt, frozenAt, 'collect 不得漂移已冻结的结束时间');
     assert.equal(readRegistry(runtimeDir).tasks[created.taskId].state, 'parked');
+    const collectedAgain = await collectStatus({ runtimeDir, issuesFixture: ISSUE_FIXTURE });
+    assert.equal(
+      collectedAgain.worktrees.find((item) => item.name === worker.name).task.finishedAt,
+      frozenAt,
+      '重复 collect 后终态耗时必须保持稳定',
+    );
+    const legacyRegistry = readJson(join(runtimeDir, 'registry.json'));
+    delete legacyRegistry.tasks[created.taskId].startedAt;
+    delete legacyRegistry.tasks[created.taskId].finishedAt;
+    writeJsonAtomic(join(runtimeDir, 'registry.json'), legacyRegistry);
+    const normalizedLegacy = readRegistry(runtimeDir).tasks[created.taskId];
+    assert.equal(normalizedLegacy.startedAt, normalizedLegacy.createdAt, '旧 TaskRecord 用 createdAt 补 startedAt');
+    assert.equal(normalizedLegacy.finishedAt, normalizedLegacy.updatedAt, '旧终态 TaskRecord 用 updatedAt 补 finishedAt');
     assert.doesNotThrow(() => JSON.parse(readFileSync(join(runtimeDir, 'status.json'), 'utf8')));
     const snapshotBoard = join(runtimeDir, 'board.html');
     assert.ok(existsSync(snapshotBoard), 'collect 必须在目标 runtime 生成可直接打开的快照页面');
@@ -1298,6 +1314,21 @@ async function orchestrationPreflightLeaseAndState() {
     assert.equal(created.task.threadId, 'T-real-thread');
     assert.equal(created.task.taskKind, 'desktop-thread');
     assert.equal(created.task.modelTier, 'luna-max');
+    assert.equal(created.task.startedAt, created.task.createdAt, 'Task 登记时开始 worker 工作周期');
+    assert.equal(created.task.finishedAt, null);
+    const originalStartedAt = created.task.startedAt;
+    heartbeatTask(created.taskId, runtimeDir);
+    assert.equal(readRegistry(runtimeDir).tasks[created.taskId].startedAt, originalStartedAt, 'heartbeat 不得重置开始时间');
+    transitionTask(created.taskId, 'executing', {}, runtimeDir);
+    assert.equal(readRegistry(runtimeDir).tasks[created.taskId].startedAt, originalStartedAt, '普通活动态转移不得重置开始时间');
+    transitionTask(created.taskId, 'parked', {}, runtimeDir);
+    const parked = readRegistry(runtimeDir).tasks[created.taskId];
+    assert.ok(parked.finishedAt, 'parked 必须记录结束时间');
+    await waitMilliseconds(5);
+    transitionTask(created.taskId, 'executing', {}, runtimeDir);
+    const resumed = readRegistry(runtimeDir).tasks[created.taskId];
+    assert.ok(resumed.startedAt > originalStartedAt, 'parked 恢复必须开始新的 worker 工作周期');
+    assert.equal(resumed.finishedAt, null, 'parked 恢复必须清空结束时间');
 
     const queuedRuntime = tempDirectory('orchestration-lifecycle-client-thread');
     try {
@@ -1349,6 +1380,28 @@ async function orchestrationPreflightLeaseAndState() {
       );
     } finally {
       await cleanTemp(reviewRuntime);
+    }
+
+    const projectionRuntime = tempDirectory('orchestration-lifecycle-timing-projection');
+    try {
+      const executorCreated = createTask({
+        issue: 17, worktree: availableWorker, role: 'executor', 'thread-id': 'T-projection-executor',
+        model: 'luna-max', 'routing-reason': 'timing projection fixture',
+      }, projectionRuntime);
+      transitionTask(executorCreated.taskId, 'executing', {}, projectionRuntime);
+      transitionTask(executorCreated.taskId, 'self-qa', {}, projectionRuntime);
+      transitionTask(executorCreated.taskId, 'committed', { commitSha: 'projection-commit' }, projectionRuntime);
+      const reviewer = createTask({
+        issue: 17, worktree: availableWorker, role: 'reviewer', 'parent-task-id': executorCreated.taskId,
+        'thread-id': 'T-projection-reviewer', model: 'sol-high', 'routing-reason': 'projection reviewer fixture',
+      }, projectionRuntime);
+      const projected = await collectStatus({ runtimeDir: projectionRuntime, issuesFixture: ISSUE_FIXTURE });
+      const projectedWorker = projected.worktrees.find((item) => item.name === availableWorker);
+      assert.equal(projectedWorker.task.taskId, executorCreated.taskId, 'reviewer 不得替换 worker 的 executor 计时真源');
+      assert.notEqual(projectedWorker.task.taskId, reviewer.taskId);
+      assert.equal(projectedWorker.mode, 'running', 'registry 活动 executor 必须把 worker 投影为 running');
+    } finally {
+      await cleanTemp(projectionRuntime);
     }
 
     const unknownRuntime = tempDirectory('orchestration-lifecycle-unknown-worktree');
@@ -1521,6 +1574,7 @@ async function orchestrationCircuitAndLateEvent() {
     assert.equal(block.result, 'circuit-broken');
     assert.equal(block.blockCount, 3);
     assert.equal(readRegistry(runtimeDir).tasks[created.taskId].state, 'handoff-required');
+    assert.ok(readRegistry(runtimeDir).tasks[created.taskId].finishedAt, 'handoff-required 必须冻结 worker 工作周期');
     assert.ok(existsSync(block.handoffBundle));
     assert.match(readFileSync(block.handoffBundle, 'utf8'), /Issue: #56|final reviewer finding|Resume conditions/);
 
@@ -1620,6 +1674,7 @@ async function orchestrationVerdictDimensions() {
       );
       transitionTask(evidenceFree.taskId, 'merged', { mergeCommit: 'merge-evidence-commit' }, splitRuntime);
       assert.equal(readRegistry(splitRuntime).leases.dev7, undefined, '只有带 mergeCommit 的 merged 才释放租约');
+      assert.ok(readRegistry(splitRuntime).tasks[evidenceFree.taskId].finishedAt, 'merged 必须冻结 worker 工作周期');
     } finally {
       await cleanTemp(splitRuntime);
     }
@@ -1895,7 +1950,7 @@ async function orchestrationContractMarkers() {
   assert.doesNotMatch(skill, /只给合并建议，不执行 merge/);
 
   const board = readFileSync(join(SKILL_DIR, 'board.html'), 'utf8');
-  for (const marker of ['id="orch-pill"', 'task-state', 'registry-section', 'transition-history', 'fallback-authorized', 'id="v2-note"', '>Map<', '>List<']) {
+  for (const marker of ['id="orch-pill"', 'task-state', 'registry-section', 'transition-history', 'workerTiming', '本轮开始', 'fallback-authorized', 'id="v2-note"', '>Map<', '>List<']) {
     assert.match(board, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
   // 星图既有高保真核心必须原样存在；控制面只允许在确认的 DOM 挂点增量渲染。
