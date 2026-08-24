@@ -200,6 +200,32 @@ export function renderMarkdown(benchmark) {
 // ---- history.json（技能目录，只追加） ----
 
 /**
+ * 当前轮的上一轮目录仍在 workspace 中，但 history 没有对应条目时给出诊断。
+ * 只检查相邻上一轮：旧目录可能已被 clean，不能把不可回补的历史伪造进 history。
+ */
+export function detectHistoryGap(iterDir, historyDir) {
+  const currentName = basename(resolve(iterDir));
+  const match = /^iteration-(\d+)$/.exec(currentName);
+  if (!match || Number(match[1]) <= 1) return null;
+
+  const previousName = `iteration-${Number(match[1]) - 1}`;
+  const previousDir = join(dirname(resolve(iterDir)), previousName);
+  if (!isDir(previousDir)) return null;
+
+  const history = readJson(join(resolve(historyDir), "history.json"));
+  const hasPrevious = Array.isArray(history?.runs)
+    && history.runs.some((run) => {
+      if (typeof run?.iteration_ref !== "string") return false;
+      const ref = run.iteration_ref.replace(/[\\/]+$/, "");
+      return basename(ref) === previousName;
+    });
+  if (hasPrevious) return null;
+
+  return `history 断档：workspace 中存在 ${previousName}，但 history.json 没有对应记录；` +
+    "本次不补写丢失的历史数据，请确保后续聚合带上 --history。";
+}
+
+/**
  * 题面沉淀体 output-evals.json：本轮评测用例集（整写覆盖，跨轮内容史由 git 记录）。
  * --keep-evals：专项轮（只跑题库子集）用——保留现有题库里本轮未跑的 eval，本轮条目覆盖/追加同名项，
  *   防止部分场景轮把题库整写成子集（全量轮换代仍用默认整写）。
@@ -471,6 +497,9 @@ if (result.error) {
   process.exit(1);
 }
 
+const historyGapWarning = historyDir ? detectHistoryGap(iterDirArg, historyDir) : null;
+if (historyGapWarning) result.benchmark.warnings.push(historyGapWarning);
+
 const outJson = outputIdx !== -1 ? resolve(argv[outputIdx + 1]) : join(resolve(iterDirArg), "benchmark.json");
 writeJson(outJson, result.benchmark);
 writeText(outJson.replace(/\.json$/, ".md"), renderMarkdown(result.benchmark));
@@ -496,6 +525,7 @@ if (cfgNames.length >= 2) {
     `        ${(d.tokens >= 0 ? "+" : "") + (d.tokens / 1000).toFixed(1) + "k"}`
   );
 }
+if (historyGapWarning) console.log(`警告: ${historyGapWarning}`);
 console.log(`→ ${outJson}, ${outJson.replace(/\.json$/, ".md")}`);
 
 // --history：评测数据反向沉淀进技能目录（唯一写入通道，须显式传参；失败不吞 benchmark 产出）

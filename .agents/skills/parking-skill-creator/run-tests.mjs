@@ -289,6 +289,18 @@ try {
   const agg = (iter, extra = []) => runFile("aggregate-benchmark.mjs", [join(root6, "ws", iter), "--skill-name", "hist-demo", ...extra]);
   const aggH = (iter) => agg(iter, ["--history", skillDir]);
 
+  // history 断档：上一轮目录仍在，但首次聚合当前轮时没有上一轮 history 条目。
+  const skillDirGap = join(root6, "skill-gap");
+  mkdirSync(skillDirGap);
+  const gapRun = agg("iteration-2", ["--history", skillDirGap]);
+  const gapBenchmark = JSON.parse(readFileSync(join(root6, "ws", "iteration-2", "benchmark.json"), "utf8"));
+  const gapHistory = JSON.parse(readFileSync(join(skillDirGap, "history.json"), "utf8"));
+  check("断档: workspace 有上一轮但 history 缺条目时显著告警", gapRun.code === 0
+    && gapRun.stdout.includes("警告: history 断档")
+    && gapBenchmark.warnings.some((warning) => warning.includes("iteration-1") && warning.includes("history.json")));
+  check("断档: 不伪造上一轮 history，只追加当前轮", gapHistory.runs.length === 1
+    && gapHistory.runs[0].iteration_ref.endsWith("iteration-2"));
+
   const r1 = aggH("iteration-1");
   const h1 = JSON.parse(readFileSync(join(skillDir, "history.json"), "utf8"));
   check("首轮: 创建 history.json 且 1 条 run", r1.code === 0 && h1.runs.length === 1);
@@ -316,6 +328,8 @@ try {
   check("次轮: 新增 eval-c 记 new 不计胜负", vs.detail.some((d) => d.eval === "eval-c" && d.result === "new") && vs.evals_total === 2);
   check("次轮: 缺席 eval-a 标 dropped", vs.detail.some((d) => d.eval === "eval-a" && d.result === "dropped"));
   check("次轮: current_best 严格推进", h2.current_best === "runs[1]");
+  check("断档: 已记录上一轮时不误报", !r2.stdout.includes("history 断档")
+    && !JSON.parse(readFileSync(join(root6, "ws", "iteration-2", "benchmark.json"), "utf8")).warnings.some((warning) => warning.includes("history 断档")));
 
   const oe2 = JSON.parse(readFileSync(join(skillDir, "output-evals.json"), "utf8"));
   check("题面沉淀: 跟随最新轮整写覆盖", oe2.source_iteration === "iteration-2"
