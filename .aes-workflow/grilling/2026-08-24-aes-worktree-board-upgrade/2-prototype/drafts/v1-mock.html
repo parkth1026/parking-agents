@@ -1,0 +1,140 @@
+<!-- draft v1 | published 2026-08-24T09:55:00Z
+     用户意见：偏离已锁定的 docs/design/design_handoff_issue_starmap 高保真设计，从零画了表格 UI，被用户质疑「差别这么大理由是什么」——无正当理由，属漏读现状
+     状态：superseded by v2-mock.html -->
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>aes-worktree-board v3 mock（草稿 v1）</title>
+<style>
+  :root{--paper:#f5f5f5;--ink:#2d3142;--muted:#4f5d75;--soft:#7a8399;--accent:#eb6c36;--tint:#fdf1ec;}
+  body{margin:0;padding:24px;background:var(--paper);color:var(--ink);font:14px/1.5 system-ui,"Segoe UI","Microsoft YaHei",sans-serif;}
+  h1{font-size:18px;margin:0 0 4px;} .sub{color:var(--soft);font-size:12px;margin-bottom:16px;}
+  .banner{border:1.5px solid var(--accent);background:var(--tint);border-radius:8px;padding:10px 14px;margin-bottom:16px;display:flex;gap:12px;align-items:baseline;}
+  .banner b{color:var(--accent);} .banner code{font-family:ui-monospace,Consolas,monospace;font-size:12px;color:var(--muted);}
+  table{border-collapse:collapse;width:100%;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.06);}
+  th,td{padding:8px 10px;text-align:left;font-size:12.5px;border-bottom:1px solid #e8eaf0;vertical-align:top;}
+  th{background:#eef1f6;color:var(--muted);font-weight:600;white-space:nowrap;}
+  th.changed{background:var(--tint);color:var(--accent);}
+  code,.mono{font-family:ui-monospace,Consolas,monospace;font-size:11.5px;}
+  .badge{display:inline-block;padding:1px 8px;border-radius:10px;font-size:11px;font-weight:600;white-space:nowrap;}
+  .st-handoff{background:#fbe3e3;color:#a33;} .st-parked{background:#fdf3d8;color:#8a6d1a;}
+  .st-merged{background:#e2f2e5;color:#2c7a3f;} .st-excluded{background:#eef1f6;color:var(--soft);}
+  .chip{display:inline-block;padding:0 6px;border-radius:3px;font-size:10.5px;font-family:ui-monospace,Consolas,monospace;margin-right:2px;}
+  .c-pass{background:#e2f2e5;color:#2c7a3f;} .c-block{background:#fbe3e3;color:#a33;}
+  .c-notrun{background:#eef1f6;color:var(--soft);} .c-handoff{background:#f7dfd3;color:#a5451c;}
+  .dots{letter-spacing:2px;color:#a33;font-size:11px;}
+  .drawer{margin-top:16px;background:#fff;border-radius:8px;padding:14px;border:1.5px solid var(--accent);}
+  .drawer h2{font-size:14px;margin:0 0 8px;} .drawer h2 .tag{color:var(--accent);font-size:11px;margin-left:8px;}
+  .hist{font-family:ui-monospace,Consolas,monospace;font-size:11.5px;color:var(--muted);margin:0;padding-left:18px;}
+  .hist li{margin:2px 0;}
+  .v2note{margin-top:16px;background:#fffbe8;border:1px solid #e6d896;border-radius:8px;padding:10px 14px;font-size:12px;color:#8a6d1a;}
+  .legend{margin-top:12px;font-size:11px;color:var(--soft);}
+  .legend .sw{display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--tint);border:1.5px solid var(--accent);vertical-align:-1px;margin-right:4px;}
+</style>
+</head>
+<body>
+<h1>aes-worktree-board <span class="mono">schemaVersion 3</span></h1>
+<div class="sub">目标仓 <code>G:/GIT/AI_WorkFlow/aes-agents-v2</code> · issueRepo <code>51world-ai-copilot/aes-agent</code> · 采集 2026-08-24T12:00:00Z · 示例数据取自上轮编排终局</div>
+
+<!-- 新增：编排全局状态横幅 -->
+<div class="banner">
+  <b>ORCHESTRATION: STOPPED</b>
+  <span>原因 <code>no-advanceable-lane</code> · 记录于 <code>2026-08-23T23:37:20Z</code> · 评估器 <code>stop eval</code> 判定，非手写账本</span>
+</div>
+
+<table>
+  <thead><tr>
+    <th>worktree</th><th>branch · ±main</th><th>dirty</th><th>issue</th>
+    <th class="changed">状态（状态机）</th>
+    <th class="changed">verdict C/R/D</th>
+    <th class="changed">block</th>
+    <th class="changed">模型</th>
+    <th class="changed">Task / thread</th>
+    <th class="changed">next action</th>
+  </tr></thead>
+  <tbody>
+    <tr>
+      <td><b>dev1</b></td><td class="mono">dev1 · +2/−3</td><td class="mono">16M</td><td class="mono">#56</td>
+      <td><span class="badge st-handoff">handoff-required</span></td>
+      <td><span class="chip c-block">code:BLOCK</span><span class="chip c-notrun">rt:NOT_RUN</span><span class="chip c-handoff">dl:HANDOFF</span></td>
+      <td><span class="dots">●●●</span> 3/3</td>
+      <td class="mono">luna-max</td>
+      <td class="mono">tk-dev1-56-g1<br>T-01HAAA</td>
+      <td>人工交接 → <code>handoff/tk-dev1-56-g1.md</code></td>
+    </tr>
+    <tr>
+      <td><b>dev2</b></td><td class="mono">dev2 · +3/−3</td><td class="mono">clean</td><td class="mono">#57</td>
+      <td><span class="badge st-handoff">handoff-required</span></td>
+      <td><span class="chip c-block">code:BLOCK</span><span class="chip c-notrun">rt:NOT_RUN</span><span class="chip c-handoff">dl:HANDOFF</span></td>
+      <td><span class="dots">●●●</span> 3/3</td>
+      <td class="mono">sol-high</td>
+      <td class="mono">tk-dev2-57-g1<br>T-01HBBB</td>
+      <td>人工交接 → <code>handoff/tk-dev2-57-g1.md</code></td>
+    </tr>
+    <tr>
+      <td><b>dev3</b></td><td class="mono">dev3 · +0/−10</td><td class="mono">24M 16U</td><td class="mono">#14</td>
+      <td><span class="badge st-parked">parked</span></td>
+      <td><span class="chip c-notrun">code:—</span><span class="chip c-notrun">rt:—</span><span class="chip c-notrun">dl:PARKED</span></td>
+      <td>0/3</td>
+      <td class="mono">—</td>
+      <td class="mono">—</td>
+      <td>等用户决策（user-aligned）</td>
+    </tr>
+    <tr>
+      <td><b>dev4</b></td><td class="mono">dev4 · +0/−8</td><td class="mono">1U</td><td class="mono">#17</td>
+      <td><span class="badge st-merged">merged</span></td>
+      <td><span class="chip c-pass">code:PASS</span><span class="chip c-notrun">rt:NOT_RUN</span><span class="chip c-pass">dl:MERGED</span></td>
+      <td>1/3</td>
+      <td class="mono">luna-max</td>
+      <td class="mono">tk-dev4-17-g1<br>T-01HCCC</td>
+      <td>不派发 · merge <code>ae6f2459</code> · 保留 untracked 现场</td>
+    </tr>
+    <tr>
+      <td><b>dev5</b></td><td class="mono">dev5 · +1/−10</td><td class="mono">33M 1U</td><td class="mono">#41</td>
+      <td><span class="badge st-parked">parked</span></td>
+      <td><span class="chip c-pass">code:PASS</span><span class="chip c-block">rt:BLOCKED</span><span class="chip c-notrun">dl:PARKED</span></td>
+      <td>0/3</td>
+      <td class="mono">sol-high</td>
+      <td class="mono">tk-dev5-41-g1<br>T-01HDDD</td>
+      <td>Ready gate 未过 · 等用户决策</td>
+    </tr>
+    <tr>
+      <td><b>test</b></td><td class="mono">test · +0/−3</td><td class="mono">clean</td><td class="mono">—</td>
+      <td><span class="badge st-excluded">excluded</span></td>
+      <td colspan="4" style="color:var(--soft)">手动测试专用，不参与自动调度（既有规则，不变）</td>
+      <td>—</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- 新增：详情面板的状态转移历史（append-only，点行展开；mock 静态展示 dev1） -->
+<div class="drawer">
+  <h2>dev1 · tk-dev1-56-g1<span class="tag">新增：状态转移历史（transitions.jsonl 渲染，只读）</span></h2>
+  <ol class="hist">
+    <li>09-23 18:02 dispatching → executing · E-1a02 · actor=executor</li>
+    <li>09-23 19:44 executing → committed · E-3b11 · commit 7d91e02</li>
+    <li>09-23 20:01 committed → reviewing · E-4c07 · reviewer T-02RAAA</li>
+    <li>09-23 20:40 reviewing → fixing · E-5d19 · BLOCK 1/3（finding: WorkflowWorkspaceFiles.ts）</li>
+    <li>09-23 22:12 reviewing → fixing · E-7e02 · BLOCK 2/3</li>
+    <li>09-23 22:58 reviewing → handoff-required · E-9c21 · BLOCK 3/3 熔断，交接包已生成</li>
+  </ol>
+</div>
+
+<div class="v2note">旧快照（schemaVersion 2）打开时：上表老列照常渲染，五个新列显示「旧快照 · 无编排数据」，页头横幅显示「v2 快照 · 建议重跑 collect」。不再像现在一样直接报错拒渲。</div>
+
+<div class="legend"><span class="sw"></span>橙框/橙表头 = 本次新增；其余 = 既有（不动）。数据为写死示例，不连真实后端。</div>
+
+<!--
+新增什么：
+  1. 编排全局状态横幅（running/stopped + 原因 + 评估器来源）
+  2. 表格五个新列：状态机徽章、三维 verdict chips、blockCount、模型档、Task/thread、next action（六项，五个新表头一个改造）
+  3. 详情面板的状态转移历史（transitions.jsonl 只读渲染）
+  4. v2 旧快照降级渲染（原为硬报错）
+不变什么：
+  - 既有列（worktree/branch/±/dirty/issue）与 issue 星图视图（本 mock 未画，维持原样）
+  - 双视图切换、端口 8321、只读渲染原则（页面不推导状态，只显示 registry/status 给的字段）
+  - test worktree 的排除展示
+-->
+</body>
+</html>

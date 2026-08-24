@@ -1,0 +1,213 @@
+<!-- 确认版·锁定 | 用户确认：2026-08-24T09:22:01Z | 源：drafts/v1-diagram.html -->
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>aes-worktree-board 升级 · 架构与流程视图（草稿 v1）</title>
+<style>
+  :root{--paper:#f5f5f5;--ink:#2d3142;--muted:#4f5d75;--soft:#7a8399;--accent:#eb6c36;}
+  body{margin:0;padding:24px;background:var(--paper);color:var(--ink);
+       font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;}
+  h1{font-size:18px;margin:0 0 4px;}
+  .lede{font-size:12px;color:var(--soft);margin-bottom:16px;}
+  .lede b{color:var(--accent);}
+  section{background:#fff;border-radius:8px;padding:16px;margin-bottom:20px;box-shadow:0 1px 2px rgba(0,0,0,.06);}
+  h2{font-size:14px;margin:0 0 8px;}
+  svg{display:block;max-width:100%;height:auto;}
+  .ledger{font-family:ui-monospace,"Cascadia Mono",Consolas,monospace;font-size:11px;color:var(--soft);
+          border-top:1px solid #e8eaf0;margin-top:12px;padding-top:8px;white-space:pre-wrap;}
+</style>
+</head>
+<body>
+<h1>aes-worktree-board 升级改造 · 改后态</h1>
+<div class="lede">图例：<b>橙 = 本次新增/变更</b>，灰 = 既有（不动或小改，见页脚改动清单）。行为细节以 behavior.md 为源，图是行的一面。</div>
+
+<section>
+<h2>架构视图（拓扑事实源 · 改后态）</h2>
+<svg viewBox="0 0 960 520" role="img" aria-labelledby="ar-title ar-desc">
+  <title id="ar-title">升级后的模块与依赖拓扑</title>
+  <desc id="ar-desc">Orchestrator agent 通过 Codex Desktop 派发与等待事件，通过新增的 orchestrate.mjs 向新增的 runtime v3 存储记账；collect 采集 GitHub issue 与目标仓事实并写 v3 快照；看板读存储，经 token 门调用降为 fallback 的 dispatch，dispatch 在显式授权下向目标仓 spawn。</desc>
+  <defs>
+    <marker id="ar-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4f5d75"/></marker>
+  </defs>
+
+  <!-- 连线（先画，z 序在节点下） -->
+  <!-- Orchestrator ↔ Desktop：双向（派发/事件） -->
+  <path d="M 220,72 H 316" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-start="url(#ar-a)" marker-end="url(#ar-a)"/>
+  <rect x="228" y="48" width="84" height="12" fill="#f5f5f5"/>
+  <text x="270" y="57" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75">create_thread / 事件</text>
+  <!-- Orchestrator → orchestrate.mjs（记账/消费/转移） -->
+  <path d="M 144,104 V 196" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#ar-a)"/>
+  <rect x="152" y="140" width="76" height="12" fill="#f5f5f5"/>
+  <text x="190" y="149" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75">记账·消费·转移</text>
+  <!-- orchestrate.mjs → runtime v3（原子写） -->
+  <path d="M 224,232 H 348" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#ar-a)"/>
+  <rect x="244" y="212" width="80" height="12" fill="#f5f5f5"/>
+  <text x="284" y="221" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75">tmp+rename 原子写</text>
+  <!-- collect → runtime v3（写 v3 快照，读 registry 并入） -->
+  <path d="M 648,232 H 552" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#ar-a)"/>
+  <rect x="560" y="212" width="76" height="12" fill="#f5f5f5"/>
+  <text x="598" y="221" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75">写 v3·并入判断</text>
+  <!-- collect → GitHub Issues（gh 采集，含 wayfinder 依赖图） -->
+  <path d="M 712,196 V 112" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#ar-a)"/>
+  <rect x="720" y="144" width="56" height="12" fill="#f5f5f5"/>
+  <text x="748" y="153" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75">gh 采集</text>
+  <!-- collect → 目标仓（git 事实） -->
+  <path d="M 712,264 V 356" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#ar-a)"/>
+  <rect x="720" y="300" width="52" height="12" fill="#f5f5f5"/>
+  <text x="746" y="309" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75">git 事实</text>
+  <!-- 看板 → runtime v3（只读渲染） -->
+  <path d="M 448,360 V 268" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#ar-a)"/>
+  <rect x="456" y="304" width="52" height="12" fill="#f5f5f5"/>
+  <text x="482" y="313" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75">只读渲染</text>
+  <!-- 看板 → dispatch（token 门） -->
+  <path d="M 356,392 H 212" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#ar-a)"/>
+  <rect x="232" y="372" width="104" height="12" fill="#f5f5f5"/>
+  <text x="284" y="381" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75">POST /api/dispatch·token</text>
+  <!-- dispatch → 目标仓（spawn，绕行下方） -->
+  <path d="M 136,424 V 456 Q 136,464 144,464 H 672 Q 680,464 680,456 V 428" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#ar-a)"/>
+  <rect x="356" y="444" width="96" height="12" fill="#f5f5f5"/>
+  <text x="404" y="453" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75">spawn（显式授权）</text>
+
+  <!-- 节点 -->
+  <g><!-- Orchestrator -->
+    <rect x="72" y="40" width="144" height="64" rx="6" fill="#ffffff" stroke="#4f5d75" stroke-width="1.25"/>
+    <rect x="80" y="48" width="40" height="12" rx="2" fill="#eef1f6"/>
+    <text x="100" y="57" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75" letter-spacing="1">AGENT</text>
+    <text x="144" y="78" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" font-weight="600" fill="#2d3142">Orchestrator</text>
+    <text x="144" y="94" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#4f5d75">既有 · 按新协议行事</text>
+  </g>
+  <g><!-- Codex Desktop -->
+    <rect x="320" y="40" width="160" height="64" rx="6" fill="#ffffff" stroke="#4f5d75" stroke-width="1.25"/>
+    <rect x="328" y="48" width="36" height="12" rx="2" fill="#eef1f6"/>
+    <text x="346" y="57" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75" letter-spacing="1">HOST</text>
+    <text x="400" y="78" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" font-weight="600" fill="#2d3142">Codex Desktop</text>
+    <text x="400" y="94" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#4f5d75">create_thread · wait_threads</text>
+  </g>
+  <g><!-- GitHub Issues -->
+    <rect x="632" y="40" width="160" height="64" rx="6" fill="#ffffff" stroke="#4f5d75" stroke-width="1.25"/>
+    <rect x="640" y="48" width="24" height="12" rx="2" fill="#eef1f6"/>
+    <text x="652" y="57" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75" letter-spacing="1">GH</text>
+    <text x="712" y="78" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" font-weight="600" fill="#2d3142">GitHub Issues</text>
+    <text x="712" y="94" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#4f5d75">wayfinder 依赖图（#5 父节点）</text>
+  </g>
+  <g class="changed"><!-- orchestrate.mjs -->
+    <rect x="64" y="200" width="160" height="64" rx="6" fill="#fdf1ec" stroke="#eb6c36" stroke-width="2"/>
+    <rect x="72" y="208" width="28" height="12" rx="2" fill="#f7dfd3"/>
+    <text x="86" y="217" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#eb6c36" letter-spacing="1">NEW</text>
+    <text x="144" y="238" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" font-weight="600" fill="#2d3142">orchestrate.mjs</text>
+    <text x="144" y="254" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#eb6c36">task·inbox·transition·stop</text>
+  </g>
+  <g class="changed"><!-- runtime v3 -->
+    <rect x="352" y="200" width="192" height="64" rx="6" fill="#fdf1ec" stroke="#eb6c36" stroke-width="2"/>
+    <rect x="360" y="208" width="28" height="12" rx="2" fill="#f7dfd3"/>
+    <text x="374" y="217" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#eb6c36" letter-spacing="1">NEW</text>
+    <text x="448" y="238" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" font-weight="600" fill="#2d3142">runtime v3 存储</text>
+    <text x="448" y="254" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#eb6c36">registry · inbox · transitions</text>
+  </g>
+  <g><!-- collect -->
+    <rect x="648" y="200" width="128" height="64" rx="6" fill="#ffffff" stroke="#4f5d75" stroke-width="1.25"/>
+    <rect x="656" y="208" width="24" height="12" rx="2" fill="#eef1f6"/>
+    <text x="668" y="217" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75" letter-spacing="1">CLI</text>
+    <text x="712" y="238" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" font-weight="600" fill="#2d3142">collect.mjs</text>
+    <text x="712" y="254" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#4f5d75">既有 · 改写 v3</text>
+  </g>
+  <g><!-- dispatch -->
+    <rect x="64" y="360" width="144" height="64" rx="6" fill="#ffffff" stroke="#4f5d75" stroke-width="1.25"/>
+    <rect x="72" y="368" width="24" height="12" rx="2" fill="#eef1f6"/>
+    <text x="84" y="377" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75" letter-spacing="1">CLI</text>
+    <text x="136" y="398" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" font-weight="600" fill="#2d3142">dispatch.mjs</text>
+    <text x="136" y="414" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#4f5d75">既有 · 降为显式 fallback</text>
+  </g>
+  <g><!-- 看板 -->
+    <rect x="360" y="360" width="176" height="64" rx="6" fill="#ffffff" stroke="#4f5d75" stroke-width="1.25"/>
+    <rect x="368" y="368" width="28" height="12" rx="2" fill="#eef1f6"/>
+    <text x="382" y="377" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75" letter-spacing="1">WEB</text>
+    <text x="448" y="398" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" font-weight="600" fill="#2d3142">看板 server+board</text>
+    <text x="448" y="414" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#4f5d75">既有 · v3 渲染+安全门</text>
+  </g>
+  <g><!-- 目标仓 -->
+    <rect x="632" y="360" width="160" height="64" rx="6" fill="#ffffff" stroke="#4f5d75" stroke-width="1.25"/>
+    <rect x="640" y="368" width="24" height="12" rx="2" fill="#eef1f6"/>
+    <text x="652" y="377" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75" letter-spacing="1">GIT</text>
+    <text x="712" y="398" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" font-weight="600" fill="#2d3142">目标仓 worktrees</text>
+    <text x="712" y="414" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#4f5d75">既有 · 现场不碰</text>
+  </g>
+</svg>
+<div class="ledger">Fidelity ledger（架构视图）
+Detail: balanced · 源 = 8 脚本/2 存储/3 外部系统 → 绘制 9 节点 / 9 边
+Merged: server.mjs+board.html → 「看板」单节点（同进程服务与其页面）；registry.json+inbox.jsonl+transitions.jsonl → 「runtime v3 存储」单节点
+Collapsed: orchestrate.mjs 八个子命令 → sub 行；status.json v3 快照 → 并入存储节点；assess/selftest/command/headless/capture 五脚本不画（不在依赖主干）
+Dropped: Orchestrator→目标仓 的 merge 门禁边（流程属行为面，见 behavior.md 行 6/9 与状态机）；旧 runtime 归档目录（只读遗产，无活动依赖）
+Kept in full: 两个 .changed 节点与九条依赖方向——本次要质疑的正是「谁写谁读」
+改动清单（灰色但有改动，accent 预算外）：collect.mjs 写 v3、看板 v3 渲染+token 门、dispatch 降 fallback、GitHub Issues 侧建 wayfinder 图
+删除清单：无删除模块</div>
+</section>
+
+<section>
+<h2>流程视图（事件消费链 · behavior.md 变化行 3/4/5/6/7/10 的图）</h2>
+<svg viewBox="0 0 960 264" role="img" aria-labelledby="fl-title fl-desc">
+  <title id="fl-title">事件从宿主返回到状态转移与全局停止的消费链</title>
+  <desc id="fl-desc">wait_threads 返回的 wake 与全部 polls 先全量入箱，再逐条幂等消费，经状态机校验转移；blockCount 达 3 转入 handoff-required，终态转移后重算全局停止。整条链路为本次新增。</desc>
+  <defs>
+    <marker id="fl-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4f5d75"/></marker>
+  </defs>
+
+  <!-- 连线 -->
+  <path d="M 176,112 H 204" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#fl-a)"/>
+  <path d="M 352,112 H 380" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#fl-a)"/>
+  <path d="M 528,112 H 556" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#fl-a)"/>
+  <!-- transition → handoff（条件：blockCount=3） -->
+  <path d="M 704,96 H 732 Q 740,96 740,88 V 80 Q 740,72 748,72 H 764" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#fl-a)"/>
+  <rect x="700" y="48" width="64" height="12" fill="#f5f5f5"/>
+  <text x="732" y="57" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75">blockCount=3</text>
+  <!-- transition → stop eval（条件：终态转移后） -->
+  <path d="M 704,128 H 732 Q 740,128 740,136 V 184 Q 740,192 748,192 H 764" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#fl-a)"/>
+  <rect x="696" y="204" width="72" height="12" fill="#f5f5f5"/>
+  <text x="732" y="213" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75">终态转移后重算</text>
+
+  <!-- 步骤节点 -->
+  <g>
+    <rect x="32" y="80" width="144" height="64" rx="6" fill="#ffffff" stroke="#4f5d75" stroke-width="1.25"/>
+    <text x="104" y="106" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" font-weight="600" fill="#2d3142">wait_threads 返回</text>
+    <text x="104" y="122" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#4f5d75">wake + 全部 polls</text>
+  </g>
+  <g class="changed">
+    <rect x="208" y="80" width="144" height="64" rx="6" fill="#fdf1ec" stroke="#eb6c36" stroke-width="2"/>
+    <text x="280" y="106" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" font-weight="600" fill="#2d3142">inbox put ×N</text>
+    <text x="280" y="122" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#eb6c36">变化行 3 · 全量入箱</text>
+  </g>
+  <g class="changed">
+    <rect x="384" y="80" width="144" height="64" rx="6" fill="#fdf1ec" stroke="#eb6c36" stroke-width="2"/>
+    <text x="456" y="106" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" font-weight="600" fill="#2d3142">consume 逐条</text>
+    <text x="456" y="122" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#eb6c36">变化行 4/5 · 幂等</text>
+  </g>
+  <g>
+    <rect x="560" y="80" width="144" height="64" rx="6" fill="#ffffff" stroke="#4f5d75" stroke-width="1.25"/>
+    <text x="632" y="106" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" font-weight="600" fill="#2d3142">transition 校验</text>
+    <text x="632" y="122" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#4f5d75">变化行 6 · 非法拒收</text>
+  </g>
+  <g>
+    <rect x="768" y="40" width="160" height="64" rx="6" fill="#ffffff" stroke="#4f5d75" stroke-width="1.25"/>
+    <text x="848" y="66" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" font-weight="600" fill="#2d3142">handoff-required</text>
+    <text x="848" y="82" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#4f5d75">变化行 7 · 交接包</text>
+  </g>
+  <g>
+    <rect x="768" y="160" width="160" height="64" rx="6" fill="#ffffff" stroke="#4f5d75" stroke-width="1.25"/>
+    <text x="848" y="186" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" font-weight="600" fill="#2d3142">stop eval</text>
+    <text x="848" y="202" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#4f5d75">变化行 10 · 无线路则停</text>
+  </g>
+  <!-- 重复消费短路注记 -->
+  <text x="456" y="164" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#7a8399">重复 eventId → already-consumed，链路到此为止（变化行 5）</text>
+</svg>
+<div class="ledger">Fidelity ledger（流程视图）
+Detail: balanced · 源 = behavior.md 变化行 3/4/5/6/7/10 → 绘制 6 步 / 6 边
+Merged: 无
+Collapsed: consume 的归属/去向裁决细节 → sub 行「幂等」；stop eval 的六线路判定 → sub 行
+Dropped: 重复消费短路边（以图下注记代替自环——自环边违反正交纪律）；heartbeat 恢复路径（q3=B 只做 inbox pending，见 example-run 场景 4）
+Kept in full: 两条条件分支边及其条件标签——熔断与全局停止是本次要质疑的两处出口
+说明：整条链路均为本次新增；accent 只标幂等关键两步（预算 ≤2），其余步骤同为新增，见 behavior.md
+删除清单：无删除步骤（旧「只处理 wake」路径被行 3 取代，不作为独立步骤存在）</div>
+</section>
+</body>
+</html>

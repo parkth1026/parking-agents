@@ -1,0 +1,19 @@
+# verify @ 2026-08-24T09:31:13Z
+# cwd: G:\GIT\AI_WorkFlow\parking-agents
+
+[FAIL] AC-001  exit=2  $ node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration --scenario storage
+         用法: node selftest.mjs <collect|fixture|dispatch|server|repo-root|layout|windows-hide>
+[FAIL] AC-002  exit=2  $ node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration --scenario lifecycle
+         用法: node selftest.mjs <collect|fixture|dispatch|server|repo-root|layout|windows-hide>
+[FAIL] AC-003  exit=2  $ node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration --scenario governance
+         用法: node selftest.mjs <collect|fixture|dispatch|server|repo-root|layout|windows-hide>
+[FAIL] AC-004  exit=2  $ node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration --scenario boundary
+         用法: node selftest.mjs <collect|fixture|dispatch|server|repo-root|layout|windows-hide>
+[FAIL] AC-006  exit=1  $ node .agents/skills/aes-worktree-board/scripts/check-issue-graph.mjs
+         }
+         Node.js v24.19.0
+[FAIL] AC-007  exit=2  $ node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration --scenario contract
+         用法: node selftest.mjs <collect|fixture|dispatch|server|repo-root|layout|windows-hide>
+
+绿 0 / 红 6 / 跑不起来 0
+另有 1 条非 [A] 档没跑：AC-005 [C]

@@ -1,0 +1,228 @@
+<!-- 确认版·锁定 | 用户确认：2026-08-24T09:22:01Z | 源：drafts/v2-mock.html（v1 被翻，v2 按既有星图 handoff 增量标注 + Map/List 改名） -->
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>AES 需求星图 · v3 控制面增量 mock（草稿 v2）</title>
+<style>
+  /* Design tokens 取自 docs/design/design_handoff_issue_starmap/README.md（离线 mock 用系统字体回退，不连 Google Fonts） */
+  :root{
+    --paper:#FAF9F5; --line:#E0DACB; --ink:#1F1E1B; --text:#6B675C; --muted:#9A948E; --faint:#B0AA9C;
+    --orange:#C15F3C; --orange-t:#A94F2F; --purple:#7C6BAE; --purple-t:#6A5A9E;
+    --blocked:#A39C8D; --resolved:#B7AF9F; --amber:#B08838; --card-line:#E8E2D2; --soft-bg:#F5F3EB;
+    --serif:"Source Serif 4","Songti SC",serif; --sans:Archivo,system-ui,"Microsoft YaHei",sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+  }
+  body{margin:0;background:var(--paper);color:var(--text);font:12px/1.5 var(--sans);}
+  .stage{position:relative;width:1440px;height:900px;margin:0 auto;border:1px solid var(--line);overflow:hidden;}
+  /* 改动标注：一个 .changed 框出来就够（aes-prototype 规则）*/
+  .changed{outline:2px dashed var(--orange);outline-offset:3px;position:relative;}
+  .changed::after{content:"新增";position:absolute;top:-9px;right:-6px;background:var(--orange);color:#fff;
+    font:600 9px/1 var(--mono);padding:2px 5px;border-radius:4px;letter-spacing:1px;}
+  /* 品牌区（既有） */
+  .brand{position:absolute;left:26px;top:22px;z-index:20;}
+  .brand h1{display:inline;font:600 18px var(--serif);color:var(--ink);margin:0 0 0 8px;vertical-align:middle;}
+  .brand-mark{display:inline-block;width:9px;height:9px;background:var(--orange);transform:rotate(45deg);vertical-align:middle;}
+  .brand-sub{margin:6px 0 0;font:400 11.5px var(--mono);color:var(--muted);}
+  /* 顶部中央工具条（既有 view-toggle + mode-badge） */
+  .toolbar{position:absolute;left:50%;top:22px;transform:translateX(-50%);z-index:20;display:flex;gap:10px;align-items:center;}
+  .view-toggle{display:flex;padding:3px;border:1px solid var(--line);border-radius:999px;background:rgba(255,255,255,.9);}
+  .view-toggle span{height:28px;line-height:28px;min-width:74px;padding:0 13px;border-radius:999px;color:var(--muted);font-size:11.5px;text-align:center;}
+  .view-toggle span.active{color:#fff;background:var(--ink);}
+  .mode-badge{font:600 10px var(--mono);letter-spacing:1px;color:#fff;background:var(--purple);border-radius:999px;padding:5px 10px;}
+  /* 新增①：编排全局状态胶囊（挂在 mode-badge 旁） */
+  .orch-pill{display:flex;gap:8px;align-items:center;background:#fff;border:1px solid var(--card-line);border-radius:999px;padding:4px 12px;font:600 10.5px var(--mono);color:#8A3B2A;}
+  .orch-pill i{width:8px;height:8px;border-radius:50%;background:#B0453A;}
+  .orch-pill small{font-weight:400;color:var(--muted);}
+  /* 星图画布（既有，不动——静态示意） */
+  svg.sky{position:absolute;inset:0;z-index:5;}
+  /* 图例（既有，不动） */
+  .legend{position:absolute;left:26px;bottom:24px;z-index:20;width:174px;padding:9px 10px;border:1px solid var(--card-line);border-radius:10px;background:rgba(255,255,255,.88);}
+  .legend-row{display:grid;grid-template-columns:18px 1fr auto;align-items:center;height:26px;padding:0 6px;font-size:11px;color:var(--text);}
+  .legend-dot{width:9px;height:9px;border-radius:50%;}
+  .lg-f{background:var(--orange);box-shadow:0 0 0 3px rgba(193,95,60,.12);}
+  .lg-c{background:var(--purple);box-shadow:0 0 0 3px rgba(124,107,174,.12);}
+  .lg-b{background:var(--paper);border:1.4px dashed var(--blocked);}
+  .lg-r{width:6px;height:6px;margin-left:2px;background:var(--resolved);}
+  .legend b{font:500 10.5px var(--mono);color:var(--muted);}
+  /* Workers 停靠面板（既有容器；行内徽章为新增②） */
+  .workers{position:absolute;right:22px;top:70px;z-index:25;width:266px;border:1px solid var(--card-line);border-radius:12px;background:#fff;box-shadow:0 6px 22px rgba(31,30,27,.08);}
+  .workers-head{display:flex;justify-content:space-between;padding:11px 13px 7px;font:600 10.5px var(--mono);letter-spacing:1px;color:var(--muted);}
+  .worker-row{display:grid;grid-template-columns:14px 1fr auto;gap:8px;align-items:start;padding:7px 13px;border-top:1px solid #F1EDE0;}
+  .worker-state{width:8px;height:8px;border-radius:50%;margin-top:4px;background:#D9D3C4;}
+  .ws-run{background:var(--purple);box-shadow:0 0 0 3px rgba(124,107,174,.18);}
+  .ws-amber{background:var(--amber);}
+  .ws-ok{background:#7C9A6D;}
+  .worker-name{font:600 12px var(--sans);color:var(--ink);}
+  .worker-pos{font-size:11px;color:var(--text);margin:1px 0 3px;}
+  .badges{display:flex;flex-wrap:wrap;gap:4px;}
+  .badge{font:500 9.5px var(--mono);color:var(--muted);background:var(--soft-bg);border-radius:5px;padding:1px 6px;}
+  .badge.dirty{color:#8A6A1F;background:#F6EDD8;}
+  /* 新增②的徽章样式 */
+  .b-state{color:#fff;} .b-handoff{background:#B0453A;} .b-parked{background:var(--amber);} .b-merged{background:#7C9A6D;} .b-excl{background:#C9C3B4;}
+  .b-block{color:#B0453A;background:#F8E7E4;}
+  .b-verdict{letter-spacing:0;} .b-model{color:var(--purple-t);background:#EFECF7;}
+  .locate{border:0;background:transparent;color:var(--muted);font-size:13px;margin-top:2px;}
+  /* 详情面板（既有容器；任务区+转移历史为新增③，派发授权提示为新增④） */
+  .details{position:absolute;right:300px;top:70px;z-index:26;width:340px;padding:17px 17px 15px;border:1px solid var(--card-line);border-radius:12px;background:#fff;box-shadow:0 8px 28px rgba(31,30,27,.10);}
+  .kicker{display:flex;gap:8px;align-items:center;font:600 12px var(--mono);color:var(--muted);}
+  .pill{font:600 10px var(--mono);color:#fff;background:var(--blocked);border-radius:999px;padding:3px 9px;}
+  .details h2{margin:12px 0 14px;font:600 19px/1.28 var(--serif);color:var(--ink);}
+  .kv{display:grid;grid-template-columns:52px 1fr;gap:8px;font-size:11.5px;margin:5px 0;}
+  .kv span:first-child{color:var(--muted);}
+  .sect{margin-top:12px;background:var(--soft-bg);border-radius:8px;padding:9px 11px;}
+  .sect h3{margin:0 0 6px;font:600 10.5px var(--mono);letter-spacing:1px;color:var(--muted);}
+  .vchips{display:flex;gap:5px;margin:4px 0 2px;}
+  .vc{font:600 9.5px var(--mono);border-radius:5px;padding:2px 7px;}
+  .vc-block{color:#fff;background:#B0453A;} .vc-notrun{color:var(--muted);background:#E9E4D6;} .vc-handoff{color:#fff;background:var(--amber);}
+  .hist{margin:4px 0 0;padding-left:16px;font:400 10px/1.7 var(--mono);color:var(--text);}
+  .auth-note{margin-top:8px;font-size:10.5px;color:#8A6A1F;background:#F6EDD8;border:1px solid #D9C48F;border-radius:6px;padding:6px 9px;}
+  /* 底部提示（既有） */
+  .hint{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);font:400 10.5px var(--mono);color:#B0A99A;}
+  /* 名牌旗（既有样式；handoff 文案沿用琥珀旗） */
+  .flag{position:absolute;z-index:15;font:600 11px var(--mono);border-radius:6px;padding:4px 9px;box-shadow:0 2px 8px rgba(31,30,27,.10);}
+  .flag-run{color:#fff;background:var(--purple);border:1px solid var(--purple-t);}
+  .flag-wait{color:#8A6A1F;background:#F6EDD8;border:1px solid #D9C48F;}
+  .flag::before{content:"";position:absolute;left:50%;bottom:-9px;width:1px;height:9px;background:currentColor;opacity:.5;}
+  .v2note{position:absolute;left:26px;top:118px;z-index:20;width:300px;font-size:10.5px;color:#8A6A1F;background:#F6EDD8;border:1px solid #D9C48F;border-radius:8px;padding:7px 10px;}
+</style>
+</head>
+<body>
+<div class="stage">
+
+  <!-- 星图画布：既有，一像素不动（静态示意节点） -->
+  <svg class="sky" viewBox="0 0 1440 900" aria-hidden="true">
+    <path d="M420,430 Q500,395 585,430" fill="none" stroke="#DFD8C7" stroke-width="1.1"/>
+    <path d="M585,430 Q660,480 740,450" fill="none" stroke="#CE9A83" stroke-width="1.15" stroke-dasharray="5 4"/>
+    <path d="M585,430 Q610,340 700,310" fill="none" stroke="#DFD8C7" stroke-width="1.1"/>
+    <circle cx="420" cy="430" r="6" fill="#B7AF9F" opacity=".95"/>
+    <text x="420" y="452" text-anchor="middle" font-family="IBM Plex Mono,Consolas,monospace" font-size="10.5" fill="#B0A897">#17</text>
+    <circle cx="585" cy="430" r="16" fill="#7C6BAE"/>
+    <circle cx="585" cy="430" r="20.5" fill="none" stroke="rgba(124,107,174,.45)" stroke-width="1.1"/>
+    <circle cx="585" cy="430" r="25" fill="none" stroke="rgba(124,107,174,.20)" stroke-width="1.1"/>
+    <text x="585" y="462" text-anchor="middle" font-family="IBM Plex Mono,Consolas,monospace" font-size="11.5" fill="#6A5A9E">#56</text>
+    <text x="585" y="476" text-anchor="middle" font-family="Archivo,sans-serif" font-size="12" fill="#6B675C">工作流工作区文件</text>
+    <circle cx="740" cy="450" r="9" fill="#FAF9F5" stroke="#A39C8D" stroke-width="1.4" stroke-dasharray="3 3"/>
+    <text x="740" y="474" text-anchor="middle" font-family="IBM Plex Mono,Consolas,monospace" font-size="11.5" fill="#8D867A">#61</text>
+    <circle cx="700" cy="310" r="13" fill="#C15F3C"/>
+    <circle cx="700" cy="310" r="17.5" fill="none" stroke="rgba(193,95,60,.35)" stroke-width="1.1"/>
+    <circle cx="700" cy="310" r="23" fill="rgba(193,95,60,.07)"/>
+    <text x="700" y="340" text-anchor="middle" font-family="IBM Plex Mono,Consolas,monospace" font-size="11.5" fill="#A94F2F">#58</text>
+    <circle cx="980" cy="240" r="2.6" fill="#DAD4C5"/><circle cx="1060" cy="520" r="2" fill="#DAD4C5"/><circle cx="320" cy="620" r="3" fill="#DAD4C5"/>
+  </svg>
+
+  <!-- worker 名牌旗：既有；handoff 线路沿用琥珀「等待」旗，文案区分 -->
+  <div class="flag flag-wait" style="left:540px;top:382px;">dev1 ✋ 交接 3/3</div>
+
+  <!-- 品牌区：既有 -->
+  <div class="brand">
+    <i class="brand-mark"></i><h1>AES 需求星图</h1>
+    <p class="brand-sub">65 issues · 44 已探明 · 星等 = 依赖连接数</p>
+  </div>
+
+  <!-- v2 快照降级提示：新增（仅打开旧快照时出现；原为硬报错拒渲）-->
+  <div class="v2note changed">v2 旧快照：星图与 Workers 照常渲染，编排徽章与任务区显示「无编排数据」。建议重跑 collect。</div>
+
+  <!-- 工具条：view-toggle 与 LIVE 徽章既有；编排状态胶囊为新增① -->
+  <div class="toolbar">
+    <div class="view-toggle changed"><span class="active">Map</span><span>List</span></div>
+    <span class="mode-badge">LIVE</span>
+    <span class="orch-pill changed"><i></i>ORCH STOPPED<small>no-advanceable-lane · 08-23 23:37Z</small></span>
+  </div>
+
+  <!-- Workers 停靠面板：容器与行结构既有；行内新增状态机/verdict/block/模型徽章（新增②） -->
+  <aside class="workers">
+    <div class="workers-head"><span>WORKERS</span><b>2/6 在场</b></div>
+    <div class="worker-row"><i class="worker-state ws-amber"></i>
+      <div><div class="worker-name">dev1</div><div class="worker-pos">#56 · 工作流工作区文件</div>
+        <div class="badges changed"><span class="badge b-state b-handoff">handoff-required</span><span class="badge b-block">BLOCK 3/3</span><span class="badge b-verdict">C:✗ R:− D:交接</span><span class="badge b-model">luna-max</span></div>
+        <div class="badges"><span class="badge dirty">dirty 16+0</span></div></div>
+      <button class="locate">⌖</button></div>
+    <div class="worker-row"><i class="worker-state ws-amber"></i>
+      <div><div class="worker-name">dev2</div><div class="worker-pos">#57 · SDK 桥接迁移</div>
+        <div class="badges changed"><span class="badge b-state b-handoff">handoff-required</span><span class="badge b-block">BLOCK 3/3</span><span class="badge b-verdict">C:✗ R:− D:交接</span><span class="badge b-model">sol-high</span></div></div>
+      <button class="locate">⌖</button></div>
+    <div class="worker-row"><i class="worker-state ws-amber"></i>
+      <div><div class="worker-name">dev3</div><div class="worker-pos">#14 · 输入侧选址</div>
+        <div class="badges changed"><span class="badge b-state b-parked">parked</span><span class="badge b-verdict">等用户决策</span></div>
+        <div class="badges"><span class="badge dirty">dirty 24+16</span></div></div>
+      <button class="locate">⌖</button></div>
+    <div class="worker-row"><i class="worker-state ws-ok"></i>
+      <div><div class="worker-name">dev4</div><div class="worker-pos">#17 · Workflow 停止反馈</div>
+        <div class="badges changed"><span class="badge b-state b-merged">merged ae6f245</span><span class="badge b-verdict">C:✓ R:− D:合入</span><span class="badge b-model">luna-max</span></div>
+        <div class="badges"><span class="badge dirty">dirty 0+1</span></div></div>
+      <button class="locate">⌖</button></div>
+    <div class="worker-row"><i class="worker-state ws-amber"></i>
+      <div><div class="worker-name">dev5</div><div class="worker-pos">#41 · Provider Ready gate</div>
+        <div class="badges changed"><span class="badge b-state b-parked">parked</span><span class="badge b-verdict">C:✓ R:✗ D:停放</span><span class="badge b-model">sol-high</span></div>
+        <div class="badges"><span class="badge dirty">dirty 33+1</span></div></div>
+      <button class="locate">⌖</button></div>
+    <div class="worker-row"><i class="worker-state"></i>
+      <div><div class="worker-name">test</div><div class="worker-pos">手动测试 · 不参与调度</div>
+        <div class="badges changed"><span class="badge b-state b-excl">excluded</span></div></div>
+      <button class="locate" disabled>⌖</button></div>
+  </aside>
+
+  <!-- 详情面板（点击 #56 后）：容器/kv/解锁区既有；任务区+转移历史为新增③；派发授权提示为新增④ -->
+  <aside class="details">
+    <div class="kicker"><span>#56</span><span class="pill">被阻塞</span></div>
+    <h2>工作流工作区文件写入契约</h2>
+    <div class="kv"><span>状态</span><span>被阻塞 · degree 4</span></div>
+    <div class="kv"><span>分支</span><span>dev1</span></div>
+    <div class="kv"><span>来路</span><span>#48 · #52</span></div>
+
+    <div class="sect changed">
+      <h3>任务（registry）</h3>
+      <div class="kv"><span>Task</span><span>tk-dev1-56-g1 · T-01HAAA · executor</span></div>
+      <div class="kv"><span>模型</span><span>luna-max（单包 · AC 明确）</span></div>
+      <div class="vchips"><span class="vc vc-block">code BLOCK</span><span class="vc vc-notrun">runtime NOT_RUN</span><span class="vc vc-handoff">delivery HANDOFF</span></div>
+      <div class="kv"><span>转移</span><span></span></div>
+      <ol class="hist">
+        <li>18:02 dispatching → executing · E-1a02</li>
+        <li>19:44 executing → committed · 7d91e02</li>
+        <li>20:40 reviewing → fixing · BLOCK 1/3</li>
+        <li>22:12 reviewing → fixing · BLOCK 2/3</li>
+        <li>22:58 → handoff-required · BLOCK 3/3 · 交接包 ↗</li>
+      </ol>
+    </div>
+
+    <div class="sect">
+      <h3>完成后解锁</h3>
+      <div class="badges"><span class="badge">#61</span><span class="badge">#63</span></div>
+    </div>
+
+    <div class="sect">
+      <h3>派发关联任务</h3>
+      <div class="kv"><span>worker</span><span>dev1 · agent: claude ▾</span></div>
+      <div class="auth-note changed">cli-fallback 需显式授权：正常路径是 Desktop create_thread。此处派发将记录授权原话；token 由页面自动携带。</div>
+    </div>
+  </aside>
+
+  <div class="legend">
+    <div class="legend-row"><i class="legend-dot lg-f"></i><span>可开工</span><b>13</b></div>
+    <div class="legend-row"><i class="legend-dot lg-c"></i><span>进行中</span><b>2</b></div>
+    <div class="legend-row"><i class="legend-dot lg-b"></i><span>被阻塞</span><b>6</b></div>
+    <div class="legend-row"><i class="legend-dot lg-r"></i><span>已探明</span><b>44</b></div>
+  </div>
+
+  <div class="hint">悬停高亮邻居 · 滚轮缩放 · 拖拽平移（既有交互，全部不动）</div>
+</div>
+
+<!--
+新增什么（全部为既有构件内的增量，虚线橙框标注）：
+  ① 工具条：编排全局状态胶囊（ORCH RUNNING/STOPPED + 原因 + 时间，数据源 registry.orchestration）
+  ② Workers 停靠面板行：状态机徽章（handoff-required/parked/merged/excluded…15 态映射）、BLOCK n/3、
+     verdict 三维缩写（C/R/D）、模型档。名牌旗沿用既有琥珀旗样式，仅文案区分（「✋ 交接 3/3」）
+  ③ 详情面板：「任务（registry）」区 = taskId/threadId/角色/模型/routingReason + verdict 三胶囊 +
+     transitions 只读渲染（append-only 历史）
+  ④ 详情面板派发框：cli-fallback 显式授权提示行；token 页面自动携带（#22）
+  ⑤ v2 旧快照降级提示条（原为 schemaVersion!==2 硬报错拒渲）
+  ⑥ 双视图切换文案改名：「图谱视图」→「Map」、「地图视图」→「List」（用户裁决：原文案不准；切换行为本身不变）
+不变什么：
+  - 星图画布全部规格（状态颜色/星等半径公式/光晕/虚线阻塞边/背景星/标签）、图例、双视图切换、
+    搜索、缩放、悬停高亮、名牌旗样式、地图视图、详情面板既有区块（kv/解锁/日志/打开 issue）
+  - Design tokens 与字体（handoff README 的全部精确值；本 mock 离线用系统字体回退）
+  - 页面只渲染不推导：新增字段全部来自 status.json v3 / registry，页面不算状态
+-->
+</body>
+</html>

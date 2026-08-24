@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "slug": "2026-08-24-aes-worktree-board-upgrade",
+  "created_at": "2026-08-24T08:33:52Z",
+  "updated_at": "2026-08-24T09:31:19Z",
+  "original_request": "aes-worktree-board 这个技能之前执行的一个复盘报告在 docs/retrospectives/aes-worktree-board-multi-agent-orchestration-retrospective-2026-08-24.md 请你仔细阅读后 我们开始确定升级改造目标。",
+  "goal_oneline": "把 aes-worktree-board 升级为 #5 协议的产品化控制平面：实现 P0 六项+修控制面 bug #22/#23/#24/#25，离线编排回归域验收，同步 SKILL.md/#5/运行时三处契约，并以 wayfinder 依赖图全量建 issue（#5 转父节点，P1/P2 建而不做）",
+  "target": null,
+  "stage": "3-contract",
+  "next_action": "契约已就绪，可用交接指令启动实现",
+  "stage_gates": {
+    "1-interview": {
+      "status": "done",
+      "closed_at": "2026-08-24T09:00:50Z",
+      "self_assessment": {
+        "意图": "已定",
+        "结果": "已定",
+        "边界": "已定",
+        "约束": "已定",
+        "现状": "已定"
+      }
+    },
+    "2-prototype": {
+      "status": "done",
+      "closed_at": "2026-08-24T09:22:09Z",
+      "artifacts_confirmed": [
+        "mock",
+        "behavior",
+        "api-mock",
+        "example-run",
+        "diagram"
+      ]
+    },
+    "3-contract": {
+      "status": "done",
+      "closed_at": "2026-08-24T09:31:19Z"
+    }
+  },
+  "validation": {
+    "status": "valid",
+    "ac_count": 7,
+    "warnings": [],
+    "ran_at": "2026-08-24T09:31:13Z",
+    "verify_tiers": {
+      "A": 6,
+      "B": 0,
+      "C": 1,
+      "D": 0
+    }
+  },
+  "blocked": [],
+  "residual_risk": null,
+  "status": "ready"
+}
