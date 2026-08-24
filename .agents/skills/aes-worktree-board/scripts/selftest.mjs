@@ -1100,9 +1100,21 @@ async function serverDomain() {
     assert.equal(status.graph.issues[0].derived.warn, true);
     assert.equal(existsSync(marker), false, 'fast=1 不得调用 gh');
 
+    let impostorMode = 'unmarked';
     impostor = createServer((request, responseImpostor) => {
-      responseImpostor.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
-      responseImpostor.end(JSON.stringify({
+      const marked = impostorMode === 'incomplete-board';
+      responseImpostor.writeHead(200, {
+        'content-type': 'application/json; charset=utf-8',
+        ...(marked ? { 'x-aes-worktree-board': `${BOARD_API.marker}/${BOARD_API.protocolVersion}` } : {}),
+      });
+      responseImpostor.end(JSON.stringify(marked ? {
+        schemaVersion: 3,
+        board: BOARD_API,
+        generatedAt: new Date().toISOString(),
+        repo: {
+          root: 'C:/foreign/repo', name: 'repo', issueRepo: 'foreign/repo', mainBranch: 'main', mainHead: 'foreign',
+        },
+      } : {
         schemaVersion: 3,
         repo: { root: 'C:/foreign/repo', issueRepo: 'foreign/repo', mainBranch: 'main' },
         actual: { root: 'C:/foreign/runtime', issueRepo: 'foreign/runtime', mainBranch: 'main' },
@@ -1121,6 +1133,15 @@ async function serverDomain() {
     assert.match(impostorDiagnostic.detail, /marker\/schema/);
     assert.equal(Object.hasOwn(impostorDiagnostic, 'actual'), false,
       'repo-shaped 非 board JSON 不得进入 identity 比较');
+
+    impostorMode = 'incomplete-board';
+    const incompleteConflict = await probeServerStartup(ROOT, boardEnv(runtimeDir), 15_000, impostorPort);
+    assert.equal(incompleteConflict.status, 2, incompleteConflict.stderr || incompleteConflict.stdout);
+    const incompleteDiagnostic = parseJsonLine(incompleteConflict.stderr || incompleteConflict.stdout);
+    assert.equal(incompleteDiagnostic.code, 'PORT_CONFLICT', JSON.stringify(incompleteDiagnostic));
+    assert.match(incompleteDiagnostic.detail, /marker\/schema/);
+    assert.equal(Object.hasOwn(incompleteDiagnostic, 'actual'), false,
+      'marker 正确但缺 graph/worktrees 的 status 不得进入 identity 比较');
     await new Promise((resolveClose, reject) => impostor.close((error) => (error ? reject(error) : resolveClose())));
     impostor = null;
 

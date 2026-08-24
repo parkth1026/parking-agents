@@ -23,6 +23,48 @@ const port = Number(requestedPort ?? config.port ?? 8321);
 const boardToken = `btk_${randomBytes(24).toString('hex')}`;
 const boardApiHeader = `${BOARD_API.marker}/${BOARD_API.protocolVersion}`;
 
+function isRecord(value) {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function hasText(value) {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function hasBoardMarker(response, payload) {
+  return response.headers.get('x-aes-worktree-board') === boardApiHeader
+    && payload?.board?.marker === BOARD_API.marker
+    && payload?.board?.protocolVersion === BOARD_API.protocolVersion;
+}
+
+function isRepoIdentity(value, { displayFields = false } = {}) {
+  return isRecord(value)
+    && hasText(value.root)
+    && hasText(value.issueRepo)
+    && hasText(value.mainBranch)
+    && (!displayFields || (hasText(value.name) && hasText(value.mainHead)));
+}
+
+function isBoardStatus(response, payload) {
+  const stats = payload?.graph?.stats;
+  return hasBoardMarker(response, payload)
+    && payload.schemaVersion === 3
+    && hasText(payload.generatedAt)
+    && isRepoIdentity(payload.repo, { displayFields: true })
+    && Array.isArray(payload.graph?.issues)
+    && payload.graph.issues.every((issue) => (
+      isRecord(issue) && Number.isInteger(issue.number) && hasText(issue.title) && hasText(issue.state)
+    ))
+    && Array.isArray(payload.graph?.edges)
+    && payload.graph.edges.every((edge) => (
+      isRecord(edge) && Number.isInteger(edge.from) && Number.isInteger(edge.to)
+    ))
+    && isRecord(stats)
+    && ['total', 'open', 'closed', 'frontier', 'edges', 'warned'].every((field) => Number.isFinite(stats[field]))
+    && Array.isArray(payload.worktrees)
+    && payload.worktrees.every((worktree) => isRecord(worktree) && hasText(worktree.name) && hasText(worktree.path));
+}
+
 function startupDiagnostic(error, fallbackCode = 'STARTUP_FAILED') {
   return {
     ok: false,
@@ -48,15 +90,11 @@ async function portConflictDiagnostic(expected, requested) {
       signal: AbortSignal.timeout(10_000),
     });
     const payload = await response.json();
-    const markedBoardStatus = response.headers.get('x-aes-worktree-board') === boardApiHeader
-      && payload?.board?.marker === BOARD_API.marker
-      && payload?.board?.protocolVersion === BOARD_API.protocolVersion
-      && [2, 3].includes(payload?.schemaVersion);
-    const markedBoardError = response.headers.get('x-aes-worktree-board') === boardApiHeader
-      && payload?.board?.marker === BOARD_API.marker
-      && payload?.board?.protocolVersion === BOARD_API.protocolVersion
+    const markedBoardStatus = isBoardStatus(response, payload);
+    const markedBoardError = hasBoardMarker(response, payload)
       && payload?.apiSchemaVersion === 1
-      && payload?.code === 'REPO_MISMATCH';
+      && payload?.code === 'REPO_MISMATCH'
+      && isRepoIdentity(payload.actual);
     if (!markedBoardStatus && !markedBoardError) {
       return { ...base, detail: '占用者未通过 aes-worktree-board marker/schema 校验' };
     }

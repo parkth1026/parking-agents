@@ -160,7 +160,7 @@ dirty 现场仍需另加 `--confirm-dirty`。server 看板的 fallback POST 还�
 - fixture 刷新：`node "$skillDir/scripts/capture-issues-fixture.mjs"`。
 - 离线生成：`node "$skillDir/scripts/collect.mjs" --no-gh --issues-fixture "$skillDir/fixtures/aes-agent-issues.json"`。
 
-看板 v3 只在既有控制面挂点显示信息：全局编排胶囊、Workers Task/工作时长徽章、详情 Task/时间/transition 区、fallback 授权提示、v2 降级条、Map/List 文案。页面不自行推导业务状态，工作时长只用 status 投影的 registry executor 时间；旧 CLI activeTask 仅在没有 registry Task 时兼容显示。server API 响应携带专属 `aes-worktree-board/1` marker；监听端口已被占用时只在 marker 与 status schema 验证通过后比较既有 `/api/status?fast=1` identity。另一目标仓返回 `REPO_MISMATCH`，同仓或 repo-shaped 非 board 进程返回 `PORT_CONFLICT`，均 exit 2，且不得把既有实例输出成当前启动成功。
+看板 v3 只在既有控制面挂点显示信息：全局编排胶囊、Workers Task/工作时长徽章、详情 Task/时间/transition 区、fallback 授权提示、v2 降级条、Map/List 文案。页面不自行推导业务状态，工作时长只用 status 投影的 registry executor 时间；旧 CLI activeTask 仅在没有 registry Task 时兼容显示。server API 响应携带专属 `aes-worktree-board/1` marker；监听端口已被占用时只有 marker、v3、generatedAt、repo、graph（issues/edges/stats）与 worktrees 完整通过 schema 校验后才比较既有 `/api/status?fast=1` identity。另一目标仓返回 `REPO_MISMATCH`，同仓、repo-shaped 非 board 或 marker 正确但 status 不完整的进程返回 `PORT_CONFLICT`，均 exit 2，且不得把既有实例输出成当前启动成功。
 
 `POST /api/dispatch` 的锁定字段名是 `worker`；server 为旧调用方兼容接收 `worktree`，但页面与新调用方统一发送 `worker`。500 报文使用 `message`。
 

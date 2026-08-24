@@ -17,7 +17,7 @@
 - LIVE 页面由 server 注入 `/runtime/status.js`；collect 在目标 runtime 生成只读 `board.html + status.js` 快照，技能目录历史 runtime 不参与读取。
 - runtime 中已有快照必须与本次解析出的 `repo.root / issueRepo / mainBranch` 完全同源；任一字段错配都以 `REPO_MISMATCH`、exit 2 拒绝复用，不能从旧快照提取 Issue 或控制面事实。
 - runtime identity 必须在 collect 的锁前快检和取得 runtime 锁后的最终快照上各校验一次；两个目标仓从同一空 runtime 并发 collect 时只能有一个写入，另一方必须 `REPO_MISMATCH`，不得 last-writer-wins。
-- server API 使用专属 `aes-worktree-board/1` marker 与 status schema；端口冲突探测只有验证 marker/schema 后才比较 identity。另一目标仓返回可诊断的 `REPO_MISMATCH`，同仓或非 board 服务返回 `PORT_CONFLICT`；任何冲突都拒绝把旧实例当成本次启动成功。
+- server API 使用专属 `aes-worktree-board/1` marker 与完整 status schema；端口冲突探测只有验证 v3、generatedAt、repo、graph（issues/edges/stats）与 worktrees 后才比较 identity。另一目标仓返回可诊断的 `REPO_MISMATCH`，同仓或 marker 正确但 status 不完整的服务返回 `PORT_CONFLICT`；任何冲突都拒绝把旧实例当成本次启动成功。
 
 ## 验收条件
 
@@ -36,7 +36,7 @@
 | AC-11 | 旧七域、自带 orchestration 域、issue graph、真实浏览器 v3/v2 验收全部保持通过。 |
 | AC-12 | registry 中最新 executor Task 是 worker 计时真源；活动时长持续增长，merged/parked/handoff-required 后冻结，reviewer 不重置，parked 恢复后开始新周期。 |
 | AC-13 | 显式目标仓、runtime 旧快照和 server 监听端口形成同一 repo identity 边界；跨项目错配以 exit 2 fail closed，当前项目 API 的仓、Issue 图谱与 worktree 列表必须同源。 |
-| AC-14 | 锁内二次 identity 校验阻止空 runtime 的双仓并发覆盖；repo-shaped 非 board JSON 未通过专属 marker/schema 时只能判为 `PORT_CONFLICT`。 |
+| AC-14 | 锁内二次 identity 校验阻止空 runtime 的双仓并发覆盖；repo-shaped 非 board JSON 或 marker 正确但缺 repo/graph/worktrees 的不完整 status 未通过完整 schema 时只能判为 `PORT_CONFLICT`。 |
 
 ## 迭代记录
 
