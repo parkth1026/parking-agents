@@ -131,7 +131,12 @@ async function ensureSession(sessionId) {
   if (!r.error) return true;
   const reg = registry[sessionId];
   if (!reg) return false;
-  const res = await callAppServer("session/resume", { sessionId, workspace: reg.workspace });
+  // session/resume expects workspace as an object (same shape as session/create);
+  // passing the raw path string is a schema error.
+  const res = await callAppServer("session/resume", {
+    sessionId,
+    workspace: { workspacePath: reg.workspace, workspaceKey: reg.workspace },
+  });
   return !res.error;
 }
 
@@ -150,7 +155,6 @@ const ops = {
     if (!p.workspace) throw new Error("workspace (absolute path) required");
     const params = { workspace: { workspacePath: p.workspace, workspaceKey: p.workspace }, runtimeModel: appServer.runtimeModel };
     if (p.mode) params.mode = p.mode;
-    if (p.title) params.title = p.title;
     const r = await callAppServer("session/create", params);
     if (r.error) throw new Error("session/create: " + JSON.stringify(r.error).slice(0, 400));
     const sessionId = r.result.session.sessionId;
@@ -252,7 +256,7 @@ async function resultText(sessionId, all) {
 
 // ---------- MCP tool descriptors ----------
 const TOOLS = [
-  { name: "create_session", description: "Create a REAL top-level ZCode session for a workspace (typically a git worktree). Returns sessionId. The session is visible and openable in the ZCode UI session list. Optionally sends the first prompt immediately.", inputSchema: { type: "object", properties: { workspace: { type: "string", description: "Absolute path to the workspace/worktree" }, mode: { type: "string", enum: ["yolo", "build", "plan", "edit"], description: "Permission mode; yolo = no permission prompts (recommended for autonomous delivery)" }, tag: { type: "string", description: "Label for the coordinator map, e.g. wt1" }, title: { type: "string", description: "Optional session title" }, prompt: { type: "string", description: "Optional fully self-contained first task prompt" } }, required: ["workspace"] } },
+  { name: "create_session", description: "Create a REAL top-level ZCode session for a workspace (typically a git worktree). Returns sessionId. The session is visible and openable in the ZCode UI session list. Optionally sends the first prompt immediately.", inputSchema: { type: "object", properties: { workspace: { type: "string", description: "Absolute path to the workspace/worktree" }, mode: { type: "string", enum: ["yolo", "build", "plan", "edit"], description: "Permission mode; yolo = no permission prompts (recommended for autonomous delivery)" }, tag: { type: "string", description: "Label for the coordinator map, e.g. wt1" }, prompt: { type: "string", description: "Optional fully self-contained first task prompt" } }, required: ["workspace"] } },
   { name: "send", description: "Send a follow-up prompt to an existing session. Keeps full context. Fails with -32010 while a turn is still running (use wait first).", inputSchema: { type: "object", properties: { sessionId: { type: "string" }, text: { type: "string" } }, required: ["sessionId", "text"] } },
   { name: "wait", description: "Wait for the session's current turn to settle (idle/waiting/error) and return the final status plus the last assistant message. Guards against the stale-snapshot race right after send.", inputSchema: { type: "object", properties: { sessionId: { type: "string" }, timeoutSeconds: { type: "number", description: "Default 600, max 1800" }, includeResult: { type: "boolean", description: "Include last assistant text (default true)" } }, required: ["sessionId"] } },
   { name: "status", description: "Point-in-time session state: idle/running/waiting/paused/completed/error, active tool calls, and permission requests escalated to the coordinator.", inputSchema: { type: "object", properties: { sessionId: { type: "string" } }, required: ["sessionId"] } },

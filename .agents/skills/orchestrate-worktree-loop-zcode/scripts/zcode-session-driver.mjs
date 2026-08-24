@@ -13,7 +13,7 @@
 //   node zcode-session-driver.mjs daemon [--state-dir DIR] [--port N] [--permission-policy allow|deny|escalate]
 //                                        [--exe PATH] [--model ID]        # run in background; writes bridge.json
 //   node zcode-session-driver.mjs create --workspace DIR [--mode yolo|build|plan|edit] [--tag NAME]
-//                                        [--title TITLE] [--prompt-file F] [--prompt TEXT]
+//                                        [--prompt TEXT | --file F]
 //   node zcode-session-driver.mjs send <sessionId> [--text TEXT | --file F]
 //   node zcode-session-driver.mjs status <sessionId>            # -> state, pendingPermissions, activeToolCalls
 //   node zcode-session-driver.mjs wait <sessionId> [--timeout S] [--text]   # poll to completion, print result
@@ -217,7 +217,12 @@ async function runDaemon(opts) {
     if (!r.error) return true;
     const reg = registry[sessionId];
     if (!reg) return false;
-    const res = await callAppServer("session/resume", { sessionId, workspace: reg.workspace });
+    // session/resume expects workspace as an object (same shape as session/create);
+    // passing the raw path string is a schema error.
+    const res = await callAppServer("session/resume", {
+      sessionId,
+      workspace: { workspacePath: reg.workspace, workspaceKey: reg.workspace },
+    });
     return !res.error;
   }
 
@@ -227,7 +232,6 @@ async function runDaemon(opts) {
       if (!p.workspace) throw new Error("workspace required");
       const params = { workspace: { workspacePath: p.workspace, workspaceKey: p.workspace }, runtimeModel };
       if (p.mode) params.mode = p.mode;
-      if (p.title) params.title = p.title;
       const r = await callAppServer("session/create", params);
       if (r.error) throw new Error("session/create: " + JSON.stringify(r.error).slice(0, 400));
       const sessionId = r.result.session.sessionId;
@@ -235,6 +239,7 @@ async function runDaemon(opts) {
       let sendRes = null;
       if (p.prompt) {
         registry[sessionId].lastSendAt = Date.now();
+        registry[sessionId].promptCount = 1;
         const s = await callAppServer("session/send", { sessionId, content: p.prompt });
         sendRes = s.error ? { error: s.error } : { accepted: true };
       }
@@ -431,8 +436,9 @@ async function main() {
     case "create": {
       const workspace = opts.workspace;
       if (!workspace || workspace === true) die("--workspace <absolute path> required");
+      if (opts.title) die("--title is not supported by the app-server session protocol; omit it");
       const prompt = typeof opts.prompt === "string" ? opts.prompt : await readStdinOrFile(opts);
-      const data = await callBridge("create", { workspace, mode: opts.mode, tag: opts.tag, title: opts.title, prompt }, 60000);
+      const data = await callBridge("create", { workspace, mode: opts.mode, tag: opts.tag, prompt }, 60000);
       console.log(JSON.stringify(data));
       return;
     }
