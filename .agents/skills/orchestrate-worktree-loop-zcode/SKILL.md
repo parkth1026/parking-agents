@@ -38,42 +38,42 @@ node scripts/inspect-worktrees.mjs --paths "D:\repo-dev1,D:\repo-dev2" --integra
 
 ## Phase 1: Start the bridge and own top-level sessions
 
-The bridge (`scripts/zcode-session-driver.mjs`, zero-dependency) talks to ZCode's own app-server protocol: `session/create` / `session/send` / `session/read` / `session/messages`. Sessions created through it are real top-level interactive sessions — persisted in the shared session store, visible and openable in the ZCode UI, sharing the user's configured model provider.
+Two equivalent control surfaces exist for driving REAL top-level ZCode sessions (not subagents). Sessions created through either are ordinary top-level interactive sessions — persisted in the shared session store, visible and openable in the ZCode UI, sharing the user's configured model provider. Both share the coordinator registry (`~/.zcode/bridge/sessions.json`).
 
-1. Start the daemon once per run, in a background shell (it survives across tool calls):
+### Surface A — native MCP tools (preferred when present)
+
+If the session has `mcp__zcode_threads__*` tools (MCP server `zcode_threads`, registered in `~/.zcode/cli/config.json` under `mcp.servers`, loaded at session start), use them directly as tool calls — no terminal involved:
+
+| Need | Native tool call |
+| --- | --- |
+| Create a per-worktree session (+ optional first prompt) | `mcp__zcode_threads__create_session` {workspace, mode:"yolo", tag, prompt} |
+| Wait for the turn, get result text | `mcp__zcode_threads__wait` {sessionId, timeoutSeconds} |
+| Point-in-time state | `mcp__zcode_threads__status` {sessionId} → `idle / running / waiting / paused / completed / error` |
+| Follow-up / next task on the same session (full context retained) | `mcp__zcode_threads__send` {sessionId, text} |
+| Read all assistant turns | `mcp__zcode_threads__result` {sessionId, all} |
+| Answer an escalated permission request | `mcp__zcode_threads__approve` {sessionId, requestId, deny?} |
+| Abort a stuck turn | `mcp__zcode_threads__stop` {sessionId} |
+| Coordinator map snapshot | `mcp__zcode_threads__list` {tag?} |
+| Unload a finished session from the server | `mcp__zcode_threads__close` {sessionId} |
+
+If the tools are absent (old session, or MCP server not registered), register once and open a new session, or use Surface B for this run.
+
+### Surface B — terminal bridge (fallback)
+
+Start the daemon once per run, in a background shell (it survives across tool calls):
 
 ```bash
 node scripts/zcode-session-driver.mjs daemon --permission-policy escalate
 ```
 
-   Wait for `BRIDGE_READY`. Bridge state lives in `~/.zcode/bridge/` (port, token, session registry). If a bridge is already running, reuse it; `--permission-policy escalate` routes child-session permission requests to you instead of silently allowing them.
+Wait for `BRIDGE_READY`. The CLI subcommands mirror the tools one-to-one: `create / send / wait / status / result / list / stop / close / approve / daemon-stop` (see `--help`-style header comment in the script). `--permission-policy escalate` routes child-session permission requests to you instead of silently allowing them.
 
-2. Create one session per worktree, with a self-contained prompt file (the session's cwd is the worktree, but spell out absolute paths anyway):
+### Common rules (both surfaces)
 
-```bash
-node scripts/zcode-session-driver.mjs create --workspace "D:\repo-dev1" --mode yolo --tag wt1 --file prompt-wt1.txt
-```
-
-   `--mode yolo` matches how delivery worktrees normally run (no permission prompts); omit it to inherit the workspace default. `create` returns the `sessionId` — record it in the coordinator map immediately.
-
-3. Monitor and steer:
-
-| Need | Command |
-| --- | --- |
-| Wait for the current turn, get result text | `wait <sessionId> --timeout 600 --text` |
-| Point-in-time state | `status <sessionId>` → `idle / running / waiting / paused / completed / error` |
-| Follow-up / next task on the same session (full context retained) | `send <sessionId> --text "..."` or `--file F` |
-| Read all assistant turns | `result <sessionId> [--all]` |
-| Answer an escalated permission request | `approve <sessionId> <requestId> [--deny]` |
-| Abort a stuck turn | `stop <sessionId>` |
-| Coordinator map snapshot | `list [--tag wt1]` |
-| Shut the bridge down at end of round | `daemon-stop` |
-
-4. **Maintain the coordinator map** `worktree -> sessionId -> issue -> state`. The bridge registry (`~/.zcode/bridge/sessions.json`) and the ZCode session store persist it; after a daemon restart the next operation auto-resumes known sessions. If a sessionId is somehow lost, it is recoverable from the registry file or the UI session list — treat as BLOCKED only if the session itself is gone.
-
-5. Prefer `send` on the existing session for follow-up work on the same issue (e.g. after review findings) — the session keeps its context. `-32010 A prompt is already running` means the turn is still active: `wait`, do not double-send.
-
-6. Do not run delivery-critical implementation inside the coordinator session; the coordinator inspects evidence, reviews, merges, and steers.
+1. Create one session per worktree with a self-contained prompt (the session's cwd is the worktree, but spell out absolute paths anyway). `--mode yolo` / `mode: "yolo"` matches how delivery worktrees normally run; omit to inherit the workspace default. Record the `sessionId` in the coordinator map immediately.
+2. **Maintain the coordinator map** `worktree -> sessionId -> issue -> state`. The registry (`~/.zcode/bridge/sessions.json`) and the ZCode session store persist it; after a daemon/server restart the next operation auto-resumes known sessions. If a sessionId is somehow lost, it is recoverable from the registry file or the UI session list — treat as BLOCKED only if the session itself is gone.
+3. Prefer `send` on the existing session for follow-up work on the same issue (e.g. after review findings) — the session keeps its context. "A prompt is already running" (-32010) means the turn is still active: `wait`, do not double-send.
+4. Do not run delivery-critical implementation inside the coordinator session; the coordinator inspects evidence, reviews, merges, and steers.
 
 Prompt shape (fill every `<...>`; no references to this conversation):
 
@@ -178,4 +178,4 @@ Stop advancing a worktree, but continue other independent worktrees, when:
 - no eligible next issue exists;
 - a session is stuck (`running` far beyond plausibility): `stop` it, inspect the worktree state yourself, and only then decide to re-dispatch or report BLOCKED — never reset the worktree.
 
-Never call the overall loop complete merely because one worktree finished. The coordinator is complete only for the requested round when every named worktree is either actively progressing at its correct state or has a clearly evidenced blocker. Run `daemon-stop` when the round is over and no follow-up dispatch is imminent (sessions persist in the ZCode session store and can be resumed later).
+Never call the overall loop complete merely because one worktree finished. The coordinator is complete only for the requested round when every named worktree is either actively progressing at its correct state or has a clearly evidenced blocker. At end of round, `close` finished sessions (Surface A) or run `daemon-stop` (Surface B) — sessions persist in the ZCode session store and can be resumed later.
