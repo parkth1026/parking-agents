@@ -20,8 +20,10 @@ import {
   symlinkSync,
   writeFileSync,
 } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { installSkills, normalizeLinkTarget, uninstallSkills } from "../../scripts/install-skills.mjs";
 
 const failures = [];
@@ -127,8 +129,76 @@ try {
     existsSync(join(root, un.backups[0], "skill-pub", "SKILL.md")),
     "backup folder deleted or emptied by uninstall"
   );
+
+  // --- optional selection: category and explicit names -----------------------
+  const selectDev = join(root, "select-dev");
+  const selectRelease = join(root, "select-release");
+  const selectOnlyTarget = join(root, "select-only-target");
+  const selectNamesTarget = join(root, "select-names-target");
+  const alphaDir = mkSkill(selectDev, "alpha");
+  const sharedDevDir = mkSkill(selectDev, "shared");
+  const engineeringDir = mkSkill(selectRelease, "engineering", "engine-only");
+  const productivityDir = mkSkill(selectRelease, "productivity", "product-only");
+  mkSkill(selectRelease, "productivity", "shared");
+
+  const onlyResult = installSkills({
+    sources: [selectDev, selectRelease],
+    target: selectOnlyTarget,
+    only: "productivity",
+  });
+  expect(onlyResult.failures.length === 0, `--only failures: ${onlyResult.failures.join("; ")}`);
+  expect(
+    readdirSync(selectOnlyTarget).sort().join(",") === "product-only,shared",
+    "--only productivity did not install exactly that category"
+  );
+  expect(
+    linkTarget(join(selectOnlyTarget, "shared")) === normalizeLinkTarget(sharedDevDir),
+    "--only did not preserve dev-side clash precedence"
+  );
+  expect(!existsSync(join(selectOnlyTarget, "engine-only")), "--only installed an unselected category");
+
+  const namesResult = installSkills({
+    sources: [selectDev, selectRelease],
+    target: selectNamesTarget,
+    skillNames: ["alpha", "engine-only"],
+  });
+  expect(namesResult.failures.length === 0, `--skills failures: ${namesResult.failures.join("; ")}`);
+  expect(
+    readdirSync(selectNamesTarget).sort().join(",") === "alpha,engine-only",
+    "--skills did not install exactly the requested names"
+  );
+  expect(linkTarget(join(selectNamesTarget, "alpha")) === normalizeLinkTarget(alphaDir), "alpha points wrong");
+  expect(
+    linkTarget(join(selectNamesTarget, "engine-only")) === normalizeLinkTarget(engineeringDir),
+    "engine-only points wrong"
+  );
+  expect(
+    linkTarget(join(selectOnlyTarget, "product-only")) === normalizeLinkTarget(productivityDir),
+    "product-only points wrong"
+  );
+
+  const rejectedTarget = join(root, "rejected-target");
+  const rejected = installSkills({
+    sources: [selectDev, selectRelease],
+    target: rejectedTarget,
+    skillNames: ["missing-skill"],
+  });
+  expect(rejected.failures.length === 1, "unknown --skills name was not rejected");
+  expect(!existsSync(rejectedTarget), "selection failure mutated the target");
 } finally {
   rmSync(root, { recursive: true, force: true });
+}
+
+// Keep the existing npm-test segment as the release-flow fixture segment.
+// The package script gains only the required build-release --check segment.
+for (const child of ["test-build-release.mjs", "test-run-evals.mjs"]) {
+  try {
+    execFileSync(process.execPath, [join(dirname(fileURLToPath(import.meta.url)), child)], {
+      stdio: "inherit",
+    });
+  } catch {
+    fail(`${child} failed`);
+  }
 }
 
 // --- Report --------------------------------------------------------------------

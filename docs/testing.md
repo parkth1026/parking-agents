@@ -23,6 +23,9 @@ npm test
 | 文件 | 守住什么 |
 |---|---|
 | `test-skill-discovery.mjs` | 开发侧 `.agents/skills/` 能被发现：一层扁平、有 `SKILL.md`、frontmatter 可解析且 `name` 与目录名一致、`agents/openai.yaml` 命名正确、仓库根 `AGENTS.md` 存在（session-start 注入源） |
+| `test-install-skills.mjs` | junction 的全量旧语义与 `--only` / `--skills` 选装；同一段还调用生成发布树和 evals 入口夹具 |
+| `test-build-release.mjs` | category 晋级、五件套与 run-tests 门槛、边界跳过/拒绝、索引、完整目录复制、手改漂移与撤销晋级 |
+| `test-run-evals.mjs` | `--list` 零成本盘点与真跑汇总、失败退出码的一致性 |
 | `test-no-tool-names.mjs` | **铁律一**：技能正文只写动作，不写任何 harness 的工具名 |
 
 `test-no-tool-names.mjs` 是整套改造的支点。动作语言纪律没有编译器保证 —— 它靠的是人不写错。这个测试是唯一的自动防线。

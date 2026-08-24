@@ -1,6 +1,6 @@
 # parking-agents
 
-> 个人跨平台 skill 库 + VS Code Copilot agent 工具箱。攒一点记一点，**体系未完成，随用随加**。
+> 个人自用的跨平台 skill 开发与发布仓库 + VS Code Copilot agent 工具箱。开发侧保持平铺与 junction 即时生效，发布侧由生成器稳定地产出分类树。
 
 ## 这个仓库有两半
 
@@ -16,12 +16,12 @@
 ## 目录结构
 
 ```
-skills/                  # ★ 跨平台发布侧（三分类布局，每类一份 README）
+skills/                  # ★ 跨平台分类发布树（Matt 移植技能 + 自研生成副本）
 ├── engineering/<name>/SKILL.md
 ├── productivity/<name>/SKILL.md
 └── pub/<name>/SKILL.md
 
-.agents/skills/          # ★ 开发侧活跃真源（全量 30+ 技能；与 skills/ 经移植流程同步，见 AGENTS.md）
+.agents/skills/          # ★ 开发侧平铺活跃真源（自研技能在此编辑，可用 category 晋级）
 
 AGENTS.md                # ★ 仓库 Agent 约定（.mjs 脚本规则、双侧目录约定、issue/标签/领域文档入口）
 CLAUDE.md / GEMINI.md    # 指令文件（@-include AGENTS.md；hooks/session-start 每会话注入它）
@@ -29,7 +29,7 @@ CONTEXT.md               # 领域术语表（单一上下文，决策记录在 d
 
 install-skills-*.cmd     # 双击一键安装/卸载（junction 本机技能目录，见下节）
 uninstall-skills-*.cmd
-scripts/                 # bump-version.mjs 版本锁步 + install/uninstall-skills-*.mjs 安装器
+scripts/                 # build-release.mjs 生成发布树 + 版本锁步 + install/uninstall 安装器
 hooks/                   # SessionStart 注入器（注入 AGENTS.md；Claude Code / Cursor / Copilot CLI 共用）
 tests/                   # 结构断言 + 工具名 lint + 安装器测试 + 各平台契约测试
 
@@ -65,6 +65,8 @@ gemini-extension.json    # Gemini CLI 扩展清单
 （或 `npm run install:skills:agents` / `install:skills:claude`，卸载对应 `uninstall-*`。）
 
 两侧源按名扁平合并进目标目录（重名时开发侧 `.agents/skills/` 赢），每个技能一条 junction，agent 直读工作区、永不漂移。已存在的真实目录会先挪进 `skills-backup-<ts>/`；每次安装附带体检：清死链、报告异常项。POSIX 下退化为普通 symlink。
+
+需要选装时把参数传给 cmd 或 npm 脚本：`--only engineering` / `--only productivity` / `--only pub` 按大类安装，`--skills skill-a,skill-b` 按名称安装。**不带参数的行为保持全量安装、两侧按名合并、重名开发侧赢。**
 
 ### 平台插件安装
 
@@ -143,7 +145,11 @@ marketplace 安装，或 `/plugins install` 加 GitHub URL。工具映射由 `.k
 
 ## Skills（发布侧 `skills/`）
 
-三分类，每类一份 README（`skills/engineering/README.md` 等）有完整触发语义。开发侧 `.agents/skills/` 是超集，还有大量未发布技能（aes-* 工作流族、workflow-interview*、shopping-deep-research、jenkins-*、ue-error-solver 等），仅本机 junction 安装可用。
+三分类，每类 README（`skills/engineering/README.md` 等）记录 Matt 移植技能；自研技能在 `.agents/skills/` 开发，通过 `category` + 评测门槛 + `build-release` 生成到相同分类树。尚未晋级的自研技能仍可通过本机 junction 全量安装使用。晋级步骤见 [自研技能晋级标准](./docs/agents/skill-release.md)。
+
+<!-- BEGIN GENERATED SELF-DEVELOPED SKILLS -->
+_当前没有自研晋级技能。_
+<!-- END GENERATED SELF-DEVELOPED SKILLS -->
 
 **仅用户可调用** = frontmatter 标 `disable-model-invocation: true`，只能由人显式调用；其余模型按 `description` 自行匹配触发。
 
@@ -229,7 +235,7 @@ marketplace 安装，或 `/plugins install` 加 GitHub URL。工具映射由 `.k
 npm test
 ```
 
-零依赖纯 Node。跑：技能发现与结构断言、安装器行为测试、**工具名 lint**、session-start hook 的三种 JSON 形状、Pi 扩展注入与去重、各平台 manifest 契约、跨 manifest 版本一致性（`--check` / `--audit`）、`check:repo` 跨平台结构检查器（对 engineering / productivity / pub 三分区逐一跑）。
+零依赖纯 Node。跑：技能发现与结构断言、安装/选装及生成发布树夹具、**工具名 lint**、session-start hook 的三种 JSON 形状、Pi 扩展注入与去重、各平台 manifest 契约、跨 manifest 版本一致性（`--check` / `--audit`）、`check:repo` 跨平台结构检查器，以及末段 `build-release --check` 防生成物漂移。
 
 **这些测试的价值在于把静默失败变成响亮失败** —— 技能加载在所有平台上都无报错、无警告，出错时技能只是不出现。详见 [docs/testing.md](./docs/testing.md)。
 
@@ -237,6 +243,15 @@ npm test
 - 增加新平台支持 → [docs/porting-to-a-new-harness.md](./docs/porting-to-a-new-harness.md)
 - 测试分层与验收标准 → [docs/testing.md](./docs/testing.md)
 - issue / 分诊标签 / 领域文档约定 → [docs/agents/](./docs/agents/)
+- 自研技能评测与分类晋级 → [docs/agents/skill-release.md](./docs/agents/skill-release.md)
+
+评测入口独立于 `npm test`（避免真实模型评测意外耗时或耗 key）：
+
+```bash
+npm run evals --list
+npm run evals
+npm run evals -- --skill parking-skill-creator
+```
 
 版本升级（七份 manifest 锁步）：
 

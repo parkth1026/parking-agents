@@ -10,7 +10,8 @@
     "install:skills:claude": "node scripts/install-skills-claude.mjs",
     "uninstall:skills:agents": "node scripts/uninstall-skills-agents.mjs",
     "uninstall:skills:claude": "node scripts/uninstall-skills-claude.mjs",
-    "test": "node tests/skills/test-skill-discovery.mjs && node tests/skills/test-install-skills.mjs && node tests/skills/test-no-tool-names.mjs && node tests/hooks/test-session-start.mjs && node --test tests/pi/test-pi-extension.mjs && node --test tests/harnesses/test-harness-manifests.mjs && node scripts/bump-version.mjs --check && node scripts/bump-version.mjs --audit && npm run check:repo"
+    "evals": "node scripts/run-evals.mjs",
+    "test": "node tests/skills/test-skill-discovery.mjs && node tests/skills/test-install-skills.mjs && node tests/skills/test-no-tool-names.mjs && node tests/hooks/test-session-start.mjs && node --test tests/pi/test-pi-extension.mjs && node --test tests/harnesses/test-harness-manifests.mjs && node scripts/bump-version.mjs --check && node scripts/bump-version.mjs --audit && npm run check:repo && node scripts/build-release.mjs --check"
   },
   "license": "MIT",
   "author": "piaotonghu <pb763396199@gmail.com>",

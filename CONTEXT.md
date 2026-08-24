@@ -1,6 +1,6 @@
 # parking-agents
 
-本仓库承载 AES 工作流技能族与 agent 工程实践。单一上下文：术语表在此，决策记录在 `docs/adr/`。
+本仓库承载 AES 工作流技能族与 agent 工程实践。单一上下文：术语表在此，已确认的架构决策记录在 `docs/adr/`；当前目录只有说明页，首条决策由 `domain-modeling` 按需创建。
 
 ## Language
 

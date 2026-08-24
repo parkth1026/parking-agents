@@ -40,7 +40,9 @@
  * are only reported, never deleted.
  *
  * Usage: see the install-skills-{agents,claude}.mjs and
- * uninstall-skills-{agents,claude}.mjs entry scripts.
+ * uninstall-skills-{agents,claude}.mjs entry scripts. Install entry scripts
+ * accept --only <category> or --skills <comma-separated-names>; with neither,
+ * discovery and first-source-wins behavior are unchanged.
  */
 
 import {
@@ -54,7 +56,7 @@ import {
   statSync,
   symlinkSync,
 } from "node:fs";
-import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -64,14 +66,19 @@ export const repoSources = [
 ];
 
 /** A directory holding SKILL.md is a skill; never descend past one. */
-function discoverSkills(root) {
+export function discoverSkills(root) {
   const skills = [];
   const walk = (dir) => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
       const dirPath = join(dir, entry.name);
       if (existsSync(join(dirPath, "SKILL.md"))) {
-        skills.push({ name: entry.name, dir: dirPath });
+        const fromRoot = relative(root, dirPath).split(sep);
+        skills.push({
+          name: entry.name,
+          dir: dirPath,
+          category: fromRoot.length > 1 ? fromRoot[0] : null,
+        });
       } else {
         walk(dirPath);
       }
@@ -101,11 +108,40 @@ function timestamp() {
  * a health pass that clears dead links and reports anomalies.
  * Returns { created, kept, repointed, converted, removed, anomalies, foreign, failures }.
  */
-export function installSkills({ sources, target, labelBase, dryRun = false }) {
+export function installSkills({
+  sources,
+  target,
+  labelBase,
+  dryRun = false,
+  only,
+  skillNames,
+}) {
+  const discovered = sources.map((source) => discoverSkills(source));
+  const availableNames = new Set(discovered.flat().map((skill) => skill.name));
+  let selectedNames = null;
+
+  if (only) {
+    const releaseCategories = new Set(
+      discovered.flat().map((skill) => skill.category).filter(Boolean)
+    );
+    if (!releaseCategories.has(only)) {
+      const available = [...releaseCategories].sort().join(", ") || "none";
+      return selectionFailure(`未知分类 '${only}'（可选: ${available}）`);
+    }
+    selectedNames = new Set(
+      discovered.flat().filter((skill) => skill.category === only).map((skill) => skill.name)
+    );
+  } else if (skillNames) {
+    selectedNames = new Set(skillNames);
+    const unknown = [...selectedNames].filter((name) => !availableNames.has(name));
+    if (unknown.length > 0) return selectionFailure(`未知技能: ${unknown.join(", ")}`);
+  }
+
   const byName = new Map();
   const clashes = [];
-  for (const source of sources) {
-    for (const skill of discoverSkills(source)) {
+  for (const skills of discovered) {
+    for (const skill of skills) {
+      if (selectedNames && !selectedNames.has(skill.name)) continue;
       if (byName.has(skill.name)) {
         clashes.push(`${skill.name}: ${skill.dir} skipped, first source wins`);
       } else {
@@ -229,6 +265,20 @@ export function installSkills({ sources, target, labelBase, dryRun = false }) {
   for (const f of failures) console.error(`  ✗ ${f}`);
 
   return { created, kept, repointed, converted, removed, anomalies, foreign, failures };
+}
+
+function selectionFailure(message) {
+  console.error(`ERROR: ${message}`);
+  return {
+    created: [],
+    kept: [],
+    repointed: [],
+    converted: [],
+    removed: [],
+    anomalies: [],
+    foreign: [],
+    failures: [message],
+  };
 }
 
 /**
