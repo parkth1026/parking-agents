@@ -86,6 +86,83 @@
         }
       ]
     },
+    "fiveTaskFanIn": {
+      "wake": [
+        {
+          "thread": "$reviewerThread1",
+          "kind": "final",
+          "eventId": "E-fanin-wake-task1",
+          "payload": {
+            "summary": "reviewer final task 1 arrived as wake",
+            "verdict": "APPROVE",
+            "commitSha": "$commit1",
+            "cursor": "$cursor1"
+          }
+        }
+      ],
+      "polls": [
+        {
+          "thread": "$executorThread3",
+          "kind": "final",
+          "eventId": "E-fanin-executor-final-task3",
+          "payload": {
+            "summary": "executor final task 3",
+            "cursor": "$executorCursor3"
+          }
+        },
+        {
+          "thread": "$reviewerThread2",
+          "kind": "final",
+          "eventId": "E-fanin-reviewer-final-task2",
+          "payload": {
+            "summary": "reviewer final task 2",
+            "verdict": "APPROVE",
+            "commitSha": "$commit2",
+            "cursor": "$cursor2"
+          }
+        },
+        {
+          "thread": "$reviewerThread3",
+          "kind": "commentary",
+          "eventId": "E-fanin-old-commentary-task3",
+          "payload": {
+            "summary": "old reviewer commentary task 3",
+            "cursor": "$commentaryCursor3"
+          }
+        },
+        {
+          "thread": "$reviewerThread4",
+          "kind": "verdict",
+          "eventId": "E-fanin-reviewer-final-task4",
+          "payload": {
+            "summary": "reviewer final task 4",
+            "verdict": "APPROVE",
+            "commitSha": "$commit4",
+            "cursor": "$cursor4"
+          }
+        },
+        {
+          "thread": "$reviewerThread5",
+          "kind": "final",
+          "eventId": "E-fanin-reviewer-final-task5",
+          "payload": {
+            "summary": "reviewer final task 5",
+            "verdict": "APPROVE",
+            "commitSha": "$commit5",
+            "cursor": "$cursor5"
+          }
+        },
+        {
+          "thread": "$reviewerThread3",
+          "kind": "commentary",
+          "eventId": "E-fanin-reviewer-poll-task3",
+          "payload": {
+            "summary": "new reviewer poll task 3",
+            "cursor": "$reviewerCursor3"
+          }
+        }
+      ]
+    },
     "reviewerBlock": {
       "wake": [],
       "polls": [

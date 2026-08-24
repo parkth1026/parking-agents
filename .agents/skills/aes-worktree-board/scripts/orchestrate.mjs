@@ -276,6 +276,12 @@ export function transitionTask(taskId, to, details = {}, runtimeDir = RUNTIME_DI
     const task = taskById(registry, taskId);
     const from = task.state;
     assertTransition(from, to);
+    if (to === 'merged' && (!details.mergeCommit || details.source !== 'cli')) {
+      throw controlError('MERGE_GATE_REQUIRED', 'merged 只能由主 agent 在 merge gate 后通过 CLI --merge-commit 登记');
+    }
+    if (to === 'merged' && (details.actor || 'orchestrator') !== 'orchestrator') {
+      throw controlError('MERGE_GATE_REQUIRED', '只有 orchestrator 主 agent 可以登记 merged');
+    }
     const candidate = {
       ...task,
       commitSha: details.commitSha || task.commitSha,
@@ -446,8 +452,12 @@ export function consumeEvent(eventId, runtimeDir = RUNTIME_DIR) {
     if (!event) throw controlError('UNKNOWN_EVENT', `未知 eventId: ${eventId}`, { eventId });
     const task = taskById(registry, event.taskId);
     const sourceTask = assertThreadTaskRelationship(registry, task, event.threadId);
+    const eventTransition = desiredTransition(event);
+    if (event.payload?.mergeCommit || eventTransition === 'merged') {
+      throw controlError('MERGE_GATE_REQUIRED', 'executor/reviewer event 不得登记 merged 或携带 mergeCommit；必须由主 agent 通过 --merge-commit 完成 merge gate');
+    }
     if ((task.consumedEventIds || []).includes(eventId)) return { result: 'already-consumed', eventId };
-    let to = desiredTransition(event);
+    const to = eventTransition;
     let transition = null;
     let nextAction = 'continue-wait';
     const explicitVerdict = String(event.payload?.verdict || '').toUpperCase();
@@ -487,7 +497,6 @@ export function consumeEvent(eventId, runtimeDir = RUNTIME_DIR) {
       const candidate = {
         ...task,
         commitSha: event.payload?.commitSha || task.commitSha,
-        mergeCommit: event.payload?.mergeCommit || task.mergeCommit,
         verdict: { ...task.verdict },
       };
       assertTransitionEvidence(registry, task, to, candidate);
@@ -495,7 +504,6 @@ export function consumeEvent(eventId, runtimeDir = RUNTIME_DIR) {
       task.state = to;
       task.phase = to;
       if (event.payload?.commitSha) task.commitSha = event.payload.commitSha;
-      if (event.payload?.mergeCommit) task.mergeCommit = event.payload.mergeCommit;
       applyTaskTiming(task, from, to, transitionTimestamp);
       transition = { from, to };
       nextAction = to === 'approved' ? 'merge-gate' : 'continue';
@@ -683,7 +691,7 @@ export async function main(argv = process.argv.slice(2), runtimeDir = RUNTIME_DI
   if (command === 'transition') return transitionTask(requireValue(options, 'task'), requireValue(options, 'to'), {
     reason: options.reason || null, actor: options.actor || 'orchestrator', eventId: options['event-id'] || null,
     phase: options.phase, nextAction: options['next-action'], commitSha: options.commit,
-    mergeCommit: options['merge-commit'], reviewTaskId: options['review-task'],
+    mergeCommit: options['merge-commit'], reviewTaskId: options['review-task'], source: 'cli',
   }, runtimeDir);
   if (command === 'inbox' && action === 'put') return putInboxEvent(options, runtimeDir);
   if (command === 'inbox' && action === 'pending') return pendingInbox(runtimeDir);
