@@ -3,7 +3,7 @@
 // 扫描 <iter-dir>/eval-*/<config>/run-*/{grading.json, timing.json}（eval 目录也可在 runs/ 下），
 // 输出 benchmark.json（configs 统计 + delta）与 benchmark.md。
 // 统计口径: pass_rate/time_ms/tokens 的 mean/stddev(样本 n-1)/min/max；delta = with − baseline。
-// timing 数值为 null 时跳过该 run 对应统计并计入 skipped，不报错。
+// timing 数值为 null 时跳过该 run 对应统计并计入 skipped；整轮缺失时显式告警，绝不渲染为 0。
 // --history <技能目录>: 另把本轮各 gate 指标追加进 <技能目录>/history.json（只追加不覆盖），
 //   与上一 run 按同 eval 名比 won/lost/tie；同通道整写 <技能目录>/output-evals.json
 //   （本轮题面+断言，clone 接收方不依赖 workspace 即可重建评测用例）。不带该参数时两者都不写。
@@ -123,6 +123,7 @@ export function buildBenchmark(iterDir, skillName = "") {
 
   const configNames = Object.keys(loaded.configs).sort();
   const configsOut = {};
+  const emptyStats = () => ({ mean: null, stddev: null, min: null, max: null });
   for (const cfg of configNames) {
     const runs = loaded.configs[cfg];
     const passRates = runs.map((r) => r.pass_rate);
@@ -131,10 +132,23 @@ export function buildBenchmark(iterDir, skillName = "") {
     configsOut[cfg] = {
       runs: runs.length,
       pass_rate: calcStats(passRates),
-      time_ms: calcStats(times),
-      tokens: calcStats(tokenList),
+      // 空 timing 样本不能沿用 calcStats([]) 的 0 占位，否则会把“未测量”伪装成真实成本。
+      time_ms: times.length > 0 ? calcStats(times) : emptyStats(),
+      tokens: tokenList.length > 0 ? calcStats(tokenList) : emptyStats(),
       skipped: { time_ms: runs.length - times.length, tokens: runs.length - tokenList.length },
     };
+  }
+
+  const allRuns = Object.values(loaded.configs).flat();
+  const timingDiagnostics = [
+    { key: "time_ms", field: "duration_ms", label: "time_ms" },
+    { key: "tokens", field: "total_tokens", label: "tokens" },
+  ];
+  for (const metric of timingDiagnostics) {
+    const available = allRuns.filter((run) => run[metric.key] !== null).length;
+    if (available === 0) {
+      warnings.push(`timing 全缺失：本轮 ${allRuns.length} 个 run 的 ${metric.field} 均为 null 或 timing.json 缺失，${metric.label} 未测量；不会把缺失数据当作 0。`);
+    }
   }
 
   const delta = {};
@@ -142,8 +156,10 @@ export function buildBenchmark(iterDir, skillName = "") {
     const a = configsOut[configNames[0]];
     const b = configsOut[configNames[1]];
     delta.pass_rate = round4(a.pass_rate.mean - b.pass_rate.mean);
-    delta.time_ms = round4(a.time_ms.mean - b.time_ms.mean);
-    delta.tokens = round4(a.tokens.mean - b.tokens.mean);
+    delta.time_ms = a.time_ms.mean === null || b.time_ms.mean === null
+      ? null : round4(a.time_ms.mean - b.time_ms.mean);
+    delta.tokens = a.tokens.mean === null || b.tokens.mean === null
+      ? null : round4(a.tokens.mean - b.tokens.mean);
   }
 
   return {
@@ -178,15 +194,15 @@ export function renderMarkdown(benchmark) {
       return fmt(s);
     });
     let d = "—";
-    if (cfgNames.length >= 2) {
+    if (cfgNames.length >= 2 && benchmark.delta[key] !== null) {
       const v = benchmark.delta[key];
       d = key === "pass_rate" ? (v >= 0 ? "+" : "") + v.toFixed(2) : (v >= 0 ? "+" : "") + v.toFixed(0);
     }
     lines.push(`| ${key} | ${cells.join(" | ")} | ${d} |`);
   };
   metricRow("pass_rate", (s) => `${(s.mean * 100).toFixed(0)}% ± ${(s.stddev * 100).toFixed(0)}%`);
-  metricRow("time_ms", (s) => `${(s.mean / 1000).toFixed(1)}s ± ${(s.stddev / 1000).toFixed(1)}s`);
-  metricRow("tokens", (s) => `${Math.round(s.mean)} ± ${Math.round(s.stddev)}`);
+  metricRow("time_ms", (s) => s.mean === null ? "未测量" : `${(s.mean / 1000).toFixed(1)}s ± ${(s.stddev / 1000).toFixed(1)}s`);
+  metricRow("tokens", (s) => s.mean === null ? "未测量" : `${Math.round(s.mean)} ± ${Math.round(s.stddev)}`);
 
   for (const c of cfgNames) {
     const sk = benchmark.configs[c].skipped;
@@ -508,12 +524,13 @@ writeText(outJson.replace(/\.json$/, ".md"), renderMarkdown(result.benchmark));
 const b = result.benchmark;
 const cfgNames = Object.keys(b.configs);
 console.log(`${b.iteration}: ${b.evals.length} evals × ${cfgNames.length} configs`);
+const formatTiming = (stats, render) => stats.mean === null ? "未测量" : render(stats);
 for (const c of cfgNames) {
   const s = b.configs[c];
   console.log(
     `  ${c.padEnd(14)} pass_rate ${(s.pass_rate.mean * 100).toFixed(0)}% ±${(s.pass_rate.stddev * 100).toFixed(0)}%` +
-    `   ${(s.time_ms.mean / 1000).toFixed(1)}s ±${(s.time_ms.stddev / 1000).toFixed(1)}s` +
-    `   ${(s.tokens.mean / 1000).toFixed(1)}k ±${(s.tokens.stddev / 1000).toFixed(1)}k tokens` +
+    `   ${formatTiming(s.time_ms, (v) => `${(v.mean / 1000).toFixed(1)}s ±${(v.stddev / 1000).toFixed(1)}s`)}` +
+    `   ${formatTiming(s.tokens, (v) => `${(v.mean / 1000).toFixed(1)}k ±${(v.stddev / 1000).toFixed(1)}k tokens`)}` +
     (s.runs ? `   (${s.runs} runs)` : "")
   );
 }
@@ -521,11 +538,11 @@ if (cfgNames.length >= 2) {
   const d = b.delta;
   console.log(
     `  delta           ${(d.pass_rate >= 0 ? "+" : "") + d.pass_rate.toFixed(2)}` +
-    `        ${(d.time_ms >= 0 ? "+" : "") + (d.time_ms / 1000).toFixed(1) + "s"}` +
-    `        ${(d.tokens >= 0 ? "+" : "") + (d.tokens / 1000).toFixed(1) + "k"}`
+    `        ${d.time_ms === null ? "未测量" : (d.time_ms >= 0 ? "+" : "") + (d.time_ms / 1000).toFixed(1) + "s"}` +
+    `        ${d.tokens === null ? "未测量" : (d.tokens >= 0 ? "+" : "") + (d.tokens / 1000).toFixed(1) + "k"}`
   );
 }
-if (historyGapWarning) console.log(`警告: ${historyGapWarning}`);
+for (const warning of b.warnings) console.log(`警告: ${warning}`);
 console.log(`→ ${outJson}, ${outJson.replace(/\.json$/, ".md")}`);
 
 // --history：评测数据反向沉淀进技能目录（唯一写入通道，须显式传参；失败不吞 benchmark 产出）

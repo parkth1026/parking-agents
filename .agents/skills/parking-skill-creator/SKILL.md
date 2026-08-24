@@ -181,7 +181,7 @@ node scripts/quick-validate.mjs <技能目录>
 { "total_tokens": 48213, "duration_ms": 137000 }
 ```
 
-数值拿不到就写 `null`（聚合器会跳过并计入 skipped，不报错）。
+数值拿不到就写 `null`（聚合器会跳过并计入 skipped；若本轮某项 timing 全部缺失，会在 `benchmark.json`/终端显著告警，统计保持「未测量」而不是伪造为 0）。
 
 通知到达时同时核对**产物已落盘**——该 run 的 `outputs/` 有文件、任务要求的关键产物存在。空产物是执行臂故障（agent 报完成但没写盘），不是技能回归：先纠偏续跑或重跑该臂补齐，再进评分；纠偏产生的 timing 按各段累计。
 
