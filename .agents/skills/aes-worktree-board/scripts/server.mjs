@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import {
   collectStatus, listWorktrees, loadConfig, readTasks, RUNTIME_DIR, SKILL_DIR, TASKS_DIR,
 } from './collect.mjs';
+import { HEADLESS_CHILD_OPTIONS } from './headless.mjs';
 
 const pExecFile = promisify(execFile);
 const config = loadConfig();
@@ -59,7 +60,7 @@ function tailFile(path, bytes = 8 * 1024) {
 }
 
 async function dirtyCount(path) {
-  const { stdout } = await pExecFile('git', ['-C', path, 'status', '--porcelain']);
+  const { stdout } = await pExecFile('git', ['-C', path, 'status', '--porcelain'], HEADLESS_CHILD_OPTIONS);
   const output = stdout.replace(/\r\n/g, '\n').trimEnd();
   const lines = output ? output.split('\n') : [];
   return {
@@ -131,6 +132,7 @@ async function handleDispatch(request, response) {
   if (payload.confirmDirty) args.push('--confirm-dirty');
   launchingTasks.set(targetName, taskId);
   const child = spawn(process.execPath, args, {
+    ...HEADLESS_CHILD_OPTIONS,
     detached: true,
     stdio: 'ignore',
     cwd: SKILL_DIR,

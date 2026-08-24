@@ -2,6 +2,7 @@
 // 采集同级既有 worktree 与全仓 issue 事实，写入 status.json v2 和 file:// 快照。
 // assessment 是主 agent 的判断；采集只保留它并计算 stale，不替 agent 作合并决定。
 import { execFile } from 'node:child_process';
+import { HEADLESS_CHILD_OPTIONS } from './headless.mjs';
 import { promisify } from 'node:util';
 import {
   existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync,
@@ -34,6 +35,7 @@ export function loadConfig() {
 
 async function git(args, opts = {}) {
   const { stdout } = await pExecFile('git', args, {
+    ...HEADLESS_CHILD_OPTIONS,
     cwd: REPO_ROOT,
     maxBuffer: 16 * 1024 * 1024,
     ...opts,
@@ -155,7 +157,7 @@ async function fetchIssueList(issueRepo) {
   const { stdout } = await pExecFile('gh', [
     'issue', 'list', '--repo', issueRepo, '--state', 'all', '--limit', '1000',
     '--json', 'number,title,state,url,body,closedAt,updatedAt',
-  ], { timeout: 60_000, maxBuffer: 32 * 1024 * 1024 });
+  ], { ...HEADLESS_CHILD_OPTIONS, timeout: 60_000, maxBuffer: 32 * 1024 * 1024 });
   return JSON.parse(stdout);
 }
 
@@ -163,7 +165,7 @@ async function timelineHasReopen(issueRepo, number) {
   const { stdout } = await pExecFile('gh', [
     'api', '--paginate', '--slurp', `repos/${issueRepo}/issues/${number}/timeline`,
     '-H', 'Accept: application/vnd.github+json',
-  ], { timeout: 30_000, maxBuffer: 16 * 1024 * 1024 });
+  ], { ...HEADLESS_CHILD_OPTIONS, timeout: 30_000, maxBuffer: 16 * 1024 * 1024 });
   const pages = JSON.parse(stdout);
   return pages.flat().some((event) => event.event === 'reopened');
 }

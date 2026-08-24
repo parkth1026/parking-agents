@@ -42,6 +42,10 @@ $worker = "dev1"
 
    表后单独列出 `frontier 可开工：#… —— 空闲队员：dev…`；frontier 为空时明确写“无可开工项”。
 
+### headless 子进程窗口策略
+
+所有后台/headless 子进程统一从 `scripts/headless.mjs` 取 `HEADLESS_CHILD_OPTIONS`（`windowsHide: true`）。`detached`、stdio 重定向与 `unref()` 只处理生命周期与 I/O，不能阻止无控制台上下文里的子进程弹出可见控制台窗口；Windows 上只有 CREATE_NO_WINDOW 可以。新增 spawn/spawnSync/execFile/execFileSync 启动点必须带上该 helper；`selftest.mjs windows-hide` 域会机械扫描全部调用点，并用真实可见窗口采样验证 server → dispatch → agent 链路零可见窗口。采样器以窗口标题对照进程树命令行归属，兼容 Windows 11 把新控制台 delegate 给 Windows Terminal 的场景；写入采样器 ps1 必须带 BOM，否则 Windows PowerShell 会按 ANSI 解析中文注释导致脚本失效。
+
 ### 合并建议口径
 
 - `recommend` 需要：分支领先 main、merge-tree 无冲突、任务与 issue 验收已闭环、worktree 干净，并有对应测试或用户验收证据。
@@ -70,4 +74,4 @@ server 只能绑定 `127.0.0.1`。不要增加外部监听或把页面改成自�
 
 ## 自检
 
-按改动域运行自检，例如 `node "$skillDir/scripts/selftest.mjs" repo-root`；其他域是 `collect`、`dispatch`、`server` 与 `layout`。`dispatch` 使用独立 Git fixture 验证 Windows 可执行解析、dirty 确认、PID 锁与 server → dispatch；`repo-root` 验证跨仓 collect、direct dispatch、server → dispatch 与非法目标路径。页面视觉与交互仍需用真实浏览器对照锁定的 mock 与 handoff，不能由自检替代。
+按改动域运行自检，例如 `node "$skillDir/scripts/selftest.mjs" repo-root`；其他域是 `collect`、`dispatch`、`server`、`layout` 与 `windows-hide`。`dispatch` 使用独立 Git fixture 验证 Windows 可执行解析、dirty 确认、PID 锁与 server → dispatch；`repo-root` 验证跨仓 collect、direct dispatch、server → dispatch 与非法目标路径；`windows-hide` 机械断言所有子进程启动点使用统一窗口策略并采样真实运行零可见控制台窗口。页面视觉与交互仍需用真实浏览器对照锁定的 mock 与 handoff，不能由自检替代。

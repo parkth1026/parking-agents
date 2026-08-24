@@ -10,6 +10,7 @@ import {
   collectStatus, listWorktrees, loadConfig, RUNTIME_DIR, TASKS_DIR,
 } from './collect.mjs';
 import { resolveCommand } from './command.mjs';
+import { HEADLESS_CHILD_OPTIONS } from './headless.mjs';
 
 function fail(error, exitCode = 1, extra = {}) {
   console.error(JSON.stringify({ ok: false, error, ...extra }));
@@ -106,7 +107,10 @@ for (const fileName of readdirSync(TASKS_DIR)) {
   writeFileSync(taskPath, `${JSON.stringify(task, null, 2)}\n`);
 }
 
-const statusOutput = execFileSync('git', ['-C', target.path, 'status', '--porcelain'], { encoding: 'utf8' })
+const statusOutput = execFileSync('git', ['-C', target.path, 'status', '--porcelain'], {
+  ...HEADLESS_CHILD_OPTIONS,
+  encoding: 'utf8',
+})
   .replace(/\r\n/g, '\n').trimEnd();
 const statusLines = statusOutput ? statusOutput.split('\n') : [];
 const dirty = {
@@ -137,6 +141,7 @@ try {
 }
 const logFd = openSync(logPath, 'a');
 const child = spawn(finalArgv[0], finalArgv.slice(1), {
+  ...HEADLESS_CHILD_OPTIONS,
   cwd: target.path,
   stdio: ['pipe', logFd, logFd],
   env: { ...process.env, FORCE_COLOR: '0', NO_COLOR: '1' },

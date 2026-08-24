@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { HEADLESS_CHILD_OPTIONS } from './headless.mjs';
 
 function concreteWindowsCommand(candidates) {
   return candidates.find((candidate) => /\.(?:cmd|bat|exe)$/i.test(candidate));
@@ -12,6 +13,7 @@ export function resolveCommand(command, options = {}) {
   let candidates;
   try {
     candidates = execFileSync('where.exe', [commandName], {
+      ...HEADLESS_CHILD_OPTIONS,
       encoding: 'utf8',
       env: options.env || process.env,
     }).split(/\r?\n/).filter(Boolean);
