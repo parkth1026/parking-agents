@@ -251,7 +251,9 @@ node eval-viewer/generate-review.mjs <workspace>/iteration-<N> [--history <技�
 
 ## 触发评测：优化 description 的触发准确率
 
-description 决定技能会不会被调用。技能做完（或触发不准）时主动提议跑触发评测。**机制：同宿主 subagent 探针**——生产环境用哪个 agent 跑就用哪个 agent 测，同宿主同模型，零无头 CLI 依赖。
+description 决定技能会不会被调用。技能做完（或触发不准）时主动提议跑触发评测。**首选机制：同宿主 subagent 探针**——生产环境用哪个 agent 跑就用哪个 agent 测，同宿主同模型。
+
+起跑前先确认**当前编排会话**能否 spawn 探针。若没有嵌套 Agent 工具，读取 `references/headless-trigger-fallback.md`：仅在主会话已把同宿主、同模型凭据预置到进程环境时，用安全 launcher 单轮运行 `zcode --prompt`；严禁读写共享 CLI 配置、key 落盘或编排器自答，运行后删除私有 Temp 并扫描凭据前缀。缺少任一宿主能力或授权时停止，把整轮触发评测交回主会话直跑。
 
 ### 建评测集
 
@@ -370,8 +372,9 @@ node scripts/package-skill.mjs <技能目录> [输出目录]
 ## 参考文件
 
 - `references/writing-guide.md` — 技能写作方法论（渐进披露、自由度分级、description 写法、防泄漏纪律）
+- `references/headless-trigger-fallback.md` — 无嵌套 Agent 工具时的单轮 headless 探针、安全凭据与残留扫描契约
 - `references/schemas.md` — 全部 JSON 契约（eval_metadata 含 ac 字段/grading/timing/benchmark/feedback/history.json/structure-review/触发评测三契约/comparison/analysis）
-- `references/design.md` — 本技能的意图、设计取舍和 AC-1…AC-6 验收依据
+- `references/design.md` — 本技能的意图、设计取舍和 AC-1…AC-12 验收依据
 - `agents/openai.yaml` — 技能列表 UI 元数据，字段值不含宿主路径
 - `agents/grader.md` — grader subagent 指令（评分哲学与 grading.json 契约）
 - `agents/comparator.md` — 盲比较指令（A/B 不知情评审）

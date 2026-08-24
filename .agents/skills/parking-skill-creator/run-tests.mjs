@@ -51,6 +51,148 @@ check("parking-skill-creator 自身 description 保持中文优先", creatorDesc
   && ["with_skill/without_skill", "description", "subagent", ".skill", "Node"].every((s) => creatorDescription.includes(s))
   && !creatorDescription.includes("with/without"));
 
+// ---- 无嵌套 Agent·headless 触发探针 fallback ----
+console.log("headless 触发探针 fallback：");
+const fallbackDoc = readFileSync(join(CREATOR_DIR, "references", "headless-trigger-fallback.md"), "utf8");
+check("SKILL.md 把无嵌套 Agent 路由到 fallback 或主会话", creatorDoc.includes("references/headless-trigger-fallback.md")
+  && creatorDoc.includes("交回主会话直跑"));
+check("fallback 文档固化三禁、单轮与扫描边界", [
+  "不得读取、备份、修改或恢复 `~/.zcode/cli/config.json`",
+  "凭据只进进程环境",
+  "禁止自答",
+  "--max-turns 1",
+  "RESIDUE_SCAN_OK",
+  "BLOCKED",
+].every((s) => fallbackDoc.includes(s)));
+
+const fallbackRoot = mkdtempSync(join(tmpdir(), "headless-probe-test-"));
+try {
+  const fakeCli = join(fallbackRoot, "fake-zcode.mjs");
+  const skillsFile = join(fallbackRoot, "visible-skills.txt");
+  const privateTemp = join(fallbackRoot, "private-temp");
+  const sharedConfig = join(fallbackRoot, ".zcode", "cli", "config.json");
+  mkdirSync(dirname(sharedConfig), { recursive: true });
+  // 预存的假 secret store 故意含测试前缀：扫描若读取它，成功用例就会失败。
+  writeFileSync(sharedConfig, "PSC_TEST_ONLY_NOT_A_REAL_SECRET_123456789\n", "utf8");
+  writeFileSync(skillsFile, "demo-skill: 处理真实的演示任务\n", "utf8");
+  writeFileSync(fakeCli, `
+import { readFileSync, writeFileSync } from "node:fs";
+const args = process.argv.slice(2);
+const value = (flag) => args[args.indexOf(flag) + 1];
+const prompt = value("--prompt") ?? "";
+const settings = value("--settings") ?? "";
+const contractOk = value("--max-turns") === "1"
+  && value("--mode") === "plan"
+  && value("--surface") === "terminal"
+  && args.includes("--no-color")
+  && readFileSync(settings, "utf8").trim() === "{}"
+  && prompt.startsWith("你是一个技能路由判断器。你不需要、也不允许实际执行任务、调用任何工具或浏览任何文件")
+  && prompt.includes("第一行输出 ")
+  && prompt.includes("SKILL: <技能name>")
+  && process.env.ZCODE_API_KEY
+  && process.env.ZCODE_MODEL === "fake-same-model";
+if (!contractOk) process.exit(9);
+if (process.env.PSC_FAKE_MODE === "private-leak") {
+  writeFileSync(process.env.TEMP + "/leaked-key.txt", process.env.ZCODE_API_KEY, "utf8");
+  console.log("SKILL: demo-skill\\n路由匹配");
+} else if (process.env.PSC_FAKE_MODE === "leak-file") {
+  writeFileSync(process.env.PSC_LEAK_FILE, process.env.ZCODE_API_KEY, "utf8");
+  console.log("SKILL: demo-skill\\n路由匹配");
+} else if (process.env.PSC_FAKE_MODE === "secret-output") {
+  console.log(process.env.ZCODE_API_KEY);
+} else if (process.env.PSC_FAKE_MODE === "invalid") {
+  console.log("我觉得应该用 demo-skill");
+} else if (process.env.PSC_FAKE_MODE === "long-reason") {
+  console.log("SKILL: demo-skill\\n这个理由明显已经超过十五个汉字所以必须失败关闭");
+} else {
+  console.log("SKILL: demo-skill\\n路由匹配");
+}
+`, "utf8");
+
+  // 明显的测试占位串，不是 Provider 凭据；只通过子进程 env 注入。
+  const fakeKey = "PSC_TEST_ONLY_NOT_A_REAL_SECRET_123456789";
+  const baseArgs = [
+    "--query", "请处理这个演示任务",
+    "--skills-file", skillsFile,
+    "--command", process.execPath,
+    "--command-arg", fakeCli,
+    "--temp-root", privateTemp,
+    "--scan-root", fallbackRoot,
+  ];
+  const baseEnv = {
+    ...process.env,
+    HOME: fallbackRoot,
+    USERPROFILE: fallbackRoot,
+    ZCODE_API_KEY: fakeKey,
+    ZCODE_MODEL: "fake-same-model",
+  };
+  const sharedBefore = readFileSync(sharedConfig, "utf8");
+  const success = runFile("run-headless-trigger-probe.mjs", baseArgs, { env: baseEnv });
+  check("fallback: 单轮 Provider 合法结果原样转发", success.code === 0
+    && success.stdout === "SKILL: demo-skill\n路由匹配\n");
+  check("fallback: 共享 cli/config.json 未读写流程保持原样", readFileSync(sharedConfig, "utf8") === sharedBefore);
+  check("fallback: 私有 psc-trigger-probe 临时目录清零", readdirSync(privateTemp).length === 0);
+  check("fallback: stdout/stderr 不含测试凭据或前缀", !out(success).includes(fakeKey)
+    && !out(success).includes(fakeKey.slice(0, 12)));
+
+  const noKeyEnv = { ...baseEnv };
+  delete noKeyEnv.ZCODE_API_KEY;
+  const noKey = runFile("run-headless-trigger-probe.mjs", baseArgs, { env: noKeyEnv });
+  check("fallback: 无进程环境 key 失败关闭", noKey.code === 1 && out(noKey).includes("缺少有效的 ZCODE_API_KEY")
+    && !out(noKey).includes("SKILL:"));
+
+  const invalid = runFile("run-headless-trigger-probe.mjs", baseArgs, {
+    env: { ...baseEnv, PSC_FAKE_MODE: "invalid" },
+  });
+  check("fallback: Provider 协议非法时不猜测不自答", invalid.code === 1
+    && out(invalid).includes("不猜测、不代答") && !out(invalid).includes("SKILL: demo-skill"));
+
+  const longReason = runFile("run-headless-trigger-probe.mjs", baseArgs, {
+    env: { ...baseEnv, PSC_FAKE_MODE: "long-reason" },
+  });
+  check("fallback: 超长理由失败关闭而非截断", longReason.code === 1
+    && out(longReason).includes("超过 15 字") && !out(longReason).includes("SKILL: demo-skill"));
+
+  const secretOutput = runFile("run-headless-trigger-probe.mjs", baseArgs, {
+    env: { ...baseEnv, PSC_FAKE_MODE: "secret-output" },
+  });
+  check("fallback: Provider 输出凭据时抑制原文", secretOutput.code === 1
+    && out(secretOutput).includes("内容已抑制")
+    && !out(secretOutput).includes(fakeKey) && !out(secretOutput).includes(fakeKey.slice(0, 12)));
+
+  const privateLeak = runFile("run-headless-trigger-probe.mjs", baseArgs, {
+    env: { ...baseEnv, PSC_FAKE_MODE: "private-leak" },
+  });
+  check("fallback: 私有 Temp 凭据落盘被发现且清理", privateLeak.code === 1
+    && out(privateLeak).includes("写入私有 Temp") && readdirSync(privateTemp).length === 0
+    && !out(privateLeak).includes(fakeKey));
+
+  const leakFile = join(fallbackRoot, "outside-private-temp.txt");
+  const leaked = runFile("run-headless-trigger-probe.mjs", baseArgs, {
+    env: { ...baseEnv, PSC_FAKE_MODE: "leak-file", PSC_LEAK_FILE: leakFile },
+  });
+  check("fallback: 扫描根发现凭据前缀即拒绝", leaked.code === 1
+    && out(leaked).includes("凭据前缀残留") && out(leaked).includes(leakFile)
+    && !out(leaked).includes(fakeKey));
+  rmSync(leakFile, { force: true });
+
+  const missingCli = runFile("run-headless-trigger-probe.mjs", [
+    ...baseArgs.slice(0, 4),
+    "--command", join(fallbackRoot, "no-such-zcode"),
+    "--temp-root", privateTemp,
+    "--scan-root", fallbackRoot,
+  ], { env: baseEnv });
+  check("fallback: CLI 缺失不生成探针答案", missingCli.code === 1
+    && out(missingCli).includes("不生成探针答案") && !out(missingCli).includes("SKILL:"));
+
+  writeFileSync(skillsFile, "demo-skill: should_trigger=true\n", "utf8");
+  const polluted = runFile("run-headless-trigger-probe.mjs", baseArgs, { env: baseEnv });
+  check("fallback: 技能清单混入预期答案提示时拒绝", polluted.code === 1
+    && out(polluted).includes("混入评测答案") && !out(polluted).includes("SKILL:"));
+} finally {
+  rmSync(fallbackRoot, { recursive: true, force: true });
+}
+
 function exists(p) {
   try { readFileSync(p); return true; } catch { return false; }
 }
