@@ -100,7 +100,7 @@ Append-only eval score ledger. Located at `<skill-dir>/history.json`, distribute
 - `runs[]`: One entry per `--history` aggregation, append-only
   - `date`: Local-timezone ISO timestamp of the aggregation
   - `iteration_ref`: Absolute path of the aggregated iteration dir (the source of this run's data). Local-machine only — for cross-machine consumers it is just a round identifier, not a readable path
-  - `gates`: Key = config directory name (gate name), open set — `with_skill` / `without_skill` / `old_skill` / any custom name. Values: `pass_rate` (mean), `mean_ms` / `mean_tokens` (`null` when all timing values were null)
+  - `gates`: Key = config directory name (gate name), open set — `with_skill` / `without_skill` / `old_skill` / any custom name. Values: `pass_rate` (mean), `mean_ms` / `mean_tokens` (each is `null` when that metric has no valid timing sample in the gate; never a synthetic 0)
   - `vs_previous`: Comparison against the previous run, matched by exact eval name with pass-boolean flips; `null` for the first run, when the previous iteration's data on disk is unreadable, when re-aggregating the same iteration (no self-comparison), or when the two runs' primary gates are discontinuous (renamed/pure-experimental gates — never recorded as `lost`). New-this-round evals count in `evals_total` but not in won/lost (`detail` marks them `new`); evals present last round but absent this round are marked `dropped` in `detail`, never silently dropped; evals lacking data under the comparison gate on either side count as `tie` (no flip derivable)
   - `current_best`: Snapshot flag written at append time when this run was the best; the authoritative pointer is the top-level `current_best`
 - `current_best` (top level): `"runs[N]"`. The **primary gate** is `with_skill`, or the alphabetically-first gate name when absent. The pointer advances only when the primary-gate pass_rate is **strictly** higher — ties never advance (anti-jitter). Two guards against dirty data: rounds whose primary gate name differs from the incumbent best's (pure experimental gates) never advance the pointer; re-aggregating the same `iteration_ref` counts as a correction — a new entry is appended (with a stdout notice) and only the latest entry per `iteration_ref` is a best-candidate, so an early partial aggregate cannot lock the ceiling
@@ -293,9 +293,10 @@ Output from `scripts/aggregate-benchmark.mjs`. Located at `<iteration-dir>/bench
 - `iteration`: Directory name of the iteration
 - `configs`: Discovered dynamically — any `eval-*/<config>/run-*` layout counts (with_skill / without_skill / old_skill / anything else, kept verbatim as keys)
   - `runs`: Total number of runs pooled across evals for that config
-  - `pass_rate` / `time_ms` / `tokens`: mean / stddev (sample, n-1) / min / max — stddev is 0 for single-run configs
+  - `pass_rate`: mean / stddev (sample, n-1) / min / max — numeric, with stddev 0 for single-run configs
+  - `time_ms` / `tokens`: mean / stddev (sample, n-1) / min / max when the metric has at least one valid sample; when no valid sample exists, all four statistics are `null` (rendered as 未测量)
   - `skipped`: Runs excluded per metric due to `null` timing values
-- `delta`: First config minus second config (alphabetical order puts with_skill before without_skill); numeric, not strings
+- `delta`: First config minus second config (alphabetical order puts with_skill before without_skill); `pass_rate` is numeric, while `time_ms`/`tokens` are numeric only when both compared configs have a valid value for that metric, otherwise `null`
 - `evals`: Eval directory names in order
 - `warnings`: Non-fatal scan issues (missing grading.json etc.)
 - `notes`: Optional string array appended by the analyst pass (SKILL.md 6.4 step 3); the viewer renders it as Analysis Notes. Absent when no analyst pass ran — consumers must not require it
