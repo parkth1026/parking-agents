@@ -16,8 +16,7 @@ import {
 import { resolveCommand } from './command.mjs';
 import { HEADLESS_CHILD_OPTIONS } from './headless.mjs';
 import {
-  consumeEvent, CONTROL_STATES, createTask, evaluateStop, heartbeatTask, pendingInbox, putInboxEvent,
-  recordBlock, setVerdict, TASK_STATES, transitionTask,
+  CONTROL_STATES, createTask, TASK_STATES,
 } from './orchestrate.mjs';
 import { readJson, readJsonLines, readRegistry, writeJsonAtomic } from './runtime-store.mjs';
 
@@ -26,6 +25,7 @@ const SCRIPT_DIR = resolve(SKILL_DIR, 'scripts');
 const SELF = fileURLToPath(import.meta.url);
 const ROOT = resolve(SKILL_DIR, '..', '..', '..');
 const ISSUE_FIXTURE = join(SKILL_DIR, 'fixtures', 'aes-agent-issues.json');
+const ORCHESTRATION_FIXTURE = join(SKILL_DIR, 'fixtures', 'orchestration-events.json');
 
 function tempDirectory(label) {
   return mkdtempSync(join(tmpdir(), `aes-worktree-board-${label}-`));
@@ -150,6 +150,146 @@ function parseJsonLine(text) {
   const line = String(text).split(/\r?\n/).find((value) => value.trim().startsWith('{'));
   assert.ok(line, `缺少 JSON 行: ${text}`);
   return JSON.parse(line);
+}
+
+function loadOrchestrationFixture() {
+  const fixture = JSON.parse(readFileSync(ORCHESTRATION_FIXTURE, 'utf8'));
+  assert.equal(fixture.schemaVersion, 1, 'orchestration event fixture schemaVersion 必须为 1');
+  assert.ok(fixture.batches && typeof fixture.batches === 'object', 'orchestration event fixture 缺少 batches');
+  return fixture;
+}
+
+function materializeFixtureValue(value, replacements) {
+  if (Array.isArray(value)) return value.map((item) => materializeFixtureValue(item, replacements));
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [
+      key, materializeFixtureValue(item, replacements),
+    ]));
+  }
+  if (typeof value !== 'string') return value;
+  return value.replace(/\$([A-Za-z0-9_]+)/g, (match, key) => (
+    Object.hasOwn(replacements, key) ? String(replacements[key]) : match
+  ));
+}
+
+function fixtureBatch(fixture, name, replacements) {
+  const source = fixture.batches[name];
+  assert.ok(source, `orchestration event fixture 缺少 batch: ${name}`);
+  const batch = materializeFixtureValue(source, replacements);
+  assert.ok(Array.isArray(batch.wake), `${name}.wake 必须是数组`);
+  assert.ok(Array.isArray(batch.polls), `${name}.polls 必须是数组`);
+  return { ...batch, events: [...batch.wake, ...batch.polls] };
+}
+
+function inboxPutViaCli(runtimeDir, taskId, event, expectedStatus = 0) {
+  const safeEventId = String(event.eventId).replace(/[^A-Za-z0-9_.-]/g, '_');
+  const payloadPath = join(runtimeDir, `.event-payload-${safeEventId}.json`);
+  writeFileSync(payloadPath, `${JSON.stringify(event.payload || {})}\n`);
+  const result = orchestrateSync([
+    'inbox', 'put', '--thread', event.thread, '--task', taskId, '--kind', event.kind,
+    '--event-id', event.eventId, '--payload-file', payloadPath,
+  ], runtimeDir);
+  assert.equal(result.status, expectedStatus, result.stderr || result.stdout);
+  return parseJsonLine(expectedStatus === 0 ? result.stdout : result.stderr);
+}
+
+function inboxPendingViaCli(runtimeDir, expectedStatus = 0) {
+  const result = orchestrateSync(['inbox', 'pending'], runtimeDir);
+  assert.equal(result.status, expectedStatus, result.stderr || result.stdout);
+  return parseJsonLine(expectedStatus === 0 ? result.stdout : result.stderr);
+}
+
+function consumeViaCli(runtimeDir, eventId, expectedStatus = 0) {
+  const result = orchestrateSync(['consume', '--event-id', eventId], runtimeDir);
+  assert.equal(result.status, expectedStatus, result.stderr || result.stdout);
+  return parseJsonLine(expectedStatus === 0 ? result.stdout : result.stderr);
+}
+
+function ingestFixtureBatch(runtimeDir, fixture, name, taskId, replacements) {
+  const batch = fixtureBatch(fixture, name, replacements);
+  for (const event of batch.events) {
+    assert.ok(event.thread && event.kind && event.eventId, `${name} 事件缺少 thread/kind/eventId`);
+    inboxPutViaCli(runtimeDir, taskId, event);
+  }
+  batch.pending = inboxPendingViaCli(runtimeDir);
+  return batch;
+}
+
+function consumeFixtureEvents(runtimeDir, events, { skipEventIds = new Set() } = {}) {
+  const results = [];
+  for (const event of events) {
+    if (!skipEventIds.has(event.eventId)) results.push(consumeViaCli(runtimeDir, event.eventId));
+  }
+  return results;
+}
+
+function taskCreateViaCli(runtimeDir, options) {
+  const args = [
+    'task', 'create', '--issue', String(options.issue), '--worktree', options.worktree,
+    '--role', options.role || 'executor', '--model', options.model || 'luna-max',
+    '--routing-reason', options.routingReason || options['routing-reason'] || 'selftest CLI fixture',
+  ];
+  const flags = {
+    'thread-id': options.threadId || options['thread-id'],
+    'client-thread-id': options.clientThreadId || options['client-thread-id'],
+    'parent-task-id': options.parentTaskId || options['parent-task-id'],
+    agent: options.agent,
+    'task-id': options.taskId || options['task-id'],
+    'fallback-authorized': options.fallbackAuthorized || options['fallback-authorized'],
+    'interaction-class': options.interactionClass || options['interaction-class'],
+  };
+  for (const [key, value] of Object.entries(flags)) {
+    if (value !== undefined && value !== null) args.push(`--${key}`, String(value));
+  }
+  if (options.requiresRuntime || options['requires-runtime']) args.push('--requires-runtime');
+  const result = orchestrateSync(args, runtimeDir);
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  return parseJsonLine(result.stdout).task;
+}
+
+function heartbeatViaCli(runtimeDir, taskId) {
+  const result = orchestrateSync(['task', 'heartbeat', '--task', taskId], runtimeDir);
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  return parseJsonLine(result.stdout);
+}
+
+function verdictViaCli(runtimeDir, taskId, verdict, expectedStatus = 0) {
+  const args = ['verdict', 'set', '--task', taskId];
+  for (const key of ['code', 'runtime', 'delivery']) {
+    if (verdict[key] !== undefined) args.push(`--${key}`, verdict[key]);
+  }
+  const result = orchestrateSync(args, runtimeDir);
+  assert.equal(result.status, expectedStatus, result.stderr || result.stdout);
+  return parseJsonLine(expectedStatus === 0 ? result.stdout : result.stderr);
+}
+
+function blockRecordViaCli(runtimeDir, taskId, options, expectedStatus = 0) {
+  const args = ['block', 'record', '--task', taskId, '--commit', options.commit, '--event-id', options.eventId];
+  if (options.findingFile) args.push('--finding-file', options.findingFile);
+  const result = orchestrateSync(args, runtimeDir);
+  assert.equal(result.status, expectedStatus, result.stderr || result.stdout);
+  return parseJsonLine(expectedStatus === 0 ? result.stdout : result.stderr);
+}
+
+function stopEvalViaCli(runtimeDir, write, expectedStatus = 0) {
+  const args = ['stop', 'eval'];
+  if (write) args.push('--write');
+  const result = orchestrateSync(args, runtimeDir);
+  assert.equal(result.status, expectedStatus, result.stderr || result.stdout);
+  const output = result.stdout || result.stderr;
+  assert.ok(output.trim(), `stop eval CLI 无 JSON 输出: status=${result.status}, stdout=${result.stdout}, stderr=${result.stderr}`);
+  return parseJsonLine(result.stdout || result.stderr);
+}
+
+function transitionViaCli(taskId, to, runtimeDir, options = {}) {
+  const args = ['transition', '--task', taskId, '--to', to];
+  if (options.commitSha) args.push('--commit', options.commitSha);
+  if (options.mergeCommit) args.push('--merge-commit', options.mergeCommit);
+  if (options.reviewTaskId) args.push('--review-task', options.reviewTaskId);
+  if (options.reason) args.push('--reason', options.reason);
+  const result = orchestrateSync(args, runtimeDir);
+  assert.equal(result.status, options.expectedStatus ?? 0, result.stderr || result.stdout);
+  return result.status === 0 ? parseJsonLine(result.stdout) : parseJsonLine(result.stderr);
 }
 
 async function ghJson(args) {
@@ -1423,7 +1563,7 @@ async function orchestrationStorageCompatibility() {
       issue: 61, worktree: worker.name, role: 'executor', 'thread-id': 'T-storage',
       model: 'luna-max', 'routing-reason': 'storage compatibility fixture',
     }, runtimeDir);
-    transitionTask(created.taskId, 'parked', { reason: 'storage terminal preservation probe' }, runtimeDir);
+    transitionViaCli(created.taskId, 'parked', runtimeDir, { reason: 'storage terminal preservation probe' });
     const frozenAt = readRegistry(runtimeDir).tasks[created.taskId].finishedAt;
     assert.ok(frozenAt, 'parked 必须冻结 worker 工作周期');
     const collected = await collectStatus({ runtimeDir, issuesFixture: ISSUE_FIXTURE });
@@ -1457,6 +1597,55 @@ async function orchestrationStorageCompatibility() {
   }
 }
 
+async function orchestrationMergeBehindRefresh() {
+  const mergeFixture = repositoryFixture('orchestration-storage-behind');
+  const mergeRuntime = join(mergeFixture.root, 'runtime');
+  try {
+    writeFileSync(join(mergeFixture.sibling, 'feature.txt'), 'feature\n');
+    gitSync(mergeFixture.sibling, ['add', 'feature.txt']);
+    gitSync(mergeFixture.sibling, ['commit', '-m', 'feature']);
+    const collectMergeFixture = () => {
+      const result = spawnSync(process.execPath, [join(SCRIPT_DIR, 'collect.mjs'), '--no-gh'], {
+        ...HEADLESS_CHILD_OPTIONS,
+        cwd: mergeFixture.main,
+        encoding: 'utf8',
+        env: boardEnv(mergeRuntime, { AES_WORKTREE_BOARD_REPO_ROOT: mergeFixture.main }),
+      });
+      assert.equal(result.status, 0, result.stderr || result.stdout);
+      return JSON.parse(readFileSync(join(mergeRuntime, 'status.json'), 'utf8'));
+    };
+    let mergeStatus = collectMergeFixture();
+    let mergeWorker = mergeStatus.worktrees.find((item) => item.name === basename(mergeFixture.sibling));
+    assert.deepEqual(
+      { ahead: mergeWorker.ahead, behind: mergeWorker.behind, merge: mergeWorker.mergeCheck.result },
+      { ahead: 1, behind: 0, merge: 'clean' },
+      'feature commit 初始应为可合并且未落后',
+    );
+
+    writeFileSync(join(mergeFixture.main, 'main-only.txt'), 'main update\n');
+    gitSync(mergeFixture.main, ['add', 'main-only.txt']);
+    gitSync(mergeFixture.main, ['commit', '-m', 'main update']);
+    mergeStatus = collectMergeFixture();
+    mergeWorker = mergeStatus.worktrees.find((item) => item.name === basename(mergeFixture.sibling));
+    assert.deepEqual(
+      { ahead: mergeWorker.ahead, behind: mergeWorker.behind },
+      { ahead: 1, behind: 1 },
+      'main 更新后 sibling 的 behind 必须刷新，而不是沿用旧快照',
+    );
+
+    writeFileSync(join(mergeFixture.sibling, 'untracked-after-merge.txt'), 'keep this现场\n');
+    gitSync(mergeFixture.main, ['merge', '--no-ff', 'fixture-dev', '-m', 'merge feature']);
+    mergeStatus = collectMergeFixture();
+    mergeWorker = mergeStatus.worktrees.find((item) => item.name === basename(mergeFixture.sibling));
+    assert.equal(mergeWorker.ahead, 0, 'merge 后 sibling 不得继续显示可合并 ahead');
+    assert.equal(mergeWorker.behind, 2, 'main-only 与 merge commit 都在 sibling 后，behind 必须反映真实拓扑');
+    assert.equal(mergeWorker.mergeCheck.result, 'up-to-date');
+    assert.equal(mergeWorker.dirty.untracked, 1, 'merge 后 sibling 的 untracked 现场必须保留并可见');
+  } finally {
+    await cleanRepositoryFixture(mergeFixture);
+  }
+}
+
 async function orchestrationAtomicConcurrency() {
   const runtimeDir = tempDirectory('orchestration-storage-race');
   try {
@@ -1487,6 +1676,28 @@ for (let index = 0; index < count; index += 1) {
   }
 }
 
+async function orchestrationLockCompetition() {
+  const runtimeDir = tempDirectory('orchestration-storage-lock-competition');
+  try {
+    const worker = basename((await listWorktrees()).siblings[0].path);
+    const args = (thread) => [
+      join(SCRIPT_DIR, 'orchestrate.mjs'), 'task', 'create', '--issue', '18', '--worktree', worker,
+      '--role', 'executor', '--thread-id', thread, '--model', 'sol-high', '--routing-reason', 'P2.3 lock competition',
+    ];
+    const env = boardEnv(runtimeDir);
+    const raced = await Promise.all([runNode(args('T-lock-a'), { env }), runNode(args('T-lock-b'), { env })]);
+    assert.deepEqual(raced.map((item) => item.status).sort(), [0, 2]);
+    const loser = raced.find((item) => item.status === 2);
+    assert.equal(parseJsonLine(loser.stderr).code, 'LOCKED');
+    const registry = readRegistry(runtimeDir);
+    assert.equal(Object.keys(registry.tasks).length, 1, '同一 worktree 竞争只能登记一个 Task');
+    const leaseWorker = Object.keys(registry.leases)[0];
+    assert.equal(registry.leases[leaseWorker].generation, 1);
+  } finally {
+    await cleanTemp(runtimeDir);
+  }
+}
+
 async function orchestrationPreflightLeaseAndState() {
   const runtimeDir = tempDirectory('orchestration-lifecycle-preflight');
   const raceRuntime = tempDirectory('orchestration-lifecycle-race');
@@ -1511,15 +1722,15 @@ async function orchestrationPreflightLeaseAndState() {
     assert.equal(created.task.startedAt, created.task.createdAt, 'Task 登记时开始 worker 工作周期');
     assert.equal(created.task.finishedAt, null);
     const originalStartedAt = created.task.startedAt;
-    heartbeatTask(created.taskId, runtimeDir);
+    heartbeatViaCli(runtimeDir, created.taskId);
     assert.equal(readRegistry(runtimeDir).tasks[created.taskId].startedAt, originalStartedAt, 'heartbeat 不得重置开始时间');
-    transitionTask(created.taskId, 'executing', {}, runtimeDir);
+    transitionViaCli(created.taskId, 'executing', runtimeDir);
     assert.equal(readRegistry(runtimeDir).tasks[created.taskId].startedAt, originalStartedAt, '普通活动态转移不得重置开始时间');
-    transitionTask(created.taskId, 'parked', {}, runtimeDir);
+    transitionViaCli(created.taskId, 'parked', runtimeDir);
     const parked = readRegistry(runtimeDir).tasks[created.taskId];
     assert.ok(parked.finishedAt, 'parked 必须记录结束时间');
     await waitMilliseconds(5);
-    transitionTask(created.taskId, 'executing', {}, runtimeDir);
+    transitionViaCli(created.taskId, 'executing', runtimeDir);
     const resumed = readRegistry(runtimeDir).tasks[created.taskId];
     assert.ok(resumed.startedAt > originalStartedAt, 'parked 恢复必须开始新的 worker 工作周期');
     assert.equal(resumed.finishedAt, null, 'parked 恢复必须清空结束时间');
@@ -1552,9 +1763,7 @@ async function orchestrationPreflightLeaseAndState() {
         model: 'luna-max', 'routing-reason': 'reviewer lease fixture',
       }, reviewRuntime);
       const executor = executorCreated.task;
-      transitionTask(executor.taskId, 'executing', {}, reviewRuntime);
-      transitionTask(executor.taskId, 'self-qa', {}, reviewRuntime);
-      transitionTask(executor.taskId, 'committed', { commitSha: 'executor-commit' }, reviewRuntime);
+      advanceToReview(executor.taskId, reviewRuntime, 'executor');
       const reviewer = createTask({
         issue: 17, worktree: 'parking-agents-dev4', role: 'reviewer',
         'parent-task-id': executor.taskId, 'thread-id': 'T-reviewer',
@@ -1582,9 +1791,7 @@ async function orchestrationPreflightLeaseAndState() {
         issue: 17, worktree: availableWorker, role: 'executor', 'thread-id': 'T-projection-executor',
         model: 'luna-max', 'routing-reason': 'timing projection fixture',
       }, projectionRuntime);
-      transitionTask(executorCreated.taskId, 'executing', {}, projectionRuntime);
-      transitionTask(executorCreated.taskId, 'self-qa', {}, projectionRuntime);
-      transitionTask(executorCreated.taskId, 'committed', { commitSha: 'projection-commit' }, projectionRuntime);
+      advanceToReview(executorCreated.taskId, projectionRuntime, 'projection');
       const reviewer = createTask({
         issue: 17, worktree: availableWorker, role: 'reviewer', 'parent-task-id': executorCreated.taskId,
         'thread-id': 'T-projection-reviewer', model: 'sol-high', 'routing-reason': 'projection reviewer fixture',
@@ -1638,16 +1845,18 @@ async function orchestrationPreflightLeaseAndState() {
 
 function advanceToReview(taskId, runtimeDir, prefix = 'commit') {
   const task = readRegistry(runtimeDir).tasks[taskId];
-  const steps = task.state === 'dispatching'
-    ? ['executing', 'self-qa', 'committed', 'reviewing']
-    : task.state === 'fixing'
-      ? ['executing', 'self-qa', 'committed', 'reviewing']
-      : [];
-  for (const [index, state] of steps.entries()) {
-    transitionTask(taskId, state, {
-      reason: `selftest ${state}`, commitSha: state === 'committed' ? `${prefix}-${index}` : undefined,
-    }, runtimeDir);
-  }
+  assert.ok(['dispatching', 'fixing'].includes(task.state), `只能从 dispatching/fixing 驱动到 reviewing，实际为 ${task.state}`);
+  const fixture = loadOrchestrationFixture();
+  const batch = ingestFixtureBatch(runtimeDir, fixture, 'executorToReview', taskId, {
+    executorThread: task.threadId || task.clientThreadId,
+    prefix,
+    commitSha: `${prefix}-2`,
+  });
+  assert.equal(batch.wake.length, 0, 'executor host fixture 必须覆盖 wake 为空、polls 有变化');
+  assert.equal(batch.polls.length, 4);
+  consumeFixtureEvents(runtimeDir, batch.events);
+  assert.equal(readRegistry(runtimeDir).tasks[taskId].state, 'reviewing');
+  return batch;
 }
 
 async function orchestrationInboxIdempotency() {
@@ -1663,48 +1872,122 @@ async function orchestrationInboxIdempotency() {
       'thread-id': 'T-review', model: 'sol-high', 'routing-reason': 'inbox reviewer fixture',
     }, runtimeDir);
     assert.equal(reviewer.task.parentTaskId, created.taskId);
-    assert.throws(
-      () => putInboxEvent({
-        thread: 'T-unrelated', task: created.taskId, kind: 'verdict', 'event-id': 'E-foreign',
-        payload: JSON.stringify({ summary: 'foreign approval', verdict: 'APPROVE', cursor: 'foreign-cursor' }),
-      }, runtimeDir),
-      (error) => error.code === 'THREAD_TASK_MISMATCH',
-      'foreign thread 不得给显式 Task 注入 verdict/cursor',
-    );
-    putInboxEvent({
-      thread: 'T-review', task: created.taskId, kind: 'commentary', 'event-id': 'E-commentary-approve-bypass',
-      payload: JSON.stringify({
+    const foreign = inboxPutViaCli(runtimeDir, created.taskId, {
+      thread: 'T-unrelated', kind: 'verdict', eventId: 'E-foreign',
+      payload: { summary: 'foreign approval', verdict: 'APPROVE', cursor: 'foreign-cursor' },
+    }, 2);
+    assert.equal(foreign.code, 'THREAD_TASK_MISMATCH', 'foreign thread 不得给显式 Task 注入 verdict/cursor');
+    inboxPutViaCli(runtimeDir, created.taskId, {
+      thread: 'T-review', kind: 'commentary', eventId: 'E-commentary-approve-bypass',
+      payload: {
         summary: 'ordinary poll must not approve', to: 'approved', cursor: 'commentary-cursor', commitSha: 'commit-2',
-      }),
-    }, runtimeDir);
-    assert.throws(
-      () => consumeEvent('E-commentary-approve-bypass', runtimeDir),
-      (error) => error.code === 'INVALID_REVIEW_EVENT',
-      'commentary/progress payload.to 不得伪造最终 reviewer APPROVE',
+      },
+    });
+    const commentaryError = consumeViaCli(runtimeDir, 'E-commentary-approve-bypass', 2);
+    assert.equal(commentaryError.code, 'INVALID_REVIEW_EVENT', 'commentary/progress payload.to 不得伪造最终 reviewer APPROVE');
+    const fixture = loadOrchestrationFixture();
+    const hostBatch = ingestFixtureBatch(runtimeDir, fixture, 'reviewerApprove', created.taskId, {
+      reviewerThread: reviewer.task.threadId,
+      approvalEventId: 'E-wake',
+      pollEventId: 'E-poll-reviewer',
+      commitSha: 'commit-2',
+      finalCursor: 'cursor-final',
+      pollCursor: 'cursor-reviewer-poll',
+    });
+    assert.equal(hostBatch.wake.length, 1);
+    assert.equal(hostBatch.polls.length, 2, 'host fixture 必须同时带 commentary poll 与重复 final poll');
+    const hostEventIds = new Set(hostBatch.events.map((event) => event.eventId));
+    const rawHostEvents = readJsonLines(join(runtimeDir, 'inbox.jsonl'))
+      .filter((event) => hostEventIds.has(event.eventId));
+    assert.equal(rawHostEvents.length, 3, 'wake 与全部 polls 都必须先完整入箱');
+    assert.equal(rawHostEvents.filter((event) => event.eventId === 'E-wake').length, 2, '重复 final 必须保留审计送达记录');
+    assert.deepEqual(
+      inboxPendingViaCli(runtimeDir).pending.map((event) => event.eventId).sort(),
+      ['E-commentary-approve-bypass', 'E-poll-reviewer', 'E-wake'].sort(),
+      'wake 与全部 polls 入箱后只能按 eventId 去重，不得漏掉 poll',
     );
-    for (let index = 1; index <= 4; index += 1) {
-      putInboxEvent({
-        thread: 'T-review', task: created.taskId, kind: 'commentary', 'event-id': `E-poll-${index}`,
-        payload: JSON.stringify({ summary: `poll ${index}`, cursor: `cursor-${index}` }),
-      }, runtimeDir);
-    }
-    putInboxEvent({
-      thread: 'T-review', task: created.taskId, kind: 'verdict', 'event-id': 'E-wake',
-      payload: JSON.stringify({
-        summary: 'reviewer approved', verdict: 'APPROVE', cursor: 'cursor-final', commitSha: 'commit-2',
-      }),
-    }, runtimeDir);
-    assert.equal(pendingInbox(runtimeDir).pending.length, 6, 'wake、全部 polls 与被拒绝事件都必须留在 pending');
-    for (let index = 1; index <= 4; index += 1) consumeEvent(`E-poll-${index}`, runtimeDir);
-    const consumed = consumeEvent('E-wake', runtimeDir);
+    consumeViaCli(runtimeDir, 'E-poll-reviewer');
+    const consumed = consumeViaCli(runtimeDir, 'E-wake');
     assert.deepEqual(consumed.transition, { from: 'reviewing', to: 'approved' });
     const transitionCount = readJsonLines(join(runtimeDir, 'transitions.jsonl')).length;
-    const duplicate = consumeEvent('E-wake', runtimeDir);
+    const duplicate = consumeViaCli(runtimeDir, 'E-wake');
     assert.equal(duplicate.result, 'already-consumed');
     assert.equal(readJsonLines(join(runtimeDir, 'transitions.jsonl')).length, transitionCount, '重复事件不得追加转移');
-    const pending = pendingInbox(runtimeDir);
+    const pending = inboxPendingViaCli(runtimeDir);
     assert.deepEqual(pending.pending.map((event) => event.eventId), ['E-commentary-approve-bypass']);
     assert.equal(pending.cursors['T-review'], 'cursor-final');
+  } finally {
+    await cleanTemp(runtimeDir);
+  }
+}
+
+async function orchestrationFiveTaskFanIn() {
+  const runtimeDir = tempDirectory('orchestration-lifecycle-five-task-fanin');
+  try {
+    const fixture = loadOrchestrationFixture();
+    const executors = Array.from({ length: 5 }, (_, index) => {
+      const task = createTask({
+        issue: 70 + index, worktree: `dev${index + 1}`, role: 'executor',
+        'thread-id': `T-fanin-executor-${index + 1}`,
+        model: index === 0 ? 'luna-max' : 'sol-high', routingReason: 'five-task host fan-in fixture',
+      }, runtimeDir).task;
+      advanceToReview(task.taskId, runtimeDir, `fanin-${index + 1}`);
+      return task;
+    });
+    const reviewers = executors.map((executor, index) => createTask({
+      issue: executor.issue, worktree: executor.worktree, role: 'reviewer', parentTaskId: executor.taskId,
+      'thread-id': `T-fanin-reviewer-${index + 1}`,
+      model: 'sol-high', routingReason: 'five-task host fan-in reviewer',
+    }, runtimeDir).task);
+    const replacements = {
+      reviewerThread1: reviewers[0].threadId,
+      reviewerThread2: reviewers[1].threadId,
+      reviewerThread3: reviewers[2].threadId,
+      reviewerThread4: reviewers[3].threadId,
+      reviewerThread5: reviewers[4].threadId,
+      executorThread3: executors[2].threadId,
+      commit1: 'fanin-1-2', commit2: 'fanin-2-2', commit3: 'fanin-3-2', commit4: 'fanin-4-2', commit5: 'fanin-5-2',
+      cursor1: 'fanin-reviewer-cursor-1', cursor2: 'fanin-reviewer-cursor-2', cursor3: 'fanin-reviewer-cursor-3',
+      cursor4: 'fanin-reviewer-cursor-4', cursor5: 'fanin-reviewer-cursor-5',
+      executorCursor3: 'fanin-executor-cursor-3', commentaryCursor3: 'fanin-old-commentary-3',
+      reviewerCursor3: 'fanin-reviewer-cursor-3',
+    };
+    const batch = fixtureBatch(fixture, 'fiveTaskFanIn', replacements);
+    const hostEventTask = (event) => {
+      const reviewerIndex = reviewers.findIndex((reviewer) => reviewer.threadId === event.thread);
+      if (reviewerIndex >= 0) return executors[reviewerIndex].taskId;
+      return executors[2].taskId;
+    };
+    for (const event of batch.events) {
+      inboxPutViaCli(runtimeDir, hostEventTask(event), event);
+    }
+    const pending = inboxPendingViaCli(runtimeDir);
+    assert.equal(pending.pending.length, batch.events.length, '五 Task host batch 的 wake/polls 必须全部进入 pending');
+    const hostEventIds = new Set(batch.events.map((event) => event.eventId));
+    const raw = readJsonLines(join(runtimeDir, 'inbox.jsonl')).filter((event) => hostEventIds.has(event.eventId));
+    assert.equal(raw.length, batch.events.length, '五 Task 的每条异构投递都必须保留原始审计记录');
+    assert.ok(batch.polls.some((event) => event.kind === 'final' && event.thread === executors[2].threadId));
+    assert.ok(batch.polls.some((event) => event.kind === 'final' && event.thread === reviewers[1].threadId));
+    assert.ok(batch.polls.some((event) => event.kind === 'commentary'));
+    assert.ok(batch.polls.some((event) => event.kind === 'final' && event.thread === reviewers[2].threadId));
+
+    const pollResults = consumeFixtureEvents(runtimeDir, batch.polls);
+    const wakeResult = consumeViaCli(runtimeDir, batch.wake[0].eventId);
+    const mergeGateTaskIds = pollResults.concat(wakeResult)
+      .filter((result) => result.nextAction === 'merge-gate')
+      .map((result) => result.taskId);
+    assert.deepEqual(new Set(mergeGateTaskIds), new Set(executors.map((executor) => executor.taskId)));
+    assert.equal(mergeGateTaskIds.length, 5, '五 Task fan-in 必须为每个 Task 生成唯一 nextAction');
+    const after = inboxPendingViaCli(runtimeDir);
+    assert.equal(after.pending.filter((event) => hostEventIds.has(event.eventId)).length, 0);
+    const registry = readRegistry(runtimeDir);
+    for (const [index, executor] of executors.entries()) {
+      const task = registry.tasks[executor.taskId];
+      const reviewerThread = reviewers[index].threadId;
+      assert.equal(task.state, 'approved');
+      assert.equal(task.threadCursors[reviewerThread], replacements[`cursor${index + 1}`]);
+      if (index === 2) assert.equal(task.threadCursors[executors[index].threadId], replacements.executorCursor3);
+    }
   } finally {
     await cleanTemp(runtimeDir);
   }
@@ -1724,47 +2007,45 @@ async function orchestrationCircuitAndLateEvent() {
       issue: 56, worktree: 'dev1', role: 'reviewer', 'parent-task-id': created.taskId,
       'thread-id': 'T-block-review', model: 'sol-high', 'routing-reason': 'BLOCK reviewer fixture',
     }, runtimeDir);
-    putInboxEvent({
-      thread: 'T-block', task: created.taskId, kind: 'verdict', 'event-id': 'E-executor-self-block',
-      payload: JSON.stringify({ verdict: 'BLOCK', commitSha: 'a1', cursor: 'self-block-cursor' }),
-    }, runtimeDir);
-    assert.throws(
-      () => consumeEvent('E-executor-self-block', runtimeDir),
-      (error) => error.code === 'REVIEW_EVIDENCE_REQUIRED',
-      'executor 自己的 thread 不得伪造独立 reviewer BLOCK',
-    );
-    const queueBlock = (eventId, commit) => putInboxEvent({
-      thread: 'T-block-review', task: created.taskId, kind: 'verdict', 'event-id': eventId,
-      payload: JSON.stringify({
-        summary: `reviewer BLOCK ${commit}`, verdict: 'BLOCK', commitSha: commit, cursor: `cursor-${eventId}`,
-      }),
-    }, runtimeDir);
+    inboxPutViaCli(runtimeDir, created.taskId, {
+      thread: 'T-block', kind: 'verdict', eventId: 'E-executor-self-block',
+      payload: { verdict: 'BLOCK', commitSha: 'a1', cursor: 'self-block-cursor' },
+    });
+    const selfBlockError = consumeViaCli(runtimeDir, 'E-executor-self-block', 2);
+    assert.equal(selfBlockError.code, 'REVIEW_EVIDENCE_REQUIRED', 'executor 自己的 thread 不得伪造独立 reviewer BLOCK');
+    const fixture = loadOrchestrationFixture();
+    const queueBlock = (eventId, commit) => ingestFixtureBatch(runtimeDir, fixture, 'reviewerBlock', created.taskId, {
+      reviewerThread: reviewer.task.threadId,
+      eventId,
+      commitSha: commit,
+      cursor: `cursor-${eventId}`,
+    });
     queueBlock('E-b1', 'a1');
-    const consumedBlock = consumeEvent('E-b1', runtimeDir);
+    const consumedBlock = consumeViaCli(runtimeDir, 'E-b1');
     assert.equal(consumedBlock.result, 'consumed');
     assert.equal(consumedBlock.blockResult, 'recorded');
     assert.deepEqual(consumedBlock.transition, { from: 'reviewing', to: 'fixing' });
     assert.equal(consumedBlock.blockCount, 1);
-    let block = recordBlock(created.taskId, {
-      commit: 'a1', 'event-id': 'E-b1', 'finding-file': finding,
-    }, runtimeDir);
+    let block = blockRecordViaCli(runtimeDir, created.taskId, {
+      commit: 'a1', eventId: 'E-b1', findingFile: finding,
+    });
     assert.equal(block.result, 'duplicate-verdict');
-    assert.equal(pendingInbox(runtimeDir).pending.some((event) => event.eventId === 'E-b1'), false, 'block record 后事件必须完成消费');
+    assert.equal(inboxPendingViaCli(runtimeDir).pending.some((event) => event.eventId === 'E-b1'), false, 'block record 后事件必须完成消费');
     queueBlock('E-b1-duplicate', 'a1');
-    const duplicateConsumed = consumeEvent('E-b1-duplicate', runtimeDir);
+    const duplicateConsumed = consumeViaCli(runtimeDir, 'E-b1-duplicate');
     assert.equal(duplicateConsumed.result, 'consumed');
     assert.equal(duplicateConsumed.blockResult, 'duplicate-verdict');
     assert.equal(duplicateConsumed.blockCount, 1);
     advanceToReview(created.taskId, runtimeDir, 'b');
     queueBlock('E-b2', 'b2');
-    recordBlock(created.taskId, {
-      commit: 'b2', 'event-id': 'E-b2', 'finding-file': finding,
-    }, runtimeDir);
+    blockRecordViaCli(runtimeDir, created.taskId, {
+      commit: 'b2', eventId: 'E-b2', findingFile: finding,
+    });
     advanceToReview(created.taskId, runtimeDir, 'c');
     queueBlock('E-b3', 'c3');
-    block = recordBlock(created.taskId, {
-      commit: 'c3', 'event-id': 'E-b3', 'finding-file': finding,
-    }, runtimeDir);
+    block = blockRecordViaCli(runtimeDir, created.taskId, {
+      commit: 'c3', eventId: 'E-b3', findingFile: finding,
+    });
     assert.equal(block.result, 'circuit-broken');
     assert.equal(block.blockCount, 3);
     assert.equal(readRegistry(runtimeDir).tasks[created.taskId].state, 'handoff-required');
@@ -1772,11 +2053,12 @@ async function orchestrationCircuitAndLateEvent() {
     assert.ok(existsSync(block.handoffBundle));
     assert.match(readFileSync(block.handoffBundle, 'utf8'), /Issue: #56|final reviewer finding|Resume conditions/);
 
-    putInboxEvent({
-      thread: 'T-block', task: created.taskId, kind: 'progress', 'event-id': 'E-late',
-      payload: JSON.stringify({ summary: 'late event', to: 'executing' }),
-    }, runtimeDir);
-    const late = consumeEvent('E-late', runtimeDir);
+    ingestFixtureBatch(runtimeDir, fixture, 'lateEvent', created.taskId, {
+      reviewerThread: reviewer.task.threadId,
+      eventId: 'E-late',
+      cursor: 'late-cursor',
+    });
+    const late = consumeViaCli(runtimeDir, 'E-late');
     assert.equal(late.nextAction, 'terminal-noop');
     assert.equal(readRegistry(runtimeDir).tasks[created.taskId].state, 'handoff-required', 'late event 不得复活终态');
     assert.throws(
@@ -1786,6 +2068,74 @@ async function orchestrationCircuitAndLateEvent() {
       }, runtimeDir),
       (error) => ['LANE_CLOSED', 'LOCKED'].includes(error.code),
     );
+
+  } finally {
+    await cleanTemp(runtimeDir);
+  }
+}
+
+async function orchestrationParkedLateEvent() {
+  const runtimeDir = tempDirectory('orchestration-governance-parked-late');
+  try {
+    const fixture = loadOrchestrationFixture();
+    const parkedTask = createTask({
+      issue: 57, worktree: 'dev2', role: 'executor', 'thread-id': 'T-parked-executor',
+      model: 'luna-max', 'routing-reason': 'park late-event fixture',
+    }, runtimeDir).task;
+    advanceToReview(parkedTask.taskId, runtimeDir, 'park');
+    const parkedReviewer = createTask({
+      issue: 57, worktree: 'dev2', role: 'reviewer', 'parent-task-id': parkedTask.taskId,
+      'thread-id': 'T-parked-reviewer', model: 'sol-high', 'routing-reason': 'park late-event reviewer',
+    }, runtimeDir).task;
+    transitionViaCli(parkedTask.taskId, 'parked', runtimeDir, { reason: 'explicit pause before reviewer delivery' });
+    ingestFixtureBatch(runtimeDir, fixture, 'lateEvent', parkedTask.taskId, {
+      reviewerThread: parkedReviewer.threadId,
+      eventId: 'E-parked-late',
+      cursor: 'parked-late-cursor',
+    });
+    const parkedLate = consumeViaCli(runtimeDir, 'E-parked-late');
+    assert.equal(parkedLate.nextAction, 'terminal-noop');
+    assert.equal(readRegistry(runtimeDir).tasks[parkedTask.taskId].state, 'parked');
+    assert.equal(readRegistry(runtimeDir).tasks[parkedTask.taskId].threadCursors[parkedReviewer.threadId], 'parked-late-cursor');
+  } finally {
+    await cleanTemp(runtimeDir);
+  }
+}
+
+async function orchestrationAutonomousNotRun() {
+  const runtimeDir = tempDirectory('orchestration-governance-autonomous-not-run');
+  try {
+    const fixture = loadOrchestrationFixture();
+    const autonomous = createTask({
+      issue: 17, worktree: 'dev4', role: 'executor', 'thread-id': 'T-autonomous',
+      model: 'luna-max', 'routing-reason': 'autonomous fixture', 'interaction-class': 'autonomous',
+    }, runtimeDir);
+    advanceToReview(autonomous.taskId, runtimeDir, 'autonomous');
+    const autonomousReviewer = createTask({
+      issue: 17, worktree: 'dev4', role: 'reviewer', 'parent-task-id': autonomous.taskId,
+      'thread-id': 'T-autonomous-review', model: 'sol-high', 'routing-reason': 'autonomous merge-gate reviewer',
+    }, runtimeDir);
+    const accepted = verdictViaCli(runtimeDir, autonomous.taskId, { code: 'PASS', runtime: 'NOT_RUN', delivery: 'MERGE_READY' });
+    assert.deepEqual(accepted.verdict, { code: 'PASS', runtime: 'NOT_RUN', delivery: 'MERGE_READY' });
+    const immutableRuntimeError = verdictViaCli(runtimeDir, autonomous.taskId, { runtime: 'PASS' }, 2);
+    assert.equal(immutableRuntimeError.code, 'RUNTIME_EVIDENCE_IMMUTABLE');
+    const approval = ingestFixtureBatch(runtimeDir, fixture, 'reviewerApprove', autonomous.taskId, {
+      reviewerThread: autonomousReviewer.task.threadId,
+      approvalEventId: 'E-autonomous-approve',
+      pollEventId: 'E-autonomous-poll',
+      commitSha: 'autonomous-2',
+      finalCursor: 'autonomous-final',
+      pollCursor: 'autonomous-poll',
+    });
+    consumeViaCli(runtimeDir, approval.polls[0].eventId);
+    consumeViaCli(runtimeDir, approval.wake[0].eventId);
+    assert.equal(readRegistry(runtimeDir).tasks[autonomous.taskId].state, 'approved');
+    transitionViaCli(autonomous.taskId, 'merge-ready', runtimeDir, { reason: 'autonomous NOT_RUN merge gate' });
+    transitionViaCli(autonomous.taskId, 'merged', runtimeDir, {
+      mergeCommit: 'autonomous-merge-commit', reason: 'autonomous merge command',
+    });
+    assert.equal(readRegistry(runtimeDir).tasks[autonomous.taskId].state, 'merged');
+    assert.equal(readRegistry(runtimeDir).leases.dev4, undefined, 'merged 后必须释放 executor 租约');
   } finally {
     await cleanTemp(runtimeDir);
   }
@@ -1794,24 +2144,15 @@ async function orchestrationCircuitAndLateEvent() {
 async function orchestrationVerdictDimensions() {
   const runtimeDir = tempDirectory('orchestration-governance-verdict');
   try {
-    const autonomous = createTask({
-      issue: 17, worktree: 'dev4', role: 'executor', 'thread-id': 'T-verdict-a',
-      model: 'luna-max', 'routing-reason': 'autonomous fixture', 'interaction-class': 'autonomous',
-    }, runtimeDir);
-    const accepted = setVerdict(autonomous.taskId, { code: 'PASS', runtime: 'NOT_RUN', delivery: 'MERGE_READY' }, runtimeDir);
-    assert.deepEqual(accepted.verdict, { code: 'PASS', runtime: 'NOT_RUN', delivery: 'MERGE_READY' });
-    assert.throws(
-      () => setVerdict(autonomous.taskId, { runtime: 'PASS' }, runtimeDir),
-      (error) => error.code === 'RUNTIME_EVIDENCE_IMMUTABLE',
-    );
+    const fixture = loadOrchestrationFixture();
     const realMachine = createTask({
       issue: 41, worktree: 'dev5', role: 'executor', 'thread-id': 'T-verdict-b',
       model: 'sol-high', 'routing-reason': 'runtime required fixture', 'requires-runtime': true,
     }, runtimeDir);
-    assert.throws(
-      () => setVerdict(realMachine.taskId, { code: 'PASS', runtime: 'NOT_RUN', delivery: 'MERGE_READY' }, runtimeDir),
-      (error) => error.code === 'RUNTIME_REQUIRED',
-    );
+    const realMachineError = verdictViaCli(runtimeDir, realMachine.taskId, {
+      code: 'PASS', runtime: 'NOT_RUN', delivery: 'MERGE_READY',
+    }, 2);
+    assert.equal(realMachineError.code, 'RUNTIME_REQUIRED');
     assert.equal(readRegistry(runtimeDir).tasks[realMachine.taskId].verdict.runtime, null);
 
     const splitRuntime = tempDirectory('orchestration-governance-split-verdict');
@@ -1820,55 +2161,106 @@ async function orchestrationVerdictDimensions() {
         issue: 42, worktree: 'dev6', role: 'executor', 'thread-id': 'T-verdict-split-a',
         model: 'sol-high', 'routing-reason': 'split verdict fixture',
       }, splitRuntime);
-      setVerdict(failedRuntime.taskId, { code: 'PASS', runtime: 'FAIL' }, splitRuntime);
-      assert.throws(
-        () => setVerdict(failedRuntime.taskId, { delivery: 'MERGE_READY' }, splitRuntime),
-        (error) => error.code === 'RUNTIME_BLOCKS_DELIVERY',
-        '分步写 verdict 不得绕过 runtime=FAIL 门禁',
-      );
+      verdictViaCli(splitRuntime, failedRuntime.taskId, { code: 'PASS', runtime: 'FAIL' });
+      const failedDeliveryError = verdictViaCli(splitRuntime, failedRuntime.taskId, { delivery: 'MERGE_READY' }, 2);
+      assert.equal(failedDeliveryError.code, 'RUNTIME_BLOCKS_DELIVERY', '分步写 verdict 不得绕过 runtime=FAIL 门禁');
 
       const evidenceFree = createTask({
         issue: 43, worktree: 'dev7', role: 'executor', 'thread-id': 'T-evidence-free',
         model: 'luna-max', 'routing-reason': 'merge evidence fixture',
       }, splitRuntime);
-      transitionTask(evidenceFree.taskId, 'executing', {}, splitRuntime);
-      transitionTask(evidenceFree.taskId, 'self-qa', {}, splitRuntime);
-      assert.throws(
-        () => transitionTask(evidenceFree.taskId, 'committed', {}, splitRuntime),
-        (error) => error.code === 'COMMIT_EVIDENCE_REQUIRED',
-      );
-      transitionTask(evidenceFree.taskId, 'committed', { commitSha: 'evidence-commit' }, splitRuntime);
-      transitionTask(evidenceFree.taskId, 'reviewing', {}, splitRuntime);
-      assert.throws(
-        () => transitionTask(evidenceFree.taskId, 'approved', {}, splitRuntime),
-        (error) => error.code === 'REVIEW_EVIDENCE_REQUIRED',
-      );
+      const evidenceBatch = ingestFixtureBatch(splitRuntime, fixture, 'executorToReview', evidenceFree.taskId, {
+        executorThread: evidenceFree.task.threadId,
+        prefix: 'evidence',
+        commitSha: 'evidence-commit',
+      });
+      consumeViaCli(splitRuntime, evidenceBatch.polls[0].eventId);
+      consumeViaCli(splitRuntime, evidenceBatch.polls[1].eventId);
+      inboxPutViaCli(splitRuntime, evidenceFree.taskId, {
+        thread: evidenceFree.task.threadId, kind: 'final', eventId: 'E-evidence-missing-commit',
+        payload: { summary: 'missing commit evidence', to: 'committed', cursor: 'missing-commit' },
+      });
+      const missingCommitError = consumeViaCli(splitRuntime, 'E-evidence-missing-commit', 2);
+      assert.equal(missingCommitError.code, 'COMMIT_EVIDENCE_REQUIRED', '真实 executor final 缺 commitSha 时必须拒绝 committed');
+      consumeViaCli(splitRuntime, evidenceBatch.polls[2].eventId);
+      consumeViaCli(splitRuntime, evidenceBatch.polls[3].eventId);
       const reviewer = createTask({
         issue: 43, worktree: 'dev7', role: 'reviewer', 'parent-task-id': evidenceFree.taskId,
         'thread-id': 'T-evidence-review', model: 'sol-high', 'routing-reason': 'merge gate reviewer',
       }, splitRuntime);
-      setVerdict(evidenceFree.taskId, { code: 'PASS', runtime: 'NOT_RUN', delivery: 'MERGE_READY' }, splitRuntime);
-      assert.throws(
-        () => transitionTask(evidenceFree.taskId, 'approved', { reviewTaskId: reviewer.taskId }, splitRuntime),
-        (error) => error.code === 'REVIEW_EVIDENCE_REQUIRED',
-        '只登记 reviewer Task 不等于 reviewer 已 APPROVE',
+      verdictViaCli(splitRuntime, evidenceFree.taskId, { code: 'PASS', runtime: 'NOT_RUN', delivery: 'MERGE_READY' });
+      const withoutReview = transitionViaCli(evidenceFree.taskId, 'approved', splitRuntime, { expectedStatus: 2 });
+      assert.equal(withoutReview.code, 'REVIEW_EVIDENCE_REQUIRED', '只登记 reviewer Task 不等于 reviewer 已 APPROVE');
+      const evidenceApproval = ingestFixtureBatch(splitRuntime, fixture, 'reviewerApprove', evidenceFree.taskId, {
+        reviewerThread: reviewer.task.threadId,
+        approvalEventId: 'E-evidence-approve',
+        pollEventId: 'E-evidence-poll',
+        commitSha: 'evidence-commit',
+        finalCursor: 'review-cursor',
+        pollCursor: 'review-poll',
+      });
+      consumeViaCli(splitRuntime, evidenceApproval.polls[0].eventId);
+      consumeViaCli(splitRuntime, evidenceApproval.wake[0].eventId);
+      transitionViaCli(evidenceFree.taskId, 'merge-ready', splitRuntime);
+      const withoutMergeCommit = transitionViaCli(evidenceFree.taskId, 'merged', splitRuntime, { expectedStatus: 2 });
+      assert.equal(withoutMergeCommit.code, 'MERGE_GATE_REQUIRED');
+      for (const spoof of [
+        {
+          eventId: 'E-spoof-merged',
+          thread: reviewer.task.threadId,
+          payload: { summary: 'reviewer forged merged', to: 'merged', mergeCommit: 'not-host-verified' },
+        },
+        {
+          eventId: 'E-spoof-executor-merge-commit',
+          thread: evidenceFree.task.threadId,
+          payload: { summary: 'executor smuggled merge commit', mergeCommit: 'not-host-verified' },
+        },
+      ]) {
+        inboxPutViaCli(splitRuntime, evidenceFree.taskId, {
+          thread: spoof.thread, kind: 'final', eventId: spoof.eventId, payload: spoof.payload,
+        });
+        const spoofError = consumeViaCli(splitRuntime, spoof.eventId, 2);
+        assert.equal(spoofError.code, 'MERGE_GATE_REQUIRED');
+      }
+      const spoofPending = inboxPendingViaCli(splitRuntime);
+      assert.deepEqual(
+        spoofPending.pending.map((event) => event.eventId).filter((eventId) => eventId.startsWith('E-spoof-')).sort(),
+        ['E-spoof-executor-merge-commit', 'E-spoof-merged'],
+        '被拒绝的伪造 merge event 必须保留可审计 pending，不得被消费成 merged',
       );
-      putInboxEvent({
-        thread: 'T-evidence-review', task: evidenceFree.taskId, kind: 'verdict', 'event-id': 'E-evidence-approve',
-        payload: JSON.stringify({
-          summary: 'reviewer approved current commit', verdict: 'APPROVE', cursor: 'review-cursor',
-          commitSha: 'evidence-commit',
-        }),
-      }, splitRuntime);
-      consumeEvent('E-evidence-approve', splitRuntime);
-      transitionTask(evidenceFree.taskId, 'merge-ready', {}, splitRuntime);
-      assert.throws(
-        () => transitionTask(evidenceFree.taskId, 'merged', {}, splitRuntime),
-        (error) => error.code === 'MERGE_COMMIT_REQUIRED',
-      );
-      transitionTask(evidenceFree.taskId, 'merged', { mergeCommit: 'merge-evidence-commit' }, splitRuntime);
+      const mergeReadyAfterSpoof = readRegistry(splitRuntime).tasks[evidenceFree.taskId];
+      assert.equal(mergeReadyAfterSpoof.state, 'merge-ready');
+      assert.equal(mergeReadyAfterSpoof.mergeCommit, null);
+      assert.equal(readRegistry(splitRuntime).leases.dev7.owner, evidenceFree.taskId, '伪造 event 不得释放 writer lease');
+      const directProbe = join(splitRuntime, 'direct-transition-probe.mjs');
+      const orchestrateUrl = pathToFileURL(join(SCRIPT_DIR, 'orchestrate.mjs')).href;
+      writeFileSync(directProbe, `
+import { transitionTask as transitionTaskApi } from ${JSON.stringify(orchestrateUrl)};
+try {
+  transitionTaskApi(process.argv[2], 'merged', {
+    mergeCommit: 'not-host-verified', source: 'cli', actor: 'orchestrator',
+  }, process.argv[3]);
+  process.exitCode = 0;
+} catch (error) {
+  console.error(JSON.stringify({ code: error.code, message: error.message }));
+  process.exitCode = error.code === 'MERGE_GATE_REQUIRED' ? 2 : 3;
+}
+`);
+      const directResult = await runNode([directProbe, evidenceFree.taskId, splitRuntime]);
+      assert.equal(directResult.status, 2, directResult.stderr || directResult.stdout);
+      assert.equal(parseJsonLine(directResult.stderr).code, 'MERGE_GATE_REQUIRED');
+      assert.equal(readRegistry(splitRuntime).tasks[evidenceFree.taskId].state, 'merge-ready');
+      assert.equal(readRegistry(splitRuntime).leases.dev7.owner, evidenceFree.taskId, 'direct import 不能绕过 host merge gate');
+      transitionViaCli(evidenceFree.taskId, 'merged', splitRuntime, {
+        mergeCommit: 'merge-evidence-commit', reason: 'merge command with evidence',
+      });
       assert.equal(readRegistry(splitRuntime).leases.dev7, undefined, '只有带 mergeCommit 的 merged 才释放租约');
       assert.ok(readRegistry(splitRuntime).tasks[evidenceFree.taskId].finishedAt, 'merged 必须冻结 worker 工作周期');
+      const mergedReceipts = readJsonLines(join(splitRuntime, 'transitions.jsonl'))
+        .filter((entry) => entry.taskId === evidenceFree.taskId && entry.to === 'merged');
+      assert.equal(mergedReceipts.length, 1);
+      assert.equal(mergedReceipts[0].source, 'cli');
+      assert.equal(mergedReceipts[0].actor, 'orchestrator');
     } finally {
       await cleanTemp(splitRuntime);
     }
@@ -1878,26 +2270,29 @@ async function orchestrationVerdictDimensions() {
 }
 
 async function orchestrationGlobalStop() {
+  const availableWorkers = (await listWorktrees()).siblings.map((entry) => basename(entry.path));
+  assert.ok(availableWorkers.length >= 4, `stop fixture 至少需要四个真实 sibling，实际只有 ${availableWorkers.length}`);
+  const [firstWorker, secondWorker, idleWorker, testWorker] = availableWorkers;
+  const workerId = (worker) => worker.match(/(?:^|-)(dev\d+|test)$/i)?.[1].toLowerCase() || worker.toLowerCase();
   const runtimeDir = tempDirectory('orchestration-governance-stop');
   try {
     const config = loadConfig();
-    const first = createTask({
-      issue: 14, worktree: 'dev3', role: 'executor', 'thread-id': 'T-stop-a',
+    const first = taskCreateViaCli(runtimeDir, {
+      issue: 14, worktree: firstWorker, role: 'executor', 'thread-id': 'T-stop-a',
       model: 'luna-max', 'routing-reason': 'stop fixture',
-    }, runtimeDir);
-    let evaluated = evaluateStop({ write: true }, runtimeDir);
+    });
+    let evaluated = stopEvalViaCli(runtimeDir, true, 1);
     assert.equal(evaluated.result, 'advanceable');
-    assert.equal(evaluated.exitCode, 1);
     assert.equal(readRegistry(runtimeDir).orchestration.state, 'running', '--write 在有可推进线路时不得生效');
-    transitionTask(first.taskId, 'parked', { reason: 'waiting for user' }, runtimeDir);
-    const second = createTask({
-      issue: 56, worktree: 'dev1', role: 'executor', 'thread-id': 'T-stop-b',
+    transitionViaCli(first.taskId, 'parked', runtimeDir, { reason: 'waiting for user' });
+    const second = taskCreateViaCli(runtimeDir, {
+      issue: 56, worktree: secondWorker, role: 'executor', 'thread-id': 'T-stop-b',
       model: 'sol-high', 'routing-reason': 'stop fixture',
-    }, runtimeDir);
-    transitionTask(second.taskId, 'handoff-required', { reason: 'manual handoff probe' }, runtimeDir);
-    createTask({
-      issue: 0, worktree: 'test', role: 'executor', agent: 'test', model: 'luna-max', 'routing-reason': 'excluded test lane',
-    }, runtimeDir);
+    });
+    transitionViaCli(second.taskId, 'handoff-required', runtimeDir, { reason: 'manual handoff probe' });
+    taskCreateViaCli(runtimeDir, {
+      issue: 0, worktree: testWorker, role: 'executor', agent: 'test', model: 'luna-max', 'routing-reason': 'excluded test lane',
+    });
     writeJsonAtomic(join(runtimeDir, 'status.json'), {
       schemaVersion: 3,
       repo: {
@@ -1905,19 +2300,19 @@ async function orchestrationGlobalStop() {
         issueRepo: config.issueRepo,
         mainBranch: config.mainBranch,
       },
-      worktrees: [{ name: 'dev3' }, { name: 'dev1' }, { name: 'dev-idle' }, { name: 'test' }],
+      worktrees: [{ name: firstWorker }, { name: secondWorker }, { name: idleWorker }, { name: testWorker }],
     });
-    evaluated = evaluateStop({ write: true }, runtimeDir);
+    evaluated = stopEvalViaCli(runtimeDir, true, 1);
     assert.equal(evaluated.result, 'advanceable');
-    assert.ok(evaluated.advanceable.some((lane) => lane.worktree === 'dev-idle' && lane.state === 'unregistered'));
-    const idle = createTask({
-      issue: 99, worktree: 'dev-idle', role: 'executor', 'thread-id': 'T-stop-idle',
+    assert.ok(evaluated.advanceable.some((lane) => lane.worktree === workerId(idleWorker) && lane.state === 'unregistered'));
+    const idle = taskCreateViaCli(runtimeDir, {
+      issue: 99, worktree: idleWorker, role: 'executor', 'thread-id': 'T-stop-idle',
       model: 'luna-max', 'routing-reason': 'register every real lane before stop',
-    }, runtimeDir);
-    transitionTask(idle.taskId, 'parked', { reason: 'explicitly classified idle lane' }, runtimeDir);
-    evaluated = evaluateStop({ write: true }, runtimeDir);
+    });
+    transitionViaCli(idle.taskId, 'parked', runtimeDir, { reason: 'explicitly classified idle lane' });
+    evaluated = stopEvalViaCli(runtimeDir, true);
     assert.equal(evaluated.result, 'stopped');
-    assert.equal(evaluated.lanes.test, 'excluded');
+    assert.equal(evaluated.lanes[workerId(testWorker)], 'excluded');
     assert.equal(readRegistry(runtimeDir).orchestration.state, 'stopped');
     const collected = await collectStatus({ runtimeDir, issuesFixture: ISSUE_FIXTURE });
     assert.equal(collected.orchestration.state, 'stopped');
@@ -1930,24 +2325,18 @@ async function orchestrationGlobalStop() {
   for (let attempt = 0; attempt < 8 && !inconsistent; attempt += 1) {
     const raceRuntime = tempDirectory(`orchestration-governance-stop-race-${attempt}`);
     try {
-      const parked = createTask({
-        issue: 1, worktree: 'dev-old', role: 'executor', 'thread-id': `T-old-${attempt}`,
+      const parked = taskCreateViaCli(raceRuntime, {
+        issue: 1, worktree: firstWorker, role: 'executor', 'thread-id': `T-old-${attempt}`,
         model: 'luna-max', 'routing-reason': 'stop race parked lane',
-      }, raceRuntime);
-      transitionTask(parked.taskId, 'parked', { reason: 'stop race seed' }, raceRuntime);
-      const writer = join(raceRuntime, 'create-active.mjs');
-      const orchestrateUrl = pathToFileURL(join(SCRIPT_DIR, 'orchestrate.mjs')).href;
-      writeFileSync(writer, `
-import { createTask } from ${JSON.stringify(orchestrateUrl)};
-createTask({
-  issue: 2, worktree: 'dev-new', role: 'executor', 'thread-id': 'T-new',
-  model: 'luna-max', 'routing-reason': 'stop race active lane',
-}, process.argv[2]);
-`);
+      });
+      transitionViaCli(parked.taskId, 'parked', raceRuntime, { reason: 'stop race seed' });
       const lock = join(raceRuntime, '.control.lock');
       mkdirSync(lock);
       writeFileSync(join(lock, 'owner.json'), '{}\n');
-      const createRun = runNode([writer, raceRuntime]);
+      const createRun = runNode([
+        join(SCRIPT_DIR, 'orchestrate.mjs'), 'task', 'create', '--issue', '2', '--worktree', secondWorker,
+        '--role', 'executor', '--thread-id', 'T-new', '--model', 'luna-max', '--routing-reason', 'stop race active lane',
+      ], { env: boardEnv(raceRuntime) });
       await waitMilliseconds(10);
       const stopRun = runNode([
         join(SCRIPT_DIR, 'orchestrate.mjs'), 'stop', 'eval', '--write',
@@ -2146,6 +2535,17 @@ async function orchestrationContractMarkers() {
     'Desktop `create_thread`', 'registry.json', 'inbox pending', '三维 verdict',
     'runtime=NOT_RUN', 'stop eval --write', '--fallback-authorized', 'Map / List',
   ]) assert.match(skill, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  const runTests = readFileSync(join(SKILL_DIR, 'run-tests.mjs'), 'utf8');
+  assert.match(runTests, /orchestration/, 'run-tests.mjs 无参默认门禁必须包含 orchestration');
+  const selftestSource = readFileSync(join(SCRIPT_DIR, 'selftest.mjs'), 'utf8');
+  for (const marker of ['P2.3-01', 'P2.3-10', 'fiveTaskFanIn', 'inboxPutViaCli', 'supportingCases']) {
+    assert.match(selftestSource, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  }
+  assert.doesNotMatch(
+    selftestSource,
+    /\b(?:putInboxEvent|consumeEvent|pendingInbox|recordBlock|setVerdict|evaluateStop|heartbeatTask|transitionTask)\s*\(/,
+    'orchestration selftest 不得直接调用内部控制面 API，事件与 BLOCK/park/stop 必须经公共 CLI',
+  );
   assert.doesNotMatch(skill, /派发 headless 任务/);
   assert.doesNotMatch(skill, /只给合并建议，不执行 merge/);
 
@@ -2167,35 +2567,66 @@ async function orchestrationContractMarkers() {
 async function orchestrationDomain() {
   const scenarioIndex = process.argv.indexOf('--scenario');
   const requested = scenarioIndex >= 0 ? process.argv[scenarioIndex + 1] : null;
-  const cases = [
-    { group: 'storage', name: 'v2-compat-assessment-terminal', run: orchestrationStorageCompatibility },
-    { group: 'storage', name: 'atomic-concurrency', run: orchestrationAtomicConcurrency },
-    { group: 'lifecycle', name: 'preflight-lease-state', run: orchestrationPreflightLeaseAndState },
-    { group: 'lifecycle', name: 'inbox-idempotency', run: orchestrationInboxIdempotency },
-    { group: 'governance', name: 'circuit-late-event', run: orchestrationCircuitAndLateEvent },
-    { group: 'governance', name: 'verdict-dimensions', run: orchestrationVerdictDimensions },
-    { group: 'governance', name: 'global-stop', run: orchestrationGlobalStop },
-    { group: 'boundary', name: 'server-origin-token', run: orchestrationServerBoundary },
-    { group: 'boundary', name: 'config-preflight', run: orchestrationConfigPreflight },
-    { group: 'contract', name: 'skill-board-contract', run: orchestrationContractMarkers },
+  const p2p3Cases = [
+    { id: 'P2.3-01', group: 'lifecycle', name: 'duplicate-final', run: orchestrationInboxIdempotency },
+    { id: 'P2.3-02', group: 'lifecycle', name: 'five-task-polls-not-lost', run: orchestrationFiveTaskFanIn },
+    { id: 'P2.3-03', group: 'governance', name: 'third-block-circuit', run: orchestrationCircuitAndLateEvent },
+    { id: 'P2.3-04', group: 'governance', name: 'park-late-event', run: orchestrationParkedLateEvent },
+    { id: 'P2.3-05', group: 'governance', name: 'autonomous-not-run', run: orchestrationAutonomousNotRun },
+    { id: 'P2.3-06', group: 'governance', name: 'global-stop', run: orchestrationGlobalStop },
+    { id: 'P2.3-07', group: 'storage', name: 'v2-compat', run: orchestrationStorageCompatibility },
+    { id: 'P2.3-08', group: 'storage', name: 'torn-read', run: orchestrationAtomicConcurrency },
+    { id: 'P2.3-09', group: 'storage', name: 'lock-competition', run: orchestrationLockCompetition },
+    { id: 'P2.3-10', group: 'storage', name: 'merge-behind-refresh', run: orchestrationMergeBehindRefresh },
   ];
-  const selected = requested ? cases.filter((testCase) => testCase.group === requested) : cases;
-  assert.ok(selected.length, `未知 orchestration scenario: ${requested}; 可用 storage|lifecycle|governance|boundary|contract`);
-  let passed = 0;
-  for (const testCase of selected) {
+  const supportingCases = [
+    { id: 'support-lifecycle-preflight', group: 'lifecycle', name: 'preflight-lease-state', run: orchestrationPreflightLeaseAndState },
+    { id: 'support-governance-verdict', group: 'governance', name: 'verdict-dimensions', run: orchestrationVerdictDimensions },
+    { id: 'support-boundary-server', group: 'boundary', name: 'server-origin-token', run: orchestrationServerBoundary },
+    { id: 'support-boundary-config', group: 'boundary', name: 'config-preflight', run: orchestrationConfigPreflight },
+    { id: 'support-contract-board', group: 'contract', name: 'skill-board-contract', run: orchestrationContractMarkers },
+  ];
+  assert.deepEqual(
+    p2p3Cases.map((testCase) => testCase.id),
+    Array.from({ length: 10 }, (_, index) => `P2.3-${String(index + 1).padStart(2, '0')}`),
+    'P2.3 必须恰好报告十个逐项映射 scenario',
+  );
+
+  const selectedPrimary = requested ? p2p3Cases.filter((testCase) => testCase.group === requested) : p2p3Cases;
+  const selectedSupporting = requested
+    ? supportingCases.filter((testCase) => testCase.group === requested)
+    : supportingCases;
+  assert.ok(
+    selectedPrimary.length || selectedSupporting.length,
+    `未知 orchestration scenario: ${requested}; 可用 storage|lifecycle|governance|boundary|contract`,
+  );
+  const runCase = async (testCase) => {
     try {
       await testCase.run();
-      passed += 1;
     } catch (cause) {
-      throw new Error(`orchestration/${testCase.group}/${testCase.name} 失败: ${cause.stack || cause.message}`, { cause });
+      throw new Error(`orchestration/${testCase.id}/${testCase.name} 失败: ${cause.stack || cause.message}`, { cause });
     }
-  }
-  return { scenario: requested || 'all', scenarios: selected.length, passed };
+  };
+  for (const testCase of selectedPrimary) await runCase(testCase);
+  for (const testCase of selectedSupporting) await runCase(testCase);
+  const primaryCount = selectedPrimary.length;
+  const primaryPassed = selectedPrimary.length;
+  const displayCount = primaryCount || selectedSupporting.length;
+  const displayPassed = primaryCount ? primaryPassed : selectedSupporting.length;
+  return {
+    scenario: requested || 'all',
+    scenarios: displayCount,
+    passed: displayPassed,
+    scenarioIds: selectedPrimary.map((testCase) => testCase.id),
+    supportingScenarios: selectedSupporting.length,
+    supportingPassed: selectedSupporting.length,
+  };
 }
 
 async function layoutDomain() {
   const required = [
     'SKILL.md', 'board.html', 'board.config.json', 'run-tests.mjs', 'references/design.md',
+    'fixtures/aes-agent-issues.json', 'fixtures/orchestration-events.json',
     'scripts/collect.mjs', 'scripts/capture-issues-fixture.mjs', 'scripts/assess.mjs', 'scripts/check-issue-graph.mjs', 'scripts/command.mjs', 'scripts/dispatch.mjs',
     'scripts/headless.mjs', 'scripts/orchestrate.mjs', 'scripts/runtime-store.mjs',
     'scripts/server.mjs', 'scripts/selftest.mjs',
@@ -2234,6 +2665,7 @@ async function layoutDomain() {
   );
   assert.notEqual(DEFAULT_RUNTIME_DIR, join(SKILL_DIR, 'runtime'), '技能目录不得再承载默认 runtime');
   assert.ok(existsSync(ISSUE_FIXTURE), '缺少全量 issue 页面 fixture');
+  assert.ok(existsSync(ORCHESTRATION_FIXTURE), '缺少离线 orchestration host event fixture');
 
   const assessRuntime = tempDirectory('layout-assess');
   try {
