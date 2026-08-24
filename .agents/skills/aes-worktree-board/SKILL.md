@@ -131,10 +131,23 @@ actionId 从事实组合稳定派生；宿主完成动作后用 payload file 写
 node "$skillDir/scripts/orchestrate.mjs" action receipt --action-id A-... --status succeeded --payload-file receipt.json
 ```
 
-`CREATE_REVIEWER` receipt 必须绑定已登记的关联 reviewer Task；`HOST_MERGE` receipt 必须登记
-真实 merge commit；`EVALUATE_MERGE_GATE` receipt 必须证明 HEAD 等于已 review commit 且 mergeCheck
-为 clean/up-to-date；`POST_MERGE_VERIFY` receipt 必须含 integration branch 上至少一条 exitCode=0
-的测试证据；`CLAIM_NEXT_ISSUE` receipt 必须绑定同 worker 的新 executor Task。多 worker 可并行
+`CREATE_REVIEWER` receipt 与 reviewer verdict 必须同时满足
+`reviewer.reviewCommit === task.commitSha === action/event.commitSha`。`EVALUATE_MERGE_GATE`
+receipt 必须绑定 live worktree HEAD、integration HEAD、integration branch，并由脚本实时运行
+`git merge-tree`。`HOST_MERGE started/succeeded` 分别绑定 live preHead 与 postHead；succeeded
+只接受第一父提交为 preHead、包含 executor commit 的真实 Git merge commit。
+
+`POST_MERGE_VERIFY` 不接受宿主自报的 `exitCode=0` JSON。先把 executable/args 写入 commands file，
+由脚本在 integration repo root 实际执行：
+
+```powershell
+node "$skillDir/scripts/orchestrate.mjs" action verify --action-id A-... --commands-file post-merge-commands.json
+```
+
+脚本生成与 action/mergeCommit/live HEAD 绑定的 `verificationRun`，全部真实命令 exit 0 且 HEAD
+未变化后，才原子写 POST receipt、进入 `merged`、释放 lease。`CLAIM_NEXT_ISSUE` 在 action 生成时
+即按 Issue 编号写 claim reservation；active/pending/succeeded claim 都从 stale frontier 排除，
+receipt 必须绑定同 reservation/worktree 的新 executor Task。多 worker 可并行
 执行/review，但只放出一个 `HOST_MERGE`；post-merge verification 前不会放出队列下一项。
 
 Goal/stop 只有在 fresh registry + inbox + Git + Issue frontier 同时证明 pending 为空、无 active /
@@ -160,6 +173,8 @@ executor final 必须直接发送如下结构，不从自然语言正则猜 comm
 缺字段、测试非零或无法分类的 executor final 返回可见 `UNCLASSIFIED_FINAL`，保持 inbox pending，
 不写 consumedEventIds、不推进 cursor、不改变 Task state。Git HEAD 相对登记 head 已变化但没有 typed
 final 时，`next-actions` 也会以 `GIT_HEAD_ADVANCED_WITHOUT_TYPED_FINAL` 暴露，不猜测提交含义。
+UNCLASSIFIED action 的任意 `resolution` 不会消费事件；只有合法 replacement typed-final，或 lane
+显式进入 `parked | handoff-required` 后才会把原事件标为 resolved/consumed。
 Task create 会从 fresh Issue labels 自动推导 `needs-manual-test` interaction class；宿主漏传
 `--interaction-class` 也不能绕过 manual debt。`runtime=FAIL|BLOCKED` 始终阻断 merge gate。
 
@@ -186,6 +201,12 @@ node "$skillDir/scripts/orchestrate.mjs" verdict set --task tk-dev4-17-g1 --code
 ```
 
 门禁按合并后的有效 verdict 校验，分多次写字段也不能绕过：`MERGE_READY` 要求 `code=PASS` 与显式 runtime evidence；要求真机时只能是 `runtime=PASS`。`committed` 必须带 `commitSha`；`approved` 必须来自关联 reviewer thread 的最终 `APPROVE` 事件，且 payload `commitSha` 等于 executor 当前 commit；`merged` 必须带 `mergeCommit`。只登记 reviewer Task 不算 review 已完成，证据不齐不得释放租约或写成终态。
+
+所有公开入口共用同一证据链：`executorFinalEvidence → CREATE_REVIEWER receipt + review evidence →
+EVALUATE_MERGE_GATE receipt → HOST_MERGE receipt → passed verificationRun + POST_MERGE_VERIFY receipt`。
+旧 `transition` 不能注入 commit/mergeCommit 绕过任一层；旧 `verdict set` 不再接受
+`delivery=MERGE_READY`，且 Task 到达 `approved | merge-ready | merged` 后 verdict 完全冻结；
+只能由 merge-gate succeeded receipt 原子写入。
 
 只有独立 reviewer 对新 follow-up commit 的最终 BLOCK 计数；同 commit 同 verdict 去重：
 

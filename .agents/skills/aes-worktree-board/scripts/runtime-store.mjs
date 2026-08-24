@@ -126,6 +126,8 @@ export function emptyRegistry(now = new Date().toISOString()) {
     tasks: {},
     actions: {},
     actionReceipts: {},
+    claimReservations: {},
+    verificationRuns: {},
     unclassifiedFinals: {},
     goal: null,
   };
@@ -138,6 +140,8 @@ export function readRegistry(runtimeDir) {
   registry.tasks ||= {};
   registry.actions ||= {};
   registry.actionReceipts ||= {};
+  registry.claimReservations ||= {};
+  registry.verificationRuns ||= {};
   registry.unclassifiedFinals ||= {};
   registry.goal ||= null;
   registry.orchestration ||= emptyRegistry().orchestration;

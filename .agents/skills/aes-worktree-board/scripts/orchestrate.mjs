@@ -2,10 +2,12 @@
 // 可恢复控制平面的单一 CLI：Task Registry、事件 inbox、状态机、三维 verdict、
 // BLOCK 熔断和全局停止。宿主 create_thread/wait_threads 仍由主 agent 调用，本脚本只登记事实。
 import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { listWorktrees, RUNTIME_DIR } from './collect.mjs';
+import { HEADLESS_CHILD_OPTIONS } from './headless.mjs';
 import {
   appendJsonLineAtomic, canonicalWorktreeKey, readJson, readJsonLines, readRegistry, updateRegistry,
   TERMINAL_TASK_STATES, withRuntimeLock, writeJsonAtomic, writeTextAtomic,
@@ -84,6 +86,92 @@ function eligibleAutonomousIssues(status) {
         && !labels.some((label) => ['ready-for-human', 'needs-info', 'needs-triage', 'wontfix'].includes(label));
     })
     .sort((left, right) => left.number - right.number);
+}
+
+function runGit(cwd, args, { allowFailure = false } = {}) {
+  const result = spawnSync('git', args, {
+    ...HEADLESS_CHILD_OPTIONS, cwd, encoding: 'utf8', timeout: 30_000,
+  });
+  if (!allowFailure && result.status !== 0) {
+    throw controlError('GIT_RECONCILIATION_FAILED', `git ${args.join(' ')} 失败 (exit ${result.status}): ${String(result.stderr || result.stdout).trim().slice(0, 300)}`);
+  }
+  return {
+    status: result.status,
+    stdout: String(result.stdout || '').replace(/\r\n/g, '\n').trim(),
+    stderr: String(result.stderr || '').replace(/\r\n/g, '\n').trim(),
+  };
+}
+
+function gitValue(cwd, args) {
+  return runGit(cwd, args).stdout;
+}
+
+function repositoryContext(runtimeDir, task) {
+  const status = readJson(join(runtimeDir, 'status.json'), null);
+  const repoRoot = status?.repo?.root ? resolve(status.repo.root) : null;
+  const integrationBranch = status?.repo?.mainBranch || null;
+  const worker = (status?.worktrees || []).find((candidate) => canonicalWorktreeId(candidate.name) === task.worktree);
+  const worktreePath = worker?.path ? resolve(worker.path) : null;
+  if (!repoRoot || !integrationBranch || !worktreePath || !existsSync(repoRoot) || !existsSync(worktreePath)) {
+    throw controlError('FRESH_GIT_STATUS_REQUIRED', `Task ${task.taskId} 缺少可读取的 fresh repo/worktree status`, {
+      repoRoot, integrationBranch, worktreePath,
+    });
+  }
+  return { status, repoRoot, integrationBranch, worker, worktreePath };
+}
+
+function assertCleanMergeCandidate(context, commitSha) {
+  const result = runGit(context.repoRoot, ['merge-tree', '--write-tree', context.integrationBranch, commitSha], { allowFailure: true });
+  if (result.status !== 0) {
+    throw controlError('MERGE_CHECK_FAILED', `commit ${commitSha} 与 ${context.integrationBranch} 的 live merge-tree 非 clean`, {
+      stderr: result.stderr.slice(0, 300),
+    });
+  }
+}
+
+function reconcileMergeGate(runtimeDir, task, action, payload) {
+  const context = repositoryContext(runtimeDir, task);
+  const workerHead = gitValue(context.worktreePath, ['rev-parse', 'HEAD']);
+  const integrationHead = gitValue(context.repoRoot, ['rev-parse', context.integrationBranch]);
+  if (action.commitSha !== task.commitSha || workerHead !== task.commitSha) {
+    throw controlError('MERGE_HEAD_MISMATCH', `merge gate 必须绑定 reviewed commit ${task.commitSha}，action=${action.commitSha}，live HEAD=${workerHead}`);
+  }
+  if (payload.headSha !== workerHead || payload.integrationHead !== integrationHead
+    || payload.integrationBranch !== context.integrationBranch || payload.mergeCheck !== 'clean') {
+    throw controlError('FRESH_MERGE_RECEIPT_REQUIRED', 'merge gate receipt 必须精确绑定 live worktree/integration HEAD、integration branch 与 mergeCheck=clean', {
+      workerHead, integrationHead, integrationBranch: context.integrationBranch,
+    });
+  }
+  assertCleanMergeCandidate(context, task.commitSha);
+  return { context, workerHead, integrationHead };
+}
+
+function assertIntegrationBranch(context) {
+  const branch = gitValue(context.repoRoot, ['branch', '--show-current']);
+  if (branch !== context.integrationBranch) {
+    throw controlError('INTEGRATION_BRANCH_MISMATCH', `HOST_MERGE 必须在 ${context.integrationBranch} 执行，当前为 ${branch || '(detached)'}`);
+  }
+  return branch;
+}
+
+function verifyMergeCommit(context, task, started, payload) {
+  assertIntegrationBranch(context);
+  const liveHead = gitValue(context.repoRoot, ['rev-parse', 'HEAD']);
+  if (payload.integrationBranch !== context.integrationBranch
+    || payload.preHead !== started.preHead
+    || payload.postHead !== liveHead
+    || payload.mergeCommit !== liveHead) {
+    throw controlError('MERGE_RECEIPT_MISMATCH', 'HOST_MERGE receipt 未绑定 live integration branch/preHead/postHead', {
+      integrationBranch: context.integrationBranch, preHead: started.preHead, liveHead,
+    });
+  }
+  const parts = gitValue(context.repoRoot, ['rev-list', '--parents', '-n', '1', liveHead]).split(/\s+/);
+  if (parts.length < 3 || parts[1] !== started.preHead) {
+    throw controlError('TRUE_MERGE_COMMIT_REQUIRED', `${liveHead} 不是以 ${started.preHead} 为第一父提交的真实 merge commit`);
+  }
+  const ancestor = runGit(context.repoRoot, ['merge-base', '--is-ancestor', task.commitSha, liveHead], { allowFailure: true });
+  if (ancestor.status !== 0) throw controlError('MERGED_COMMIT_NOT_INCLUDED', `merge commit ${liveHead} 未包含 executor commit ${task.commitSha}`);
+  return liveHead;
 }
 
 function validateExecutorFinal(payload) {
@@ -188,9 +276,32 @@ function assertEffectiveVerdict(task, verdict) {
   }
 }
 
+function successfulTaskAction(registry, type, task, predicate = () => true) {
+  return Object.values(registry.actions).find((action) => action.type === type && action.taskId === task.taskId
+    && predicate(action) && receiptSucceeded(registry, action.actionId));
+}
+
 function assertTransitionEvidence(registry, task, to, candidate) {
   if (['committed', 'reviewing', 'approved', 'merge-ready', 'merged'].includes(to) && !candidate.commitSha) {
     throw controlError('COMMIT_EVIDENCE_REQUIRED', `${to} 要求 commitSha`);
+  }
+  if (['committed', 'reviewing', 'approved', 'merge-ready', 'merged'].includes(to)) {
+    const finalEvidence = candidate.executorFinalEvidence;
+    if (finalEvidence?.schemaVersion !== EXECUTOR_FINAL_SCHEMA || finalEvidence.outcome !== 'COMMITTED'
+      || finalEvidence.commitSha !== candidate.commitSha || !finalEvidence.eventId) {
+      throw controlError('EXECUTOR_FINAL_EVIDENCE_REQUIRED', `${to} 要求与当前 commit 绑定的 ${EXECUTOR_FINAL_SCHEMA}`);
+    }
+  }
+  if (['reviewing', 'approved', 'merge-ready', 'merged'].includes(to)) {
+    const reviewer = candidate.reviewTaskId ? registry.tasks[candidate.reviewTaskId] : null;
+    const createAction = successfulTaskAction(registry, 'CREATE_REVIEWER', task, (action) => (
+      action.commitSha === candidate.commitSha && action.parentTaskId === task.taskId
+    ));
+    if (!reviewer || reviewer.role !== 'reviewer' || reviewer.parentTaskId !== task.taskId
+      || reviewer.worktree !== task.worktree || reviewer.reviewCommit !== candidate.commitSha
+      || !createAction) {
+      throw controlError('CREATE_REVIEWER_RECEIPT_REQUIRED', `${to} 要求 reviewer.reviewCommit 与当前 commit 一致且 CREATE_REVIEWER receipt=succeeded`);
+    }
   }
   if (['approved', 'merge-ready', 'merged'].includes(to)) {
     const evidence = candidate.reviewEvidence || null;
@@ -198,7 +309,8 @@ function assertTransitionEvidence(registry, task, to, candidate) {
     if (!evidence?.eventId || evidence.verdict !== 'APPROVE'
       || evidence.commitSha !== candidate.commitSha
       || !reviewer || reviewer.role !== 'reviewer'
-      || reviewer.parentTaskId !== task.taskId || reviewer.worktree !== task.worktree) {
+      || reviewer.parentTaskId !== task.taskId || reviewer.worktree !== task.worktree
+      || reviewer.reviewCommit !== candidate.commitSha) {
       throw controlError('REVIEW_EVIDENCE_REQUIRED', `${to} 要求与当前 commit 绑定的独立 reviewer APPROVE 事件`);
     }
     if (candidate.verdict.code !== 'PASS') throw controlError('CODE_REVIEW_REQUIRED', `${to} 要求 code=PASS`);
@@ -206,10 +318,40 @@ function assertTransitionEvidence(registry, task, to, candidate) {
   if (['merge-ready', 'merged'].includes(to)) {
     if (candidate.verdict.delivery !== 'MERGE_READY') throw controlError('DELIVERY_VERDICT_REQUIRED', `${to} 要求 delivery=MERGE_READY`);
     assertEffectiveVerdict(task, candidate.verdict);
+    const gateAction = successfulTaskAction(registry, 'EVALUATE_MERGE_GATE', task, (action) => action.commitSha === candidate.commitSha);
+    if (!gateAction || candidate.mergeGateReceipt?.actionId !== gateAction.actionId
+      || candidate.mergeGateReceipt.commitSha !== candidate.commitSha) {
+      throw controlError('MERGE_GATE_RECEIPT_REQUIRED', `${to} 要求绑定当前 commit 的 EVALUATE_MERGE_GATE receipt`);
+    }
   }
   if (to === 'merged' && !candidate.mergeCommit) {
     throw controlError('MERGE_COMMIT_REQUIRED', 'merged 要求 mergeCommit');
   }
+  if (to === 'merged') {
+    const mergeAction = successfulTaskAction(registry, 'HOST_MERGE', task, (action) => action.commitSha === candidate.commitSha);
+    const postAction = successfulTaskAction(registry, 'POST_MERGE_VERIFY', task, (action) => action.mergeCommit === candidate.mergeCommit);
+    const verification = candidate.postMergeVerification;
+    const run = verification?.verificationRunId ? registry.verificationRuns[verification.verificationRunId] : null;
+    if (!mergeAction || candidate.hostMergeReceipt?.actionId !== mergeAction.actionId
+      || candidate.hostMergeReceipt.mergeCommit !== candidate.mergeCommit
+      || !postAction || verification?.actionId !== postAction.actionId
+      || !run || run.status !== 'passed' || run.actionId !== postAction.actionId
+      || run.mergeCommit !== candidate.mergeCommit) {
+      throw controlError('POST_MERGE_RECEIPT_REQUIRED', 'merged 要求真实 HOST_MERGE receipt 与 passed verificationRun 绑定的 POST_MERGE_VERIFY receipt');
+    }
+  }
+}
+
+function resolvePendingUnclassifiedFinals(registry, task, resolution) {
+  task.consumedEventIds ||= [];
+  for (const record of Object.values(registry.unclassifiedFinals)) {
+    if (record.taskId !== task.taskId || record.status !== 'pending') continue;
+    record.status = 'resolved';
+    record.resolution = resolution;
+    record.resolvedAt = now();
+    if (!task.consumedEventIds.includes(record.eventId)) task.consumedEventIds.push(record.eventId);
+  }
+  delete task.unclassifiedFinal;
 }
 
 function applyTransition(registry, runtimeDir, task, to, details = {}) {
@@ -234,6 +376,7 @@ function applyTransition(registry, runtimeDir, task, to, details = {}) {
   if (details.mergeCommit) task.mergeCommit = details.mergeCommit;
   if (details.reviewTaskId) task.reviewTaskId = details.reviewTaskId;
   if (to === 'merged' && registry.leases[task.worktree]?.owner === task.taskId) delete registry.leases[task.worktree];
+  if (['parked', 'handoff-required'].includes(to)) resolvePendingUnclassifiedFinals(registry, task, `lane-${to}`);
   appendTransition(runtimeDir, task, from, to, details);
   return { from, to };
 }
@@ -312,6 +455,10 @@ export function createTask(options, runtimeDir = RUNTIME_DIR) {
         throw controlError('LOCKED', `${worktree} 已由 ${existingLease.owner} 持有租约`, {
           worktree, leaseOwner: existingLease.owner, acquiredAt: existingLease.acquiredAt,
         });
+      }
+      const reservation = registry.claimReservations[String(issue)];
+      if (reservation && reservation.worktree !== worktree && ['pending', 'succeeded'].includes(reservation.status)) {
+        throw controlError('ISSUE_CLAIM_RESERVED', `Issue #${issue} 已由 ${reservation.worktree} 的 ${reservation.actionId} 保留`, reservation);
       }
       generation = taskGeneration(registry, worktree);
       taskId = options['task-id'] || options.taskId || `tk-${shortWorker(worktree)}-${issue}-g${generation}`;
@@ -459,6 +606,7 @@ function validateBlockEvent(registry, task, event, commit) {
   const reviewer = assertThreadTaskRelationship(registry, task, event.threadId);
   const eventVerdict = String(event.payload?.verdict || '').toUpperCase();
   if (reviewer.role !== 'reviewer' || reviewer.parentTaskId !== task.taskId
+    || reviewer.reviewCommit !== task.commitSha || reviewer.reviewCommit !== commit
     || !['final', 'verdict'].includes(event.kind) || eventVerdict !== 'BLOCK'
     || event.payload?.commitSha !== commit) {
     throw controlError('REVIEW_EVIDENCE_REQUIRED', `BLOCK ${event.eventId} 不是当前 commit ${commit} 的最终 reviewer verdict`);
@@ -508,6 +656,7 @@ function applyBlockRecord(registry, runtimeDir, task, event, { commit, finding, 
   }
   task.state = 'handoff-required';
   applyTaskTiming(task, from, task.state, timestamp);
+  resolvePendingUnclassifiedFinals(registry, task, 'lane-handoff-required');
   task.phase = 'awaiting-human';
   task.nextAction = `人工交接，见 runtime/handoff/${task.taskId}.md`;
   const handoffPath = join(runtimeDir, 'handoff', `${task.taskId}.md`);
@@ -550,30 +699,12 @@ function consumeExecutorFinal(registry, runtimeDir, task, event, sourceTask) {
       code: 'UNCLASSIFIED_FINAL', errors: validation.errors, consumed: false, nextAction: 'UNCLASSIFIED_FINAL',
     };
   }
-  if (!['dispatching', 'executing', 'self-qa', 'fixing', 'committed'].includes(task.state)) {
+  if (!['dispatching', 'executing', 'self-qa', 'committed'].includes(task.state)) {
     throw controlError('INVALID_EXECUTOR_FINAL_STATE', `executor final 不能从 ${task.state} 推进`, { taskId: task.taskId });
   }
-  const transitions = [];
-  const path = task.state === 'dispatching'
-    ? ['executing', 'self-qa', 'committed']
-    : task.state === 'executing'
-      ? ['self-qa', 'committed']
-      : task.state === 'fixing'
-        ? ['executing', 'self-qa', 'committed']
-        : task.state === 'self-qa' ? ['committed'] : [];
-  for (const to of path) {
-    transitions.push(applyTransition(registry, runtimeDir, task, to, {
-      actor: 'executor-final', eventId: event.eventId,
-      reason: `typed executor final ${event.payload.schemaVersion}`,
-      commitSha: to === 'committed' ? event.payload.commitSha : undefined,
-      evidence: [`thread:${event.threadId}`, `event:${event.eventId}`],
-    }));
-  }
-  if (task.commitSha && task.commitSha !== event.payload.commitSha) {
+  if (task.commitSha && task.state === 'committed' && task.commitSha !== event.payload.commitSha) {
     throw controlError('EXECUTOR_FINAL_COMMIT_MISMATCH', `Task 当前 commit ${task.commitSha} 与 final ${event.payload.commitSha} 不一致`);
   }
-  task.commitSha = event.payload.commitSha;
-  task.headSha = event.payload.commitSha;
   task.executorFinalEvidence = {
     schemaVersion: event.payload.schemaVersion,
     eventId: event.eventId,
@@ -585,8 +716,23 @@ function consumeExecutorFinal(registry, runtimeDir, task, event, sourceTask) {
     manualTestDebt: event.payload.manualTestDebt,
     recordedAt: now(),
   };
-  if (registry.unclassifiedFinals[event.eventId]) registry.unclassifiedFinals[event.eventId].status = 'resolved';
-  delete task.unclassifiedFinal;
+  resolvePendingUnclassifiedFinals(registry, task, `replacement-typed-final:${event.eventId}`);
+  const transitions = [];
+  const path = task.state === 'dispatching'
+    ? ['executing', 'self-qa', 'committed']
+    : task.state === 'executing'
+      ? ['self-qa', 'committed']
+      : task.state === 'self-qa' ? ['committed'] : [];
+  for (const to of path) {
+    transitions.push(applyTransition(registry, runtimeDir, task, to, {
+      actor: 'executor-final', eventId: event.eventId,
+      reason: `typed executor final ${event.payload.schemaVersion}`,
+      commitSha: to === 'committed' ? event.payload.commitSha : undefined,
+      evidence: [`thread:${event.threadId}`, `event:${event.eventId}`],
+    }));
+  }
+  task.commitSha = event.payload.commitSha;
+  task.headSha = event.payload.commitSha;
   task.nextAction = 'CREATE_REVIEWER';
   consumeRecordedEvent(task, event);
   task.updatedAt = now();
@@ -632,7 +778,7 @@ export function consumeEvent(eventId, runtimeDir = RUNTIME_DIR) {
           throw controlError('REVIEW_EVIDENCE_REQUIRED', 'APPROVE 必须来自已关联的独立 reviewer Task');
         }
         const reviewedCommit = event.payload?.commitSha || null;
-        if (!reviewedCommit || reviewedCommit !== task.commitSha) {
+        if (!reviewedCommit || reviewedCommit !== task.commitSha || sourceTask.reviewCommit !== task.commitSha) {
           throw controlError('REVIEW_COMMIT_MISMATCH', `reviewer APPROVE 必须绑定当前 commit ${task.commitSha || '(未记录)'}`);
         }
         task.verdict.code = 'PASS';
@@ -670,12 +816,18 @@ export function consumeEvent(eventId, runtimeDir = RUNTIME_DIR) {
 export function setVerdict(taskId, verdict, runtimeDir = RUNTIME_DIR) {
   return updateRegistry(runtimeDir, (registry) => {
     const task = taskById(registry, taskId);
+    if (['approved', 'merge-ready', 'merged'].includes(task.state)) {
+      throw controlError('VERDICT_LOCKED_AFTER_REVIEW', `Task ${taskId} 已到 ${task.state}，verdict 只能由绑定 receipt 的动作保持，不得用旧入口改写`);
+    }
     const code = verdict.code || null;
     const runtime = verdict.runtime || null;
     const delivery = verdict.delivery || null;
     if (code && !VERDICT_CODES.includes(code)) throw controlError('INVALID_VERDICT', `code 只接受 ${VERDICT_CODES.join('|')}`);
     if (runtime && !RUNTIME_VERDICTS.includes(runtime)) throw controlError('INVALID_VERDICT', `runtime 只接受 ${RUNTIME_VERDICTS.join('|')}`);
     if (delivery && !DELIVERY_VERDICTS.includes(delivery)) throw controlError('INVALID_VERDICT', `delivery 只接受 ${DELIVERY_VERDICTS.join('|')}`);
+    if (delivery === 'MERGE_READY') {
+      throw controlError('MERGE_GATE_RECEIPT_REQUIRED', '旧 verdict set 不得写 delivery=MERGE_READY；只能由 EVALUATE_MERGE_GATE succeeded receipt 原子写入');
+    }
     if (task.verdict.runtime === 'NOT_RUN' && runtime === 'PASS') {
       throw controlError('RUNTIME_EVIDENCE_IMMUTABLE', 'runtime=NOT_RUN 不得改写为 PASS；必须保留真实证据状态');
     }
@@ -807,11 +959,29 @@ function deriveActionCandidates(registry, runtimeDir, status) {
     }
   }
 
-  const eligible = eligibleAutonomousIssues(status);
+  const claimedIssues = new Set(Object.values(registry.tasks)
+    .filter((task) => task.role === 'executor')
+    .map((task) => task.issue));
+  const reservedIssues = new Set();
+  const reservedWorkers = new Set();
+  for (const reservation of Object.values(registry.claimReservations)) {
+    if (!['pending', 'succeeded'].includes(reservation.status)) continue;
+    reservedIssues.add(reservation.issue);
+    reservedWorkers.add(reservation.worktree);
+    if (reservation.status === 'pending') {
+      const existingAction = registry.actions[reservation.actionId];
+      if (existingAction && !receiptSucceeded(registry, existingAction.actionId)) {
+        actions.push({ ...existingAction, resume: true, reason: 'root 重启恢复既有 Issue claim reservation；禁止跨 worker 重复认领' });
+      }
+    }
+  }
+  const eligible = eligibleAutonomousIssues(status)
+    .filter((issue) => !claimedIssues.has(issue.number) && !reservedIssues.has(issue.number));
   let issueIndex = 0;
   const initialWorkers = (registry.goal?.workers || []).filter((worktree) => !latest.has(worktree))
     .map((worktree) => ({ taskId: null, worktree, issue: null, generation: 0, state: 'unregistered' }));
   const claimable = realLatest.filter((candidate) => candidate.state === 'merged').concat(initialWorkers)
+    .filter((candidate) => !reservedWorkers.has(candidate.worktree))
     .sort((left, right) => left.worktree.localeCompare(right.worktree));
   for (const task of claimable) {
     const issue = eligible[issueIndex++];
@@ -862,7 +1032,20 @@ export function nextActions(runtimeDir = RUNTIME_DIR) {
   return updateRegistry(runtimeDir, (registry) => {
     const status = readJson(join(runtimeDir, 'status.json'), null);
     const actions = deriveActionCandidates(registry, runtimeDir, status);
-    for (const action of actions) registry.actions[action.actionId] ||= { ...action, createdAt: now() };
+    for (const action of actions) {
+      registry.actions[action.actionId] ||= { ...action, createdAt: now() };
+      if (action.type === 'CLAIM_NEXT_ISSUE') {
+        const key = String(action.issue);
+        const current = registry.claimReservations[key];
+        if (current && current.actionId !== action.actionId && ['pending', 'succeeded'].includes(current.status)) {
+          throw controlError('ISSUE_CLAIM_RESERVED', `Issue #${action.issue} 已由 ${current.actionId} 保留`, current);
+        }
+        registry.claimReservations[key] ||= {
+          schemaVersion: 'aes.worktree-board.claim-reservation/v1', issue: action.issue,
+          actionId: action.actionId, worktree: action.worktree, status: 'pending', reservedAt: now(),
+        };
+      }
+    }
     const mergeQueue = [...latestExecutors(registry).values()]
       .filter((task) => task.agent !== 'test' && task.worktree !== 'test' && task.state === 'merge-ready')
       .sort((left, right) => String(left.updatedAt).localeCompare(String(right.updatedAt)) || left.taskId.localeCompare(right.taskId))
@@ -909,23 +1092,34 @@ export function receiveActionReceipt(actionIdValue, status, payload = {}, runtim
       const other = Object.entries(registry.actionReceipts).find(([id, receipt]) => id !== actionIdValue
         && registry.actions[id]?.type === 'HOST_MERGE' && receipt.latestStatus === 'started');
       if (other) throw controlError('MERGE_MUTEX_LOCKED', `integration merge mutex 已由 ${other[0]} 持有`);
+      const task = taskById(registry, action.taskId);
+      assertTransitionEvidence(registry, task, 'merge-ready', { ...task, verdict: { ...task.verdict } });
+      const context = repositoryContext(runtimeDir, task);
+      assertIntegrationBranch(context);
+      const preHead = gitValue(context.repoRoot, ['rev-parse', 'HEAD']);
+      if (action.commitSha !== task.commitSha || payload.integrationBranch !== context.integrationBranch
+        || payload.preHead !== preHead) {
+        throw controlError('HOST_MERGE_START_MISMATCH', 'HOST_MERGE started receipt 必须绑定当前 task commit、integration branch 与 live preHead', {
+          taskCommit: task.commitSha, integrationBranch: context.integrationBranch, preHead,
+        });
+      }
+      assertCleanMergeCandidate(context, task.commitSha);
+      task.hostMergeStarted = {
+        actionId: action.actionId, receiptId: recorded.receipt.receiptId,
+        integrationBranch: context.integrationBranch, preHead, commitSha: task.commitSha, startedAt: now(),
+      };
     }
     if (status === 'succeeded') {
       const task = action.taskId ? taskById(registry, action.taskId) : null;
       if (action.type === 'UNCLASSIFIED_FINAL') {
-        if (typeof payload.resolution !== 'string' || !payload.resolution.trim()) throw controlError('FINAL_RESOLUTION_REQUIRED', 'UNCLASSIFIED_FINAL receipt 需要明确 resolution');
-        const record = registry.unclassifiedFinals[action.eventId];
-        if (record) {
-          record.status = 'resolved';
-          record.resolution = payload.resolution;
-          record.resolvedAt = now();
-          const event = readJsonLines(inboxPath(runtimeDir)).find((candidate) => candidate.eventId === action.eventId);
-          if (event && task && !(task.consumedEventIds || []).includes(event.eventId)) consumeRecordedEvent(task, event);
-        }
+        throw controlError('UNCLASSIFIED_FINAL_REQUIRES_REPLACEMENT', 'UNCLASSIFIED_FINAL 不接受任意 resolution；必须消费合法 replacement typed-final，或显式收敛到 parked/handoff-required');
       } else if (action.type === 'CREATE_REVIEWER') {
         const reviewer = taskById(registry, payload.reviewerTaskId);
         if (reviewer.role !== 'reviewer' || reviewer.parentTaskId !== task.taskId || reviewer.worktree !== task.worktree) {
           throw controlError('INVALID_REVIEW_RECEIPT', 'CREATE_REVIEWER receipt 必须绑定已登记的关联 reviewer Task');
+        }
+        if (action.commitSha !== task.commitSha || reviewer.reviewCommit !== task.commitSha) {
+          throw controlError('REVIEW_COMMIT_MISMATCH', 'CREATE_REVIEWER receipt 必须满足 reviewer.reviewCommit === task.commitSha === action.commitSha');
         }
         if (task.state === 'committed') applyTransition(registry, runtimeDir, task, 'reviewing', {
           actor: 'action-receipt', reason: 'CREATE_REVIEWER succeeded', reviewTaskId: reviewer.taskId,
@@ -936,10 +1130,6 @@ export function receiveActionReceipt(actionIdValue, status, payload = {}, runtim
           actor: 'action-receipt', reason: 'RETURN_TO_EXECUTOR succeeded', evidence: [`action:${action.actionId}`],
         });
       } else if (action.type === 'EVALUATE_MERGE_GATE') {
-        if (!['clean', 'up-to-date'].includes(payload.mergeCheck)) throw controlError('MERGE_CHECK_REQUIRED', 'mergeCheck 必须为 clean|up-to-date');
-        if (payload.headSha !== task.commitSha) {
-          throw controlError('MERGE_HEAD_MISMATCH', `merge gate 必须证明 worktree HEAD=${task.commitSha}，实际 receipt=${payload.headSha || '(未提供)'}`);
-        }
         const effective = { code: payload.code, runtime: payload.runtime, delivery: payload.delivery };
         if (effective.code !== 'PASS' || effective.delivery !== 'MERGE_READY' || !RUNTIME_VERDICTS.includes(effective.runtime)) {
           throw controlError('INVALID_MERGE_GATE_RECEIPT', 'merge gate succeeded 必须携带 code=PASS、合法 runtime、delivery=MERGE_READY');
@@ -949,26 +1139,51 @@ export function receiveActionReceipt(actionIdValue, status, payload = {}, runtim
           throw controlError('MANUAL_TEST_DEBT_REQUIRED', 'needs-manual-test + runtime=NOT_RUN 必须显式记录 manualTestDebt');
         }
         assertEffectiveVerdict(task, effective);
+        const reconciled = reconcileMergeGate(runtimeDir, task, action, payload);
         task.verdict = effective;
+        task.mergeGateReceipt = {
+          actionId: action.actionId, receiptId: recorded.receipt.receiptId, commitSha: task.commitSha,
+          integrationBranch: reconciled.context.integrationBranch,
+          workerHead: reconciled.workerHead, integrationHead: reconciled.integrationHead,
+          mergeCheck: 'clean', recordedAt: now(),
+        };
         applyTransition(registry, runtimeDir, task, 'merge-ready', {
           actor: 'action-receipt', reason: 'EVALUATE_MERGE_GATE succeeded', evidence: [`action:${action.actionId}`, `mergeCheck:${payload.mergeCheck}`],
         });
       } else if (action.type === 'HOST_MERGE') {
-        if (typeof payload.mergeCommit !== 'string' || !payload.mergeCommit.trim()) throw controlError('MERGE_COMMIT_REQUIRED', 'HOST_MERGE receipt 需要 mergeCommit');
-        task.mergeCommit = payload.mergeCommit;
-        task.hostMergeReceipt = { actionId: action.actionId, receiptId: recorded.receipt.receiptId, mergeCommit: payload.mergeCommit, mergedAt: now() };
+        if (!task.hostMergeStarted || task.hostMergeStarted.actionId !== action.actionId) {
+          throw controlError('HOST_MERGE_START_REQUIRED', 'HOST_MERGE succeeded 前必须有同 action 的 live started receipt');
+        }
+        const context = repositoryContext(runtimeDir, task);
+        const mergeCommit = verifyMergeCommit(context, task, task.hostMergeStarted, payload);
+        task.mergeCommit = mergeCommit;
+        task.hostMergeReceipt = {
+          actionId: action.actionId, receiptId: recorded.receipt.receiptId,
+          integrationBranch: context.integrationBranch, preHead: task.hostMergeStarted.preHead,
+          mergeCommit, postHead: mergeCommit, mergedAt: now(),
+        };
       } else if (action.type === 'POST_MERGE_VERIFY') {
-        if (!Array.isArray(payload.tests) || !payload.tests.length
-          || payload.tests.some((test) => typeof test?.command !== 'string' || !Number.isInteger(test?.exitCode) || test.exitCode !== 0)) {
-          throw controlError('POST_MERGE_EVIDENCE_REQUIRED', 'POST_MERGE_VERIFY 需要至少一条 exitCode=0 的真实测试证据');
+        const run = registry.verificationRuns[payload.verificationRunId];
+        if (!run || run.status !== 'passed' || run.actionId !== action.actionId || run.taskId !== task.taskId
+          || run.mergeCommit !== action.mergeCommit || !run.results?.length) {
+          throw controlError('POST_MERGE_EVIDENCE_REQUIRED', 'POST_MERGE_VERIFY succeeded 只接受 action verify 实际执行生成的 passed verificationRunId');
         }
         if (!task.hostMergeReceipt?.mergeCommit || task.hostMergeReceipt.mergeCommit !== action.mergeCommit) {
           throw controlError('MERGE_RECEIPT_MISMATCH', 'post-merge verification 必须绑定当前 HOST_MERGE receipt');
         }
-        task.postMergeVerification = { actionId: action.actionId, receiptId: recorded.receipt.receiptId, tests: payload.tests, recordedAt: now() };
+        const context = repositoryContext(runtimeDir, task);
+        assertIntegrationBranch(context);
+        const liveHead = gitValue(context.repoRoot, ['rev-parse', 'HEAD']);
+        if (liveHead !== action.mergeCommit || run.postVerificationHead !== liveHead) {
+          throw controlError('POST_MERGE_HEAD_MISMATCH', 'verificationRun 与 live integration HEAD 不一致');
+        }
+        task.postMergeVerification = {
+          actionId: action.actionId, receiptId: recorded.receipt.receiptId,
+          verificationRunId: run.verificationRunId, results: run.results, recordedAt: now(),
+        };
         applyTransition(registry, runtimeDir, task, 'merged', {
           actor: 'action-receipt', reason: 'POST_MERGE_VERIFY succeeded', mergeCommit: action.mergeCommit,
-          evidence: [`action:${action.actionId}`, ...payload.tests.map((test) => `${test.command}:exit=${test.exitCode}`)],
+          evidence: [`action:${action.actionId}`, `verificationRun:${run.verificationRunId}`],
         });
       } else if (action.type === 'CLAIM_NEXT_ISSUE') {
         const nextTask = taskById(registry, payload.nextTaskId);
@@ -976,6 +1191,14 @@ export function receiveActionReceipt(actionIdValue, status, payload = {}, runtim
           || (task && nextTask.generation <= task.generation)) {
           throw controlError('INVALID_CLAIM_RECEIPT', 'CLAIM_NEXT_ISSUE receipt 必须绑定同 worker、目标 Issue 的新 executor Task');
         }
+        const reservation = registry.claimReservations[String(action.issue)];
+        if (!reservation || reservation.actionId !== action.actionId || reservation.worktree !== action.worktree) {
+          throw controlError('CLAIM_RESERVATION_REQUIRED', 'CLAIM_NEXT_ISSUE receipt 缺少同 Issue/action/worktree reservation');
+        }
+        reservation.status = 'succeeded';
+        reservation.taskId = nextTask.taskId;
+        reservation.receiptId = recorded.receipt.receiptId;
+        reservation.succeededAt = now();
       } else if (action.type === 'STOP') {
         const remaining = deriveActionCandidates(registry, runtimeDir, readJson(join(runtimeDir, 'status.json'), null))
           .filter((candidate) => candidate.type !== 'STOP');
@@ -991,6 +1214,98 @@ export function receiveActionReceipt(actionIdValue, status, payload = {}, runtim
     }
     return { result: 'receipt-recorded', actionId: actionIdValue, type: action.type, status, receipt: recorded.receipt };
   });
+}
+
+function normalizeVerificationCommands(commands) {
+  if (!Array.isArray(commands) || !commands.length) {
+    throw controlError('VERIFICATION_COMMANDS_REQUIRED', 'action verify 需要非空 commands 数组');
+  }
+  return commands.map((command, index) => {
+    if (typeof command?.file !== 'string' || !command.file.trim()
+      || !Array.isArray(command.args) || command.args.some((arg) => typeof arg !== 'string')) {
+      throw controlError('INVALID_VERIFICATION_COMMAND', `commands[${index}] 必须包含 file 与字符串 args 数组`);
+    }
+    return {
+      file: command.file,
+      args: command.args,
+      label: typeof command.label === 'string' && command.label.trim()
+        ? command.label.trim()
+        : `${command.file} ${command.args.join(' ')}`.trim(),
+      timeoutMs: Math.min(600_000, Math.max(1_000, Number(command.timeoutMs) || 120_000)),
+    };
+  });
+}
+
+export function runPostMergeVerification(actionIdValue, commands, runtimeDir = RUNTIME_DIR) {
+  const normalized = normalizeVerificationCommands(commands);
+  const prepared = updateRegistry(runtimeDir, (registry) => {
+    const action = registry.actions[actionIdValue];
+    if (!action || action.type !== 'POST_MERGE_VERIFY') {
+      throw controlError('INVALID_VERIFY_ACTION', `${actionIdValue} 不是已登记的 POST_MERGE_VERIFY action`);
+    }
+    const task = taskById(registry, action.taskId);
+    const context = repositoryContext(runtimeDir, task);
+    assertIntegrationBranch(context);
+    const liveHead = gitValue(context.repoRoot, ['rev-parse', 'HEAD']);
+    if (liveHead !== action.mergeCommit || task.hostMergeReceipt?.mergeCommit !== liveHead) {
+      throw controlError('POST_MERGE_HEAD_MISMATCH', `action verify 必须在 live merge commit ${action.mergeCommit} 上执行`);
+    }
+    const verificationRunId = `V-${stableDigest([actionIdValue, action.mergeCommit, normalized])}`;
+    const existing = registry.verificationRuns[verificationRunId];
+    if (existing?.status === 'passed') {
+      return { action, task, context, verificationRunId, alreadyPassed: true };
+    }
+    registry.verificationRuns[verificationRunId] = {
+      schemaVersion: 'aes.worktree-board.verification-run/v1', verificationRunId,
+      actionId: actionIdValue, taskId: task.taskId, mergeCommit: action.mergeCommit,
+      integrationBranch: context.integrationBranch, repoRoot: context.repoRoot,
+      preVerificationHead: liveHead, commands: normalized, status: 'running', startedAt: now(), results: [],
+    };
+    return { action, task, context, verificationRunId, alreadyPassed: false };
+  });
+  if (!prepared.alreadyPassed) {
+    const results = [];
+    for (const command of normalized) {
+      const startedAt = Date.now();
+      const result = spawnSync(command.file, command.args, {
+        ...HEADLESS_CHILD_OPTIONS,
+        cwd: prepared.context.repoRoot,
+        encoding: 'utf8',
+        timeout: command.timeoutMs,
+      });
+      const exitCode = Number.isInteger(result.status) ? result.status : 1;
+      results.push({
+        label: command.label, file: command.file, args: command.args, exitCode,
+        durationMs: Date.now() - startedAt,
+        stdoutDigest: stableDigest(String(result.stdout || '')),
+        stderrDigest: stableDigest(String(result.stderr || result.error?.message || '')),
+      });
+      if (exitCode !== 0) break;
+    }
+    const completed = updateRegistry(runtimeDir, (registry) => {
+      const run = registry.verificationRuns[prepared.verificationRunId];
+      const task = taskById(registry, prepared.task.taskId);
+      const context = repositoryContext(runtimeDir, task);
+      assertIntegrationBranch(context);
+      const postVerificationHead = gitValue(context.repoRoot, ['rev-parse', 'HEAD']);
+      run.results = results;
+      run.postVerificationHead = postVerificationHead;
+      run.finishedAt = now();
+      run.status = results.length === normalized.length && results.every((result) => result.exitCode === 0)
+        && postVerificationHead === run.mergeCommit ? 'passed' : 'failed';
+      return { status: run.status, postVerificationHead };
+    });
+    if (completed.status !== 'passed') {
+      return {
+        result: 'verification-failed', verificationRunId: prepared.verificationRunId,
+        results, postVerificationHead: completed.postVerificationHead, exitCode: 1,
+      };
+    }
+  }
+  const receipt = receiveActionReceipt(actionIdValue, 'succeeded', {
+    verificationRunId: prepared.verificationRunId,
+  }, runtimeDir);
+  return { result: 'verification-passed', verificationRunId: prepared.verificationRunId, receipt };
 }
 
 export function startGoal(options = {}, runtimeDir = RUNTIME_DIR) {
@@ -1162,13 +1477,17 @@ export async function main(argv = process.argv.slice(2), runtimeDir = RUNTIME_DI
     else if (options.payload) payload = JSON.parse(options.payload);
     return receiveActionReceipt(requireValue(options, 'action-id'), requireValue(options, 'status'), payload, runtimeDir);
   }
+  if (command === 'action' && action === 'verify') {
+    const commandsFile = resolve(requireValue(options, 'commands-file'));
+    return runPostMergeVerification(requireValue(options, 'action-id'), JSON.parse(readFileSync(commandsFile, 'utf8')), runtimeDir);
+  }
   if (command === 'goal' && action === 'start') return startGoal(options, runtimeDir);
   if (command === 'verdict' && action === 'set') return setVerdict(requireValue(options, 'task'), {
     code: options.code, runtime: options.runtime, delivery: options.delivery,
   }, runtimeDir);
   if (command === 'block' && action === 'record') return recordBlock(requireValue(options, 'task'), options, runtimeDir);
   if (command === 'stop' && action === 'eval') return evaluateStop({ write: Boolean(options.write) }, runtimeDir);
-  throw controlError('BAD_REQUEST', '用法: orchestrate.mjs task create|task heartbeat|task attach-thread|inbox put|inbox pending|consume|next-actions|action receipt|goal start|transition|verdict set|block record|stop eval');
+  throw controlError('BAD_REQUEST', '用法: orchestrate.mjs task create|task heartbeat|task attach-thread|inbox put|inbox pending|consume|next-actions|action receipt|action verify|goal start|transition|verdict set|block record|stop eval');
 }
 
 if (resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url))) {

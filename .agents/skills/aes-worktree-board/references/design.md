@@ -17,6 +17,9 @@
 - LIVE 页面由 server 注入 `/runtime/status.js`；collect 在目标 runtime 生成只读 `board.html + status.js` 快照，技能目录历史 runtime 不参与读取。
 - 连续编排不靠自然语言猜测 worker 结果：executor final 使用 `aes.worktree-board.executor-final/v1`；无法校验的 final 保持 inbox pending，并投影为 `UNCLASSIFIED_FINAL`。
 - 宿主动作由稳定 actionId 驱动，receipt 写回 registry。root 重启只重算同一 actionId；`HOST_MERGE` 在 post-merge verification 完成前独占 integration merge mutex。
+- `committed → reviewing → approved → merge-ready → merged` 的所有公开入口共用一条证据链；旧 transition/verdict 不能旁路。reviewer、action/event、executor 三方 commit 必须相等。
+- claim reservation 在 next-actions 物化时按 Issue 编号原子占位；active/pending/succeeded claim 都会从 stale frontier 排除。
+- Git merge receipt 由 live repo 校验 pre/post HEAD、integration branch、真实双父 merge commit及 executor commit ancestry；post-merge 只接受脚本实际执行形成的 passed verificationRun。
 - Goal 只能由显式 `goal start` 创建。Goal 是 root 的持久完成条件，不代替 Desktop `create_thread` / `wait_threads`，也不扩大 merge、dirty 或人工决策权限。
 
 ## Continuous orchestration loop
@@ -66,6 +69,11 @@ merge gate，Task create 从 fresh Issue labels 自动推导该 interaction clas
 | AC-14 | next-actions/action receipt 在 root 重启与重复事件下幂等；review BLOCK 返回原 executor，第三个新 commit BLOCK 才熔断。 |
 | AC-15 | integration merge 严格串行；HOST_MERGE receipt 后必须 POST_MERGE_VERIFY 通过才进入 merged 并释放 writer 租约。 |
 | AC-16 | merged worker 自动得到 CLAIM_NEXT_ISSUE；pending inbox、活动线路、merge/post-merge 或 eligible frontier 任一存在时 Goal/stop 不得 complete。 |
+| AC-17 | 旧 transition/verdict set 不能绕过 executor-final、review、merge-gate、HOST_MERGE、post-merge receipt；旁路失败不得释放 lease。 |
+| AC-18 | reviewer.reviewCommit、task.commitSha、action/event.commitSha 必须三方相等；旧 reviewer 回放 APPROVE/BLOCK 均拒绝。 |
+| AC-19 | claim reservation 防止多 worker 在 root 重启及 stale snapshot 下重复领取同一 Issue。 |
+| AC-20 | UNCLASSIFIED_FINAL 只有 replacement typed-final 或显式 parked/handoff-required 才能消费。 |
+| AC-21 | fake SHA、非 live branch/head、任意 exitCode JSON 均不能形成 merge/post-merge receipt；CLI action verify 正向链必须真实执行。 |
 
 ## 迭代记录
 
@@ -75,3 +83,4 @@ merge gate，Task create 从 fresh Issue labels 自动推导该 interaction clas
 | 2026-08-25 | 默认 collect 改用完整 Issue fixture，并把真实 GitHub 二次对账拆成显式 `collect-live` smoke，消除授权、网络及两次查询间 Issue 变化造成的 flaky。 | 无效 `issueRepo` 下 collect 绿、collect-live 红；八域 `run-tests.mjs` 8/8 通过。 | 这是测试证据分层，不新增技能职责，无需拆分。 |
 | 2026-08-25 | 为 Desktop worker lane 增加可恢复的开始/结束时间投影，统一 registry、collect 与 web 面板的工作时长。 | lifecycle/storage/contract 回归、八域回归与真实浏览器活动/冻结计时验收。 | 复用既有 TaskRecord 与 schema v3，不引入后台计时服务。 |
 | 2026-08-25 | Issue #43：增加显式 Goal、版本化 executor final、typed next-actions/action receipts、串行 merge queue、post-merge verification 与 next-Issue 连续闭环。 | `orchestration --scenario continuous` 四组 host-shaped 回归；默认八域回归。 | 继续保持宿主执行动作、脚本登记/校验事实的边界，不引入 daemon。 |
+| 2026-08-25 | Issue #43 BLOCK 1/3：封闭旧入口、旧 reviewer、重复 claim、任意 final resolution 与伪造 merge/post-merge receipt 五类旁路。 | 临时真实 Git merge + CLI verification 正向链，以及对应负向 probes。 | receipt 控制面仍在 registry v3 additive 字段中，保持旧快照可读。 |
