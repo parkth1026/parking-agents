@@ -9,7 +9,7 @@ import {
 } from 'node:fs';
 import { join } from 'node:path';
 import {
-  assertRuntimeIdentity, collectStatus, listWorktrees, loadConfig, repoIdentity, repoIdentityMatches,
+  assertRuntimeIdentity, BOARD_API, collectStatus, listWorktrees, loadConfig, repoIdentity, repoIdentityMatches,
   RUNTIME_DIR, SKILL_DIR, TASKS_DIR,
 } from './collect.mjs';
 import { HEADLESS_CHILD_OPTIONS } from './headless.mjs';
@@ -21,6 +21,7 @@ const config = loadConfig();
 const requestedPort = process.argv.find((argument, index) => process.argv[index - 1] === '--port');
 const port = Number(requestedPort ?? config.port ?? 8321);
 const boardToken = `btk_${randomBytes(24).toString('hex')}`;
+const boardApiHeader = `${BOARD_API.marker}/${BOARD_API.protocolVersion}`;
 
 function startupDiagnostic(error, fallbackCode = 'STARTUP_FAILED') {
   return {
@@ -47,6 +48,18 @@ async function portConflictDiagnostic(expected, requested) {
       signal: AbortSignal.timeout(10_000),
     });
     const payload = await response.json();
+    const markedBoardStatus = response.headers.get('x-aes-worktree-board') === boardApiHeader
+      && payload?.board?.marker === BOARD_API.marker
+      && payload?.board?.protocolVersion === BOARD_API.protocolVersion
+      && [2, 3].includes(payload?.schemaVersion);
+    const markedBoardError = response.headers.get('x-aes-worktree-board') === boardApiHeader
+      && payload?.board?.marker === BOARD_API.marker
+      && payload?.board?.protocolVersion === BOARD_API.protocolVersion
+      && payload?.apiSchemaVersion === 1
+      && payload?.code === 'REPO_MISMATCH';
+    if (!markedBoardStatus && !markedBoardError) {
+      return { ...base, detail: '占用者未通过 aes-worktree-board marker/schema 校验' };
+    }
     const reportedIdentity = payload?.repo || payload?.actual || null;
     const actual = reportedIdentity
       ? repoIdentity(reportedIdentity.root || '', reportedIdentity)
@@ -66,7 +79,10 @@ async function portConflictDiagnostic(expected, requested) {
 }
 
 function sendJson(response, statusCode, value) {
-  response.writeHead(statusCode, { 'content-type': 'application/json; charset=utf-8' });
+  response.writeHead(statusCode, {
+    'content-type': 'application/json; charset=utf-8',
+    'x-aes-worktree-board': boardApiHeader,
+  });
   response.end(JSON.stringify(value));
 }
 
@@ -276,6 +292,8 @@ const server = createServer(async (request, response) => {
   } catch (error) {
     return sendJson(response, error.code === 'REPO_MISMATCH' ? 409 : 500, {
       ok: false,
+      board: BOARD_API,
+      apiSchemaVersion: 1,
       message: String(error.message).slice(0, 300),
       code: error.code || 'INTERNAL',
       ...(error.expected ? { expected: error.expected } : {}),

@@ -16,7 +16,8 @@
 - stop 的读取、判断和写入与 Task 创建使用同一临界区，保证 `stopped` 与 active Task 不会并存。
 - LIVE 页面由 server 注入 `/runtime/status.js`；collect 在目标 runtime 生成只读 `board.html + status.js` 快照，技能目录历史 runtime 不参与读取。
 - runtime 中已有快照必须与本次解析出的 `repo.root / issueRepo / mainBranch` 完全同源；任一字段错配都以 `REPO_MISMATCH`、exit 2 拒绝复用，不能从旧快照提取 Issue 或控制面事实。
-- server 端口冲突时探测占用者的 `/api/status?fast=1`：另一目标仓返回可诊断的 `REPO_MISMATCH`，同仓或非 board 服务返回 `PORT_CONFLICT`；任何冲突都拒绝把旧实例当成本次启动成功。
+- runtime identity 必须在 collect 的锁前快检和取得 runtime 锁后的最终快照上各校验一次；两个目标仓从同一空 runtime 并发 collect 时只能有一个写入，另一方必须 `REPO_MISMATCH`，不得 last-writer-wins。
+- server API 使用专属 `aes-worktree-board/1` marker 与 status schema；端口冲突探测只有验证 marker/schema 后才比较 identity。另一目标仓返回可诊断的 `REPO_MISMATCH`，同仓或非 board 服务返回 `PORT_CONFLICT`；任何冲突都拒绝把旧实例当成本次启动成功。
 
 ## 验收条件
 
@@ -35,6 +36,7 @@
 | AC-11 | 旧七域、自带 orchestration 域、issue graph、真实浏览器 v3/v2 验收全部保持通过。 |
 | AC-12 | registry 中最新 executor Task 是 worker 计时真源；活动时长持续增长，merged/parked/handoff-required 后冻结，reviewer 不重置，parked 恢复后开始新周期。 |
 | AC-13 | 显式目标仓、runtime 旧快照和 server 监听端口形成同一 repo identity 边界；跨项目错配以 exit 2 fail closed，当前项目 API 的仓、Issue 图谱与 worktree 列表必须同源。 |
+| AC-14 | 锁内二次 identity 校验阻止空 runtime 的双仓并发覆盖；repo-shaped 非 board JSON 未通过专属 marker/schema 时只能判为 `PORT_CONFLICT`。 |
 
 ## 迭代记录
 
@@ -44,3 +46,4 @@
 | 2026-08-25 | 默认 collect 改用完整 Issue fixture，并把真实 GitHub 二次对账拆成显式 `collect-live` smoke，消除授权、网络及两次查询间 Issue 变化造成的 flaky。 | 无效 `issueRepo` 下 collect 绿、collect-live 红；八域 `run-tests.mjs` 8/8 通过。 | 这是测试证据分层，不新增技能职责，无需拆分。 |
 | 2026-08-25 | 为 Desktop worker lane 增加可恢复的开始/结束时间投影，统一 registry、collect 与 web 面板的工作时长。 | lifecycle/storage/contract 回归、八域回归与真实浏览器活动/冻结计时验收。 | 复用既有 TaskRecord 与 schema v3，不引入后台计时服务。 |
 | 2026-08-25 | 锁定跨项目 repo identity：拒绝错误 runtime 快照，并在端口占用时区分另一仓 server 与普通冲突。 | repo-root 跨项目 runtime/port/API 回归 + 八域回归 + 真实 parking-agents API smoke。 | 沿用既有 `/api/status?fast=1`，不增加监听地址、路由或第三方依赖。 |
+| 2026-08-25 | BLOCK 1/3 follow-up：目标仓 integration 配置落为 `dev`，collect 增加锁内 identity 复核，端口探测增加专属 board marker/schema。 | 双仓 barrier 并发回归、repo-shaped 伪服务回归、无 env 目标主仓 live API/Playwright。 | marker 是 additive v3 字段与响应头；页面仍可降级读取旧 v2/v3 快照。 |

@@ -2,6 +2,7 @@
 // Goal Contract 的机械验收入口：collect / dispatch / server / repo-root / layout。
 import assert from 'node:assert/strict';
 import { execFile, spawn, spawnSync } from 'node:child_process';
+import { createServer } from 'node:http';
 import { promisify } from 'node:util';
 import {
   chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync,
@@ -10,7 +11,7 @@ import { tmpdir } from 'node:os';
 import { basename, join, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
-  collectStatus, DEFAULT_RUNTIME_DIR, listWorktrees, loadIssueFixture, loadConfig, SKILL_DIR,
+  BOARD_API, collectStatus, DEFAULT_RUNTIME_DIR, listWorktrees, loadIssueFixture, loadConfig, SKILL_DIR,
 } from './collect.mjs';
 import { resolveCommand } from './command.mjs';
 import { HEADLESS_CHILD_OPTIONS } from './headless.mjs';
@@ -665,6 +666,71 @@ async function repoRootDomain() {
         assertFixtureStatus(runtimeOf(repo.main), repo);
       }
 
+      // #44 BLOCK 1/3: 两仓必须都在空 runtime 上完成锁前检查，再竞争同一写锁。
+      // 只有锁内重读 latestSnapshot 后再校验 identity，才能稳定阻止 last-writer-wins。
+      const sharedRuntime = join(fixture.root, 'shared-concurrent-runtime');
+      const barrierDir = join(fixture.root, 'collect-barrier');
+      const concurrentRunner = join(fixture.root, 'concurrent-collect.mjs');
+      mkdirSync(barrierDir, { recursive: true });
+      writeFileSync(concurrentRunner, `
+import { existsSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { collectStatus } from ${JSON.stringify(pathToFileURL(join(SCRIPT_DIR, 'collect.mjs')).href)};
+const [id, runtimeDir, issuesFixture, barrierDir] = process.argv.slice(2);
+try {
+  const status = await collectStatus({
+    runtimeDir,
+    issuesFixture,
+    beforeWrite: async () => {
+      writeFileSync(join(barrierDir, 'ready-' + id), id);
+      while (!existsSync(join(barrierDir, 'release'))) {
+        await new Promise((resolveWait) => setTimeout(resolveWait, 10));
+      }
+    },
+  });
+  console.log(JSON.stringify({ ok: true, repo: status.repo, issues: status.graph.issues.map((issue) => issue.number) }));
+} catch (error) {
+  console.error(JSON.stringify({ ok: false, code: error.code, expected: error.expected, actual: error.actual }));
+  process.exitCode = error.exitCode || 1;
+}
+`);
+      const concurrentA = runNode([
+        concurrentRunner, 'a', sharedRuntime, issuesA, barrierDir,
+      ], {
+        cwd: fixture.main,
+        env: boardEnv(sharedRuntime, {
+          AES_WORKTREE_BOARD_REPO_ROOT: fixture.main,
+          AES_WORKTREE_BOARD_ISSUE_REPO: issueRepoA,
+        }),
+      });
+      const concurrentB = runNode([
+        concurrentRunner, 'b', sharedRuntime, issuesB, barrierDir,
+      ], {
+        cwd: peer.main,
+        env: boardEnv(sharedRuntime, {
+          AES_WORKTREE_BOARD_REPO_ROOT: peer.main,
+          AES_WORKTREE_BOARD_ISSUE_REPO: issueRepoB,
+        }),
+      });
+      for (let attempt = 0; attempt < 1_000; attempt += 1) {
+        if (existsSync(join(barrierDir, 'ready-a')) && existsSync(join(barrierDir, 'ready-b'))) break;
+        await waitMilliseconds(10);
+      }
+      assert.equal(existsSync(join(barrierDir, 'ready-a')), true, 'A collect 未到达同步写入点');
+      assert.equal(existsSync(join(barrierDir, 'ready-b')), true, 'B collect 未到达同步写入点');
+      writeFileSync(join(barrierDir, 'release'), 'release');
+      const concurrentResults = await Promise.all([concurrentA, concurrentB]);
+      assert.deepEqual(concurrentResults.map((result) => result.status).sort(), [0, 2],
+        concurrentResults.map((result) => result.stderr || result.stdout).join('\n'));
+      const failedCollect = concurrentResults.find((result) => result.status === 2);
+      assert.equal(parseJsonLine(failedCollect.stderr).code, 'REPO_MISMATCH');
+      const finalSharedStatus = readJson(join(sharedRuntime, 'status.json'));
+      const successfulCollect = parseJsonLine(concurrentResults.find((result) => result.status === 0).stdout);
+      assert.equal(resolve(finalSharedStatus.repo.root), resolve(successfulCollect.repo.root),
+        '失败方不得覆盖赢家 repo identity');
+      assert.equal(finalSharedStatus.repo.issueRepo, successfulCollect.repo.issueRepo);
+      assert.deepEqual(finalSharedStatus.graph.issues.map((issue) => issue.number), successfulCollect.issues);
+
       // 同名 worktree + 同 taskId：A 运行中 B 直发必须成功（旧共享目录会 LOCKED 或任务 id 冲突）。
       const dispatchA = spawn(process.execPath, [
         join(SCRIPT_DIR, 'dispatch.mjs'), basename(fixture.sibling), '--agent', 'test',
@@ -990,6 +1056,7 @@ async function dispatchDomain() {
 async function serverDomain() {
   const runtimeDir = tempDirectory('server');
   let server = null;
+  let impostor = null;
   try {
     const marker = join(runtimeDir, 'gh-called.txt');
     const shimDir = join(runtimeDir, 'shim');
@@ -1026,10 +1093,36 @@ async function serverDomain() {
 
     response = await fetch(`${server.origin}/api/status?fast=1`);
     assert.equal(response.status, 200);
+    assert.equal(response.headers.get('x-aes-worktree-board'), `${BOARD_API.marker}/${BOARD_API.protocolVersion}`);
     const status = await response.json();
+    assert.deepEqual(status.board, BOARD_API);
     assert.equal(status.graph.issues[0].title, 'fast-cache-sentinel');
     assert.equal(status.graph.issues[0].derived.warn, true);
     assert.equal(existsSync(marker), false, 'fast=1 不得调用 gh');
+
+    impostor = createServer((request, responseImpostor) => {
+      responseImpostor.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
+      responseImpostor.end(JSON.stringify({
+        schemaVersion: 3,
+        repo: { root: 'C:/foreign/repo', issueRepo: 'foreign/repo', mainBranch: 'main' },
+        actual: { root: 'C:/foreign/runtime', issueRepo: 'foreign/runtime', mainBranch: 'main' },
+      }));
+    });
+    await new Promise((resolveListen, reject) => {
+      impostor.once('error', reject);
+      impostor.listen(0, '127.0.0.1', resolveListen);
+    });
+    const impostorAddress = impostor.address();
+    const impostorPort = typeof impostorAddress === 'object' ? impostorAddress.port : null;
+    const impostorConflict = await probeServerStartup(ROOT, boardEnv(runtimeDir), 15_000, impostorPort);
+    assert.equal(impostorConflict.status, 2, impostorConflict.stderr || impostorConflict.stdout);
+    const impostorDiagnostic = parseJsonLine(impostorConflict.stderr || impostorConflict.stdout);
+    assert.equal(impostorDiagnostic.code, 'PORT_CONFLICT', JSON.stringify(impostorDiagnostic));
+    assert.match(impostorDiagnostic.detail, /marker\/schema/);
+    assert.equal(Object.hasOwn(impostorDiagnostic, 'actual'), false,
+      'repo-shaped 非 board JSON 不得进入 identity 比较');
+    await new Promise((resolveClose, reject) => impostor.close((error) => (error ? reject(error) : resolveClose())));
+    impostor = null;
 
     response = await fetch(`${server.origin}/api/task/${task.id}`);
     assert.equal(response.status, 200);
@@ -1045,6 +1138,9 @@ async function serverDomain() {
     assert.equal(response.status, 400);
     assert.equal((await response.json()).code, 'BAD_REQUEST');
   } finally {
+    if (impostor?.listening) {
+      await new Promise((resolveClose) => impostor.close(() => resolveClose()));
+    }
     if (server?.child && server.child.exitCode === null) {
       const stopped = waitForExit(server.child);
       server.child.kill();
@@ -2098,6 +2194,11 @@ async function layoutDomain() {
   for (const key of ['mainBranch', 'issueRepo', 'port', 'defaultAgent', 'agents']) {
     assert.ok(Object.hasOwn(config, key), `board.config.json 缺少既有字段 ${key}`);
   }
+  const repoConfigPath = join(ROOT, '.aes-worktree-board', 'board.config.json');
+  assert.ok(existsSync(repoConfigPath), '目标仓必须提交 .aes-worktree-board/board.config.json');
+  const repoConfig = JSON.parse(readFileSync(repoConfigPath, 'utf8'));
+  assert.equal(repoConfig.mainBranch, 'dev', 'parking-agents integration branch 必须为 dev');
+  assert.equal(repoConfig.issueRepo, 'parkth1026/parking-agents');
   const scripts = ['collect.mjs', 'assess.mjs', 'check-issue-graph.mjs', 'command.mjs', 'dispatch.mjs', 'headless.mjs', 'orchestrate.mjs', 'runtime-store.mjs', 'server.mjs', 'selftest.mjs'];
   for (const script of scripts) {
     const source = readFileSync(join(SCRIPT_DIR, script), 'utf8');

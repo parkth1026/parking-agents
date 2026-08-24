@@ -16,6 +16,7 @@ import {
 const pExecFile = promisify(execFile);
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 export const SKILL_DIR = dirname(SCRIPT_DIR);
+export const BOARD_API = Object.freeze({ marker: 'aes-worktree-board', protocolVersion: 1 });
 // 默认沿用调用方当前目录，显式环境变量可把看板指向另一个同级 worktree 仓库。
 // skill 本身可以放在独立的工具仓库中，不再把 skill 目录误当成目标仓库根。
 export const REPO_ROOT = resolve(process.env.AES_WORKTREE_BOARD_REPO_ROOT || process.cwd());
@@ -464,6 +465,7 @@ export async function collectStatus({
   skipGh = false,
   runtimeDir = RUNTIME_DIR,
   issuesFixture = null,
+  beforeWrite = null,
 } = {}) {
   const config = loadConfig();
   const fixturePath = issuesFixture || process.env.AES_WORKTREE_BOARD_ISSUES_FIXTURE || null;
@@ -577,6 +579,7 @@ export async function collectStatus({
   });
   const status = {
     schemaVersion: 3,
+    board: BOARD_API,
     generatedAt: new Date().toISOString(),
     repo: {
       root: expectedIdentity.root,
@@ -594,9 +597,11 @@ export async function collectStatus({
   const snapshotPage = readFileSync(join(SKILL_DIR, 'board.html'), 'utf8')
     .replace('__WORKBOARD_STATUS__', 'status.js');
   mkdirSync(paths.tasksDir, { recursive: true });
+  if (beforeWrite) await beforeWrite({ expectedIdentity, runtimeDir });
   withRuntimeLock(runtimeDir, () => {
     // collect 计算期间 assess/registry 可能已更新；临写前重新承接，避免旧快照复活。
     const latestSnapshot = readJson(paths.statusJson, null);
+    assertRuntimeIdentity(runtimeDir, expectedIdentity, latestSnapshot);
     const latestAssessments = new Map((latestSnapshot?.worktrees || []).map((worker) => [worker.name, worker.assessment]));
     const latestRegistry = readRegistry(runtimeDir);
     status.orchestration = latestRegistry.orchestration;
