@@ -1,0 +1,148 @@
+{
+  "skill": "shopping-deep-research",
+  "runs": [
+    {
+      "date": "2026-08-24T15:18:18+08:00",
+      "iteration_ref": "G:\\GIT\\AI_WorkFlow\\parking-agents\\.agents\\evals\\shopping-deep-research-workspace\\iteration-1",
+      "gates": {
+        "with_skill": {
+          "pass_rate": 1,
+          "mean_ms": 892904,
+          "mean_tokens": 785664
+        },
+        "without_skill": {
+          "pass_rate": 0.825,
+          "mean_ms": 767328,
+          "mean_tokens": 645609
+        }
+      },
+      "vs_previous": null,
+      "bank_epoch": 1,
+      "current_best": true
+    },
+    {
+      "date": "2026-08-24T16:35:30+08:00",
+      "iteration_ref": "G:\\GIT\\AI_WorkFlow\\parking-agents\\.agents\\evals\\shopping-deep-research-workspace\\iteration-2",
+      "gates": {
+        "with_skill": {
+          "pass_rate": 1,
+          "mean_ms": 981458,
+          "mean_tokens": 1300955.25
+        },
+        "without_skill": {
+          "pass_rate": 0.7202,
+          "mean_ms": 609401,
+          "mean_tokens": 563290.75
+        }
+      },
+      "vs_previous": {
+        "evals_total": 4,
+        "won": 0,
+        "lost": 0,
+        "tie": 4,
+        "detail": [
+          {
+            "eval": "eval-净化器榜单真伪调研",
+            "result": "tie"
+          },
+          {
+            "eval": "eval-升降桌小房间调研",
+            "result": "tie"
+          },
+          {
+            "eval": "eval-工学椅大体型幼童调研",
+            "result": "tie"
+          },
+          {
+            "eval": "eval-电视双场景调研",
+            "result": "tie"
+          }
+        ]
+      },
+      "bank_epoch": 1
+    },
+    {
+      "date": "2026-08-24T20:17:25+08:00",
+      "iteration_ref": "G:\\GIT\\AI_WorkFlow\\parking-agents\\.agents\\evals\\shopping-deep-research-workspace\\iteration-3",
+      "gates": {
+        "with_skill": {
+          "pass_rate": 1,
+          "mean_ms": 990642.2,
+          "mean_tokens": 1093570.4
+        },
+        "without_skill": {
+          "pass_rate": 0.6478,
+          "mean_ms": 563002.25,
+          "mean_tokens": 476568.75
+        }
+      },
+      "vs_previous": {
+        "evals_total": 4,
+        "won": 0,
+        "lost": 0,
+        "tie": 4,
+        "detail": [
+          {
+            "eval": "eval-净化器榜单真伪调研",
+            "result": "tie"
+          },
+          {
+            "eval": "eval-升降桌小房间调研",
+            "result": "tie"
+          },
+          {
+            "eval": "eval-工学椅大体型幼童调研",
+            "result": "tie"
+          },
+          {
+            "eval": "eval-电视双场景调研",
+            "result": "tie"
+          }
+        ]
+      },
+      "bank_epoch": 1
+    },
+    {
+      "date": "2026-08-24T20:56:03+08:00",
+      "iteration_ref": "G:\\GIT\\AI_WorkFlow\\parking-agents\\.agents\\evals\\shopping-deep-research-workspace\\iteration-4",
+      "gates": {
+        "with_skill": {
+          "pass_rate": 1,
+          "mean_ms": 1214973.5,
+          "mean_tokens": 1260378.75
+        },
+        "without_skill": {
+          "pass_rate": 0.5486,
+          "mean_ms": 678676.5,
+          "mean_tokens": 545122
+        }
+      },
+      "vs_previous": {
+        "evals_total": 4,
+        "won": 0,
+        "lost": 0,
+        "tie": 4,
+        "detail": [
+          {
+            "eval": "eval-净化器榜单真伪调研",
+            "result": "tie"
+          },
+          {
+            "eval": "eval-升降桌小房间调研",
+            "result": "tie"
+          },
+          {
+            "eval": "eval-工学椅大体型幼童调研",
+            "result": "tie"
+          },
+          {
+            "eval": "eval-电视双场景调研",
+            "result": "tie"
+          }
+        ]
+      },
+      "bank_epoch": 1
+    }
+  ],
+  "current_best": "runs[0]"
+}

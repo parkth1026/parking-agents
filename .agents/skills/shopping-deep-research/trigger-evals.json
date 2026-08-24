@@ -1,0 +1,25 @@
+{
+  "skill": "shopping-deep-research",
+  "queries": [
+    { "id": "q1", "text": "想给爸妈换一台冰箱，三四千预算，帮我好好调研下现在买哪个牌子的靠谱", "should_trigger": true },
+    { "id": "q2", "text": "家里装修完要买床垫，我和老婆都腰不好，预算 5000 以内，有没有查过销量和口碑的那种靠谱选购建议", "should_trigger": true },
+    { "id": "q3", "text": "帮我对比一下现在市面上的洗地机，添可和追觅到底哪个值得买", "should_trigger": true },
+    { "id": "q4", "text": "预算 8000 配一台主要打 3A 游戏的台式主机，帮我调研下现在哪套配置最划算", "should_trigger": true },
+    { "id": "q5", "text": "想买个千元以上的蓝牙降噪耳机，网上说法太乱了，帮我系统调研下 2026 年值得买的型号", "should_trigger": true },
+    { "id": "q6", "text": "我是程序员天天坐 8 小时，想买张人体工学椅，身高 185 预算 3000，帮我做个深度调研别只看广告", "should_trigger": true },
+    { "id": "q7", "text": "家里新房要装中央空调还是挂机，帮我调研下大金、格力、美的怎么选，预算 3 万", "should_trigger": true },
+    { "id": "q8", "text": "想给摄影入门买台微单相机，预算 6000，帮我对比下索尼佳能现在哪款值得入", "should_trigger": true },
+    { "id": "q9", "text": "打算买台 65 寸电视放客厅，主要看电影，预算 8000，帮我做个品牌销量口碑的深度调研再推荐", "should_trigger": true },
+    { "id": "q10", "text": "想给家里换一台洗烘一体洗衣机，预算 6000，帮我深度调研下海尔小天鹅松下怎么选", "should_trigger": true },
+    { "id": "q11", "text": "纸巾洗衣液这些日用囤货哪里买便宜？帮我做个比价", "should_trigger": false },
+    { "id": "q12", "text": "帮我调研下市面上的订阅制网课平台哪家好，想给孩子报英语课", "should_trigger": false },
+    { "id": "q13", "text": "公司要采购一批办公椅给会议室，走招投标流程，帮我写一份采购需求文档", "should_trigger": false },
+    { "id": "q14", "text": "帮我调研一下 Java 虚拟机垃圾回收的几种算法并做个对比排行", "should_trigger": false },
+    { "id": "q15", "text": "我想调研一下新能源汽车市场格局，写一份行业分析报告", "should_trigger": false },
+    { "id": "q16", "text": "帮我用 best-practice-research 调研一下前端状态管理的最佳实践", "should_trigger": false },
+    { "id": "q17", "text": "这张图片里的椅子是什么型号，帮我搜搜同款", "should_trigger": false },
+    { "id": "q18", "text": "帮我把这份英文的商品测评报告翻译成中文", "should_trigger": false },
+    { "id": "q19", "text": "deep-research 帮我调研一下大语言模型幻觉缓解技术的现状", "should_trigger": false },
+    { "id": "q20", "text": "帮我写一个自动抓取京东商品评论数并生成排行榜的 Python 脚本", "should_trigger": false }
+  ]
+}

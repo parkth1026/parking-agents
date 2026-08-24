@@ -1,0 +1,108 @@
+{
+  "skill": "shopping-deep-research",
+  "split": {
+    "train": [
+      "q3",
+      "q2",
+      "q9",
+      "q10",
+      "q5",
+      "q7",
+      "q11",
+      "q12",
+      "q16",
+      "q18",
+      "q13",
+      "q15"
+    ],
+    "test": [
+      "q1",
+      "q8",
+      "q4",
+      "q6",
+      "q20",
+      "q17",
+      "q14",
+      "q19"
+    ],
+    "seed": 42,
+    "holdout": 0.4
+  },
+  "rounds": [
+    {
+      "description": null,
+      "valid_probes": 53,
+      "train": {
+        "queries": 12,
+        "trigger_rate_on_should": 1,
+        "false_trigger_rate_on_should_not": 0.1667,
+        "correct": 11,
+        "invalid_queries": 0
+      },
+      "test": {
+        "queries": 8,
+        "trigger_rate_on_should": 1,
+        "false_trigger_rate_on_should_not": 0.25,
+        "correct": 7,
+        "invalid_queries": 0
+      }
+    },
+    {
+      "description": "大件消费品深度选购调研（硬证据导购）。问答锁定需求 → 推导硬约束与一票否决项 → 证据分级（拒绝营销排行榜）→ 销量+口碑双口径一手数据 → 型号级对比 → 场景结论+下单核对清单 → Markdown 报告留档。适用于家具、家电、数码、工学设备等高客单价实物商品的\"帮我调研/对比/排行/选哪个\"请求。订阅课程等虚拟商品与服务、从图片识别单品找同款不适用。",
+      "valid_probes": 55,
+      "train": {
+        "queries": 12,
+        "trigger_rate_on_should": 1,
+        "false_trigger_rate_on_should_not": 0,
+        "correct": 12,
+        "invalid_queries": 0
+      },
+      "test": {
+        "queries": 8,
+        "trigger_rate_on_should": 1,
+        "false_trigger_rate_on_should_not": 0,
+        "correct": 8,
+        "invalid_queries": 0
+      }
+    },
+    {
+      "description": "大件消费品深度选购调研（硬证据导购）。对话锁定需求（需求卡回读确认）→ 推导硬约束与一票否决项 → 证据分级（拒绝营销排行榜）→ 销量+口碑双口径品牌榜 + 品牌画像（售后/企业实力，标证据级）→ 型号级对比 → 场景结论+下单核对清单 → Markdown 报告留档。适用于家具、家电、数码、工学设备等高客单价实物商品的\"帮我调研/对比/排行/选哪个\"请求。订阅课程等虚拟商品与服务、从图片识别单品找同款不适用。",
+      "valid_probes": 56,
+      "train": {
+        "queries": 12,
+        "trigger_rate_on_should": 1,
+        "false_trigger_rate_on_should_not": 0.1667,
+        "correct": 11,
+        "invalid_queries": 0
+      },
+      "test": {
+        "queries": 8,
+        "trigger_rate_on_should": 1,
+        "false_trigger_rate_on_should_not": 0,
+        "correct": 8,
+        "invalid_queries": 0
+      }
+    },
+    {
+      "description": "大件消费品深度选购调研（硬证据导购）。对话锁定需求（需求卡回读确认）→ 推导硬约束与一票否决项 → 证据分级（拒绝营销排行榜）→ 销量+口碑双口径品牌榜 + 品牌画像（售后/企业实力，标证据级）→ 型号级对比 → 场景结论+下单核对清单 → Markdown 报告留档。适用于家具、家电、数码、工学设备等高客单价实物商品的\"帮我调研/对比/排行/选哪个\"请求。订阅课程等虚拟商品与服务、从图片识别单品找同款、代写采购需求/招投标等文书不适用。",
+      "valid_probes": 21,
+      "train": {
+        "queries": 12,
+        "trigger_rate_on_should": 1,
+        "false_trigger_rate_on_should_not": 0,
+        "correct": 11,
+        "invalid_queries": 1
+      },
+      "test": {
+        "queries": 8,
+        "trigger_rate_on_should": 1,
+        "false_trigger_rate_on_should_not": 0,
+        "correct": 8,
+        "invalid_queries": 0
+      }
+    }
+  ],
+  "best_description": "大件消费品深度选购调研（硬证据导购）。问答锁定需求 → 推导硬约束与一票否决项 → 证据分级（拒绝营销排行榜）→ 销量+口碑双口径一手数据 → 型号级对比 → 场景结论+下单核对清单 → Markdown 报告留档。适用于家具、家电、数码、工学设备等高客单价实物商品的\"帮我调研/对比/排行/选哪个\"请求。订阅课程等虚拟商品与服务、从图片识别单品找同款不适用。",
+  "valid_probes": 185,
+  "invalid_probes": 17
+}
