@@ -263,6 +263,64 @@ try {
   rmSync(root5, { recursive: true, force: true });
 }
 
+// ---- 聚合·timing 全缺失防呆（离线夹具：全 null/部分有效/正常/无 timing 文件） ----
+console.log("聚合·timing 缺失诊断：");
+const timingFixtureRoot = join(CREATOR_DIR, "fixtures", "aggregate-timing");
+const timingTestRoot = mkdtempSync(join(tmpdir(), "timing-fixture-test-"));
+try {
+  const aggregateFixture = (name, persistHistory = false) => {
+    const target = join(timingTestRoot, name);
+    cpSync(join(timingFixtureRoot, name, "iteration-1"), join(target, "iteration-1"), { recursive: true });
+    const iterDir = join(target, "iteration-1");
+    const args = [iterDir, "--skill-name", "timing-demo"];
+    const historyDir = join(target, "skill");
+    if (persistHistory) { mkdirSync(historyDir); args.push("--history", historyDir); }
+    const result = runFile("aggregate-benchmark.mjs", args);
+    const benchmark = JSON.parse(readFileSync(join(iterDir, "benchmark.json"), "utf8"));
+    const markdown = readFileSync(join(iterDir, "benchmark.md"), "utf8");
+    const history = persistHistory ? JSON.parse(readFileSync(join(historyDir, "history.json"), "utf8")) : null;
+    return { result, benchmark, markdown, history };
+  };
+
+  const allNull = aggregateFixture("all-null", true);
+  check("timing 全 null: 聚合成功且 stdout 显著告警", allNull.result.code === 0
+    && (allNull.result.stdout.match(/^警告: timing 全缺失：/gm) || []).length === 2);
+  check("timing 全 null: benchmark 保持 null、不伪造 0", allNull.benchmark.configs.with_skill.time_ms.mean === null
+    && allNull.benchmark.configs.with_skill.tokens.mean === null
+    && allNull.benchmark.delta.time_ms === null
+    && allNull.benchmark.delta.tokens === null);
+  check("timing 全 null: markdown/终端显示未测量", allNull.markdown.includes("未测量") && allNull.result.stdout.includes("未测量"));
+  check("timing 全 null: --history 仍追加一条且保持 null", allNull.history.runs.length === 1
+    && allNull.history.runs[0].gates.with_skill.mean_ms === null
+    && allNull.history.runs[0].gates.with_skill.mean_tokens === null);
+
+  const partial = aggregateFixture("partial");
+  check("timing 部分有效: 不误报整轮全缺失且保留可用样本", partial.result.code === 0
+    && !partial.benchmark.warnings.some((warning) => warning.startsWith("timing 全缺失"))
+    && partial.benchmark.configs.with_skill.tokens.mean === 200
+    && partial.benchmark.configs.without_skill.time_ms.mean === 1200);
+  check("timing 部分有效: 缺失侧仍为 null，delta 不造假", partial.benchmark.configs.with_skill.time_ms.mean === null
+    && partial.benchmark.configs.without_skill.tokens.mean === null
+    && partial.benchmark.delta.time_ms === null
+    && partial.benchmark.delta.tokens === null);
+
+  const normal = aggregateFixture("normal");
+  check("timing 正常: 数值与 delta 保持兼容", normal.result.code === 0 && normal.benchmark.warnings.length === 0
+    && normal.benchmark.configs.with_skill.time_ms.mean === 1200
+    && normal.benchmark.configs.without_skill.tokens.mean === 180
+    && normal.benchmark.delta.time_ms === 200
+    && normal.benchmark.delta.tokens === 20);
+
+  const missing = aggregateFixture("missing-file");
+  check("timing 文件缺失: 与 null 同样显式诊断", missing.result.code === 0
+    && missing.benchmark.warnings.filter((warning) => warning.startsWith("timing 全缺失")).length === 2
+    && missing.benchmark.configs.with_skill.time_ms.mean === null
+    && missing.benchmark.configs.without_skill.tokens.mean === null
+    && missing.result.stdout.includes("timing.json 缺失"));
+} finally {
+  rmSync(timingTestRoot, { recursive: true, force: true });
+}
+
 // ---- 聚合·--history 契约边界（首轮/次轮/防抖/dropped/损坏/无参数不变/拒绝） ----
 console.log("聚合·history 契约：");
 const root6 = mkdtempSync(join(tmpdir(), "histtest-"));

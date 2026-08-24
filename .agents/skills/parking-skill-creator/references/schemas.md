@@ -255,7 +255,7 @@ Wall clock timing for a run — exactly one file per run directory. Located at `
 - `total_tokens`: Token usage; `null` when unavailable
 - `duration_ms`: Wall-clock duration in milliseconds; `null` when unavailable
 
-**Boundary behavior:** `null` values are silently skipped by the aggregator (that run's corresponding statistic is excluded) and counted in the config's `skipped` counters — not an error.
+**Boundary behavior:** `null` values are skipped by the aggregator (that run's corresponding statistic is excluded) and counted in the config's `skipped` counters. If every run in the iteration lacks a valid value for a timing metric, the benchmark emits a warning and keeps that metric's statistics/delta as `null` (rendered as 未测量), never as a synthetic 0.
 
 ---
 

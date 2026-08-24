@@ -1,0 +1,4 @@
+{
+  "prompt": "离线 timing 文件缺失评测",
+  "assertions": [{ "name": "输出完成", "type": "script" }]
+}

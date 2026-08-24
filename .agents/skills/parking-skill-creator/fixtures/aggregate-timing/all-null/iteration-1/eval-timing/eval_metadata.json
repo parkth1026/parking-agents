@@ -1,0 +1,4 @@
+{
+  "prompt": "离线 timing 全 null 评测",
+  "assertions": [{ "name": "输出完成", "type": "script" }]
+}
