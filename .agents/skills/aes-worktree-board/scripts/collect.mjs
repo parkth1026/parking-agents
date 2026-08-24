@@ -164,6 +164,48 @@ function loadPrevious(runtimeDir) {
   return readJson(runtimePaths(runtimeDir).statusJson, null);
 }
 
+function identityPathKey(value) {
+  if (!value) return null;
+  const key = norm(resolve(String(value)));
+  return process.platform === 'win32' ? key.toLowerCase() : key;
+}
+
+export function repoIdentity(root, config) {
+  return {
+    root: root ? norm(resolve(String(root))) : '',
+    issueRepo: String(config.issueRepo || ''),
+    mainBranch: String(config.mainBranch || ''),
+  };
+}
+
+export function repoIdentityMatches(expected, actual) {
+  return Boolean(actual)
+    && identityPathKey(expected.root) === identityPathKey(actual.root)
+    && expected.issueRepo.toLowerCase() === String(actual.issueRepo || '').toLowerCase()
+    && expected.mainBranch === String(actual.mainBranch || '');
+}
+
+export function assertRuntimeIdentity(runtimeDir, expected, snapshot = undefined) {
+  const existing = snapshot === undefined ? loadPrevious(runtimeDir) : snapshot;
+  if (!existing) return;
+  const actual = repoIdentity(existing.repo?.root || '', {
+    issueRepo: existing.repo?.issueRepo,
+    mainBranch: existing.repo?.mainBranch,
+  });
+  if (repoIdentityMatches(expected, actual)) return;
+  const error = new Error(
+    `[runtime] repo mismatch：${norm(resolve(runtimeDir))} 属于 `
+    + `${actual.root || '(missing root)'} | ${actual.issueRepo || '(missing issueRepo)'} | ${actual.mainBranch || '(missing mainBranch)'}，`
+    + `当前目标是 ${expected.root} | ${expected.issueRepo} | ${expected.mainBranch}`,
+  );
+  error.code = 'REPO_MISMATCH';
+  error.exitCode = 2;
+  error.expected = expected;
+  error.actual = actual;
+  error.runtimeDir = norm(resolve(runtimeDir));
+  throw error;
+}
+
 function latestRegistryTask(registry, worktreeName) {
   return Object.values(registry.tasks || {})
     .filter((task) => task.role === 'executor'
@@ -426,8 +468,10 @@ export async function collectStatus({
   const config = loadConfig();
   const fixturePath = issuesFixture || process.env.AES_WORKTREE_BOARD_ISSUES_FIXTURE || null;
   const { main, siblings } = await listWorktrees();
+  const expectedIdentity = repoIdentity(main.path, config);
   await preflightConfig(config, { skipIssueRepo: Boolean(skipGh || fixturePath) });
   const previous = loadPrevious(runtimeDir);
+  assertRuntimeIdentity(runtimeDir, expectedIdentity, previous);
   const registry = readRegistry(runtimeDir);
   const previousWorktrees = new Map((previous?.worktrees || []).map((worker) => [worker.name, worker]));
   const tasks = readTasks(runtimeDir);
@@ -535,11 +579,11 @@ export async function collectStatus({
     schemaVersion: 3,
     generatedAt: new Date().toISOString(),
     repo: {
-      root: norm(main.path),
+      root: expectedIdentity.root,
       name: basename(main.path),
-      mainBranch: config.mainBranch,
+      mainBranch: expectedIdentity.mainBranch,
       mainHead,
-      issueRepo: config.issueRepo,
+      issueRepo: expectedIdentity.issueRepo,
     },
     orchestration: registry.orchestration,
     graph,
