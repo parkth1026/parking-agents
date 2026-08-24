@@ -135,7 +135,8 @@ node "$skillDir/scripts/orchestrate.mjs" action receipt --action-id A-... --stat
 `reviewer.reviewCommit === task.commitSha === action/event.commitSha`。`EVALUATE_MERGE_GATE`
 receipt 必须绑定 live worktree HEAD、integration HEAD、integration branch，并由脚本实时运行
 `git merge-tree`。`HOST_MERGE started/succeeded` 分别绑定 live preHead 与 postHead；succeeded
-只接受第一父提交为 preHead、包含 executor commit 的真实 Git merge commit。
+只接受恰好两个 parent、第一父提交为 preHead、且包含 executor commit 的真实 Git merge commit；
+octopus merge 明确拒绝。
 
 `POST_MERGE_VERIFY` 不接受宿主自报的 `exitCode=0` JSON。先把 executable/args 写入 commands file，
 由脚本在 integration repo root 实际执行：
@@ -175,6 +176,8 @@ executor final 必须直接发送如下结构，不从自然语言正则猜 comm
 final 时，`next-actions` 也会以 `GIT_HEAD_ADVANCED_WITHOUT_TYPED_FINAL` 暴露，不猜测提交含义。
 UNCLASSIFIED action 的任意 `resolution` 不会消费事件；只有合法 replacement typed-final，或 lane
 显式进入 `parked | handoff-required` 后才会把原事件标为 resolved/consumed。
+schema 校验先于 terminal-noop：malformed final 即使 late 到 `merged` 也保持 pending
+`UNCLASSIFIED_FINAL`；同 commit 的合法 replacement typed-final 才能收敛。
 Task create 会从 fresh Issue labels 自动推导 `needs-manual-test` interaction class；宿主漏传
 `--interaction-class` 也不能绕过 manual debt。`runtime=FAIL|BLOCKED` 始终阻断 merge gate。
 

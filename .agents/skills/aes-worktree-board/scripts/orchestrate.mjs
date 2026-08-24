@@ -166,8 +166,8 @@ function verifyMergeCommit(context, task, started, payload) {
     });
   }
   const parts = gitValue(context.repoRoot, ['rev-list', '--parents', '-n', '1', liveHead]).split(/\s+/);
-  if (parts.length < 3 || parts[1] !== started.preHead) {
-    throw controlError('TRUE_MERGE_COMMIT_REQUIRED', `${liveHead} 不是以 ${started.preHead} 为第一父提交的真实 merge commit`);
+  if (parts.length !== 3 || parts[1] !== started.preHead) {
+    throw controlError('TRUE_TWO_PARENT_MERGE_REQUIRED', `${liveHead} 必须恰为 commit + 两个 parent，且第一父提交为 ${started.preHead}`);
   }
   const ancestor = runGit(context.repoRoot, ['merge-base', '--is-ancestor', task.commitSha, liveHead], { allowFailure: true });
   if (ancestor.status !== 0) throw controlError('MERGED_COMMIT_NOT_INCLUDED', `merge commit ${liveHead} 未包含 executor commit ${task.commitSha}`);
@@ -673,11 +673,6 @@ function applyBlockRecord(registry, runtimeDir, task, event, { commit, finding, 
 
 function consumeExecutorFinal(registry, runtimeDir, task, event, sourceTask) {
   if (sourceTask.role !== 'executor' || sourceTask.taskId !== task.taskId || event.kind !== 'final') return null;
-  if (TERMINAL_OR_PAUSED.includes(task.state)) {
-    consumeRecordedEvent(task, event);
-    task.updatedAt = now();
-    return { result: 'consumed', eventId: event.eventId, taskId: task.taskId, transition: null, nextAction: 'terminal-noop' };
-  }
   const validation = validateExecutorFinal(event.payload);
   if (!validation.ok) {
     const record = registry.unclassifiedFinals[event.eventId] || {
@@ -694,10 +689,27 @@ function consumeExecutorFinal(registry, runtimeDir, task, event, sourceTask) {
     task.unclassifiedFinal = record;
     task.nextAction = 'UNCLASSIFIED_FINAL';
     task.updatedAt = now();
+    if (['parked', 'handoff-required'].includes(task.state)) {
+      resolvePendingUnclassifiedFinals(registry, task, `lane-${task.state}`);
+      consumeRecordedEvent(task, event);
+      return {
+        result: 'consumed', eventId: event.eventId, taskId: task.taskId,
+        transition: null, nextAction: 'terminal-noop', resolution: `lane-${task.state}`,
+      };
+    }
     return {
       result: 'unclassified-final', eventId: event.eventId, taskId: task.taskId,
       code: 'UNCLASSIFIED_FINAL', errors: validation.errors, consumed: false, nextAction: 'UNCLASSIFIED_FINAL',
     };
+  }
+  if (TERMINAL_OR_PAUSED.includes(task.state)) {
+    if (task.commitSha && event.payload.commitSha !== task.commitSha) {
+      throw controlError('EXECUTOR_FINAL_COMMIT_MISMATCH', `terminal Task 当前 commit ${task.commitSha} 与 replacement final ${event.payload.commitSha} 不一致`);
+    }
+    resolvePendingUnclassifiedFinals(registry, task, `replacement-typed-final:${event.eventId}`);
+    consumeRecordedEvent(task, event);
+    task.updatedAt = now();
+    return { result: 'consumed', eventId: event.eventId, taskId: task.taskId, transition: null, nextAction: 'terminal-noop' };
   }
   if (!['dispatching', 'executing', 'self-qa', 'committed'].includes(task.state)) {
     throw controlError('INVALID_EXECUTOR_FINAL_STATE', `executor final 不能从 ${task.state} 推进`, { taskId: task.taskId });

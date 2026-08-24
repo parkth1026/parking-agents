@@ -1811,6 +1811,25 @@ async function orchestrationContinuousHostChain() {
     assert.equal(readRegistry(runtimeDir).tasks[task.taskId].state, 'merged');
     assert.equal(readRegistry(runtimeDir).leases.dev43, undefined);
 
+    putInboxEvent({
+      thread: 'T-dev43-executor', task: task.taskId, kind: 'final', 'event-id': 'E-late-merged-malformed',
+      payload: JSON.stringify({ summary: 'late malformed final after merged' }),
+    }, runtimeDir);
+    const lateMalformed = consumeEvent('E-late-merged-malformed', runtimeDir);
+    assert.equal(lateMalformed.code, 'UNCLASSIFIED_FINAL');
+    assert.equal(lateMalformed.consumed, false);
+    let mergedTask = readRegistry(runtimeDir).tasks[task.taskId];
+    assert.equal(mergedTask.state, 'merged');
+    assert.equal(mergedTask.consumedEventIds.includes('E-late-merged-malformed'), false,
+      'merged 上 malformed final 也不得 terminal-noop 静默消费');
+    assert.equal(readRegistry(runtimeDir).unclassifiedFinals['E-late-merged-malformed'].status, 'pending');
+    assert.equal(pendingInbox(runtimeDir).pending.some((event) => event.eventId === 'E-late-merged-malformed'), true);
+    putTypedFinal(runtimeDir, task, 'T-dev43-executor', 'E-late-merged-replacement', commitSha, { manual: true });
+    mergedTask = readRegistry(runtimeDir).tasks[task.taskId];
+    assert.equal(mergedTask.state, 'merged');
+    assert.equal(pendingInbox(runtimeDir).pending.some((event) => event.eventId === 'E-late-merged-malformed'), false,
+      '同 commit 合法 replacement typed-final 才能收敛 late malformed event');
+
     const claim = actionOf(runtimeDir, 'CLAIM_NEXT_ISSUE', task.taskId);
     assert.equal(claim.issue, 44);
     const nextTask = createTask({
@@ -2036,6 +2055,62 @@ async function orchestrationMergeQueueAndRuntimeBoundary() {
     await cleanTemp(frontierRuntime);
     await cleanTemp(claimRuntime);
     await cleanRepositoryFixture(mergeFixture);
+  }
+}
+
+async function orchestrationOctopusMergeRejected() {
+  const runtimeDir = tempDirectory('orchestration-continuous-octopus');
+  const fixture = repositoryFixture('orchestration-continuous-octopus-git');
+  const extra = join(fixture.root, 'fixture-extra');
+  try {
+    writeFileSync(join(fixture.sibling, 'executor.txt'), 'executor\n');
+    gitSync(fixture.sibling, ['add', 'executor.txt']);
+    gitSync(fixture.sibling, ['commit', '-m', 'executor branch commit']);
+    const commitSha = gitSync(fixture.sibling, ['rev-parse', 'HEAD']);
+    const mainHead = gitSync(fixture.main, ['rev-parse', 'HEAD']);
+
+    gitSync(fixture.main, ['worktree', 'add', '-b', 'fixture-extra', extra]);
+    writeFileSync(join(extra, 'extra.txt'), 'extra\n');
+    gitSync(extra, ['add', 'extra.txt']);
+    gitSync(extra, ['commit', '-m', 'extra branch commit']);
+
+    continuousStatus(runtimeDir, [{
+      name: 'dev-octopus', path: fixture.sibling, branch: 'fixture-dev', head: commitSha,
+    }], [], { repoRoot: fixture.main, mainHead });
+    const task = createTask({
+      issue: 88, worktree: 'dev-octopus', role: 'executor', 'thread-id': 'T-octopus-executor',
+      model: 'sol-high', 'routing-reason': 'octopus merge rejection fixture',
+    }, runtimeDir);
+    putTypedFinal(runtimeDir, task, 'T-octopus-executor', 'E-octopus-final', commitSha);
+    const reviewer = hostCreateReviewer(runtimeDir, task, 1);
+    hostApprove(runtimeDir, task, reviewer, 'E-octopus-approve');
+    const gate = actionOf(runtimeDir, 'EVALUATE_MERGE_GATE', task.taskId);
+    receiveActionReceipt(gate.actionId, 'succeeded', {
+      code: 'PASS', runtime: 'NOT_RUN', delivery: 'MERGE_READY', mergeCheck: 'clean',
+      headSha: commitSha, integrationHead: mainHead, integrationBranch: 'main',
+    }, runtimeDir);
+    const merge = actionOf(runtimeDir, 'HOST_MERGE', task.taskId);
+    receiveActionReceipt(merge.actionId, 'started', { integrationBranch: 'main', preHead: mainHead }, runtimeDir);
+    gitSync(fixture.main, ['merge', '--no-ff', 'fixture-dev', 'fixture-extra', '-m', 'octopus merge probe']);
+    const octopusHead = gitSync(fixture.main, ['rev-parse', 'HEAD']);
+    const parentParts = gitSync(fixture.main, ['rev-list', '--parents', '-n', '1', octopusHead]).split(/\s+/);
+    assert.equal(parentParts.length, 4, 'probe 必须真实构造 commit + 三个 parent 的 octopus merge');
+    assert.throws(
+      () => receiveActionReceipt(merge.actionId, 'succeeded', {
+        integrationBranch: 'main', preHead: mainHead, postHead: octopusHead, mergeCommit: octopusHead,
+      }, runtimeDir),
+      (error) => error.code === 'TRUE_TWO_PARENT_MERGE_REQUIRED',
+      'octopus merge 不得冒充合同要求的真实双父 merge',
+    );
+    assert.equal(readRegistry(runtimeDir).tasks[task.taskId].state, 'merge-ready');
+    assert.ok(readRegistry(runtimeDir).leases['dev-octopus'], 'octopus receipt 被拒绝后不得释放 lease');
+  } finally {
+    if (existsSync(extra)) {
+      gitSync(fixture.main, ['worktree', 'remove', '--force', extra]);
+      assert.equal(existsSync(extra), false, 'octopus extra fixture worktree 必须清理');
+    }
+    await cleanTemp(runtimeDir);
+    await cleanRepositoryFixture(fixture);
   }
 }
 
@@ -2303,7 +2378,7 @@ async function orchestrationContractMarkers() {
     'Desktop `create_thread`', 'registry.json', 'inbox pending', '三维 verdict',
     'runtime=NOT_RUN', 'stop eval --write', '--fallback-authorized', 'Map / List',
     'aes.worktree-board.executor-final/v1', 'next-actions', 'action receipt', 'action verify',
-    'claim reservation', 'verificationRun', 'CLAIM_NEXT_ISSUE',
+    'claim reservation', 'verificationRun', 'octopus merge', 'schema 校验先于 terminal-noop', 'CLAIM_NEXT_ISSUE',
   ]) assert.match(skill, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.doesNotMatch(skill, /派发 headless 任务/);
   assert.doesNotMatch(skill, /只给合并建议，不执行 merge/);
@@ -2338,6 +2413,7 @@ async function orchestrationDomain() {
     { group: 'continuous', name: 'unclassified-final', run: orchestrationUnclassifiedFinal },
     { group: 'continuous', name: 'host-block-circuit', run: orchestrationHostBlockCircuit },
     { group: 'continuous', name: 'merge-queue-runtime-boundary', run: orchestrationMergeQueueAndRuntimeBoundary },
+    { group: 'continuous', name: 'octopus-merge-rejected', run: orchestrationOctopusMergeRejected },
     { group: 'boundary', name: 'server-origin-token', run: orchestrationServerBoundary },
     { group: 'boundary', name: 'config-preflight', run: orchestrationConfigPreflight },
     { group: 'contract', name: 'skill-board-contract', run: orchestrationContractMarkers },
