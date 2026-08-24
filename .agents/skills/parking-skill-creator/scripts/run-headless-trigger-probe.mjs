@@ -108,6 +108,10 @@ function normalizedPath(path) {
   return process.platform === "win32" ? value.toLowerCase() : value;
 }
 
+function redactSecretDerivedPath(path, prefix) {
+  return path.includes(prefix) ? "[REDACTED_SECRET_DERIVED_PATH]" : path;
+}
+
 function scanRoots(roots, prefix, excludes) {
   const findings = [];
   const unreadable = [];
@@ -134,7 +138,7 @@ function scanRoots(roots, prefix, excludes) {
     if (!stat.isFile()) return;
     files++;
     try {
-      if (containsSecretPrefix(path, prefix)) findings.push(path);
+      if (path.includes(prefix) || containsSecretPrefix(path, prefix)) findings.push(path);
     } catch {
       unreadable.push(path);
     }
@@ -228,7 +232,7 @@ if (Array.from(reason).length > 15) failures.push("拒绝: Provider 理由超过
 if (failures.length > 0) {
   process.stderr.write(`RESIDUE_SCAN_DONE roots=${args.scanRoots.length} files=${scan.files} excluded=${scan.excluded} findings=${scan.findings.length} unreadable=${scan.unreadable.length} status=failed\n`);
   for (const message of failures) process.stderr.write(`${message}\n`);
-  for (const file of scan.findings) process.stderr.write(`RESIDUE ${file}\n`);
+  for (const file of scan.findings) process.stderr.write(`RESIDUE ${redactSecretDerivedPath(file, prefix)}\n`);
   process.exit(1);
 }
 process.stdout.write(`${firstLine}\n${reason ? `${reason}\n` : ""}`);

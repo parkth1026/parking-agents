@@ -59,7 +59,7 @@ node scripts/run-headless-trigger-probe.mjs \
 
 每次调用都把 `TEMP`/`TMP`/`TMPDIR` 指向该调用独占的 `psc-trigger-probe-*` 目录。Provider 返回后先在目录内检查凭据前缀，再无条件递归删除；即使前缀文件已随目录清掉，本次调用仍判失败。私有目录清理完成后必须继续扫描全部外部 `--scan-root`，输出 `RESIDUE_SCAN_OK`（干净）或 `RESIDUE_SCAN_DONE ... status=failed`（有问题）的审计摘要，最后才统一报告所有失败；私有命中不得跳过外部扫描。只删除 launcher 自己创建的目录；不清理共享 Temp 中来源不明的文件。
 
-`--scan-root` 必须覆盖本轮所有可写位置，至少包括 workspace 和宿主 Temp；严格验收可把每个授权且可读的本地盘根逐个传入。扫描器默认排除当前用户的 `.zcode/cli/config.json` 与 `.zcode/v2/config.json`，其他合法 secret store 用 `--exclude` 明确排除。它仅从进程环境在内存中派生 12 字符前缀，分块读取普通文件，不跟随 symlink，不打印匹配内容或前缀。发现残留、遇到不可读路径或扫描不完整都退出 1；命中路径由人工确认后再做最小范围清理，不自动删除非自有文件。
+`--scan-root` 必须覆盖本轮所有可写位置，至少包括 workspace 和宿主 Temp；严格验收可把每个授权且可读的本地盘根逐个传入。扫描器默认排除当前用户的 `.zcode/cli/config.json` 与 `.zcode/v2/config.json`，其他合法 secret store 用 `--exclude` 明确排除。它仅从进程环境在内存中派生 12 字符前缀，检查文件名/父路径并分块读取普通文件，不跟随 symlink，不打印匹配内容或前缀。命中路径若含前缀，整条输出替换为 `[REDACTED_SECRET_DERIVED_PATH]`；不含前缀的安全路径仍可输出供人工最小范围清理。发现残留、遇到不可读路径或扫描不完整都退出 1，不自动删除非自有文件。
 
 扫描本地盘时必须排除宿主合法凭据存储所在的树，并在验收报告中写明排除项；不要用残留扫描变相读取已知 secret store。若无法给出完整、授权且排除了 secret store 的扫描根集合，就把全盘扫描标成 `BLOCKED`，不得声称已完成。
 

@@ -102,6 +102,9 @@ if (process.env.PSC_FAKE_MODE === "both-leaks") {
 } else if (process.env.PSC_FAKE_MODE === "leak-file") {
   writeFileSync(process.env.PSC_LEAK_FILE, process.env.ZCODE_API_KEY, "utf8");
   console.log("SKILL: demo-skill\\n路由匹配");
+} else if (process.env.PSC_FAKE_MODE === "prefix-filename") {
+  writeFileSync(process.env.PSC_LEAK_DIR + "/" + process.env.ZCODE_API_KEY.slice(0, 12) + "-name.txt", "no secret content", "utf8");
+  console.log("SKILL: demo-skill\\n路由匹配");
 } else if (process.env.PSC_FAKE_MODE === "secret-output") {
   console.log(process.env.ZCODE_API_KEY);
 } else if (process.env.PSC_FAKE_MODE === "invalid") {
@@ -196,6 +199,19 @@ if (process.env.PSC_FAKE_MODE === "both-leaks") {
     && out(leaked).includes("凭据前缀残留") && out(leaked).includes(leakFile)
     && !out(leaked).includes(fakeKey));
   rmSync(leakFile, { force: true });
+
+  const prefixFilename = join(fallbackRoot, `${fakeKey.slice(0, 12)}-name.txt`);
+  const filenameLeaked = runFile("run-headless-trigger-probe.mjs", baseArgs, {
+    env: { ...baseEnv, PSC_FAKE_MODE: "prefix-filename", PSC_LEAK_DIR: fallbackRoot },
+  });
+  const filenameOutput = out(filenameLeaked);
+  check("fallback: 文件名含 key 前缀时检出且整条路径脱敏", filenameLeaked.code === 1
+    && filenameOutput.includes("RESIDUE [REDACTED_SECRET_DERIVED_PATH]")
+    && filenameOutput.includes("findings=1")
+    && !filenameOutput.includes(prefixFilename)
+    && !filenameOutput.includes(fakeKey)
+    && !filenameOutput.includes(fakeKey.slice(0, 12)));
+  rmSync(prefixFilename, { force: true });
 
   const missingCli = runFile("run-headless-trigger-probe.mjs", [
     ...baseArgs.slice(0, 4),
