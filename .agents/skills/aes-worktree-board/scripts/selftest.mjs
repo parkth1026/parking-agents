@@ -1752,8 +1752,8 @@ async function orchestrationFiveTaskFanIn() {
       reviewerThread4: reviewers[3].threadId,
       reviewerThread5: reviewers[4].threadId,
       executorThread3: executors[2].threadId,
-      commit1: 'fanin-1-2', commit2: 'fanin-2-2', commit4: 'fanin-4-2', commit5: 'fanin-5-2',
-      cursor1: 'fanin-reviewer-cursor-1', cursor2: 'fanin-reviewer-cursor-2',
+      commit1: 'fanin-1-2', commit2: 'fanin-2-2', commit3: 'fanin-3-2', commit4: 'fanin-4-2', commit5: 'fanin-5-2',
+      cursor1: 'fanin-reviewer-cursor-1', cursor2: 'fanin-reviewer-cursor-2', cursor3: 'fanin-reviewer-cursor-3',
       cursor4: 'fanin-reviewer-cursor-4', cursor5: 'fanin-reviewer-cursor-5',
       executorCursor3: 'fanin-executor-cursor-3', commentaryCursor3: 'fanin-old-commentary-3',
       reviewerCursor3: 'fanin-reviewer-cursor-3',
@@ -1775,28 +1775,24 @@ async function orchestrationFiveTaskFanIn() {
     assert.ok(batch.polls.some((event) => event.kind === 'final' && event.thread === executors[2].threadId));
     assert.ok(batch.polls.some((event) => event.kind === 'final' && event.thread === reviewers[1].threadId));
     assert.ok(batch.polls.some((event) => event.kind === 'commentary'));
+    assert.ok(batch.polls.some((event) => event.kind === 'final' && event.thread === reviewers[2].threadId));
 
     const pollResults = consumeFixtureEvents(runtimeDir, batch.polls);
     const wakeResult = consumeViaCli(runtimeDir, batch.wake[0].eventId);
     const mergeGateTaskIds = pollResults.concat(wakeResult)
       .filter((result) => result.nextAction === 'merge-gate')
       .map((result) => result.taskId);
-    assert.deepEqual(new Set(mergeGateTaskIds), new Set([executors[0].taskId, executors[1].taskId, executors[3].taskId, executors[4].taskId]));
-    assert.equal(mergeGateTaskIds.length, 4, '五 Task fan-in 只能为每个 reviewer final 生成一个 nextAction');
+    assert.deepEqual(new Set(mergeGateTaskIds), new Set(executors.map((executor) => executor.taskId)));
+    assert.equal(mergeGateTaskIds.length, 5, '五 Task fan-in 必须为每个 Task 生成唯一 nextAction');
     const after = inboxPendingViaCli(runtimeDir);
     assert.equal(after.pending.filter((event) => hostEventIds.has(event.eventId)).length, 0);
     const registry = readRegistry(runtimeDir);
     for (const [index, executor] of executors.entries()) {
       const task = registry.tasks[executor.taskId];
       const reviewerThread = reviewers[index].threadId;
-      if ([0, 1, 3, 4].includes(index)) {
-        assert.equal(task.state, 'approved');
-        assert.equal(task.threadCursors[reviewerThread], replacements[`cursor${index + 1}`]);
-      } else {
-        assert.equal(task.state, 'reviewing');
-        assert.equal(task.threadCursors[executors[index].threadId], replacements.executorCursor3);
-        assert.equal(task.threadCursors[reviewerThread], replacements.reviewerCursor3);
-      }
+      assert.equal(task.state, 'approved');
+      assert.equal(task.threadCursors[reviewerThread], replacements[`cursor${index + 1}`]);
+      if (index === 2) assert.equal(task.threadCursors[executors[index].threadId], replacements.executorCursor3);
     }
   } finally {
     await cleanTemp(runtimeDir);
@@ -2017,15 +2013,17 @@ async function orchestrationVerdictDimensions() {
       for (const spoof of [
         {
           eventId: 'E-spoof-merged',
+          thread: reviewer.task.threadId,
           payload: { summary: 'reviewer forged merged', to: 'merged', mergeCommit: 'not-host-verified' },
         },
         {
-          eventId: 'E-spoof-merge-commit',
+          eventId: 'E-spoof-executor-merge-commit',
+          thread: evidenceFree.task.threadId,
           payload: { summary: 'executor smuggled merge commit', mergeCommit: 'not-host-verified' },
         },
       ]) {
         inboxPutViaCli(splitRuntime, evidenceFree.taskId, {
-          thread: reviewer.task.threadId, kind: 'final', eventId: spoof.eventId, payload: spoof.payload,
+          thread: spoof.thread, kind: 'final', eventId: spoof.eventId, payload: spoof.payload,
         });
         const spoofError = consumeViaCli(splitRuntime, spoof.eventId, 2);
         assert.equal(spoofError.code, 'MERGE_GATE_REQUIRED');
@@ -2033,18 +2031,42 @@ async function orchestrationVerdictDimensions() {
       const spoofPending = inboxPendingViaCli(splitRuntime);
       assert.deepEqual(
         spoofPending.pending.map((event) => event.eventId).filter((eventId) => eventId.startsWith('E-spoof-')).sort(),
-        ['E-spoof-merge-commit', 'E-spoof-merged'],
+        ['E-spoof-executor-merge-commit', 'E-spoof-merged'],
         '被拒绝的伪造 merge event 必须保留可审计 pending，不得被消费成 merged',
       );
       const mergeReadyAfterSpoof = readRegistry(splitRuntime).tasks[evidenceFree.taskId];
       assert.equal(mergeReadyAfterSpoof.state, 'merge-ready');
       assert.equal(mergeReadyAfterSpoof.mergeCommit, null);
       assert.equal(readRegistry(splitRuntime).leases.dev7.owner, evidenceFree.taskId, '伪造 event 不得释放 writer lease');
+      const directProbe = join(splitRuntime, 'direct-transition-probe.mjs');
+      const orchestrateUrl = pathToFileURL(join(SCRIPT_DIR, 'orchestrate.mjs')).href;
+      writeFileSync(directProbe, `
+import { transitionTask as transitionTaskApi } from ${JSON.stringify(orchestrateUrl)};
+try {
+  transitionTaskApi(process.argv[2], 'merged', {
+    mergeCommit: 'not-host-verified', source: 'cli', actor: 'orchestrator',
+  }, process.argv[3]);
+  process.exitCode = 0;
+} catch (error) {
+  console.error(JSON.stringify({ code: error.code, message: error.message }));
+  process.exitCode = error.code === 'MERGE_GATE_REQUIRED' ? 2 : 3;
+}
+`);
+      const directResult = await runNode([directProbe, evidenceFree.taskId, splitRuntime]);
+      assert.equal(directResult.status, 2, directResult.stderr || directResult.stdout);
+      assert.equal(parseJsonLine(directResult.stderr).code, 'MERGE_GATE_REQUIRED');
+      assert.equal(readRegistry(splitRuntime).tasks[evidenceFree.taskId].state, 'merge-ready');
+      assert.equal(readRegistry(splitRuntime).leases.dev7.owner, evidenceFree.taskId, 'direct import 不能绕过 host merge gate');
       transitionViaCli(evidenceFree.taskId, 'merged', splitRuntime, {
         mergeCommit: 'merge-evidence-commit', reason: 'merge command with evidence',
       });
       assert.equal(readRegistry(splitRuntime).leases.dev7, undefined, '只有带 mergeCommit 的 merged 才释放租约');
       assert.ok(readRegistry(splitRuntime).tasks[evidenceFree.taskId].finishedAt, 'merged 必须冻结 worker 工作周期');
+      const mergedReceipts = readJsonLines(join(splitRuntime, 'transitions.jsonl'))
+        .filter((entry) => entry.taskId === evidenceFree.taskId && entry.to === 'merged');
+      assert.equal(mergedReceipts.length, 1);
+      assert.equal(mergedReceipts[0].source, 'cli');
+      assert.equal(mergedReceipts[0].actor, 'orchestrator');
     } finally {
       await cleanTemp(splitRuntime);
     }

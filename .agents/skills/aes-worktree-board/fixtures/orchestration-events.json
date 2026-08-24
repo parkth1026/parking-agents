@@ -160,6 +160,17 @@
             "summary": "new reviewer poll task 3",
             "cursor": "$reviewerCursor3"
           }
+        },
+        {
+          "thread": "$reviewerThread3",
+          "kind": "final",
+          "eventId": "E-fanin-reviewer-final-task3",
+          "payload": {
+            "summary": "reviewer final task 3",
+            "verdict": "APPROVE",
+            "commitSha": "$commit3",
+            "cursor": "$cursor3"
+          }
         }
       ]
     },

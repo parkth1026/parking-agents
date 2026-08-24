@@ -39,6 +39,7 @@ const BASE_TRANSITIONS = {
   'handoff-required': [],
 };
 const ACTIVE_STATES = TASK_STATES.filter((state) => !TERMINAL_OR_PAUSED.includes(state));
+const CLI_MERGE_GATE = Symbol('cli-merge-gate');
 export const TRANSITIONS = Object.freeze(Object.fromEntries(TASK_STATES.map((state) => [
   state,
   Object.freeze([...new Set([
@@ -95,9 +96,11 @@ function taskById(registry, taskId) {
   return task;
 }
 
-function appendTransition(runtimeDir, task, from, to, { eventId = null, actor = 'orchestrator', reason = null, evidence = [] } = {}) {
+function appendTransition(runtimeDir, task, from, to, {
+  eventId = null, actor = 'orchestrator', source = 'internal', reason = null, evidence = [],
+} = {}) {
   appendJsonLineAtomic(transitionsPath(runtimeDir), {
-    ts: now(), taskId: task.taskId, from, to, eventId, actor, reason, evidence,
+    ts: now(), taskId: task.taskId, from, to, eventId, actor, source, reason, evidence,
   });
 }
 
@@ -271,12 +274,15 @@ export function heartbeatTask(taskId, runtimeDir = RUNTIME_DIR) {
   });
 }
 
-export function transitionTask(taskId, to, details = {}, runtimeDir = RUNTIME_DIR) {
+function transitionTaskInternal(taskId, to, details = {}, runtimeDir = RUNTIME_DIR, capability = null) {
   return updateRegistry(runtimeDir, (registry) => {
     const task = taskById(registry, taskId);
     const from = task.state;
     assertTransition(from, to);
-    if (to === 'merged' && (!details.mergeCommit || details.source !== 'cli')) {
+    if (to === 'merged' && capability !== CLI_MERGE_GATE) {
+      throw controlError('MERGE_GATE_REQUIRED', 'merged 只能由主 agent 在 merge gate 后通过 CLI --merge-commit 登记');
+    }
+    if (to === 'merged' && !details.mergeCommit) {
       throw controlError('MERGE_GATE_REQUIRED', 'merged 只能由主 agent 在 merge gate 后通过 CLI --merge-commit 登记');
     }
     if (to === 'merged' && (details.actor || 'orchestrator') !== 'orchestrator') {
@@ -301,9 +307,21 @@ export function transitionTask(taskId, to, details = {}, runtimeDir = RUNTIME_DI
     if (details.mergeCommit) task.mergeCommit = details.mergeCommit;
     if (details.reviewTaskId) task.reviewTaskId = details.reviewTaskId;
     if (to === 'merged' && registry.leases[task.worktree]?.owner === taskId) delete registry.leases[task.worktree];
-    appendTransition(runtimeDir, task, from, to, details);
+    appendTransition(runtimeDir, task, from, to, {
+      ...details,
+      actor: details.actor || 'orchestrator',
+      source: capability === CLI_MERGE_GATE ? 'cli' : 'internal',
+    });
     return { result: 'transitioned', taskId, from, to, nextAction: task.nextAction };
   });
+}
+
+export function transitionTask(taskId, to, details = {}, runtimeDir = RUNTIME_DIR) {
+  return transitionTaskInternal(taskId, to, details, runtimeDir);
+}
+
+function transitionTaskFromCli(taskId, to, details = {}, runtimeDir = RUNTIME_DIR) {
+  return transitionTaskInternal(taskId, to, details, runtimeDir, CLI_MERGE_GATE);
 }
 
 function payloadSummary(payload) {
@@ -508,7 +526,7 @@ export function consumeEvent(eventId, runtimeDir = RUNTIME_DIR) {
       transition = { from, to };
       nextAction = to === 'approved' ? 'merge-gate' : 'continue';
       appendTransition(runtimeDir, task, from, to, {
-        eventId, actor: 'orchestrator', reason: event.payload?.summary || `${event.kind} consumed`, evidence: [`thread:${event.threadId}`],
+        eventId, actor: 'orchestrator', source: 'event', reason: event.payload?.summary || `${event.kind} consumed`, evidence: [`thread:${event.threadId}`],
       });
     } else if (TERMINAL_OR_PAUSED.includes(task.state)) {
       nextAction = 'terminal-noop';
@@ -675,7 +693,7 @@ async function resolveExistingWorktree(value) {
   return canonicalWorktreeId(basename(matches[0].path));
 }
 
-export async function main(argv = process.argv.slice(2), runtimeDir = RUNTIME_DIR) {
+async function main(argv = process.argv.slice(2), runtimeDir = RUNTIME_DIR) {
   const { options, positional } = parseArguments(argv);
   const [command, action] = positional;
   if (command === 'task' && action === 'create') {
@@ -688,10 +706,10 @@ export async function main(argv = process.argv.slice(2), runtimeDir = RUNTIME_DI
   }
   if (command === 'task' && action === 'heartbeat') return heartbeatTask(requireValue(options, 'task'), runtimeDir);
   if (command === 'task' && action === 'attach-thread') return attachTaskThread(requireValue(options, 'task'), options, runtimeDir);
-  if (command === 'transition') return transitionTask(requireValue(options, 'task'), requireValue(options, 'to'), {
+  if (command === 'transition') return transitionTaskFromCli(requireValue(options, 'task'), requireValue(options, 'to'), {
     reason: options.reason || null, actor: options.actor || 'orchestrator', eventId: options['event-id'] || null,
     phase: options.phase, nextAction: options['next-action'], commitSha: options.commit,
-    mergeCommit: options['merge-commit'], reviewTaskId: options['review-task'], source: 'cli',
+    mergeCommit: options['merge-commit'], reviewTaskId: options['review-task'],
   }, runtimeDir);
   if (command === 'inbox' && action === 'put') return putInboxEvent(options, runtimeDir);
   if (command === 'inbox' && action === 'pending') return pendingInbox(runtimeDir);
