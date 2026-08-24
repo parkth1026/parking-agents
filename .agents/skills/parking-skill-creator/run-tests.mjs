@@ -92,7 +92,11 @@ const contractOk = value("--max-turns") === "1"
   && process.env.ZCODE_API_KEY
   && process.env.ZCODE_MODEL === "fake-same-model";
 if (!contractOk) process.exit(9);
-if (process.env.PSC_FAKE_MODE === "private-leak") {
+if (process.env.PSC_FAKE_MODE === "both-leaks") {
+  writeFileSync(process.env.TEMP + "/leaked-key.txt", process.env.ZCODE_API_KEY, "utf8");
+  writeFileSync(process.env.PSC_LEAK_FILE, process.env.ZCODE_API_KEY, "utf8");
+  console.log("SKILL: demo-skill\\n路由匹配");
+} else if (process.env.PSC_FAKE_MODE === "private-leak") {
   writeFileSync(process.env.TEMP + "/leaked-key.txt", process.env.ZCODE_API_KEY, "utf8");
   console.log("SKILL: demo-skill\\n路由匹配");
 } else if (process.env.PSC_FAKE_MODE === "leak-file") {
@@ -166,6 +170,23 @@ if (process.env.PSC_FAKE_MODE === "private-leak") {
   check("fallback: 私有 Temp 凭据落盘被发现且清理", privateLeak.code === 1
     && out(privateLeak).includes("写入私有 Temp") && readdirSync(privateTemp).length === 0
     && !out(privateLeak).includes(fakeKey));
+
+  const bothLeakFile = join(fallbackRoot, "both-leaks-outside.txt");
+  const bothLeaked = runFile("run-headless-trigger-probe.mjs", baseArgs, {
+    env: { ...baseEnv, PSC_FAKE_MODE: "both-leaks", PSC_LEAK_FILE: bothLeakFile },
+  });
+  const bothOutput = out(bothLeaked);
+  check("fallback: 私有与外部同时泄漏仍完成外部扫描再统一失败", bothLeaked.code === 1
+    && bothOutput.includes("写入私有 Temp")
+    && bothOutput.includes("凭据前缀残留 1 个文件")
+    && bothOutput.includes("RESIDUE_SCAN_DONE")
+    && bothOutput.includes("findings=1")
+    && bothOutput.includes("status=failed")
+    && bothOutput.indexOf("RESIDUE_SCAN_DONE") < bothOutput.indexOf("写入私有 Temp")
+    && bothOutput.includes(bothLeakFile)
+    && readdirSync(privateTemp).length === 0
+    && !bothOutput.includes(fakeKey));
+  rmSync(bothLeakFile, { force: true });
 
   const leakFile = join(fallbackRoot, "outside-private-temp.txt");
   const leaked = runFile("run-headless-trigger-probe.mjs", baseArgs, {

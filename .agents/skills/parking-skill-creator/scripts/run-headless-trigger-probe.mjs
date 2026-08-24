@@ -205,31 +205,31 @@ try {
 }
 
 const captured = `${child?.stdout ?? ""}\n${child?.stderr ?? ""}`;
-if (captured.includes(prefix)) fail("拒绝: Provider 输出含凭据前缀；内容已抑制");
-if (privateScan.findings.length > 0) fail("拒绝: Provider 把凭据前缀写入私有 Temp；目录已清理");
-if (privateScan.unreadable.length > 0) fail("拒绝: 私有 Temp 残留扫描不完整；目录已清理");
-
 const scan = scanRoots(args.scanRoots, prefix, args.excludes);
-if (scan.findings.length > 0) {
-  process.stderr.write(`拒绝: 凭据前缀残留 ${scan.findings.length} 个文件（不输出内容）\n`);
-  for (const file of scan.findings) process.stderr.write(`RESIDUE ${file}\n`);
-  process.exit(1);
-}
-if (scan.unreadable.length > 0) {
-  process.stderr.write(`拒绝: 残留扫描不完整，${scan.unreadable.length} 个路径不可读\n`);
-  process.exit(1);
-}
+const failures = [];
+if (captured.includes(prefix)) failures.push("拒绝: Provider 输出含凭据前缀；内容已抑制");
+if (privateScan.findings.length > 0) failures.push("拒绝: Provider 把凭据前缀写入私有 Temp；目录已清理");
+if (privateScan.unreadable.length > 0) failures.push("拒绝: 私有 Temp 残留扫描不完整；目录已清理");
+if (scan.findings.length > 0) failures.push(`拒绝: 凭据前缀残留 ${scan.findings.length} 个文件（不输出内容）`);
+if (scan.unreadable.length > 0) failures.push(`拒绝: 残留扫描不完整，${scan.unreadable.length} 个路径不可读`);
 if (child?.error || child?.status !== 0) {
   const reason = child?.error?.code ?? child?.signal ?? child?.status ?? "unknown";
-  fail(`拒绝: headless Provider 未成功完成 (${reason})；不生成探针答案`);
+  failures.push(`拒绝: headless Provider 未成功完成 (${reason})；不生成探针答案`);
 }
 
 const lines = String(child.stdout ?? "").replaceAll("\r\n", "\n").replace(/\n+$/, "").split("\n");
 const firstLine = lines[0] ?? "";
 if (!/^SKILL: (?:none|[a-z0-9]+(?:-[a-z0-9]+)*)$/.test(firstLine)) {
-  fail("拒绝: Provider 首行不符合 SKILL 协议；不猜测、不代答");
+  failures.push("拒绝: Provider 首行不符合 SKILL 协议；不猜测、不代答");
 }
 const reason = lines.slice(1).join(" ").trim();
-if (Array.from(reason).length > 15) fail("拒绝: Provider 理由超过 15 字；不截断、不代答");
+if (Array.from(reason).length > 15) failures.push("拒绝: Provider 理由超过 15 字；不截断、不代答");
+
+if (failures.length > 0) {
+  process.stderr.write(`RESIDUE_SCAN_DONE roots=${args.scanRoots.length} files=${scan.files} excluded=${scan.excluded} findings=${scan.findings.length} unreadable=${scan.unreadable.length} status=failed\n`);
+  for (const message of failures) process.stderr.write(`${message}\n`);
+  for (const file of scan.findings) process.stderr.write(`RESIDUE ${file}\n`);
+  process.exit(1);
+}
 process.stdout.write(`${firstLine}\n${reason ? `${reason}\n` : ""}`);
 process.stderr.write(`RESIDUE_SCAN_OK roots=${args.scanRoots.length} files=${scan.files} excluded=${scan.excluded}\n`);
