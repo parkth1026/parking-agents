@@ -2,6 +2,7 @@
 // Goal Contract 的机械验收入口：collect / dispatch / server / repo-root / layout。
 import assert from 'node:assert/strict';
 import { execFile, spawn, spawnSync } from 'node:child_process';
+import { createServer } from 'node:http';
 import { promisify } from 'node:util';
 import {
   chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync,
@@ -10,7 +11,7 @@ import { tmpdir } from 'node:os';
 import { basename, join, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
-  collectStatus, DEFAULT_RUNTIME_DIR, listWorktrees, loadIssueFixture, loadConfig, SKILL_DIR,
+  BOARD_API, collectStatus, DEFAULT_RUNTIME_DIR, listWorktrees, loadIssueFixture, loadConfig, SKILL_DIR,
 } from './collect.mjs';
 import { resolveCommand } from './command.mjs';
 import { HEADLESS_CHILD_OPTIONS } from './headless.mjs';
@@ -505,9 +506,9 @@ async function authorizedDispatch(server, body) {
   });
 }
 
-function probeServerStartup(cwd, env, timeoutMs = 750) {
+function probeServerStartup(cwd, env, timeoutMs = 750, port = 0) {
   return new Promise((resolveProbe, reject) => {
-    const child = spawn(process.execPath, [join(SCRIPT_DIR, 'server.mjs'), '--port', '0'], {
+    const child = spawn(process.execPath, [join(SCRIPT_DIR, 'server.mjs'), '--port', String(port)], {
       ...HEADLESS_CHILD_OPTIONS,
       cwd,
       env,
@@ -638,6 +639,21 @@ async function repoRootDomain() {
     try {
       const defaultEnv = boardEnv(null);
       const runtimeOf = (main) => join(main, '.aes-worktree-board', 'runtime');
+      const issueRepoA = 'fixture.invalid/project-a';
+      const issueRepoB = 'fixture.invalid/project-b';
+      const issuesA = join(fixture.root, 'issues-a.json');
+      const issuesB = join(peer.root, 'issues-b.json');
+      for (const [repo, issueRepo] of [[fixture, issueRepoA], [peer, issueRepoB]]) {
+        const configDir = join(repo.main, '.aes-worktree-board');
+        mkdirSync(configDir, { recursive: true });
+        writeFileSync(join(configDir, 'board.config.json'), `${JSON.stringify({ mainBranch: 'main', issueRepo }, null, 2)}\n`);
+      }
+      writeFileSync(issuesA, `${JSON.stringify({ issues: [
+        { number: 4401, title: 'project-a-only', state: 'OPEN', url: null, body: '', blockedByNumbers: [] },
+      ] })}\n`);
+      writeFileSync(issuesB, `${JSON.stringify({ issues: [
+        { number: 4402, title: 'project-b-only', state: 'OPEN', url: null, body: '', blockedByNumbers: [] },
+      ] })}\n`);
 
       for (const repo of [fixture, peer]) {
         const defaultCollected = spawnSync(process.execPath, [join(SCRIPT_DIR, 'collect.mjs'), '--no-gh'], {
@@ -649,6 +665,71 @@ async function repoRootDomain() {
         assert.equal(defaultCollected.status, 0, defaultCollected.stderr);
         assertFixtureStatus(runtimeOf(repo.main), repo);
       }
+
+      // #44 BLOCK 1/3: 两仓必须都在空 runtime 上完成锁前检查，再竞争同一写锁。
+      // 只有锁内重读 latestSnapshot 后再校验 identity，才能稳定阻止 last-writer-wins。
+      const sharedRuntime = join(fixture.root, 'shared-concurrent-runtime');
+      const barrierDir = join(fixture.root, 'collect-barrier');
+      const concurrentRunner = join(fixture.root, 'concurrent-collect.mjs');
+      mkdirSync(barrierDir, { recursive: true });
+      writeFileSync(concurrentRunner, `
+import { existsSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { collectStatus } from ${JSON.stringify(pathToFileURL(join(SCRIPT_DIR, 'collect.mjs')).href)};
+const [id, runtimeDir, issuesFixture, barrierDir] = process.argv.slice(2);
+try {
+  const status = await collectStatus({
+    runtimeDir,
+    issuesFixture,
+    beforeWrite: async () => {
+      writeFileSync(join(barrierDir, 'ready-' + id), id);
+      while (!existsSync(join(barrierDir, 'release'))) {
+        await new Promise((resolveWait) => setTimeout(resolveWait, 10));
+      }
+    },
+  });
+  console.log(JSON.stringify({ ok: true, repo: status.repo, issues: status.graph.issues.map((issue) => issue.number) }));
+} catch (error) {
+  console.error(JSON.stringify({ ok: false, code: error.code, expected: error.expected, actual: error.actual }));
+  process.exitCode = error.exitCode || 1;
+}
+`);
+      const concurrentA = runNode([
+        concurrentRunner, 'a', sharedRuntime, issuesA, barrierDir,
+      ], {
+        cwd: fixture.main,
+        env: boardEnv(sharedRuntime, {
+          AES_WORKTREE_BOARD_REPO_ROOT: fixture.main,
+          AES_WORKTREE_BOARD_ISSUE_REPO: issueRepoA,
+        }),
+      });
+      const concurrentB = runNode([
+        concurrentRunner, 'b', sharedRuntime, issuesB, barrierDir,
+      ], {
+        cwd: peer.main,
+        env: boardEnv(sharedRuntime, {
+          AES_WORKTREE_BOARD_REPO_ROOT: peer.main,
+          AES_WORKTREE_BOARD_ISSUE_REPO: issueRepoB,
+        }),
+      });
+      for (let attempt = 0; attempt < 1_000; attempt += 1) {
+        if (existsSync(join(barrierDir, 'ready-a')) && existsSync(join(barrierDir, 'ready-b'))) break;
+        await waitMilliseconds(10);
+      }
+      assert.equal(existsSync(join(barrierDir, 'ready-a')), true, 'A collect 未到达同步写入点');
+      assert.equal(existsSync(join(barrierDir, 'ready-b')), true, 'B collect 未到达同步写入点');
+      writeFileSync(join(barrierDir, 'release'), 'release');
+      const concurrentResults = await Promise.all([concurrentA, concurrentB]);
+      assert.deepEqual(concurrentResults.map((result) => result.status).sort(), [0, 2],
+        concurrentResults.map((result) => result.stderr || result.stdout).join('\n'));
+      const failedCollect = concurrentResults.find((result) => result.status === 2);
+      assert.equal(parseJsonLine(failedCollect.stderr).code, 'REPO_MISMATCH');
+      const finalSharedStatus = readJson(join(sharedRuntime, 'status.json'));
+      const successfulCollect = parseJsonLine(concurrentResults.find((result) => result.status === 0).stdout);
+      assert.equal(resolve(finalSharedStatus.repo.root), resolve(successfulCollect.repo.root),
+        '失败方不得覆盖赢家 repo identity');
+      assert.equal(finalSharedStatus.repo.issueRepo, successfulCollect.repo.issueRepo);
+      assert.deepEqual(finalSharedStatus.graph.issues.map((issue) => issue.number), successfulCollect.issues);
 
       // 同名 worktree + 同 taskId：A 运行中 B 直发必须成功（旧共享目录会 LOCKED 或任务 id 冲突）。
       const dispatchA = spawn(process.execPath, [
@@ -687,14 +768,76 @@ async function repoRootDomain() {
       }
 
       // 跨 server 实例：同名 worktree 并发派发，.requests 与 PID 锁互不可见。
-      serverFixture = await startServer(null, {}, fixture.main, { observeDispatch: true, observerDir: observerDirA });
+      serverFixture = await startServer(null, {
+        AES_WORKTREE_BOARD_ISSUE_REPO: issueRepoA,
+        AES_WORKTREE_BOARD_ISSUES_FIXTURE: issuesA,
+      }, fixture.main, { observeDispatch: true, observerDir: observerDirA });
+      const currentA = await (await fetch(`${serverFixture.origin}/api/status?fast=1`)).json();
+      assert.equal(resolve(currentA.repo.root), resolve(fixture.main));
+      assert.equal(currentA.repo.issueRepo, issueRepoA);
+      assert.equal(currentA.repo.mainBranch, 'main');
+      assert.deepEqual(currentA.graph.issues.map((issue) => issue.number), [4401]);
+      assert.deepEqual(currentA.worktrees.map((worker) => worker.name), [basename(fixture.sibling)]);
+
+      const wrongRuntime = join(fixture.root, 'wrong-runtime');
+      mkdirSync(wrongRuntime, { recursive: true });
+      const foreignSnapshot = {
+        ...currentA,
+        repo: { ...currentA.repo, root: peer.main.replace(/\\/g, '/'), issueRepo: issueRepoB },
+        graph: { ...currentA.graph, issues: [{ ...currentA.graph.issues[0], number: 4402, title: 'foreign-stale-issue' }] },
+        worktrees: [{ ...currentA.worktrees[0], name: basename(peer.sibling), path: peer.sibling.replace(/\\/g, '/') }],
+      };
+      writeFileSync(join(wrongRuntime, 'status.json'), `${JSON.stringify(foreignSnapshot, null, 2)}\n`);
+      writeFileSync(join(wrongRuntime, 'status.js'), `window.WORKBOARD = ${JSON.stringify(foreignSnapshot)};\n`);
+      const staleCollect = spawnSync(process.execPath, [
+        join(SCRIPT_DIR, 'collect.mjs'), '--no-gh', '--issues-fixture', issuesA,
+      ], {
+        ...HEADLESS_CHILD_OPTIONS,
+        cwd: fixture.main,
+        env: boardEnv(wrongRuntime, { AES_WORKTREE_BOARD_ISSUE_REPO: issueRepoA }),
+        encoding: 'utf8',
+      });
+      assert.equal(staleCollect.status, 2, `错误 runtime collect 必须 exit 2: ${staleCollect.stderr}`);
+      assert.match(staleCollect.stderr, /repo mismatch/i);
+      assert.equal(JSON.parse(readFileSync(join(wrongRuntime, 'status.json'), 'utf8')).repo.issueRepo, issueRepoB,
+        'fail-closed collect 不得覆盖 foreign runtime');
+      const staleRuntime = await probeServerStartup(fixture.main, boardEnv(wrongRuntime, {
+        AES_WORKTREE_BOARD_ISSUE_REPO: issueRepoA,
+        AES_WORKTREE_BOARD_ISSUES_FIXTURE: issuesA,
+      }), 5_000);
+      assert.equal(staleRuntime.status, 2, `错误 runtime 必须 exit 2: ${staleRuntime.stderr || staleRuntime.stdout}`);
+      const staleDiagnostic = parseJsonLine(staleRuntime.stderr || staleRuntime.stdout);
+      assert.equal(staleDiagnostic.code, 'REPO_MISMATCH');
+      assert.equal(resolve(staleDiagnostic.expected.root), resolve(fixture.main));
+      assert.equal(resolve(staleDiagnostic.actual.root), resolve(peer.main));
+
+      const occupiedPort = Number(new URL(serverFixture.origin).port);
+      const conflict = await probeServerStartup(peer.main, boardEnv(null, {
+        AES_WORKTREE_BOARD_ISSUE_REPO: issueRepoB,
+        AES_WORKTREE_BOARD_ISSUES_FIXTURE: issuesB,
+      }), 15_000, occupiedPort);
+      assert.equal(conflict.status, 2, `跨项目端口冲突必须 exit 2: ${conflict.stderr || conflict.stdout}`);
+      const conflictDiagnostic = parseJsonLine(conflict.stderr || conflict.stdout);
+      assert.equal(conflictDiagnostic.code, 'REPO_MISMATCH', JSON.stringify(conflictDiagnostic));
+      assert.equal(conflictDiagnostic.port, occupiedPort);
+      assert.equal(resolve(conflictDiagnostic.expected.root), resolve(peer.main));
+      assert.equal(resolve(conflictDiagnostic.actual.root), resolve(fixture.main));
+
       let isolationResponse = await authorizedDispatch(serverFixture, {
         worktree: basename(fixture.sibling), prompt: 'cross-repo server A', agent: 'test',
       });
       assert.equal(isolationResponse.status, 202);
       const payloadA = await isolationResponse.json();
       await waitTaskRunning(serverFixture.origin, payloadA.taskId);
-      serverPeer = await startServer(null, {}, peer.main, { observeDispatch: true, observerDir: observerDirB });
+      serverPeer = await startServer(null, {
+        AES_WORKTREE_BOARD_ISSUE_REPO: issueRepoB,
+        AES_WORKTREE_BOARD_ISSUES_FIXTURE: issuesB,
+      }, peer.main, { observeDispatch: true, observerDir: observerDirB });
+      const currentB = await (await fetch(`${serverPeer.origin}/api/status?fast=1`)).json();
+      assert.equal(resolve(currentB.repo.root), resolve(peer.main));
+      assert.equal(currentB.repo.issueRepo, issueRepoB);
+      assert.deepEqual(currentB.graph.issues.map((issue) => issue.number), [4402]);
+      assert.deepEqual(currentB.worktrees.map((worker) => worker.name), [basename(peer.sibling)]);
       isolationResponse = await authorizedDispatch(serverPeer, {
         worktree: basename(peer.sibling), prompt: 'cross-repo server B', agent: 'test',
       });
@@ -913,6 +1056,7 @@ async function dispatchDomain() {
 async function serverDomain() {
   const runtimeDir = tempDirectory('server');
   let server = null;
+  let impostor = null;
   try {
     const marker = join(runtimeDir, 'gh-called.txt');
     const shimDir = join(runtimeDir, 'shim');
@@ -949,10 +1093,57 @@ async function serverDomain() {
 
     response = await fetch(`${server.origin}/api/status?fast=1`);
     assert.equal(response.status, 200);
+    assert.equal(response.headers.get('x-aes-worktree-board'), `${BOARD_API.marker}/${BOARD_API.protocolVersion}`);
     const status = await response.json();
+    assert.deepEqual(status.board, BOARD_API);
     assert.equal(status.graph.issues[0].title, 'fast-cache-sentinel');
     assert.equal(status.graph.issues[0].derived.warn, true);
     assert.equal(existsSync(marker), false, 'fast=1 不得调用 gh');
+
+    let impostorMode = 'unmarked';
+    impostor = createServer((request, responseImpostor) => {
+      const marked = impostorMode === 'incomplete-board';
+      responseImpostor.writeHead(200, {
+        'content-type': 'application/json; charset=utf-8',
+        ...(marked ? { 'x-aes-worktree-board': `${BOARD_API.marker}/${BOARD_API.protocolVersion}` } : {}),
+      });
+      responseImpostor.end(JSON.stringify(marked ? {
+        schemaVersion: 3,
+        board: BOARD_API,
+        generatedAt: new Date().toISOString(),
+        repo: {
+          root: 'C:/foreign/repo', name: 'repo', issueRepo: 'foreign/repo', mainBranch: 'main', mainHead: 'foreign',
+        },
+      } : {
+        schemaVersion: 3,
+        repo: { root: 'C:/foreign/repo', issueRepo: 'foreign/repo', mainBranch: 'main' },
+        actual: { root: 'C:/foreign/runtime', issueRepo: 'foreign/runtime', mainBranch: 'main' },
+      }));
+    });
+    await new Promise((resolveListen, reject) => {
+      impostor.once('error', reject);
+      impostor.listen(0, '127.0.0.1', resolveListen);
+    });
+    const impostorAddress = impostor.address();
+    const impostorPort = typeof impostorAddress === 'object' ? impostorAddress.port : null;
+    const impostorConflict = await probeServerStartup(ROOT, boardEnv(runtimeDir), 15_000, impostorPort);
+    assert.equal(impostorConflict.status, 2, impostorConflict.stderr || impostorConflict.stdout);
+    const impostorDiagnostic = parseJsonLine(impostorConflict.stderr || impostorConflict.stdout);
+    assert.equal(impostorDiagnostic.code, 'PORT_CONFLICT', JSON.stringify(impostorDiagnostic));
+    assert.match(impostorDiagnostic.detail, /marker\/schema/);
+    assert.equal(Object.hasOwn(impostorDiagnostic, 'actual'), false,
+      'repo-shaped 非 board JSON 不得进入 identity 比较');
+
+    impostorMode = 'incomplete-board';
+    const incompleteConflict = await probeServerStartup(ROOT, boardEnv(runtimeDir), 15_000, impostorPort);
+    assert.equal(incompleteConflict.status, 2, incompleteConflict.stderr || incompleteConflict.stdout);
+    const incompleteDiagnostic = parseJsonLine(incompleteConflict.stderr || incompleteConflict.stdout);
+    assert.equal(incompleteDiagnostic.code, 'PORT_CONFLICT', JSON.stringify(incompleteDiagnostic));
+    assert.match(incompleteDiagnostic.detail, /marker\/schema/);
+    assert.equal(Object.hasOwn(incompleteDiagnostic, 'actual'), false,
+      'marker 正确但缺 graph/worktrees 的 status 不得进入 identity 比较');
+    await new Promise((resolveClose, reject) => impostor.close((error) => (error ? reject(error) : resolveClose())));
+    impostor = null;
 
     response = await fetch(`${server.origin}/api/task/${task.id}`);
     assert.equal(response.status, 200);
@@ -968,6 +1159,9 @@ async function serverDomain() {
     assert.equal(response.status, 400);
     assert.equal((await response.json()).code, 'BAD_REQUEST');
   } finally {
+    if (impostor?.listening) {
+      await new Promise((resolveClose) => impostor.close(() => resolveClose()));
+    }
     if (server?.child && server.child.exitCode === null) {
       const stopped = waitForExit(server.child);
       server.child.kill();
@@ -1686,6 +1880,7 @@ async function orchestrationVerdictDimensions() {
 async function orchestrationGlobalStop() {
   const runtimeDir = tempDirectory('orchestration-governance-stop');
   try {
+    const config = loadConfig();
     const first = createTask({
       issue: 14, worktree: 'dev3', role: 'executor', 'thread-id': 'T-stop-a',
       model: 'luna-max', 'routing-reason': 'stop fixture',
@@ -1705,6 +1900,11 @@ async function orchestrationGlobalStop() {
     }, runtimeDir);
     writeJsonAtomic(join(runtimeDir, 'status.json'), {
       schemaVersion: 3,
+      repo: {
+        root: ROOT.replace(/\\/g, '/'),
+        issueRepo: config.issueRepo,
+        mainBranch: config.mainBranch,
+      },
       worktrees: [{ name: 'dev3' }, { name: 'dev1' }, { name: 'dev-idle' }, { name: 'test' }],
     });
     evaluated = evaluateStop({ write: true }, runtimeDir);
@@ -2015,6 +2215,11 @@ async function layoutDomain() {
   for (const key of ['mainBranch', 'issueRepo', 'port', 'defaultAgent', 'agents']) {
     assert.ok(Object.hasOwn(config, key), `board.config.json 缺少既有字段 ${key}`);
   }
+  const repoConfigPath = join(ROOT, '.aes-worktree-board', 'board.config.json');
+  assert.ok(existsSync(repoConfigPath), '目标仓必须提交 .aes-worktree-board/board.config.json');
+  const repoConfig = JSON.parse(readFileSync(repoConfigPath, 'utf8'));
+  assert.equal(repoConfig.mainBranch, 'dev', 'parking-agents integration branch 必须为 dev');
+  assert.equal(repoConfig.issueRepo, 'parkth1026/parking-agents');
   const scripts = ['collect.mjs', 'assess.mjs', 'check-issue-graph.mjs', 'command.mjs', 'dispatch.mjs', 'headless.mjs', 'orchestrate.mjs', 'runtime-store.mjs', 'server.mjs', 'selftest.mjs'];
   for (const script of scripts) {
     const source = readFileSync(join(SCRIPT_DIR, script), 'utf8');
