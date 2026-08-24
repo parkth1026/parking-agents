@@ -16,7 +16,8 @@ export const SKILL_DIR = dirname(SCRIPT_DIR);
 // 默认沿用调用方当前目录，显式环境变量可把看板指向另一个同级 worktree 仓库。
 // skill 本身可以放在独立的工具仓库中，不再把 skill 目录误当成目标仓库根。
 export const REPO_ROOT = resolve(process.env.AES_WORKTREE_BOARD_REPO_ROOT || process.cwd());
-export const DEFAULT_RUNTIME_DIR = join(SKILL_DIR, 'runtime');
+// #14: runtime 默认跟随目标仓根，技能目录只放代码；AES_WORKTREE_BOARD_RUNTIME_DIR 显式覆盖仍最优先。
+export const DEFAULT_RUNTIME_DIR = join(REPO_ROOT, '.aes-worktree-board', 'runtime');
 export const RUNTIME_DIR = resolve(process.env.AES_WORKTREE_BOARD_RUNTIME_DIR || DEFAULT_RUNTIME_DIR);
 export const TASKS_DIR = join(RUNTIME_DIR, 'tasks');
 

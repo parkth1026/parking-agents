@@ -16,6 +16,8 @@ $worker = "dev1"
 
 运行脚本前，把当前目录切到要巡检的目标主仓。目标仓根按以下单一 contract 解析：`AES_WORKTREE_BOARD_REPO_ROOT`（显式覆盖）优先，否则使用调用进程的当前目录；skill 的安装目录永远不参与目标仓判定。server 启动 dispatch 时必须把已经解析的目标仓根继续传给子进程。
 
+运行时产物（status 快照、任务三件套、`.requests` prompt 暂存、PID 锁）按同一条链选址：`AES_WORKTREE_BOARD_RUNTIME_DIR`（显式覆盖，仅自检等隔离场景使用）优先，否则默认落在目标仓根的 `.aes-worktree-board/runtime/`；技能安装目录只放代码，不承载任何仓的运行时数据，多仓巡检/派发因此天然隔离。本文其余处的 `runtime/…` 均指目标仓根下该目录。目标仓应把 `.aes-worktree-board/runtime/` 加入本仓 `.gitignore`，运行时数据不进 git。
+
 ## 不可越过的边界
 
 - 只操作 `git worktree list` 中与主仓同级的既有 worktree；不创建、不删除 worktree。
@@ -91,4 +93,4 @@ server 只能绑定 `127.0.0.1`。不要增加外部监听或把页面改成自�
 
 ## 自检
 
-按改动域运行自检，例如 `node "$skillDir/scripts/selftest.mjs" repo-root`；其他域是 `collect`、`fixture`、`dispatch`、`server`、`layout` 与 `windows-hide`。`fixture` 验证全量 Issue 数据能生成页面使用的 graph/status 快照；`dispatch` 使用独立 Git fixture 验证 Windows 可执行解析、dirty 确认、PID 锁与 server → dispatch；`repo-root` 验证跨仓 collect、direct dispatch、server → dispatch 与非法目标路径；`windows-hide` 机械断言所有子进程启动点使用统一窗口策略并采样真实运行零可见控制台窗口。页面视觉与交互仍需用真实浏览器对照锁定的 mock 与 handoff，不能由自检替代。
+按改动域运行自检，例如 `node "$skillDir/scripts/selftest.mjs" repo-root`；其他域是 `collect`、`fixture`、`dispatch`、`server`、`layout` 与 `windows-hide`。`fixture` 验证全量 Issue 数据能生成页面使用的 graph/status 快照；`dispatch` 使用独立 Git fixture 验证 Windows 可执行解析、dirty 确认、PID 锁与 server → dispatch；`repo-root` 验证跨仓 collect、direct dispatch、server → dispatch、非法目标路径与跨仓 runtime 隔离（快照/任务三件套/PID 锁各归各仓、技能目录零写入）；`windows-hide` 机械断言所有子进程启动点使用统一窗口策略并采样真实运行零可见控制台窗口。页面视觉与交互仍需用真实浏览器对照锁定的 mock 与 handoff，不能由自检替代。

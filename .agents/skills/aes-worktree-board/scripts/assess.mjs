@@ -5,12 +5,10 @@
 //     --task "一句话描述当前任务" --reason "判断依据" [--by claude-main]
 // 只更新 status.json 中该节点的 assessment 字段并同步 status.js；事实字段一律不碰。
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
-import { join, dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
+// #14: runtime 选址与 collect 同一条 env/cwd 解析链（目标仓根下 .aes-worktree-board/runtime）。
+import { RUNTIME_DIR } from './collect.mjs';
 
-const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
-const SKILL_DIR = dirname(SCRIPT_DIR);
-const RUNTIME_DIR = resolve(process.env.AES_WORKTREE_BOARD_RUNTIME_DIR || join(SKILL_DIR, 'runtime'));
 const STATUS_JSON = join(RUNTIME_DIR, 'status.json');
 const STATUS_JS = join(RUNTIME_DIR, 'status.js');
 
