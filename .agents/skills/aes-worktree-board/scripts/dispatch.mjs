@@ -3,7 +3,7 @@
 // PID 锁、任务三件套与干净 worktree 的成功输出保持 v1 兼容。
 import { execFileSync, spawn } from 'node:child_process';
 import {
-  existsSync, mkdirSync, openSync, readFileSync, readdirSync, unlinkSync, writeFileSync,
+  existsSync, mkdirSync, openSync, readFileSync, unlinkSync,
 } from 'node:fs';
 import { join, resolve, sep } from 'node:path';
 import {
@@ -11,8 +11,19 @@ import {
 } from './collect.mjs';
 import { resolveCommand } from './command.mjs';
 import { HEADLESS_CHILD_OPTIONS } from './headless.mjs';
+import {
+  completeFallbackDispatch, markFallbackStarted, registerFallbackDispatch,
+} from './orchestrate.mjs';
+import { withRuntimeLock, writeJsonAtomic, writeTextAtomic } from './runtime-store.mjs';
 
 function fail(error, exitCode = 1, extra = {}) {
+  if (registered && taskId) {
+    try {
+      completeFallbackDispatch(taskId, { exitCode, preflightFailure: true, error });
+    } catch {
+      // 原始 preflight 错误优先；registry 若已由其他路径收敛则保持其结果。
+    }
+  }
   console.error(JSON.stringify({ ok: false, error, ...extra }));
   process.exit(exitCode);
 }
@@ -34,6 +45,8 @@ let promptFile = null;
 let promptStdin = false;
 let deletePromptFile = false;
 let confirmDirty = false;
+let fallbackAuthorized = null;
+let registered = false;
 const positional = [];
 for (let index = 0; index < argv.length; index += 1) {
   if (argv[index] === '--agent') agentName = argv[++index];
@@ -42,6 +55,8 @@ for (let index = 0; index < argv.length; index += 1) {
   else if (argv[index] === '--prompt-stdin') promptStdin = true;
   else if (argv[index] === '--delete-prompt-file') deletePromptFile = true;
   else if (argv[index] === '--confirm-dirty') confirmDirty = true;
+  else if (argv[index] === '--fallback-authorized') fallbackAuthorized = argv[++index];
+  else if (argv[index] === '--registered') registered = true;
   else positional.push(argv[index]);
 }
 const worktreeArg = positional.shift();
@@ -55,6 +70,11 @@ const agentArgv = config.agents[agentName];
 if (!agentArgv) {
   fail(`未知 agent "${agentName}"，可用: ${Object.keys(config.agents).join(', ')}`, 1, { code: 'BAD_REQUEST' });
 }
+if (agentName !== 'test' && !fallbackAuthorized) {
+  fail('cli-fallback 需显式授权：加 --fallback-authorized "<用户原话>"；正常路径是 Desktop create_thread。', 2, {
+    code: 'FALLBACK_AUTH_REQUIRED',
+  });
+}
 const prompt = promptStdin
   ? await readStdin()
   : promptFile
@@ -63,7 +83,9 @@ const prompt = promptStdin
 if (deletePromptFile && promptFile) {
   const requestRoot = resolve(RUNTIME_DIR, '.requests');
   const requestPath = resolve(promptFile);
-  if (requestPath.startsWith(`${requestRoot}${sep}`) && existsSync(requestPath)) unlinkSync(requestPath);
+  withRuntimeLock(RUNTIME_DIR, () => {
+    if (requestPath.startsWith(`${requestRoot}${sep}`) && existsSync(requestPath)) unlinkSync(requestPath);
+  });
 }
 if (!prompt.trim()) fail('prompt 为空：请以位置参数、stdin 或 --prompt-file 提供任务内容', 1, { code: 'BAD_REQUEST' });
 
@@ -80,32 +102,6 @@ if (!target) {
   );
 }
 const targetName = target.path.split('/').pop();
-
-mkdirSync(TASKS_DIR, { recursive: true });
-for (const fileName of readdirSync(TASKS_DIR)) {
-  if (!fileName.endsWith('.json')) continue;
-  const taskPath = join(TASKS_DIR, fileName);
-  let task;
-  try {
-    task = JSON.parse(readFileSync(taskPath, 'utf8'));
-  } catch {
-    continue;
-  }
-  if (task.worktree !== targetName || task.status !== 'running') continue;
-  let alive = false;
-  try {
-    process.kill(task.pid, 0);
-    alive = true;
-  } catch {
-    // 死锁记录在本次派发前收敛为 stale。
-  }
-  if (alive) {
-    fail(`${targetName} 已有运行中任务 ${task.id}`, 2, { code: 'LOCKED' });
-  }
-  task.status = 'stale';
-  task.endedAt = new Date().toISOString();
-  writeFileSync(taskPath, `${JSON.stringify(task, null, 2)}\n`);
-}
 
 const statusOutput = execFileSync('git', ['-C', target.path, 'status', '--porcelain'], {
   ...HEADLESS_CHILD_OPTIONS,
@@ -127,11 +123,11 @@ if (!confirmDirty && dirty.modified + dirty.untracked > 0) {
 
 const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
 taskId = taskId || `${targetName.replace(/^.*-(dev\d+)$/, '$1')}-${stamp}`;
+mkdirSync(TASKS_DIR, { recursive: true });
 const taskJsonPath = join(TASKS_DIR, `${taskId}.json`);
 const logPath = join(TASKS_DIR, `${taskId}.log`);
 const promptPath = join(TASKS_DIR, `${taskId}.prompt.txt`);
 if (existsSync(taskJsonPath)) fail(`任务 id 已存在: ${taskId}`, 1, { code: 'BAD_REQUEST' });
-writeFileSync(promptPath, prompt);
 
 let finalArgv;
 try {
@@ -139,6 +135,16 @@ try {
 } catch (error) {
   fail(error.message, 1, { code: 'BAD_REQUEST' });
 }
+if (!registered) {
+  try {
+    registerFallbackDispatch({
+      worktree: targetName, taskId, agent: agentName, prompt, fallbackAuthorized,
+    });
+  } catch (error) {
+    fail(error.message, error.exitCode || 1, { code: error.code || 'INTERNAL', ...(error.details || {}) });
+  }
+}
+withRuntimeLock(RUNTIME_DIR, () => writeTextAtomic(promptPath, prompt));
 const logFd = openSync(logPath, 'a');
 const child = spawn(finalArgv[0], finalArgv.slice(1), {
   ...HEADLESS_CHILD_OPTIONS,
@@ -154,36 +160,63 @@ const task = {
   prompt: prompt.length > 500 ? `${prompt.slice(0, 500)}…` : prompt,
   promptFile: promptPath,
   log: logPath,
-  status: 'running',
+  status: 'starting',
   pid: child.pid,
   startedAt: new Date().toISOString(),
   endedAt: null,
   exitCode: null,
 };
-writeFileSync(taskJsonPath, `${JSON.stringify(task, null, 2)}\n`);
-console.log(JSON.stringify({ ok: true, taskId, worktree: targetName, pid: child.pid, log: logPath }));
-child.stdin.write(prompt);
-child.stdin.end();
+let childSettled = false;
+let agentStarted = false;
 
-child.on('error', (error) => {
+function settleSpawnFailure(error) {
+  if (childSettled) return;
+  childSettled = true;
   task.status = 'failed';
   task.endedAt = new Date().toISOString();
   task.error = String(error.message).slice(0, 300);
-  writeFileSync(taskJsonPath, `${JSON.stringify(task, null, 2)}\n`);
+  withRuntimeLock(RUNTIME_DIR, () => writeJsonAtomic(taskJsonPath, task));
+  completeFallbackDispatch(taskId, {
+    exitCode: 1, preflightFailure: !agentStarted, error: task.error,
+  });
   console.error(JSON.stringify({ ok: false, taskId, error: task.error }));
-  process.exit(1);
-});
+  process.exitCode = 1;
+}
 
-child.on('close', async (code) => {
+child.once('error', settleSpawnFailure);
+
+child.once('close', async (code) => {
+  if (childSettled) return;
+  childSettled = true;
   task.status = code === 0 ? 'done' : 'failed';
   task.exitCode = code;
   task.endedAt = new Date().toISOString();
-  writeFileSync(taskJsonPath, `${JSON.stringify(task, null, 2)}\n`);
+  withRuntimeLock(RUNTIME_DIR, () => writeJsonAtomic(taskJsonPath, task));
+  completeFallbackDispatch(taskId, { exitCode: code });
   try {
     await collectStatus({ skipGh: true });
   } catch {
     // 快照刷新失败不改写 headless 任务的真实退出状态。
   }
   console.log(JSON.stringify({ ok: code === 0, taskId, exitCode: code, log: logPath }));
-  process.exit(code === 0 ? 0 : 1);
+  process.exitCode = code === 0 ? 0 : 1;
 });
+
+if (!Number.isInteger(child.pid) || child.pid <= 0) {
+  // Windows spawn ENOENT 异步发 error；等待统一 settlement，不能先伪造 executing。
+} else {
+  task.status = 'running';
+  withRuntimeLock(RUNTIME_DIR, () => writeJsonAtomic(taskJsonPath, task));
+  try {
+    markFallbackStarted(taskId, child.pid);
+    agentStarted = true;
+  } catch (error) {
+    child.kill();
+    settleSpawnFailure(error);
+  }
+  if (agentStarted) {
+    console.log(JSON.stringify({ ok: true, taskId, worktree: targetName, pid: child.pid, log: logPath }));
+    child.stdin.write(prompt);
+    child.stdin.end();
+  }
+}

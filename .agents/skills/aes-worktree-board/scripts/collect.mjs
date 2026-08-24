@@ -5,10 +5,13 @@ import { execFile } from 'node:child_process';
 import { HEADLESS_CHILD_OPTIONS } from './headless.mjs';
 import { promisify } from 'node:util';
 import {
-  existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync,
+  existsSync, mkdirSync, readFileSync, readdirSync,
 } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  readJson, readJsonLines, readRegistry, withRuntimeLock, writeJsonAtomic, writeTextAtomic,
+} from './runtime-store.mjs';
 
 const pExecFile = promisify(execFile);
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
@@ -27,11 +30,51 @@ function runtimePaths(runtimeDir = RUNTIME_DIR) {
     tasksDir: join(runtimeDir, 'tasks'),
     statusJson: join(runtimeDir, 'status.json'),
     statusJs: join(runtimeDir, 'status.js'),
+    snapshotHtml: join(runtimeDir, 'board.html'),
   };
 }
 
+function mergeConfig(base, override = {}) {
+  return { ...base, ...override, agents: { ...(base.agents || {}), ...(override.agents || {}) } };
+}
+
 export function loadConfig() {
-  return JSON.parse(readFileSync(join(SKILL_DIR, 'board.config.json'), 'utf8'));
+  let config = JSON.parse(readFileSync(join(SKILL_DIR, 'board.config.json'), 'utf8'));
+  const repoConfig = join(REPO_ROOT, '.aes-worktree-board', 'board.config.json');
+  if (existsSync(repoConfig)) config = mergeConfig(config, JSON.parse(readFileSync(repoConfig, 'utf8')));
+  if (process.env.AES_WORKTREE_BOARD_CONFIG) {
+    const source = process.env.AES_WORKTREE_BOARD_CONFIG;
+    const override = existsSync(source) ? JSON.parse(readFileSync(source, 'utf8')) : JSON.parse(source);
+    config = mergeConfig(config, override);
+  }
+  const scalarOverrides = {
+    mainBranch: process.env.AES_WORKTREE_BOARD_MAIN_BRANCH,
+    issueRepo: process.env.AES_WORKTREE_BOARD_ISSUE_REPO,
+    port: process.env.AES_WORKTREE_BOARD_PORT ? Number(process.env.AES_WORKTREE_BOARD_PORT) : undefined,
+    defaultAgent: process.env.AES_WORKTREE_BOARD_DEFAULT_AGENT,
+  };
+  return mergeConfig(config, Object.fromEntries(Object.entries(scalarOverrides).filter(([, value]) => value !== undefined)));
+}
+
+async function preflightConfig(config, { skipIssueRepo = false } = {}) {
+  try {
+    await git(['rev-parse', '--verify', `${config.mainBranch}^{commit}`]);
+  } catch {
+    const error = new Error(`[preflight] mainBranch 错配：目标仓 ${norm(REPO_ROOT)} 不存在 ${config.mainBranch}`);
+    error.exitCode = 2;
+    throw error;
+  }
+  if (skipIssueRepo) return;
+  try {
+    const { stdout } = await pExecFile('gh', [
+      'repo', 'view', config.issueRepo, '--json', 'nameWithOwner', '--jq', '.nameWithOwner',
+    ], { ...HEADLESS_CHILD_OPTIONS, timeout: 30_000, maxBuffer: 1024 * 1024 });
+    if (stdout.trim().toLowerCase() !== String(config.issueRepo).toLowerCase()) throw new Error(`resolved ${stdout.trim()}`);
+  } catch (cause) {
+    const error = new Error(`[preflight] issueRepo 错配或不可访问：${config.issueRepo}`, { cause });
+    error.exitCode = 2;
+    throw error;
+  }
 }
 
 async function git(args, opts = {}) {
@@ -118,11 +161,13 @@ export function readTasks(runtimeDir = RUNTIME_DIR) {
 }
 
 function loadPrevious(runtimeDir) {
-  try {
-    return JSON.parse(readFileSync(runtimePaths(runtimeDir).statusJson, 'utf8'));
-  } catch {
-    return null;
-  }
+  return readJson(runtimePaths(runtimeDir).statusJson, null);
+}
+
+function latestRegistryTask(registry, worktreeName) {
+  return Object.values(registry.tasks || {})
+    .filter((task) => task.worktree === worktreeName || worktreeName.endsWith(`-${task.worktree}`))
+    .sort((left, right) => Number(right.generation) - Number(left.generation) || String(right.updatedAt).localeCompare(String(left.updatedAt)))[0] || null;
 }
 
 function extractIssueNumbers(subjects) {
@@ -380,7 +425,9 @@ export async function collectStatus({
   const config = loadConfig();
   const fixturePath = issuesFixture || process.env.AES_WORKTREE_BOARD_ISSUES_FIXTURE || null;
   const { main, siblings } = await listWorktrees();
+  await preflightConfig(config, { skipIssueRepo: Boolean(skipGh || fixturePath) });
   const previous = loadPrevious(runtimeDir);
+  const registry = readRegistry(runtimeDir);
   const previousWorktrees = new Map((previous?.worktrees || []).map((worker) => [worker.name, worker]));
   const tasks = readTasks(runtimeDir);
   const mainHead = await git(['rev-parse', '--short', config.mainBranch]);
@@ -426,7 +473,8 @@ export async function collectStatus({
     const issueNumbers = extractIssueNumbers(subjects.filter(Boolean));
     const worktreeTasks = tasks.get(name) || [];
     const activeTask = worktreeTasks.find((task) => task.status === 'running') || null;
-    const claimedIssue = claimedIssueFrom(activeTask, headSubject);
+    const registryTask = latestRegistryTask(registry, name);
+    const claimedIssue = Number(registryTask?.issue) || claimedIssueFrom(activeTask, headSubject);
     return {
       name,
       path: norm(entry.path),
@@ -443,6 +491,7 @@ export async function collectStatus({
       assessment: assessmentWithStale(previousWorktrees.get(name)?.assessment, lastCommitAt, worktreeTasks),
       activeTask,
       recentTasks: worktreeTasks.filter((task) => task.status !== 'running').slice(0, 5),
+      task: registryTask,
     };
   }));
 
@@ -475,10 +524,11 @@ export async function collectStatus({
       assessment: worker.assessment,
       activeTask: worker.activeTask,
       recentTasks: worker.recentTasks,
+      task: worker.task,
     };
   });
   const status = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     generatedAt: new Date().toISOString(),
     repo: {
       root: norm(main.path),
@@ -487,13 +537,37 @@ export async function collectStatus({
       mainHead,
       issueRepo: config.issueRepo,
     },
+    orchestration: registry.orchestration,
     graph,
     worktrees,
+    transitions: readJsonLines(join(runtimeDir, 'transitions.jsonl')),
   };
   const paths = runtimePaths(runtimeDir);
+  const snapshotPage = readFileSync(join(SKILL_DIR, 'board.html'), 'utf8')
+    .replace('__WORKBOARD_STATUS__', 'status.js');
   mkdirSync(paths.tasksDir, { recursive: true });
-  writeFileSync(paths.statusJson, `${JSON.stringify(status, null, 2)}\n`);
-  writeFileSync(paths.statusJs, `window.WORKBOARD = ${JSON.stringify(status)};\n`);
+  withRuntimeLock(runtimeDir, () => {
+    // collect 计算期间 assess/registry 可能已更新；临写前重新承接，避免旧快照复活。
+    const latestSnapshot = readJson(paths.statusJson, null);
+    const latestAssessments = new Map((latestSnapshot?.worktrees || []).map((worker) => [worker.name, worker.assessment]));
+    const latestRegistry = readRegistry(runtimeDir);
+    status.orchestration = latestRegistry.orchestration;
+    status.transitions = readJsonLines(join(runtimeDir, 'transitions.jsonl'));
+    for (const worker of status.worktrees) {
+      if (latestAssessments.get(worker.name)) {
+        worker.assessment = assessmentWithStale(
+          latestAssessments.get(worker.name),
+          worker.lastCommitAt,
+          [worker.activeTask, ...(worker.recentTasks || [])].filter(Boolean),
+        );
+      }
+      const task = latestRegistryTask(latestRegistry, worker.name);
+      if (task) worker.task = task;
+    }
+    writeJsonAtomic(paths.statusJson, status);
+    writeTextAtomic(paths.statusJs, `window.WORKBOARD = ${JSON.stringify(status)};\n`);
+    writeTextAtomic(paths.snapshotHtml, snapshotPage);
+  });
   return status;
 }
 
@@ -503,30 +577,35 @@ function positionLabel(worker) {
 }
 
 if (norm(process.argv[1] || '') === norm(fileURLToPath(import.meta.url))) {
-  const skipGh = process.argv.includes('--no-gh');
-  const fixtureIndex = process.argv.indexOf('--issues-fixture');
-  const issuesFixture = fixtureIndex >= 0 ? process.argv[fixtureIndex + 1] : null;
-  if (fixtureIndex >= 0 && !issuesFixture) throw new Error('--issues-fixture 需要路径');
-  const status = await collectStatus({ skipGh, issuesFixture });
-  if (process.argv.includes('--json')) {
-    console.log(JSON.stringify(status, null, 2));
-  } else {
-    const stats = status.graph.stats;
-    console.log(
-      `图谱: ${stats.total} issue (${stats.open} OPEN / ${stats.closed} CLOSED)`
-      + ` · frontier ${stats.frontier} · 依赖边 ${stats.edges} · ⚠回归 ${stats.warned}`,
-    );
-    for (const worker of status.worktrees) {
-      const assessment = worker.assessment
-        ? ` · ${worker.assessment.merge}: ${worker.assessment.reason}`
-        : '';
+  try {
+    const skipGh = process.argv.includes('--no-gh');
+    const fixtureIndex = process.argv.indexOf('--issues-fixture');
+    const issuesFixture = fixtureIndex >= 0 ? process.argv[fixtureIndex + 1] : null;
+    if (fixtureIndex >= 0 && !issuesFixture) throw new Error('--issues-fixture 需要路径');
+    const status = await collectStatus({ skipGh, issuesFixture });
+    if (process.argv.includes('--json')) {
+      console.log(JSON.stringify(status, null, 2));
+    } else {
+      const stats = status.graph.stats;
       console.log(
-        `${worker.name}  ${worker.branch ?? '(detached)'}@${worker.head}`
-        + `  +${worker.ahead}/-${worker.behind}`
-        + `  dirty:${worker.dirty.modified}+${worker.dirty.untracked}?`
-        + `  ${positionLabel(worker)}  merge:${worker.mergeCheck.result}${assessment}`,
+        `图谱: ${stats.total} issue (${stats.open} OPEN / ${stats.closed} CLOSED)`
+        + ` · frontier ${stats.frontier} · 依赖边 ${stats.edges} · ⚠回归 ${stats.warned}`,
       );
+      for (const worker of status.worktrees) {
+        const assessment = worker.assessment
+          ? ` · ${worker.assessment.merge}: ${worker.assessment.reason}`
+          : '';
+        console.log(
+          `${worker.name}  ${worker.branch ?? '(detached)'}@${worker.head}`
+          + `  +${worker.ahead}/-${worker.behind}`
+          + `  dirty:${worker.dirty.modified}+${worker.dirty.untracked}?`
+          + `  ${positionLabel(worker)}  merge:${worker.mergeCheck.result}${assessment}`,
+        );
+      }
+      console.log(`\n已写入 ${runtimePaths().statusJson}`);
     }
-    console.log(`\n已写入 ${runtimePaths().statusJson}`);
+  } catch (error) {
+    console.error(error.stack || error.message);
+    process.exitCode = error.exitCode || 1;
   }
 }

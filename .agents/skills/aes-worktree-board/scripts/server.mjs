@@ -1,22 +1,25 @@
 #!/usr/bin/env node
 // 零依赖本地看板服务；固定绑定 127.0.0.1，不暴露到局域网。
 import { execFile, spawn } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import { createServer } from 'node:http';
 import { promisify } from 'node:util';
 import {
-  closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, statSync, unlinkSync, writeFileSync,
+  closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, statSync, unlinkSync,
 } from 'node:fs';
 import { join } from 'node:path';
 import {
-  collectStatus, listWorktrees, loadConfig, readTasks, RUNTIME_DIR, SKILL_DIR, TASKS_DIR,
+  collectStatus, listWorktrees, loadConfig, RUNTIME_DIR, SKILL_DIR, TASKS_DIR,
 } from './collect.mjs';
 import { HEADLESS_CHILD_OPTIONS } from './headless.mjs';
+import { canonicalWorktreeId, completeFallbackDispatch, registerFallbackDispatch } from './orchestrate.mjs';
+import { readRegistry, withRuntimeLock, writeTextAtomic } from './runtime-store.mjs';
 
 const pExecFile = promisify(execFile);
 const config = loadConfig();
 const requestedPort = process.argv.find((argument, index) => process.argv[index - 1] === '--port');
 const port = Number(requestedPort ?? config.port ?? 8321);
-const launchingTasks = new Map();
+const boardToken = `btk_${randomBytes(24).toString('hex')}`;
 
 function sendJson(response, statusCode, value) {
   response.writeHead(statusCode, { 'content-type': 'application/json; charset=utf-8' });
@@ -76,7 +79,8 @@ async function handleDispatch(request, response) {
   } catch {
     return badRequest(response, '请求体必须是合法 JSON');
   }
-  const { worktree, prompt } = payload;
+  const worktree = payload.worker || payload.worktree;
+  const { prompt } = payload;
   const agent = payload.agent || config.defaultAgent;
   if (!worktree || typeof prompt !== 'string' || !prompt.trim()) {
     return badRequest(response, '需要 worktree 与非空 prompt');
@@ -90,22 +94,16 @@ async function handleDispatch(request, response) {
   });
   if (!target) return badRequest(response, `worktree "${worktree}" 不在同级列表中`);
   const targetName = target.path.split('/').pop();
+  const worktreeId = canonicalWorktreeId(targetName);
 
-  // 并发锁始终先于 dirty 握手；confirmDirty 不能越过这个检查。
-  const launching = launchingTasks.get(targetName);
-  if (launching) {
+  const lease = readRegistry(RUNTIME_DIR).leases[worktreeId];
+  if (lease) {
     return sendJson(response, 409, {
       ok: false,
-      error: `${targetName} 已有运行中任务 ${launching}`,
       code: 'LOCKED',
-    });
-  }
-  const running = (readTasks().get(targetName) || []).find((task) => task.status === 'running');
-  if (running) {
-    return sendJson(response, 409, {
-      ok: false,
-      error: `${targetName} 已有运行中任务 ${running.id}`,
-      code: 'LOCKED',
+      worktree: worktreeId,
+      leaseOwner: lease.owner,
+      acquiredAt: lease.acquiredAt,
     });
   }
   const dirty = await dirtyCount(target.path);
@@ -119,18 +117,35 @@ async function handleDispatch(request, response) {
     });
   }
 
-  const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
-  const taskId = `${targetName.replace(/^.*-(dev\d+)$/, '$1')}-${stamp}`;
+  let taskId;
+  try {
+    const registration = registerFallbackDispatch({
+      worktree: worktreeId,
+      agent,
+      prompt,
+      fallbackAuthorized: payload.fallbackAuthorized || null,
+    });
+    taskId = registration.taskId;
+  } catch (error) {
+    if (error.code === 'LOCKED') {
+      return sendJson(response, 409, {
+        ok: false, code: 'LOCKED', worktree: worktreeId,
+        leaseOwner: error.details?.leaseOwner, acquiredAt: error.details?.acquiredAt,
+      });
+    }
+    if (error.exitCode === 2) return sendJson(response, 400, { ok: false, error: error.message, code: error.code });
+    throw error;
+  }
   const requestDir = join(RUNTIME_DIR, '.requests');
   const requestPath = join(requestDir, `${taskId}.txt`);
   mkdirSync(requestDir, { recursive: true });
-  writeFileSync(requestPath, prompt);
+  withRuntimeLock(RUNTIME_DIR, () => writeTextAtomic(requestPath, prompt));
   const args = [
     join(SKILL_DIR, 'scripts', 'dispatch.mjs'), targetName,
-    '--agent', agent, '--task-id', taskId, '--prompt-file', requestPath, '--delete-prompt-file',
+    '--agent', agent, '--task-id', taskId, '--prompt-file', requestPath, '--delete-prompt-file', '--registered',
   ];
+  if (payload.fallbackAuthorized) args.push('--fallback-authorized', payload.fallbackAuthorized);
   if (payload.confirmDirty) args.push('--confirm-dirty');
-  launchingTasks.set(targetName, taskId);
   const child = spawn(process.execPath, args, {
     ...HEADLESS_CHILD_OPTIONS,
     detached: true,
@@ -139,14 +154,36 @@ async function handleDispatch(request, response) {
     env: { ...process.env, AES_WORKTREE_BOARD_REPO_ROOT: main.path },
   });
   child.on('error', () => {
-    launchingTasks.delete(targetName);
-    if (existsSync(requestPath)) unlinkSync(requestPath);
+    withRuntimeLock(RUNTIME_DIR, () => {
+      if (existsSync(requestPath)) unlinkSync(requestPath);
+    });
+    try { completeFallbackDispatch(taskId, { exitCode: 1, preflightFailure: true, error: 'dispatch wrapper spawn failed' }); } catch { /* registry 保留原始错误优先 */ }
+  });
+  child.on('close', (code) => {
+    if (code === 0) return;
+    try { completeFallbackDispatch(taskId, { exitCode: code ?? 1, preflightFailure: true, error: `dispatch wrapper exit ${code}` }); } catch { /* wrapper 已收敛时保持其证据 */ }
   });
   child.unref();
-  setTimeout(() => launchingTasks.delete(targetName), 2_000).unref();
 
-  // 键顺序与 v1 的干净请求响应保持一致。
-  return sendJson(response, 202, { ok: true, taskId, worktree: targetName, agent });
+  return sendJson(response, 202, { ok: true, taskId, logPath: join(TASKS_DIR, `${taskId}.log`) });
+}
+
+function dispatchSecurity(request, response) {
+  const token = request.headers['x-board-token'];
+  if (!token || token !== boardToken) {
+    sendJson(response, 401, { ok: false, code: 'MISSING_TOKEN' });
+    return false;
+  }
+  const host = request.headers.host;
+  const expectedOrigin = `http://${host}`;
+  const source = request.headers.origin || request.headers.referer || '';
+  let sourceOrigin = '';
+  try { sourceOrigin = new URL(source).origin; } catch { sourceOrigin = ''; }
+  if (!host?.startsWith('127.0.0.1:') || sourceOrigin !== expectedOrigin) {
+    sendJson(response, 403, { ok: false, code: 'FORBIDDEN_ORIGIN', origin: request.headers.origin || sourceOrigin || null });
+    return false;
+  }
+  return true;
 }
 
 const server = createServer(async (request, response) => {
@@ -154,7 +191,10 @@ const server = createServer(async (request, response) => {
   try {
     if (request.method === 'GET' && url.pathname === '/') {
       response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-      return response.end(readFileSync(join(SKILL_DIR, 'board.html')));
+      const page = readFileSync(join(SKILL_DIR, 'board.html'), 'utf8')
+        .replace('__WORKBOARD_STATUS__', '/runtime/status.js')
+        .replace('</head>', `<meta name="board-token" content="${boardToken}">\n</head>`);
+      return response.end(page);
     }
     if (request.method === 'GET' && ['/runtime/status.js', '/status.js'].includes(url.pathname)) {
       const snapshotPath = join(RUNTIME_DIR, 'status.js');
@@ -166,6 +206,7 @@ const server = createServer(async (request, response) => {
       return sendJson(response, 200, status);
     }
     if (request.method === 'POST' && url.pathname === '/api/dispatch') {
+      if (!dispatchSecurity(request, response)) return undefined;
       return await handleDispatch(request, response);
     }
     const taskMatch = url.pathname.match(/^\/api\/task\/([\w.-]+)$/);
@@ -179,7 +220,7 @@ const server = createServer(async (request, response) => {
   } catch (error) {
     return sendJson(response, 500, {
       ok: false,
-      error: String(error.message).slice(0, 300),
+      message: String(error.message).slice(0, 300),
       code: 'INTERNAL',
     });
   }

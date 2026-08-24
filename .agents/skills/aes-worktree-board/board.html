@@ -46,6 +46,13 @@ button { cursor:pointer; }
 .mode-badge, .refresh-btn { height:28px; border:1px solid var(--line); border-radius:999px; background:rgba(255,255,255,.9); padding:0 10px; font:500 10.5px var(--mono); color:var(--muted); }
 .mode-badge.live { color:#56724E; border-color:#CAD8C5; background:#F6FAF4; }
 .mode-badge.snapshot { color:#8A6A1F; border-color:#D9C48F; background:#F6EDD8; }
+.orch-pill { min-height:28px; display:flex; align-items:center; gap:7px; border:1px solid #E8E2D2; border-radius:999px; background:#fff; padding:0 10px; color:var(--purple-text); font:600 9.5px var(--mono); }
+.orch-pill::before { content:""; width:7px; height:7px; border-radius:50%; background:var(--purple); }
+.orch-pill.stopped { color:#8A3B2A; }
+.orch-pill.stopped::before { background:#B0453A; }
+.orch-pill small { color:var(--muted); font-weight:400; }
+.v2-note { display:none; position:absolute; z-index:24; top:66px; left:50%; transform:translateX(-50%); max-width:620px; padding:6px 11px; border:1px dashed #D9C48F; border-radius:7px; background:#FBF6E9; color:#8A6A1F; font-size:10px; }
+.v2-note.open { display:block; }
 .refresh-btn:hover { color:var(--orange-text); border-color:#D7B09F; }
 .progress { position:absolute; top:58px; left:50%; width:250px; transform:translateX(-50%); z-index:20; }
 .progress-meta { display:flex; justify-content:space-between; color:var(--muted); font:500 9.5px var(--mono); margin-bottom:4px; }
@@ -72,6 +79,12 @@ button { cursor:pointer; }
 .badges { display:flex; gap:4px; margin-top:4px; flex-wrap:wrap; }
 .badge { padding:2px 5px; border-radius:999px; background:#F5F3EB; color:var(--muted); font:500 8.5px var(--mono); }
 .badge.dirty, .badge.stale { color:#8A6A1F; background:#F6EDD8; border:1px dashed #D9C48F; }
+.badge.task-state { color:#fff; background:var(--purple); }
+.badge.task-state.handoff-required { background:#B0453A; }
+.badge.task-state.parked { background:var(--warning); }
+.badge.task-state.merged { background:#7C9A6D; }
+.badge.block-count { color:#B0453A; background:#F8E7E4; }
+.badge.model-tier { color:var(--purple-text); background:#EFECF7; }
 .locate { width:25px; height:25px; border:1px solid var(--line); border-radius:999px; background:#fff; color:var(--muted); font-size:13px; padding:0; }
 .locate:hover:not(:disabled) { color:var(--orange); border-color:#D7B09F; }
 .locate:disabled { opacity:.32; cursor:default; }
@@ -102,6 +115,13 @@ button { cursor:pointer; }
 .btn:disabled { opacity:.45; cursor:default; }
 .dispatch-box { margin-top:13px; padding-top:12px; border-top:1px solid #EEE9DE; }
 .dispatch-box h3 { margin:0 0 8px; color:var(--ink); font-size:11px; }
+.registry-section { margin-top:13px; padding:10px; border:1px dashed #D7B09F; border-radius:8px; background:#FFFCF8; }
+.registry-section h3 { margin:0 0 8px; font-size:10px; }
+.verdict-chips { display:flex; flex-wrap:wrap; gap:4px; margin:8px 0; }
+.verdict-chip { padding:3px 6px; border-radius:5px; background:#F5F3EB; color:var(--text); font:500 8.5px var(--mono); }
+.transition-history { margin:7px 0 0; padding-left:18px; color:var(--muted); font:400 9px/1.5 var(--mono); }
+.auth-note { margin:7px 0; padding:7px 8px; border:1px dashed #D7B09F; border-radius:7px; background:#FFF8F2; color:#8A3B2A; font-size:9.5px; line-height:1.45; }
+.fallback-auth { width:100%; height:31px; border:1px solid var(--line); border-radius:7px; padding:0 8px; color:var(--text); font-size:10px; }
 .dispatch-box textarea { width:100%; height:70px; resize:vertical; border:1px solid var(--line); border-radius:7px; padding:8px; outline:none; color:var(--text); font:400 10.5px/1.45 var(--ui); }
 .dispatch-controls { display:grid; grid-template-columns:1fr 88px; gap:6px; margin-top:6px; }
 .dispatch-controls select { height:31px; border:1px solid var(--line); border-radius:7px; background:#fff; color:var(--text); padding:0 7px; font-size:10.5px; }
@@ -180,10 +200,12 @@ button { cursor:pointer; }
   <div class="brand"><div class="brand-line"><i class="brand-mark"></i><h1>AES 需求星图</h1></div><p class="brand-sub" id="brand-sub">读取 issue 星图…</p></div>
   <div class="search-wrap"><input class="search" id="search" placeholder="搜索 issue / worker…" autocomplete="off"><div class="search-results" id="search-results"></div></div>
   <div class="top-tools">
-    <div class="view-toggle"><button data-view="graph" class="active">图谱视图</button><button data-view="map">地图视图</button></div>
+    <div class="view-toggle"><button data-view="graph" class="active">Map</button><button data-view="map">List</button></div>
     <span class="mode-badge snapshot" id="mode-badge">SNAPSHOT</span>
+    <span class="orch-pill" id="orch-pill">ORCH <small>无编排数据</small></span>
     <button class="refresh-btn" id="refresh">↻ 刷新</button>
   </div>
+  <div class="v2-note" id="v2-note">v2 旧快照：星图与 Workers 照常渲染，编排徽章与任务区显示「无编排数据」。建议重跑 collect。</div>
   <div class="progress"><div class="progress-meta"><span>全仓探明进度</span><b id="progress-label">0 / 0</b></div><div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div></div>
   <div class="legend" id="legend"></div>
   <aside class="workers" id="workers"></aside>
@@ -193,7 +215,7 @@ button { cursor:pointer; }
   <div class="modal-backdrop" id="dirty-modal"><div class="modal"><h2>这个 worktree 有未提交现场</h2><p id="dirty-copy"></p><div class="modal-actions"><button class="btn" data-dirty="cancel">取消</button><button class="btn" data-dirty="inspect">先侦查</button><button class="btn primary" data-dirty="confirm">仍要派发</button></div></div></div>
   <div class="toast" id="toast"></div>
 </div>
-<script src="runtime/status.js"></script>
+<script src="__WORKBOARD_STATUS__"></script>
 <script>
 (() => {
   'use strict';
@@ -459,6 +481,18 @@ button { cursor:pointer; }
     }));
   }
 
+  function verdictText(task) {
+    if (!task?.verdict) return 'C:− R:− D:−';
+    const code = task.verdict.code === 'PASS' ? '✓' : task.verdict.code === 'BLOCK' ? '✗' : '−';
+    const runtime = task.verdict.runtime === 'PASS' ? '✓' : task.verdict.runtime === 'NOT_RUN' ? '−' : task.verdict.runtime || '−';
+    return `C:${code} R:${runtime} D:${task.verdict.delivery || '−'}`;
+  }
+
+  function taskBadges(task) {
+    if (!task) return '';
+    return `<span class="badge task-state ${esc(task.state)}">${esc(task.state)}</span>${task.blockCount ? `<span class="badge block-count">BLOCK ${task.blockCount}/3</span>` : ''}<span class="badge">${esc(verdictText(task))}</span>${task.modelTier ? `<span class="badge model-tier">${esc(task.modelTier)}</span>` : ''}`;
+  }
+
   function renderWorkers() {
     if (!state.status) return;
     const present = state.status.worktrees.filter((worker) => worker.position.kind === 'issue').length;
@@ -466,7 +500,7 @@ button { cursor:pointer; }
       const issue = worker.position.kind === 'issue' ? state.status.graph.issues.find((item) => item.number === worker.position.issue) : null;
       const dirty = worker.dirty.modified + worker.dirty.untracked;
       const position = issue ? `#${issue.number} · ${issue.title}` : '未在场';
-      return `<div class="worker-row"><i class="worker-state ${worker.mode}"></i><div><div class="worker-name">${esc(shortName(worker.name))}</div><div class="worker-position">${esc(position)}</div><div class="badges">${dirty ? `<span class="badge dirty">dirty ${worker.dirty.modified}+${worker.dirty.untracked}</span>` : ''}${worker.assessment?.stale ? '<span class="badge stale">评估过期</span>' : ''}${worker.mode === 'running' ? `<span class="badge">▶ ${elapsed(worker.activeTask?.startedAt)}</span>` : ''}</div></div><button class="locate" data-locate="${issue?.number || ''}" ${issue ? '' : 'disabled'} title="定位队员">⌖</button></div>`;
+      return `<div class="worker-row"><i class="worker-state ${worker.mode}"></i><div><div class="worker-name">${esc(shortName(worker.name))}</div><div class="worker-position">${esc(position)}</div>${worker.task ? `<div class="badges">${taskBadges(worker.task)}</div>` : ''}<div class="badges">${dirty ? `<span class="badge dirty">dirty ${worker.dirty.modified}+${worker.dirty.untracked}</span>` : ''}${worker.assessment?.stale ? '<span class="badge stale">评估过期</span>' : ''}${worker.mode === 'running' ? `<span class="badge">▶ ${elapsed(worker.activeTask?.startedAt)}</span>` : ''}</div></div><button class="locate" data-locate="${issue?.number || ''}" ${issue ? '' : 'disabled'} title="定位队员">⌖</button></div>`;
     }).join('')}`;
     $$('.locate:not(:disabled)').forEach((button) => button.addEventListener('click', () => flyTo(Number(button.dataset.locate))));
   }
@@ -496,13 +530,20 @@ button { cursor:pointer; }
     $('#mode-badge').className = `mode-badge ${state.mode}`;
     $('#refresh').textContent = state.mode === 'live' ? '↻ 刷新' : '只读快照';
     $('#refresh').disabled = state.mode !== 'live';
+    const orchestration = state.status.orchestration;
+    const pill = $('#orch-pill');
+    pill.classList.toggle('stopped', orchestration?.state === 'stopped');
+    pill.innerHTML = orchestration
+      ? `ORCH ${esc(orchestration.state.toUpperCase())}<small>${esc(orchestration.reason || 'active')} · ${esc(orchestration.evaluatedAt?.slice(5,16).replace('T',' ') || '')}</small>`
+      : 'ORCH <small>无编排数据</small>';
   }
 
   function renderAll(status) {
-    if (!status || status.schemaVersion !== 2) {
-      toast('需要先运行 collect.mjs 生成 status.json v2'); return;
+    if (!status || ![2, 3].includes(status.schemaVersion)) {
+      toast('需要先运行 collect.mjs 生成 status.json v3'); return;
     }
     state.status = status;
+    $('#v2-note').classList.toggle('open', status.schemaVersion === 2);
     renderMeta(); renderLegend(); renderWorkers(); renderGraph(); renderMap();
     if (state.selected) renderDetails();
   }
@@ -526,10 +567,13 @@ button { cursor:pointer; }
     const worker = workerFor(issue);
     const downstream = state.status.graph.edges.filter((edge) => edge.from === issue.number).map((edge) => state.status.graph.issues.find((item) => item.number === edge.to)).filter(Boolean);
     const latestTask = worker?.activeTask || worker?.recentTasks?.[0];
+    const registryTask = worker?.task || null;
+    const transitions = (state.status.transitions || []).filter((item) => item.taskId === registryTask?.taskId).slice(-8);
     const idleWorkers = state.status.worktrees.filter((item) => item.mode === 'idle');
     const workerOptions = (idleWorkers.length ? idleWorkers : state.status.worktrees).map((item) => `<option value="${esc(item.name)}" ${worker?.name === item.name ? 'selected' : ''}>${esc(shortName(item.name))}${item.dirty.modified + item.dirty.untracked ? ' · dirty' : ''}</option>`).join('');
     const prompt = `处理 #${issue.number}：${issue.title}\n先读取 issue 正文与仓库规则，按其验收条件完成；不要关闭 issue，不要合并到 main。`;
-    $('#details').innerHTML = `<div class="details-top"><div class="issue-kicker"><span>#${issue.number}</span><span class="status-pill ${issue.derived.status}">${labels[issue.derived.status]}</span></div><button class="close" aria-label="关闭">×</button></div><h2>${esc(issue.title)}</h2><div class="kv"><span>状态</span><span>${labels[issue.derived.status]} · degree ${issue.derived.degree}${issue.derived.warn ? ' · ⚠ 回归有波动' : ''}</span></div><div class="kv"><span>分支</span><span>${esc(worker?.branch || '尚未认领')}</span></div><div class="kv"><span>来路</span><span>${issue.blockedBy.length ? issue.blockedBy.map((number) => `#${number}`).join(' · ') : '无前置依赖'}</span></div>${worker?.assessment?.stale ? '<div class="stale-note">评估已过期：最新 commit 或任务结束晚于 assessedAt，请以现场为准重新评估。</div>' : ''}<div class="unlock"><div class="unlock-title">完成后解锁</div><div class="chips">${downstream.length ? downstream.map((item) => `<span class="chip">#${item.number}</span>`).join('') : '<span class="chip">无直接下游</span>'}</div></div><div class="details-actions"><button class="btn primary" id="view-log" ${state.mode !== 'live' || !latestTask ? 'disabled' : ''}>查看运行日志</button><button class="btn" id="open-issue">打开 issue</button></div><pre class="log-view" id="log-view"></pre><div class="dispatch-box"><h3>${issue.derived.status === 'frontier' ? '从这里派活' : '派发关联任务'}</h3>${state.mode === 'live' ? `<textarea id="dispatch-prompt">${esc(prompt)}</textarea><div class="dispatch-controls"><select id="dispatch-worker">${workerOptions}</select><select id="dispatch-agent"><option>claude</option><option>codex</option><option>test</option></select></div><button class="btn primary" id="dispatch" style="width:100%;margin-top:7px">派发 headless 任务</button>` : '<div class="snapshot-note">file:// 只读快照不能派发。请启动 server.mjs 后从 LIVE 页面操作。</div>'}</div>`;
+    const registrySection = registryTask ? `<div class="registry-section"><h3>任务（registry）</h3><div class="kv"><span>Task</span><span>${esc(registryTask.taskId)} · ${esc(registryTask.threadId || registryTask.clientThreadId || 'cli-fallback')} · ${esc(registryTask.role)}</span></div><div class="kv"><span>模型</span><span>${esc(registryTask.modelTier || '—')}（${esc(registryTask.routingReason || '未记录') }）</span></div><div class="verdict-chips"><span class="verdict-chip">code ${esc(registryTask.verdict?.code || '—')}</span><span class="verdict-chip">runtime ${esc(registryTask.verdict?.runtime || '—')}</span><span class="verdict-chip">delivery ${esc(registryTask.verdict?.delivery || '—')}</span></div><div class="kv"><span>转移</span><span>${transitions.length ? '' : '暂无历史'}</span></div>${transitions.length ? `<ol class="transition-history">${transitions.map((item) => `<li>${esc(item.ts?.slice(11,16))} ${esc(item.from)} → ${esc(item.to)}${item.eventId ? ` · ${esc(item.eventId)}` : ''}</li>`).join('')}</ol>` : ''}</div>` : '';
+    $('#details').innerHTML = `<div class="details-top"><div class="issue-kicker"><span>#${issue.number}</span><span class="status-pill ${issue.derived.status}">${labels[issue.derived.status]}</span></div><button class="close" aria-label="关闭">×</button></div><h2>${esc(issue.title)}</h2><div class="kv"><span>状态</span><span>${labels[issue.derived.status]} · degree ${issue.derived.degree}${issue.derived.warn ? ' · ⚠ 回归有波动' : ''}</span></div><div class="kv"><span>分支</span><span>${esc(worker?.branch || '尚未认领')}</span></div><div class="kv"><span>来路</span><span>${issue.blockedBy.length ? issue.blockedBy.map((number) => `#${number}`).join(' · ') : '无前置依赖'}</span></div>${worker?.assessment?.stale ? '<div class="stale-note">评估已过期：最新 commit 或任务结束晚于 assessedAt，请以现场为准重新评估。</div>' : ''}${registrySection}<div class="unlock"><div class="unlock-title">完成后解锁</div><div class="chips">${downstream.length ? downstream.map((item) => `<span class="chip">#${item.number}</span>`).join('') : '<span class="chip">无直接下游</span>'}</div></div><div class="details-actions"><button class="btn primary" id="view-log" ${state.mode !== 'live' || !latestTask ? 'disabled' : ''}>查看运行日志</button><button class="btn" id="open-issue">打开 issue</button></div><pre class="log-view" id="log-view"></pre><div class="dispatch-box"><h3>${issue.derived.status === 'frontier' ? '从这里派活' : '派发关联任务'}</h3>${state.mode === 'live' ? `<textarea id="dispatch-prompt">${esc(prompt)}</textarea><div class="dispatch-controls"><select id="dispatch-worker">${workerOptions}</select><select id="dispatch-agent"><option>claude</option><option>codex</option><option>test</option></select></div><div class="auth-note">cli-fallback 需显式授权；正常路径是 Desktop create_thread。真实 fallback 必须记录用户授权原话，token 由页面自动携带。</div><input class="fallback-auth" id="fallback-authorized" placeholder="粘贴用户授权原话（test 假 agent 豁免）"><button class="btn primary" id="dispatch" style="width:100%;margin-top:7px">派发 cli-fallback 任务</button>` : '<div class="snapshot-note">file:// 只读快照不能派发。请启动 server.mjs 后从 LIVE 页面操作。</div>'}</div>`;
     $('.close').addEventListener('click', closeDetails);
     $('#open-issue').addEventListener('click', () => window.open(issue.url, '_blank', 'noopener'));
     if ($('#view-log') && !$('#view-log').disabled) $('#view-log').addEventListener('click', () => showLog(latestTask.id));
@@ -549,20 +593,23 @@ button { cursor:pointer; }
   async function dispatchIssue(issue, confirmDirty = false, inspect = false) {
     const worktree = $('#dispatch-worker')?.value || state.pendingDispatch?.worktree;
     const agent = $('#dispatch-agent')?.value || state.pendingDispatch?.agent;
+    const fallbackAuthorized = $('#fallback-authorized')?.value.trim() || state.pendingDispatch?.fallbackAuthorized || '';
     let prompt = $('#dispatch-prompt')?.value.trim() || state.pendingDispatch?.prompt;
     if (!worktree || !prompt) return toast('请选择队员并填写任务指令');
+    if (agent !== 'test' && !fallbackAuthorized) return toast('真实 cli-fallback 必须填写用户授权原话；正常路径请用 Desktop create_thread');
     if (inspect) prompt = `只读侦查，不修改文件、不提交：先说明当前 worktree 的未提交现场与 #${issue.number} 的关系。\n\n${prompt}`;
-    const body = { worktree, prompt, agent };
+    const body = { worker: worktree, prompt, agent, fallbackAuthorized: fallbackAuthorized || undefined };
     if (confirmDirty) body.confirmDirty = true;
     try {
-      const response = await fetch('/api/dispatch', { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify(body) });
+      const boardToken = document.querySelector('meta[name="board-token"]')?.content || '';
+      const response = await fetch('/api/dispatch', { method:'POST', headers:{'content-type':'application/json','x-board-token':boardToken}, body:JSON.stringify(body) });
       const payload = await response.json();
       if (response.status === 409 && payload.code === 'DIRTY') {
-        state.pendingDispatch = { issue, worktree, prompt, agent, dirty:payload.dirty };
+        state.pendingDispatch = { issue, worktree, prompt, agent, fallbackAuthorized, dirty:payload.dirty };
         $('#dirty-copy').innerHTML = `<code>${esc(shortName(worktree))}</code> 有 ${payload.dirty.modified} 处修改 + ${payload.dirty.untracked} 个未跟踪文件，可能是另一个会话的现场。`;
         $('#dirty-modal').classList.add('open'); return;
       }
-      if (!response.ok) return toast(`派发失败：${payload.error}`);
+      if (!response.ok) return toast(`派发失败：${payload.error || payload.message || payload.code || response.status}`);
       state.pendingDispatch = null; $('#dirty-modal').classList.remove('open');
       toast(`已派发 ${payload.taskId}`);
       setTimeout(() => refresh(true), 500);
@@ -662,7 +709,8 @@ button { cursor:pointer; }
 
   async function boot() {
     bindShell();
-    if (location.protocol !== 'file:') {
+    const liveToken = document.querySelector('meta[name="board-token"]')?.content || '';
+    if (location.protocol !== 'file:' && liveToken) {
       try {
         const response = await fetch('/api/status?fast=1', { cache:'no-store' });
         if (response.ok) { state.mode = 'live'; renderAll(await response.json()); return; }
