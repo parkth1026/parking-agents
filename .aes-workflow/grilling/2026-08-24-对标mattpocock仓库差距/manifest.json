@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "slug": "2026-08-24-对标mattpocock仓库差距",
+  "created_at": "2026-08-24T10:19:17Z",
+  "updated_at": "2026-08-24T17:01:56Z",
+  "original_request": null,
+  "goal_oneline": "产出两轴分层的对标 mattpocock-skills 差距报告,并将用户圈定的高优差距立项改造(自用消费口径)",
+  "target": null,
+  "stage": "3-contract",
+  "next_action": "契约 Ready:可按交接指令启动执行(生成式发布树+差距报告)",
+  "stage_gates": {
+    "1-interview": {
+      "status": "done",
+      "closed_at": "2026-08-24T10:31:25Z",
+      "self_assessment": {
+        "意图": "已定",
+        "结果": "已定",
+        "边界": "已定",
+        "约束": "已定",
+        "现状": "已定"
+      }
+    },
+    "2-prototype": {
+      "status": "done",
+      "closed_at": "2026-08-24T16:54:53Z",
+      "artifacts_confirmed": [
+        "behavior",
+        "example-run",
+        "diagram"
+      ]
+    },
+    "3-contract": {
+      "status": "done",
+      "closed_at": "2026-08-24T17:01:56Z"
+    }
+  },
+  "validation": {
+    "status": "valid",
+    "ac_count": 7,
+    "warnings": [],
+    "ran_at": "2026-08-24T17:01:55Z",
+    "verify_tiers": {
+      "A": 3,
+      "B": 0,
+      "C": 1,
+      "D": 3
+    }
+  },
+  "blocked": [],
+  "residual_risk": null,
+  "status": "ready"
+}

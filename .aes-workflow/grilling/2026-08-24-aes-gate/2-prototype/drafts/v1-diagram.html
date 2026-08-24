@@ -1,0 +1,115 @@
+<!-- draft v1 | published 2026-08-24
+     用户意见：（待质疑）
+     状态：draft -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>aes-gate 架构视图（改后态）</title>
+<style>
+  :root { --accent:#C25E00; --accent-tint:#FDF0E3; --gray:#8A8A8A; --gray-tint:#F2F2F0; --ink:#2B2B2B; }
+  body { font-family: system-ui, "Segoe UI", "Microsoft YaHei", sans-serif; color: var(--ink); margin: 24px; background: #fff; }
+  h1 { font-size: 18px; }
+  .legend { font-size: 13px; margin: 8px 0 16px; }
+  .legend .o { color: var(--accent); font-weight: 600; }
+  .legend .g { color: var(--gray); font-weight: 600; }
+  figure { margin: 0; }
+  figcaption, .ledger, .droplist { font-size: 12.5px; line-height: 1.7; }
+  .ledger { margin-top: 16px; padding: 12px; background: #FAFAF8; border: 1px solid #E6E6E2; }
+  .ledger b { display: block; margin-bottom: 4px; }
+  .droplist { margin-top: 8px; color: #6A6A6A; }
+</style>
+</head>
+<body>
+<h1>aes-gate 架构视图（改后态·本次新增=橙，既有=灰）</h1>
+<p class="legend"><span class="o">橙 = 本次新增/变更</span>　<span class="g">灰 = 既有（不动）</span></p>
+
+<figure>
+<svg viewBox="0 0 960 480" width="960" height="480" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="aes-gate 架构视图">
+  <defs>
+    <marker id="m-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8A8A8A"/>
+    </marker>
+    <marker id="m-accent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#C25E00"/>
+    </marker>
+  </defs>
+
+  <!-- aes-qa（既有） -->
+  <rect x="32" y="200" width="176" height="72" rx="8" fill="#F2F2F0" stroke="#8A8A8A" stroke-width="1.5"/>
+  <text x="120" y="228" text-anchor="middle" font-size="14" font-weight="600">aes-qa（既有·#19）</text>
+  <text x="120" y="250" text-anchor="middle" font-size="12">六步第一步发起调用</text>
+
+  <!-- aes-gate 容器（新增·accent） -->
+  <rect x="296" y="120" width="320" height="320" rx="12" fill="#FDF0E3" stroke="#C25E00" stroke-width="2"/>
+  <text x="456" y="148" text-anchor="middle" font-size="14" font-weight="700" fill="#C25E00">aes-gate 新技能（.agents/skills/aes-gate）</text>
+
+  <rect x="320" y="168" width="272" height="64" rx="6" fill="#FFFFFF" stroke="#C25E00" stroke-width="1"/>
+  <text x="456" y="192" text-anchor="middle" font-size="13" font-weight="600">检测半程</text>
+  <text x="456" y="212" text-anchor="middle" font-size="11.5">Phase 1–3：调查 → 体检 → 分诊</text>
+
+  <rect x="320" y="256" width="272" height="64" rx="6" fill="#FFFFFF" stroke="#C25E00" stroke-width="1"/>
+  <text x="456" y="280" text-anchor="middle" font-size="13" font-weight="600">组装半程（仅显式会话）</text>
+  <text x="456" y="300" text-anchor="middle" font-size="11.5">Phase 4–5：生成+selftest → 确认门</text>
+
+  <rect x="320" y="344" width="272" height="64" rx="6" fill="#FFFFFF" stroke="#C25E00" stroke-width="1"/>
+  <text x="456" y="368" text-anchor="middle" font-size="13" font-weight="600">references/</text>
+  <text x="456" y="388" text-anchor="middle" font-size="11.5">模式库（蓝图 M0）+ 调研出处</text>
+
+  <!-- 目标仓库（既有） -->
+  <rect x="720" y="176" width="208" height="104" rx="8" fill="#F2F2F0" stroke="#8A8A8A" stroke-width="1.5"/>
+  <text x="824" y="204" text-anchor="middle" font-size="14" font-weight="600">目标仓库</text>
+  <text x="824" y="226" text-anchor="middle" font-size="12">报告落 .aes-gate/report-&lt;ts&gt;.md</text>
+  <text x="824" y="246" text-anchor="middle" font-size="12">确认后写入门禁件</text>
+
+  <!-- gate/v1 协议包（既有·零依赖） -->
+  <rect x="720" y="344" width="208" height="64" rx="8" fill="#F2F2F0" stroke="#8A8A8A" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="824" y="368" text-anchor="middle" font-size="13" font-weight="600">gate/v1 协议包</text>
+  <text x="824" y="388" text-anchor="middle" font-size="11.5">G:\GIT\AI_WorkFlow\aes-gate（spec-only）</text>
+
+  <!-- 蓝图+调研源（既有） -->
+  <rect x="32" y="392" width="176" height="64" rx="8" fill="#F2F2F0" stroke="#8A8A8A" stroke-width="1.5"/>
+  <text x="120" y="416" text-anchor="middle" font-size="13" font-weight="600">蓝图 + TOP-5 调研</text>
+  <text x="120" y="436" text-anchor="middle" font-size="11.5">docs/research/（v2 已核查）</text>
+
+  <!-- 边 1：aes-qa → aes-gate（调用） -->
+  <path d="M208,236 L296,236" fill="none" stroke="#8A8A8A" stroke-width="1.5" marker-end="url(#m-gray)"/>
+  <text x="252" y="226" text-anchor="middle" font-size="11.5">调用</text>
+  <text x="252" y="252" text-anchor="middle" font-size="10.5" fill="#6A6A6A">精简回传</text>
+
+  <!-- 边 2：检测半程 → 目标仓库（只读） -->
+  <path d="M592,200 L656,200 L656,212 L720,212" fill="none" stroke="#8A8A8A" stroke-width="1.5" marker-end="url(#m-gray)"/>
+  <text x="656" y="190" text-anchor="middle" font-size="11.5">只读盘点</text>
+
+  <!-- 边 3：组装半程 → 目标仓库（确认后写入·accent） -->
+  <path d="M592,292 L664,292 L664,264 L720,264" fill="none" stroke="#C25E00" stroke-width="2" marker-end="url(#m-accent)"/>
+  <text x="652" y="288" text-anchor="middle" font-size="11.5" fill="#C25E00">确认后写入</text>
+
+  <!-- 边 4：蓝图 → references（出处） -->
+  <path d="M208,424 L264,424 L264,376 L320,376" fill="none" stroke="#8A8A8A" stroke-width="1.5" marker-end="url(#m-gray)"/>
+  <text x="240" y="416" text-anchor="middle" font-size="11.5">出处</text>
+
+  <!-- 边 5：references → 组装半程（选型） -->
+  <path d="M456,344 L456,324" fill="none" stroke="#8A8A8A" stroke-width="1.5" marker-end="url(#m-gray)"/>
+  <text x="476" y="338" text-anchor="start" font-size="11.5">选型</text>
+
+  <!-- 边 6：aes-gate ⇏ gate/v1（零依赖·虚线✕） -->
+  <path d="M616,376 L720,376" fill="none" stroke="#8A8A8A" stroke-width="1.5" stroke-dasharray="5 5"/>
+  <text x="668" y="366" text-anchor="middle" font-size="11.5" fill="#6A6A6A">零依赖（Q2=C）</text>
+  <text x="668" y="382" text-anchor="middle" font-size="13" fill="#8A8A8A">✕</text>
+</svg>
+<figcaption>图 1：aes-gate 架构视图（改后态）。节点 7、箭头 6（含 1 条零依赖标注虚线）、accent 2 处，均在预算内。</figcaption>
+</figure>
+
+<div class="ledger">
+  <b>Fidelity Ledger（保真申报）</b>
+  <b style="font-weight:600;color:#6A6A6A">Detail</b> 确认门与「仅显式会话」限定标注在组装半程内；精简回传（不落盘）标注在调用边。<br>
+  <b style="font-weight:600;color:#6A6A6A">Merged</b> Phase 1–3 合并为「检测半程」、Phase 4–5 合并为「组装半程」；蓝图+TOP-5 调研+evals 框架合并为一个出处源节点。<br>
+  <b style="font-weight:600;color:#6A6A6A">Collapsed</b> gate/v1 的 spec/schema/vectors/ADR 四类资产收拢为一个包节点。<br>
+  <b style="font-weight:600;color:#6A6A6A">Dropped</b> scripts/ 子目录（≤3 个 .mjs，与 references 同层，图面省略）。<br>
+  <b style="font-weight:600;color:#6A6A6A">Kept</b> aes-qa→aes-gate 调用边（本次唯一新增外部边）；检测只读/组装写入两条分边；对 gate/v1 的零依赖标注（Q2=C 终裁的可视化）。
+</div>
+
+<p class="droplist">删除/出界清单：通用 gate-builder Skill（长期方向）；M3 复诊登记簿（v2）；twe-gate 引擎对接（蓝图 M5）。</p>
+</body>
+</html>

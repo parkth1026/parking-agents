@@ -1,0 +1,10 @@
+# verify @ 2026-08-24T17:01:55Z
+# cwd: G:\GIT\AI_WorkFlow\parking-agents
+
+[FAIL] AC-001  exit=1  $ bash -c 'grep -q build-release package.json && npm test'
+[FAIL] AC-002  exit=1  $ bash -c 'grep -q -- "--only" scripts/install-skills.mjs && npm test'
+[FAIL] AC-005  exit=128  $ bash -c 'git rev-parse --verify v0.2.0 && test -s CHANGELOG.md'
+         fatal: Needed a single revision
+
+绿 0 / 红 3 / 跑不起来 0
+另有 4 条非 [A] 档没跑：AC-003 [C]、AC-004 [D]、AC-006 [D]、AC-007 [D]

@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>对标差距改造 · 架构视图(改后态)</title>
+<style>
+  :root { --paper:#f5f5f5; --ink:#2d3142; --muted:#4f5d75; --soft:#7a8399; --accent:#eb6c36; --accent-tint:#fdf1ec; }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:32px; background:var(--paper); color:var(--ink);
+         font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif; }
+  main { max-width:1000px; margin:0 auto; }
+  h1 { font-size:20px; margin:0 0 4px; }
+  .lede { font-size:12px; color:var(--soft); margin:0 0 24px; }
+  .lede b { color:var(--accent); font-weight:600; }
+  svg { width:100%; height:auto; display:block; }
+  footer { margin-top:24px; font-size:12px; color:var(--muted); line-height:1.7; }
+  footer h2 { font-size:12px; color:var(--soft); letter-spacing:1px; margin:16px 0 4px; }
+  footer code { font-family:ui-monospace,"Cascadia Mono",Consolas,monospace; font-size:11px; }
+</style>
+</head>
+<body>
+<main>
+<h1>生成式发布树 · 架构视图(改后态)</h1>
+<p class="lede">图例:<b>橙 = 本次新增/变更</b>,灰 = 既有(不动)。口径冲突以 behavior.md 对行为准。</p>
+
+<svg viewBox="0 0 960 368" role="img" aria-labelledby="dg-title dg-desc">
+  <title id="dg-title">对标差距改造:生成式发布树架构(改后态)</title>
+  <desc id="dg-desc">架构图。开发真源 .agents/skills 平铺目录新增 category 字段,build-release 生成器读取分类真源,生成带分类桶的 skills 发布树并维护索引;junction 安装器全量或按分类/名单选装到用户技能目录,既有合并语义不变;npm test 新增 --check 校验段;npm run evals 作为独立入口逐技能跑评测。</desc>
+  <defs>
+    <marker id="dg-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4f5d75"/></marker>
+    <marker id="dg-arrow-accent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#eb6c36"/></marker>
+  </defs>
+
+  <!-- 连线先画(z 序在节点下) -->
+  <!-- e1 ①→② 读 category(既有色;新增状态以节点①文字申报,不占 accent 预算) -->
+  <path d="M 224,144 H 284" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#dg-arrow)"/>
+  <rect x="228" y="124" width="52" height="12" fill="#f5f5f5"/>
+  <text x="254" y="134" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75">读 category</text>
+
+  <!-- e2 ②→③ 生成/刷新(accent:本次机制核心的产出边) -->
+  <path d="M 464,144 H 524" fill="none" stroke="#eb6c36" stroke-width="1.75" marker-end="url(#dg-arrow-accent)"/>
+  <rect x="470" y="124" width="52" height="12" fill="#f5f5f5"/>
+  <text x="496" y="134" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#eb6c36">生成/刷新</text>
+
+  <!-- e3 ③→④ 全量 -->
+  <path d="M 624,184 V 244" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#dg-arrow)"/>
+  <rect x="632" y="204" width="28" height="12" fill="#f5f5f5"/>
+  <text x="646" y="214" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75">全量</text>
+
+  <!-- e4 ①→④ 合并(既有边:重名开发侧赢,D 方案命门之一,完整保留) -->
+  <path d="M 64,184 V 356 H 616 Q 624,356 624,348 V 324" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#dg-arrow)"/>
+  <rect x="280" y="338" width="124" height="12" fill="#f5f5f5"/>
+  <text x="342" y="348" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75">合并 · 重名开发侧赢</text>
+
+  <!-- e5 ④→⑤ junction -->
+  <path d="M 720,284 H 780" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#dg-arrow)"/>
+  <rect x="722" y="264" width="44" height="12" fill="#f5f5f5"/>
+  <text x="744" y="274" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75">junction</text>
+
+  <!-- e6 ⑥→③ --check 校验 -->
+  <path d="M 376,248 V 196 H 576 Q 584,196 584,204 V 188" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#dg-arrow)"/>
+  <rect x="436" y="178" width="60" height="12" fill="#f5f5f5"/>
+  <text x="466" y="188" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75">--check 校验</text>
+
+  <!-- e7 ⑦→① 跑评测 -->
+  <path d="M 128,248 V 188" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#dg-arrow)"/>
+  <rect x="136" y="208" width="44" height="12" fill="#f5f5f5"/>
+  <text x="158" y="218" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75">跑评测</text>
+
+  <!-- ① 开发真源(既有;category 字段为本次新增,以文字申报) -->
+  <g>
+    <rect x="32" y="104" width="192" height="80" rx="6" fill="#ffffff" stroke="#4f5d75" stroke-width="1.25"/>
+    <rect x="40" y="112" width="32" height="12" rx="2" fill="#eef1f6"/>
+    <text x="56" y="121" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75" letter-spacing="1">DEV</text>
+    <text x="128" y="144" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="12" font-weight="600" fill="#2d3142">.agents/skills/</text>
+    <text x="128" y="164" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#4f5d75">平铺 30 · category 字段(新增)</text>
+  </g>
+
+  <!-- ② 生成器(本次新增,accent 1/2) -->
+  <g class="changed">
+    <rect x="288" y="104" width="176" height="80" rx="6" fill="#fdf1ec" stroke="#eb6c36" stroke-width="2"/>
+    <rect x="296" y="112" width="36" height="12" rx="2" fill="#f7dfd3"/>
+    <text x="314" y="121" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#eb6c36" letter-spacing="1">GEN</text>
+    <text x="376" y="144" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="12" font-weight="600" fill="#2d3142">build-release</text>
+    <text x="376" y="164" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#eb6c36">生成发布树 · 本次新增</text>
+  </g>
+
+  <!-- ③ 发布树(既有;自研副本来源变更,由 accent 产出边表达) -->
+  <g>
+    <rect x="528" y="104" width="192" height="80" rx="6" fill="#ffffff" stroke="#4f5d75" stroke-width="1.25"/>
+    <rect x="536" y="112" width="32" height="12" rx="2" fill="#eef1f6"/>
+    <text x="552" y="121" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75" letter-spacing="1">REL</text>
+    <text x="624" y="144" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="12" font-weight="600" fill="#2d3142">skills/&lt;分类&gt;/</text>
+    <text x="624" y="164" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#4f5d75">Matt 28 + 自研晋级副本</text>
+  </g>
+
+  <!-- ④ junction 安装器(既有;选装参数以文字申报) -->
+  <g>
+    <rect x="528" y="248" width="192" height="72" rx="6" fill="#ffffff" stroke="#4f5d75" stroke-width="1.25"/>
+    <rect x="536" y="256" width="32" height="12" rx="2" fill="#eef1f6"/>
+    <text x="552" y="265" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75" letter-spacing="1">CLI</text>
+    <text x="624" y="288" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" font-weight="600" fill="#2d3142">junction 安装器</text>
+    <text x="624" y="306" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#4f5d75">--only/--skills 选装(新增)</text>
+  </g>
+
+  <!-- ⑤ 用户技能目录(既有) -->
+  <g>
+    <rect x="784" y="248" width="144" height="72" rx="6" fill="#ffffff" stroke="#4f5d75" stroke-width="1.25"/>
+    <rect x="792" y="256" width="24" height="12" rx="2" fill="#eef1f6"/>
+    <text x="804" y="265" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75" letter-spacing="1">FS</text>
+    <text x="856" y="288" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" font-weight="600" fill="#2d3142">user 技能目录</text>
+    <text x="856" y="306" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#4f5d75">~/.agents · ~/.claude</text>
+  </g>
+
+  <!-- ⑥ npm test(既有;新段以文字申报) -->
+  <g>
+    <rect x="288" y="248" width="176" height="72" rx="6" fill="#ffffff" stroke="#4f5d75" stroke-width="1.25"/>
+    <rect x="296" y="256" width="40" height="12" rx="2" fill="#eef1f6"/>
+    <text x="316" y="265" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75" letter-spacing="1">TEST</text>
+    <text x="376" y="288" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="12" font-weight="600" fill="#2d3142">npm test</text>
+    <text x="376" y="306" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#4f5d75">10 段(+--check 段)</text>
+  </g>
+
+  <!-- ⑦ npm run evals(本次新增;accent 让位机制核心,以文字申报) -->
+  <g>
+    <rect x="32" y="248" width="192" height="72" rx="6" fill="#ffffff" stroke="#4f5d75" stroke-width="1.25"/>
+    <rect x="40" y="256" width="32" height="12" rx="2" fill="#eef1f6"/>
+    <text x="56" y="265" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75" letter-spacing="1">CLI</text>
+    <text x="128" y="288" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="12" font-weight="600" fill="#2d3142">npm run evals</text>
+    <text x="128" y="306" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#4f5d75">汇总表 · 本次新增(不进 test)</text>
+  </g>
+</svg>
+
+<footer>
+  <h2>删除清单</h2>
+  <p>无删除项。</p>
+  <h2>Fidelity ledger</h2>
+  <p>
+    <b>Detail:</b> balanced · 源 = behavior.md 变化行 11 条 + 边界值 4 条 + 不变清单 → 绘制 7 节点 / 7 边<br>
+    <b>Merged:</b> 变化行 1(category 字段)并入节点①文字;变化行 10(AGENTS.md 表述)与 9(标准文档)并入生成器语境;变化行 4(选装参数)并入节点④;变化行 7/8(CHANGELOG/tag、CONTEXT 修复)与报告落盘不入图(无拓扑含义)<br>
+    <b>Collapsed:</b> 发布树内部(桶 README/顶层索引/副本文件)收进节点③;evals 汇总输出收进节点⑦;npm test 十段收进节点⑥<br>
+    <b>Dropped:</b> 流程视图(主链 3 步,behavior.md 变化行 1–3 自足);⑦/④/⑥ 的 accent 标注——预算 2 留给机制核心(生成器节点+生成边),新增状态以文字小签表达,信息不丢<br>
+    <b>Kept in full:</b> ②→③ 生成边(accent)与 ①→④「合并·重名开发侧赢」既有边——D 方案的两条命门:发布树内容从哪来、开发流为何不被破坏
+  </p>
+</footer>
+</main>
+</body>
+</html>
