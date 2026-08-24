@@ -22,33 +22,30 @@ npm test
 
 | 文件 | 守住什么 |
 |---|---|
-| `test-skill-discovery.mjs` | 技能能被平台发现：一层扁平、有 `SKILL.md`、frontmatter 可解析且 `name` 与目录名一致、`agents/openai.yaml` 命名正确、bootstrap 的 reference 文件齐全 |
+| `test-skill-discovery.mjs` | 开发侧 `.agents/skills/` 能被发现：一层扁平、有 `SKILL.md`、frontmatter 可解析且 `name` 与目录名一致、`agents/openai.yaml` 命名正确、仓库根 `AGENTS.md` 存在（session-start 注入源） |
 | `test-no-tool-names.mjs` | **铁律一**：技能正文只写动作，不写任何 harness 的工具名 |
 
 `test-no-tool-names.mjs` 是整套改造的支点。动作语言纪律没有编译器保证 —— 它靠的是人不写错。这个测试是唯一的自动防线。
 
-它的豁免名单只有两项，且都在文件里注明了理由：
-
-- `skills/claude-to-vscode-skill-converter/` —— 工具名转换表**就是**这个技能的主题
-- `skills/using-parking-skills/references/` —— 适配层本身，指名真实工具正是它的职责
+它的豁免名单当前为空 —— 工具名转换类技能（`claude-to-vscode-skill-converter`、`making-skills-cross-platform`）都住在开发侧 `.agents/skills/`，不在发布侧扫描范围内。新增豁免必须在 `ALLOWLIST` 注明理由，并同步 `package.json` `check:repo` 的 `--allow`。
 
 ### 2. Hook 输出契约 —— `tests/hooks/`
 
 `test-session-start.mjs` 用三种环境变量组合真实执行 `hooks/session-start`，断言每个平台**恰好一个**顶层 JSON 字段。
 
-这条断言是防双重注入的核心：**Claude Code 会同时读 `additional_context` 和 `hookSpecificOutput`，且不去重**。多输出一个字段，bootstrap 就被注入两遍。
+这条断言是防双重注入的核心：**Claude Code 会同时读 `additional_context` 和 `hookSpecificOutput`，且不去重**。多输出一个字段，AGENTS.md 约定就被注入两遍。
 
 ### 3. Doc-contract 测试 —— `tests/harnesses/`、`tests/pi/`
 
 大部分平台无法在这台机器上安装或驱动，写不出端到端测试。**能钉住的是契约**：
 
 - manifest 声明了该 harness 真正会读的字段
-- bootstrap 指向的文件确实存在（Gemini 的 `@`-include 指向不存在的文件时会静默加载空内容）
-- 工具映射点名了该平台真实拥有的工具
+- 注入器指向的文件确实存在（Gemini 的 `@`-include 指向不存在的文件时会静默加载空内容）
+- 内联工具映射点名了该平台真实拥有的工具
 - 每个带版本号的 manifest 都登记进了 `.version-bump.json`
 - Shape B 插件的去重逻辑真的能挡住第二次注入
 
-`tests/pi/test-pi-extension.mjs` 额外做一件事：**交叉校验 Pi 映射的两个副本**。`references/pi-tools.md`（人读的）和 `piToolMapping()`（实际注入的）是同一份内容的两处维护，漂移是静默的。
+`tests/pi/test-pi-extension.mjs` 额外断言：**实际注入的 `piToolMapping()` 覆盖关键映射与降级指引**。它是 Pi 映射的唯一真源（曾经与 `references/pi-tools.md` 双份维护，后者已随引导技能移除）。
 
 ---
 
@@ -64,6 +61,6 @@ npm test
 
 > 帮我写个 PowerShell 脚本检查磁盘空间
 
-`ps1-creator` 必须在**写任何代码之前**自动触发。触发不了，说明 bootstrap 没到模型面前 —— 技能全都躺在磁盘上没被调用。
+`ps1-creator` 必须在**写任何代码之前**自动触发。触发不了，说明技能发现或会话开始注入没生效 —— 技能全都躺在磁盘上没被调用。
 
-冒烟快检：问「你现在有哪些 parking skills？」。bootstrap 成功注入的话模型知道自己有。
+冒烟快检：问「你现在有哪些 parking skills？」。发现与注入都生效的话模型知道自己有。

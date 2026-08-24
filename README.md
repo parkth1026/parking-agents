@@ -18,11 +18,14 @@
 ## 目录结构
 
 ```
-skills/                  # ★ 跨平台技能真源（dev/ 未发布组 + pub/ 已发布组）
-├── dev/<name>/SKILL.md
+skills/                  # ★ 跨平台发布侧（engineering/ + productivity/ + pub/ 分类布局）
+├── engineering/<name>/SKILL.md
+├── productivity/<name>/SKILL.md
 └── pub/<name>/SKILL.md
 
-AGENTS.md                # ★ 仓库 Agent 约定（产物落盘位置等；CLAUDE.md/GEMINI.md @-include 它）
+.agents/skills/          # ★ 开发侧活跃真源（与 skills/ 经移植流程同步，见 AGENTS.md）
+
+AGENTS.md                # ★ 仓库 Agent 约定（脚本规则、技能源布局；CLAUDE.md/GEMINI.md @-include 它，hooks/session-start 每会话注入它）
 CLAUDE.md                # Claude Code 指令文件（@-include AGENTS.md）
 .claude-plugin/          # Claude Code 插件清单 + dev marketplace
 .cursor-plugin/          # Cursor 插件清单
@@ -34,7 +37,7 @@ CLAUDE.md                # Claude Code 指令文件（@-include AGENTS.md）
 gemini-extension.json    # Gemini CLI 扩展清单
 GEMINI.md                # Gemini 的指令文件（@-include AGENTS.md）
 hooks/                   # SessionStart 注入器（注入 AGENTS.md；Claude Code / Cursor / Copilot CLI 共用）
-tests/                   # 结构断言 + 工具名 lint + 产物卫生门禁 + 各平台契约测试
+tests/                   # 结构断言 + 工具名 lint + 各平台契约测试
 scripts/bump-version.mjs # 跨 manifest 版本锁步
 docs/                    # 移植文档 + 测试文档
 docs/reports/            # 运行生成的报告/审计产物（gitignored，见 AGENTS.md）
@@ -54,7 +57,7 @@ docs/reports/            # 运行生成的报告/审计产物（gitignored，见
 claude --plugin-dir /path/to/parking-agents
 ```
 
-或加进 marketplace 后 `/plugin install parking-skills`。会话开始时 `hooks/session-start` 自动注入 bootstrap。
+或加进 marketplace 后 `/plugin install parking-skills`。会话开始时 `hooks/session-start` 自动注入仓库约定（AGENTS.md）；技能由 Claude Code 原生发现。
 
 ### ✅ Codex
 
@@ -83,7 +86,7 @@ pi install git:https://github.com/parkth1026/parking-agents
 gemini extensions install https://github.com/parkth1026/parking-agents
 ```
 
-`gemini-extension.json` 声明 `GEMINI.md` 为上下文文件，后者 `@`-include bootstrap 与工具映射。
+`gemini-extension.json` 声明 `GEMINI.md` 为上下文文件，后者 `@`-include 仓库约定（AGENTS.md）。
 
 ### ⚠️ OpenCode
 
@@ -97,11 +100,11 @@ gemini extensions install https://github.com/parkth1026/parking-agents
 
 ### ⚠️ Kimi Code
 
-marketplace 安装，或 `/plugins install` 加 GitHub URL。bootstrap 与工具映射都由 `.kimi-plugin/plugin.json` 声明。
+marketplace 安装，或 `/plugins install` 加 GitHub URL。工具映射由 `.kimi-plugin/plugin.json` 的 `skillInstructions` 字段内联声明。
 
 ### ⚠️ Copilot CLI / Antigravity
 
-两者都复用 Claude Code 的插件路径。Copilot CLI 靠 `COPILOT_CLI` 环境变量走 hook 的第三个分支；Antigravity 的工具差异见 `references/antigravity-tools.md`。
+两者都复用 Claude Code 的插件路径。Copilot CLI 靠 `COPILOT_CLI` 环境变量走 hook 的第三个分支；Antigravity 无专属映射文件（原 `antigravity-tools.md` 已随引导技能架构移除）。
 
 ### ❌ VS Code Copilot（不适配）
 
@@ -111,19 +114,19 @@ marketplace 安装，或 `/plugins install` 加 GitHub URL。bootstrap 与工具
 New-Item -ItemType Junction -Path "$env:USERPROFILE\.copilot\skills" -Target "G:\GIT\AI_WorkFlow\parking-agents-dev\skills"
 ```
 
-技能能被发现（扁平结构是所有平台的最小公倍数），但**没有 bootstrap 注入**，`using-parking-skills` 不会自动生效。原因见 [docs/porting-to-a-new-harness.md](./docs/porting-to-a-new-harness.md) 附录 B。
+技能能被发现（扁平结构是所有平台的最小公倍数），但**没有会话开始注入**，仓库约定与工具映射不会自动生效。原因见 [docs/porting-to-a-new-harness.md](./docs/porting-to-a-new-harness.md) 附录 B。
 
 ## 跨平台是怎么做到的
 
 三层结构，零构建、零依赖：
 
-1. **`skills/` 是唯一真源** —— 所有平台逐字共享。技能正文只写**动作**（"读一个文件"、"派发一个子代理"），从不指名具体工具。这就是同一份正文能在 9 个平台上原封不动运行的原因。
-2. **每平台一份工具映射表，只写差异** —— `references/<harness>-tools.md` 做「动作 → 该平台工具」的两列翻译。**工具面已覆盖全部动作的平台不需要映射表**（Claude Code / Cursor / Copilot CLI 都没有）。
-3. **每平台一个 bootstrap 注入器** —— 会话开始把 `using-parking-skills/SKILL.md` 注入上下文。
+1. **`skills/` 逐字共享** —— 所有平台读同一份正文。技能正文只写**动作**（"读一个文件"、"派发一个子代理"），从不指名具体工具。这就是同一份正文能在 9 个平台上原封不动运行的原因。
+2. **每平台一份工具映射，只写差异，内联在该平台的注入器里** —— Pi 在 `piToolMapping()`、OpenCode 在 `openCodeToolMapping()`、Kimi 在 manifest 的 `skillInstructions`，各自是唯一真源。**工具面已覆盖全部动作的平台不需要映射**（Claude Code / Cursor / Copilot CLI 都没有）。
+3. **每平台一个会话开始注入器** —— Shape A 平台（Claude Code / Cursor / Copilot CLI）注入仓库约定（AGENTS.md），Shape B 平台（Pi / OpenCode）注入各自的内联映射。早期由 `using-parking-skills` 引导技能统一承载，该技能已移除（048efac），注入器现已自包含。
 
-> **Bootstrap 就是集成本身。** 没有它，技能文件只是躺在磁盘上的死文本 —— 存在，但永远不会被调用。
+> **会话开始注入就是集成本身。** 没有它，约定与映射只是躺在磁盘上的死文本 —— 存在，但永远不会被送到模型面前。
 
-⚠️ **技能正文里不允许出现任何 harness 的工具名。** 一句 "use the Agent tool" 在一个平台上正确，在另外八个平台上静默出错。`npm test` 里的 `tests/skills/test-no-tool-names.mjs` 会拦下来。缺能力的修法永远是**改映射表**，不是改技能正文。
+⚠️ **技能正文里不允许出现任何 harness 的工具名。** 一句 "use the Agent tool" 在一个平台上正确，在另外八个平台上静默出错。`npm test` 里的 `tests/skills/test-no-tool-names.mjs` 会拦下来。缺能力的修法永远是**改该平台的内联映射**，不是改技能正文。
 
 ## Skills
 
@@ -131,7 +134,6 @@ New-Item -ItemType Junction -Path "$env:USERPROFILE\.copilot\skills" -Target "G:
 
 | Skill | 说明 | 来源 |
 |---|---|---|
-| using-parking-skills | bootstrap：技能使用规则 + 各平台工具映射（`references/`） | 本仓库 |
 | making-skills-cross-platform | 把任意技能仓库改造成多 harness 插件，含可移植结构检查器 | 本仓库 |
 | cpu-monitor | Windows CPU 进程/线程采样 + WMI 诊断 | 本仓库 |
 | ps1-creator | PowerShell 脚本创建规范（契约头 + 强制测试） | 本仓库 |

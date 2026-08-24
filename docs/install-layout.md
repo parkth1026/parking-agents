@@ -15,16 +15,16 @@
 | 路径 | 谁在用 | 怎么被找到 |
 |---|---|---|
 | `skills/` | **全部 9 个平台** | 各平台 manifest 的 `"skills"` 字段声明，或插件代码里 resolve。Claude Code 系是目录约定自动发现 |
-| `skills/using-parking-skills/SKILL.md` | **全部 9 个平台** | 每个平台的 bootstrap 注入器都读这一个文件 |
+| `AGENTS.md` | Claude Code / Cursor / Copilot CLI / Antigravity / Gemini CLI | `hooks/session-start` 每会话注入它；`GEMINI.md` `@`-include 它 |
 | `hooks/session-start` | Claude Code / Cursor / Copilot CLI / Antigravity | 由 `run-hook.cmd` 调起，同一份脚本用环境变量分出三种 JSON 形状 |
 | `hooks/run-hook.cmd` | 同上 4 个 | 两份 hook 配置都指向它。polyglot 包装器：同一个文件既是合法 `.bat` 又是合法 sh |
 | `package.json` | Pi（`pi` 字段）+ OpenCode（`main` 字段）+ npm | 一个文件承载三种消费者 |
 
-**共享层是这套架构的全部价值。** 33 个技能只写一遍，改一处九个平台同时生效。
+**共享层是这套架构的全部价值。** 技能只写一遍，改一处九个平台同时生效。
 
-`skills/` 有两条不可违背的约束（两条都有 `npm test` 兜底）：
+`skills/` 有两条不可违背的约束（两条都有 `npm test` / `check:repo` 兜底）：
 
-- **一层扁平**：`skills/<name>/SKILL.md`，禁止更深嵌套。嵌套会让技能在所有平台**静默消失**
+- **分类根下一层扁平**：`skills/<组>/<name>/SKILL.md`（组 = `engineering` / `productivity` / `pub`），组内禁止更深嵌套。嵌套会让技能在所有平台**静默消失**。开发侧真源 `.agents/skills/` 则是不分组的一层扁平
 - **正文只写动作，不写工具名**：一句 "use the Agent tool" 在一个平台上对，在另外八个平台上静默出错
 
 ---
@@ -39,9 +39,9 @@
 | `.claude-plugin/marketplace.json` | Claude Code | 本地 dev marketplace 入口 |
 | `.cursor-plugin/plugin.json` | Cursor | 显式声明 `"skills": "./skills/"` 和 `"hooks": "./hooks/hooks-cursor.json"` |
 | `.codex-plugin/plugin.json` | Codex | 显式声明 `"skills"`，外加 `"hooks": {}`（见下方坑一） |
-| `.kimi-plugin/plugin.json` | Kimi Code | bootstrap 与整张工具映射**都在 manifest 字段里**（`sessionStart.skill` + `skillInstructions`） |
+| `.kimi-plugin/plugin.json` | Kimi Code | 整张工具映射**在 manifest 字段里**（`skillInstructions`） |
 | `gemini-extension.json` | Gemini CLI | 仓库根固定文件名，只声明 `"contextFileName": "GEMINI.md"` |
-| `GEMINI.md` | Gemini CLI | 全文只有两行 `@`-include。**文件名由 `contextFileName` 声明，所以这个可以改** |
+| `GEMINI.md` | Gemini CLI | 全文只有一行 `@AGENTS.md`。**文件名由 `contextFileName` 声明，所以这个可以改** |
 | `.agents/plugins/marketplace.json` | 跨运行时 marketplace | 通用安装入口 |
 | `hooks/hooks.json` | Claude Code / Copilot CLI / Antigravity | Claude Code 系的 hook schema（PascalCase `SessionStart` + `matcher`） |
 | `hooks/hooks-cursor.json` | Cursor | **Cursor 自己的 schema**（camelCase `sessionStart` + 顶层 `version`） |
@@ -57,17 +57,17 @@
 
 ---
 
-## 三、工具映射表放在四种不同位置
+## 三、工具映射的承载位置各不相同
 
-同一件事（把动作翻译成该平台的工具），在不同平台有四种承载方式。**在 `references/` 里找不到就以为没做，是常见误判。**
+同一件事（把动作翻译成该平台的工具），在不同平台有不同承载方式，全部**内联在注入器 / manifest 里**（引导技能时代的 `references/<harness>-tools.md` 映射文件已随 048efac 移除）。**在一个位置找不到就以为没做，是常见误判。**
 
 | 平台 | 映射放在哪 |
 |---|---|
-| Codex / Pi / Gemini CLI / Antigravity | `skills/using-parking-skills/references/<harness>-tools.md` |
+| Pi | 内联在 `.pi/extensions/parking-skills.ts` 的 `piToolMapping()`（唯一真源） |
 | OpenCode | 内联在 `.opencode/plugins/parking-skills.js` 的 `openCodeToolMapping()` |
 | Kimi Code | `.kimi-plugin/plugin.json` 的 `skillInstructions` 字段（一整个 JSON 字符串） |
-| Pi | **两处都有** —— `references/pi-tools.md`（人读）+ `piToolMapping()`（实际注入），改一处必须同步另一处 |
 | Claude Code / Cursor / Copilot CLI | **没有，也不需要** —— 工具面已覆盖全部动作 |
+| Codex / Gemini CLI / Antigravity | **没有** —— 无映射文件，动作词汇由模型自行对应 |
 
 ---
 
@@ -79,7 +79,7 @@
 .claude-plugin/plugin.json + hooks/hooks.json + hooks/session-start
    ├── Claude Code    → 输出 hookSpecificOutput.additionalContext
    ├── Copilot CLI    → 靠 COPILOT_CLI 环境变量走第三分支，输出顶层 additionalContext
-   └── Antigravity    → 同 Claude Code，只多一份 references/antigravity-tools.md
+   └── Antigravity    → 同 Claude Code（无专属映射文件）
 
 Cursor 复用 hooks/session-start 脚本，但 hook 配置必须是自己那份
    └── .cursor-plugin/plugin.json → hooks/hooks-cursor.json → hooks/run-hook.cmd
@@ -134,14 +134,13 @@ Claude Code 会**同时**读 `additional_context` 和 `hookSpecificOutput`。多
 
 ```
 仓库根
-├── skills/                          ★ 共享 · 9 平台逐字复用 · 一层扁平 · 正文禁工具名
-│   └── using-parking-skills/
-│       ├── SKILL.md                 ★ 共享 · 9 平台的 bootstrap 都读它
-│       └── references/
-│           ├── codex-tools.md       Codex
-│           ├── pi-tools.md          Pi（与 piToolMapping() 双份维护）
-│           ├── gemini-tools.md      Gemini（被 GEMINI.md @-include）
-│           └── antigravity-tools.md Antigravity
+├── skills/                          ★ 共享 · 9 平台逐字复用 · 发布侧分类布局 · 正文禁工具名
+│   ├── engineering/<name>/SKILL.md
+│   ├── productivity/<name>/SKILL.md
+│   └── pub/<name>/SKILL.md
+│
+├── .agents/skills/                  开发侧活跃真源（一层扁平，与 skills/ 经移植流程同步）
+├── AGENTS.md                        ★ 共享 · session-start 注入 + GEMINI.md @-include
 │
 ├── hooks/
 │   ├── session-start                ★ 共享 · CC/Cursor/CopilotCLI/Antigravity · 无扩展名
@@ -153,7 +152,7 @@ Claude Code 会**同时**读 `additional_context` 和 `hookSpecificOutput`。多
 ├── .claude-plugin/                  固定 · CC/CopilotCLI/Antigravity
 ├── .cursor-plugin/                  固定 · Cursor
 ├── .codex-plugin/                   固定 · Codex（"hooks": {} 是抑制开关）
-├── .kimi-plugin/                    固定 · Kimi（bootstrap + 映射都在 manifest 里）
+├── .kimi-plugin/                    固定 · Kimi（映射内联在 skillInstructions）
 ├── .agents/plugins/                 固定 · 跨运行时 marketplace
 ├── gemini-extension.json            固定 · Gemini
 ├── GEMINI.md                        由 contextFileName 声明 → 可改名

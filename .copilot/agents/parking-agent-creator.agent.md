@@ -42,7 +42,7 @@ user-invocable: false
 
 - **一层扁平，禁止更深嵌套**。平台只扫 `skills/` 的直接子目录，嵌套会让技能在所有平台**静默消失**（无报错、无警告）。
 - **目录名必须与 frontmatter `name:` 完全一致**。
-- 正文里的 `read_file` / `run_in_terminal` / `runSubagent` 等 VS Code 工具名被当作**动作别名**，由 `skills/using-parking-skills/references/<harness>-tools.md` 翻译成各平台真实工具名。新建 skill 沿用这套命名即可，**不要**改写成某个平台的专有工具名。
+- 正文里的 `read_file` / `run_in_terminal` / `runSubagent` 等 VS Code 工具名被当作**动作别名**，由各平台注入器的内联工具映射（Pi/OpenCode 的映射函数、Kimi 的 `skillInstructions`）翻译成真实工具名。新建 skill 沿用这套命名即可，**不要**改写成某个平台的专有工具名。
 - 建完跑 `npm test` 验证结构（`tests/skills/test-skill-discovery.mjs` 会断言以上全部）。
 - 完整规范见 `docs/porting-to-a-new-harness.md`。
 
