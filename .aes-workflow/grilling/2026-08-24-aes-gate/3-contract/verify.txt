@@ -1,0 +1,12 @@
+# verify @ 2026-08-24T18:46:44Z
+# cwd: G:\GIT\AI_WorkFlow\parking-agents
+
+[FAIL] AC-002  exit=1  $ node .agents/skills/aes-gate/scripts/collect.mjs
+         }
+         Node.js v24.19.0
+[FAIL] AC-004  exit=1  $ node .agents/skills/aes-gate/scripts/collect.mjs --self-test
+         }
+         Node.js v24.19.0
+
+绿 0 / 红 2 / 跑不起来 0
+另有 3 条非 [A] 档没跑：AC-001 [C]、AC-003 [C]、AC-005 [C]

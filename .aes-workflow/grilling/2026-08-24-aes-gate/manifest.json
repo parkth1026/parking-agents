@@ -2,12 +2,12 @@
   "schema_version": 1,
   "slug": "2026-08-24-aes-gate",
   "created_at": "2026-08-24T10:33:38Z",
-  "updated_at": "2026-08-24T11:06:00Z",
+  "updated_at": "2026-08-24T18:46:54Z",
   "original_request": "把 aes-gate skill 也纳入计划。aes-qa 会调用 aes-gate 去检测。来 重新走 goal contract 流程",
   "goal_oneline": "落地 aes-gate 门禁技能：检测（盘点+六维评分+缺口清单，供 aes-qa 调用与独立体检双通道）+组装（仅显式会话按模式库生成最小门禁+selftest，经确认落地），不对齐 gate/v1 协议",
   "target": null,
-  "stage": "2-prototype",
-  "next_action": "进入 2-prototype：扫影响面，出 SKILL.md 骨架+体检报告模板+缺口移交单模板+生成物样例等对照物供逐处质疑",
+  "stage": "3-contract",
+  "next_action": "契约就绪：按交接指令启动实现（wayfinder #42），finalize 生成的启动指令见 manifest/verify.txt",
   "stage_gates": {
     "1-interview": {
       "status": "done",
@@ -21,14 +21,34 @@
       }
     },
     "2-prototype": {
-      "status": "pending"
+      "status": "done",
+      "closed_at": "2026-08-24T18:40:36Z",
+      "artifacts_confirmed": [
+        "behavior",
+        "api-mock",
+        "example-run",
+        "mock",
+        "diagram"
+      ]
     },
     "3-contract": {
-      "status": "pending"
+      "status": "done",
+      "closed_at": "2026-08-24T18:46:54Z"
     }
   },
-  "validation": null,
+  "validation": {
+    "status": "valid",
+    "ac_count": 5,
+    "warnings": [],
+    "ran_at": "2026-08-24T18:46:44Z",
+    "verify_tiers": {
+      "A": 2,
+      "B": 0,
+      "C": 3,
+      "D": 0
+    }
+  },
   "blocked": [],
   "residual_risk": null,
-  "status": "in_progress"
+  "status": "ready"
 }

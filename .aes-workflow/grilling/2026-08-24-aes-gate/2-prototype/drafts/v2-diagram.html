@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>aes-gate 架构视图 v2（改后态）</title>
+<style>
+  :root { --accent:#C25E00; --accent-tint:#FDF0E3; --gray:#8A8A8A; --gray-tint:#F2F2F0; --ink:#2B2B2B; }
+  body { font-family: system-ui, "Segoe UI", "Microsoft YaHei", sans-serif; color: var(--ink); margin: 24px; background: #fff; }
+  h1 { font-size: 18px; }
+  .legend { font-size: 13px; margin: 8px 0 16px; }
+  .legend .o { color: var(--accent); font-weight: 600; }
+  .legend .g { color: var(--gray); font-weight: 600; }
+  figcaption, .ledger, .droplist { font-size: 12.5px; line-height: 1.7; }
+  .ledger { margin-top: 16px; padding: 12px; background: #FAFAF8; border: 1px solid #E6E6E2; }
+  .ledger b { display: block; margin-bottom: 4px; }
+  .droplist { margin-top: 8px; color: #6A6A6A; }
+</style>
+</head>
+<body>
+<h1>aes-gate 架构视图 v2（改后态·本次新增=橙，既有=灰）</h1>
+<p class="legend"><span class="o">橙 = 本次新增/变更</span>　<span class="g">灰 = 既有（不动）</span></p>
+
+<figure>
+<svg viewBox="0 0 960 580" width="960" height="580" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="aes-gate v2 架构视图">
+  <defs>
+    <marker id="m-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8A8A8A"/>
+    </marker>
+    <marker id="m-accent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#C25E00"/>
+    </marker>
+  </defs>
+
+  <!-- aes-qa（既有） -->
+  <rect x="32" y="200" width="176" height="72" rx="8" fill="#F2F2F0" stroke="#8A8A8A" stroke-width="1.5"/>
+  <text x="120" y="228" text-anchor="middle" font-size="14" font-weight="600">aes-qa（既有·#19）</text>
+  <text x="120" y="250" text-anchor="middle" font-size="12">六步第一步发起调用</text>
+
+  <!-- aes-gate 容器（新增·accent） -->
+  <rect x="280" y="96" width="320" height="312" rx="12" fill="#FDF0E3" stroke="#C25E00" stroke-width="2"/>
+  <text x="440" y="120" text-anchor="middle" font-size="14" font-weight="700" fill="#C25E00">aes-gate 新技能（.agents/skills/aes-gate）</text>
+
+  <rect x="304" y="132" width="272" height="64" rx="6" fill="#FFFFFF" stroke="#C25E00" stroke-width="1"/>
+  <text x="440" y="156" text-anchor="middle" font-size="13" font-weight="600">检测半程（含采集）</text>
+  <text x="440" y="176" text-anchor="middle" font-size="11.5">读 run.toml · 跑门禁定红绿（Q5=A）· 六维评分</text>
+
+  <rect x="304" y="216" width="272" height="80" rx="6" fill="#FFFFFF" stroke="#C25E00" stroke-width="1"/>
+  <text x="440" y="240" text-anchor="middle" font-size="13" font-weight="600">组装 + 单条沉淀</text>
+  <text x="440" y="260" text-anchor="middle" font-size="11.5">批量四件套（低频）＋</text>
+  <text x="440" y="278" text-anchor="middle" font-size="11.5">「踩坑记门」高频主路径 → 注册 run.toml</text>
+
+  <rect x="304" y="320" width="272" height="64" rx="6" fill="#FFFFFF" stroke="#C25E00" stroke-width="1"/>
+  <text x="440" y="344" text-anchor="middle" font-size="13" font-weight="600">references/</text>
+  <text x="440" y="364" text-anchor="middle" font-size="11.5">模式库＋两范例 gate skill 四机制（出处）</text>
+
+  <!-- run.toml（注册真源·既有标准的新用途） -->
+  <rect x="688" y="180" width="240" height="72" rx="8" fill="#F2F2F0" stroke="#8A8A8A" stroke-width="1.5"/>
+  <text x="808" y="208" text-anchor="middle" font-size="14" font-weight="600">run.toml（注册真源）</text>
+  <text x="808" y="230" text-anchor="middle" font-size="11.5">kind="gate" actions（run 标准既有）</text>
+
+  <!-- gate-registry.json -->
+  <rect x="688" y="300" width="240" height="64" rx="8" fill="#F2F2F0" stroke="#8A8A8A" stroke-width="1.5"/>
+  <text x="808" y="324" text-anchor="middle" font-size="13" font-weight="600">gate-registry.json</text>
+  <text x="808" y="344" text-anchor="middle" font-size="11.5">运行时事实：红绿/缺口/评分</text>
+
+  <!-- board.html -->
+  <rect x="688" y="412" width="240" height="56" rx="8" fill="#F2F2F0" stroke="#8A8A8A" stroke-width="1.5"/>
+  <text x="808" y="436" text-anchor="middle" font-size="13" font-weight="600">board.html</text>
+  <text x="808" y="454" text-anchor="middle" font-size="11.5">投影 · 页面不推导状态</text>
+
+  <!-- gate/v1（零依赖） -->
+  <rect x="688" y="488" width="240" height="52" rx="8" fill="#F2F2F0" stroke="#8A8A8A" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="808" y="510" text-anchor="middle" font-size="13" font-weight="600">gate/v1 协议包</text>
+  <text x="808" y="528" text-anchor="middle" font-size="11.5">spec-only（G:\GIT\AI_WorkFlow\aes-gate）</text>
+
+  <!-- 边 1：aes-qa → aes-gate -->
+  <path d="M208,236 L280,236" fill="none" stroke="#8A8A8A" stroke-width="1.5" marker-end="url(#m-gray)"/>
+  <text x="244" y="226" text-anchor="middle" font-size="11.5">调用</text>
+  <text x="244" y="252" text-anchor="middle" font-size="10.5" fill="#6A6A6A">精简回传</text>
+
+  <!-- 边 2：检测 → run.toml（只读盘点） -->
+  <path d="M576,150 L808,150 L808,180" fill="none" stroke="#8A8A8A" stroke-width="1.5" marker-end="url(#m-gray)"/>
+  <text x="700" y="142" text-anchor="middle" font-size="11.5">只读盘点</text>
+
+  <!-- 边 3：检测 → registry（写红绿） -->
+  <path d="M576,178 L668,178 L668,332 L688,332" fill="none" stroke="#8A8A8A" stroke-width="1.5" marker-end="url(#m-gray)"/>
+  <text x="610" y="206" text-anchor="middle" font-size="11" fill="#6A6A6A">跑门禁·写红绿（collect.mjs）</text>
+
+  <!-- 边 4：组装+单条沉淀 → run.toml（注册·accent） -->
+  <path d="M576,256 L640,256 L640,216 L688,216" fill="none" stroke="#C25E00" stroke-width="2" marker-end="url(#m-accent)"/>
+  <text x="636" y="300" text-anchor="middle" font-size="11.5" fill="#C25E00">注册 kind=gate</text>
+
+  <!-- 边 5：run.toml → registry（门 id 引用） -->
+  <path d="M808,252 L808,300" fill="none" stroke="#8A8A8A" stroke-width="1.5" marker-end="url(#m-gray)"/>
+  <text x="826" y="280" text-anchor="start" font-size="11.5">门 id 引用</text>
+
+  <!-- 边 6：registry → board（投影） -->
+  <path d="M808,364 L808,412" fill="none" stroke="#8A8A8A" stroke-width="1.5" marker-end="url(#m-gray)"/>
+  <text x="826" y="392" text-anchor="start" font-size="11.5">投影</text>
+
+  <!-- 边 7：aes-gate ⇏ gate/v1（零依赖） -->
+  <path d="M600,408 L600,514 L688,514" fill="none" stroke="#8A8A8A" stroke-width="1.5" stroke-dasharray="5 5"/>
+  <text x="644" y="504" text-anchor="middle" font-size="11.5" fill="#6A6A6A">零依赖（Q2=C）</text>
+  <text x="648" y="520" text-anchor="middle" font-size="13" fill="#8A8A8A">✕</text>
+</svg>
+<figcaption>图 1：aes-gate v2 架构视图。节点 9、箭头 7（含 1 条零依赖标注虚线）、accent 2 处，均在预算内。</figcaption>
+</figure>
+
+<div class="ledger">
+  <b>Fidelity Ledger（保真申报）</b>
+  <b style="font-weight:600;color:#6A6A6A">Detail</b> 高频主路径（单条沉淀）与低频批量组装标注在同一节点内分两行；「跑门禁定红绿（Q5=A）」标注在检测半程。<br>
+  <b style="font-weight:600;color:#6A6A6A">Merged</b> 组装半程与单条沉淀合并一节点；蓝图+TOP-5 调研+两范例 gate skill 的出处并入 references 标注；collect.mjs 并入检测半程（数据流以边标注表达）。<br>
+  <b style="font-weight:600;color:#6A6A6A">Collapsed</b> run 标准的 schema/校验器/doctor 并入 run.toml 节点；看板三件（collect/registry/board）各自一节点但省略内部字段。<br>
+  <b style="font-weight:600;color:#6A6A6A">Dropped</b> 蓝图源独立节点（v1 有，v2 并入 references 标注）；CI/hooks 接线分诊（运行时决策，不进架构图）。<br>
+  <b style="font-weight:600;color:#6A6A6A">Kept</b> run.toml→registry 的门 id 引用边（注册真源与运行时事实的分工）；零依赖 ✕（Q2=C）；注册边为唯一第二 accent。
+</div>
+
+<p class="droplist">删除/出界清单：通用 gate-builder Skill（长期方向）；M3 复诊登记簿（v2）；twe-gate 引擎对接（蓝图 M5）；CI/hooks 接线细节（运行时分诊）。</p>
+</body>
+</html>

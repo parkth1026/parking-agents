@@ -1,6 +1,6 @@
 <!-- draft v1 | published 2026-08-24
-     用户意见：（待质疑）
-     状态：draft -->
+     用户意见：（v1 已被 v2 取代：加单条沉淀场景 D、检测跑门禁、对话组装入口）
+     状态：superseded by v2-example-run.md -->
 
 # 可执行示例: /aes-gate 对 parking-agents 自身跑一轮（写死示例数据，不连真实系统）
 

@@ -1,6 +1,6 @@
 <!-- draft v1 | published 2026-08-24
-     用户意见：（待质疑）
-     状态：draft -->
+     用户意见：（v1 已被 v2 取代：加入单条沉淀主路径/Q5=A/对话组装/run.toml 真源）
+     状态：superseded by v2-behavior.md -->
 
 # 行为对照表: 2026-08-24-aes-gate
 

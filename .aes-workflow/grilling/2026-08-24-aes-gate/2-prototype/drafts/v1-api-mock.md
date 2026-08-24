@@ -1,6 +1,6 @@
 <!-- draft v1 | published 2026-08-24
-     用户意见：（待质疑）
-     状态：draft -->
+     用户意见：（v1 已被 v2 取代：registry JSON 定为数据标准、补 run.toml 引用关系）
+     状态：superseded by v2-api-mock.md -->
 
 # 接口报文对: aes-qa ↔ aes-gate 调用回传
 

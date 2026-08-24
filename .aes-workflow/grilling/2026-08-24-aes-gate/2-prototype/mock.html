@@ -1,0 +1,166 @@
+<!-- 确认版·锁定（用户确认 2026-08-25）·数据=2026-08-25 实测快照；真实实现读 gate-registry.json，页面不推导状态 -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>gate 看板 · parking-agents</title>
+<style>
+  :root {
+    --ink:#2B2B2B; --muted:#6A6A6A; --line:#E6E6E2; --bg:#FAFAF8;
+    --green:#1D7A3E; --green-bg:#EAF5EC; --miss:#A35A00; --miss-bg:#FDF0E3;
+    --red:#B3261E; --red-bg:#FBEAE9; --stale:#5A5AA8; --stale-bg:#EDEDF8;
+    --p0:#B3261E; --p1:#A35A00; --p2:#5A6A7A;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, "Segoe UI", "Microsoft YaHei", sans-serif; color: var(--ink); margin: 0; background: var(--bg); }
+  header { padding: 20px 28px 14px; border-bottom: 1px solid var(--line); background: #fff; }
+  h1 { font-size: 19px; margin: 0 0 4px; }
+  .meta { font-size: 12.5px; color: var(--muted); display: flex; gap: 18px; flex-wrap: wrap; align-items: center; }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+  .badge.paper { background: var(--miss-bg); color: var(--miss); }
+  .badge.score { background: var(--bg); color: var(--ink); border: 1px solid var(--line); }
+  main { padding: 20px 28px 32px; display: grid; gap: 20px; }
+  section h2 { font-size: 15px; margin: 0 0 10px; }
+  .note { font-size: 12px; color: var(--muted); margin: 0 0 12px; }
+
+  /* 六维评分 */
+  .dims { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 10px 28px; }
+  .dim { display: grid; grid-template-columns: 96px 1fr 64px; align-items: center; gap: 10px; font-size: 13px; }
+  .dim .name { color: var(--muted); }
+  .bar { height: 10px; background: #EFEFEA; border-radius: 5px; overflow: hidden; }
+  .bar > i { display: block; height: 100%; background: var(--miss); border-radius: 5px; }
+  .dim .val { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+
+  /* 门清单 */
+  table { border-collapse: collapse; width: 100%; background: #fff; border: 1px solid var(--line); font-size: 13px; }
+  th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; color: var(--muted); background: var(--bg); font-weight: 600; }
+  td .id { font-weight: 600; }
+  td .ev { color: var(--muted); font-size: 12px; }
+  .st { display: inline-block; padding: 1px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .st.green { background: var(--green-bg); color: var(--green); }
+  .st.miss { background: var(--miss-bg); color: var(--miss); }
+  .st.red { background: var(--red-bg); color: var(--red); }
+  .st.stale { background: var(--stale-bg); color: var(--stale); }
+  .prot { font-size: 12px; }
+  .prot.paper { color: var(--miss); font-weight: 600; }
+
+  /* 缺口 */
+  .gaps { display: grid; gap: 10px; }
+  .gap { background: #fff; border: 1px solid var(--line); border-left: 4px solid var(--p2); border-radius: 6px; padding: 10px 14px; display: grid; grid-template-columns: 40px 1fr auto; gap: 4px 12px; align-items: baseline; }
+  .gap.p0 { border-left-color: var(--p0); } .gap.p1 { border-left-color: var(--p1); }
+  .gap .tag { font-size: 12px; font-weight: 700; color: var(--muted); }
+  .gap.p0 .tag { color: var(--p0); } .gap.p1 .tag { color: var(--p1); }
+  .gap .what { font-size: 13.5px; }
+  .gap .owner { font-size: 12px; color: var(--muted); text-align: right; }
+  .asm { display: inline-block; margin-left: 8px; font-size: 11.5px; padding: 1px 8px; border-radius: 999px; background: var(--green-bg); color: var(--green); }
+
+  /* 图例与页脚 */
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); margin-top: 6px; }
+  footer { padding: 14px 28px 28px; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--muted); line-height: 1.8; }
+  code { background: #F0F0EC; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>gate 看板 · parking-agents <span class="badge paper">档位：纸面门禁</span> <span class="badge score">总分 18.5 / 110</span></h1>
+  <div class="meta">
+    <span>仓库：parkth1026/parking-agents @ dev</span>
+    <span>数据真源：<code>gate-registry.json</code>（采集脚本刷新，页面不推导状态）</span>
+    <span>最近采集：2026-08-25 12:40（本会话实测 npm test exit=0）</span>
+    <span>刷新：跑采集脚本 <code>node .agents/skills/aes-gate/scripts/collect.mjs</code></span>
+    <span>轻路径：开发中踩坑 →「把这个问题记成 gate」→ 注册 run.toml + 本看板即时刷新</span>
+  </div>
+</header>
+
+<main>
+
+  <section>
+    <h2>六维评分</h2>
+    <div class="dims">
+      <div class="dim"><span class="name">阻断强制性</span><span class="bar"><i style="width:1.7%"></i></span><span class="val">0.5 / 30</span></div>
+      <div class="dim"><span class="name">覆盖广度</span><span class="bar"><i style="width:45%"></i></span><span class="val">9 / 20</span></div>
+      <div class="dim"><span class="name">分层反馈</span><span class="bar"><i style="width:20%"></i></span><span class="val">3 / 15</span></div>
+      <div class="dim"><span class="name">有效性证据</span><span class="bar"><i style="width:30%"></i></span><span class="val">6 / 20</span></div>
+      <div class="dim"><span class="name">AI 门禁</span><span class="bar"><i style="width:0%"></i></span><span class="val">0 / 15</span></div>
+      <div class="dim"><span class="name">持续演进</span><span class="bar"><i style="width:0%"></i></span><span class="val">0 / 10</span></div>
+    </div>
+    <p class="note">档位规则：硬门禁（CI 阻断+branch protection）／部分（有 CI 无保护）／纸面（仅本地或约定）。当前唯一在场的门是本地命令链 → 纸面。</p>
+  </section>
+
+  <section>
+    <h2>门清单</h2>
+    <table>
+      <tr><th>门 id</th><th>类型</th><th>命令 / 位置</th><th>状态</th><th>保护级别</th><th>最近运行 / 证据</th></tr>
+      <tr>
+        <td><span class="id">local.npm-test</span><div class="ev">七连：discovery·install·no-tool-names·session-start·pi·harness·bump+check:repo（约 10 个断言点）</div></td>
+        <td>本地命令链</td>
+        <td><code>npm test</code></td>
+        <td><span class="st green">绿</span></td>
+        <td class="prot paper">手动（纸面）</td>
+        <td>2026-08-25 实测 exit=0<br><span class="ev">package.json:13</span></td>
+      </tr>
+      <tr>
+        <td><span class="id">ci.required</span></td>
+        <td>CI 聚合 check</td>
+        <td>—</td>
+        <td><span class="st miss">缺失</span></td>
+        <td class="prot">—</td>
+        <td><span class="ev">.github/workflows/ 不存在</span></td>
+      </tr>
+      <tr>
+        <td><span class="id">hooks.pre-commit</span></td>
+        <td>本地钩子</td>
+        <td>—</td>
+        <td><span class="st miss">缺失</span></td>
+        <td class="prot">—</td>
+        <td><span class="ev">.git/hooks/ 无自定义</span></td>
+      </tr>
+      <tr>
+        <td><span class="id">gate.registry</span></td>
+        <td>登记簿</td>
+        <td>—</td>
+        <td><span class="st miss">缺失</span></td>
+        <td class="prot">—</td>
+        <td><span class="ev">本看板落地后即有</span></td>
+      </tr>
+      <tr>
+        <td><span class="id">ratchet.*</span></td>
+        <td>棘轮（指标只许收紧）</td>
+        <td>—</td>
+        <td><span class="st miss">缺失</span></td>
+        <td class="prot">—</td>
+        <td><span class="ev">—</span></td>
+      </tr>
+    </table>
+    <div class="legend">
+      <span>状态词汇：<span class="st green">绿</span> <span class="st red">红</span> <span class="st miss">缺失</span> <span class="st stale">疑似过时</span>（与运行态矛盾时标，人审归位）</span>
+    </div>
+  </section>
+
+  <section>
+    <h2>缺口清单（=给 aes-qa 的移交单）</h2>
+    <div class="gaps">
+      <div class="gap p0"><span class="tag">P0</span><span class="what">无 CI 阻断，红代码可直进 main<span class="asm">可组装·聚合 check</span></span><span class="owner">aes-gate 组装（显式会话）</span></div>
+      <div class="gap p1"><span class="tag">P1</span><span class="what">无结构守卫（目录/约定无机器断言）<span class="asm">可组装·结构守卫</span></span><span class="owner">aes-gate 组装（显式会话）</span></div>
+      <div class="gap p2"><span class="tag">P2</span><span class="what">无棘轮（指标无只许收紧机制）<span class="asm">可组装·棘轮</span></span><span class="owner">aes-gate 组装（显式会话）</span></div>
+      <div class="gap p2"><span class="tag">P2</span><span class="what">无 eval / AI 门禁</span><span class="owner">通用 gate-builder（出界）</span></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>约定级检查（无机器断言，靠约定）</h2>
+    <p class="note">脚本一律 .mjs 零依赖（AGENTS.md）· .agents/skills 真源→skills/ 发布树同步 · 卫生门禁锚点断言（存废待裁定）——看板列出但不计入评分，升级为机器断言后移入门清单。</p>
+  </section>
+
+</main>
+
+<footer>
+  本页为 <b>mock 样例</b>：数据写死为 2026-08-25 实测快照，零 JS。<br>
+  真实实现（Q6=B）：采集脚本 <code>scripts/collect.mjs</code> 采事实 → 写 <code>gate-registry.json</code>（数据真源）→ <code>board.html</code> 只做投影，页面不推导业务状态（aes-worktree-board 同构）。红门规则：红着的门=没有门，置顶显示。<br>
+  新增/变更清单：整个看板均为新增；不改动任何既有页面。
+</footer>
+
+</body>
+</html>
