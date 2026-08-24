@@ -2,20 +2,16 @@
 // runtime when it loads this extension. This repo intentionally ships no
 // node_modules or tsconfig, so an editor opening this file standalone will report
 // unresolved imports — that is expected and does not affect the extension.
-import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 const EXTREMELY_IMPORTANT_MARKER = "<EXTREMELY_IMPORTANT>";
-const BOOTSTRAP_MARKER = "parking-skills:using-parking-skills bootstrap for pi";
+const BOOTSTRAP_MARKER = "parking-skills: bootstrap for pi";
 
 const extensionDir = dirname(fileURLToPath(import.meta.url));
 const packageRoot = resolve(extensionDir, "../..");
 const skillsDir = resolve(packageRoot, "skills");
-const bootstrapSkillPath = resolve(skillsDir, "using-parking-skills", "SKILL.md");
-
-let cachedBootstrap: string | null | undefined;
 
 export default function parkingSkillsPiExtension(pi: ExtensionAPI) {
 	let injectBootstrap = true;
@@ -64,36 +60,21 @@ export default function parkingSkillsPiExtension(pi: ExtensionAPI) {
 	});
 }
 
-function getBootstrapContent(): string | null {
-	if (cachedBootstrap !== undefined) return cachedBootstrap;
-
-	try {
-		const skillContent = readFileSync(bootstrapSkillPath, "utf8");
-		const body = stripFrontmatter(skillContent);
-		cachedBootstrap = `${EXTREMELY_IMPORTANT_MARKER}
+// The bootstrap-skill era ended in 048efac (skills/using-parking-skills removed);
+// the mapping below is now the single source of truth for Pi and is built without
+// touching the filesystem.
+function getBootstrapContent(): string {
+	return `${EXTREMELY_IMPORTANT_MARKER}
 ${BOOTSTRAP_MARKER}
 
 You have the parking skills.
 
-The using-parking-skills skill content is included below and is already loaded for this Pi session. Follow it now. Do not try to load using-parking-skills again.
-
-${body}
+The tool mapping below is already loaded for this Pi session. Follow it now.
 
 ${piToolMapping()}
 </EXTREMELY_IMPORTANT>`;
-		return cachedBootstrap;
-	} catch {
-		cachedBootstrap = null;
-		return null;
-	}
 }
 
-function stripFrontmatter(content: string): string {
-	const match = content.match(/^---\n[\s\S]*?\n---\n([\s\S]*)$/);
-	return (match ? match[1] : content).trim();
-}
-
-// Keep in sync with skills/using-parking-skills/references/pi-tools.md
 function piToolMapping(): string {
 	return `## Pi tool mapping
 

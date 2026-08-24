@@ -11,8 +11,8 @@ CONVENTIONS_FILE="${PLUGIN_ROOT}/AGENTS.md"
 
 bootstrap_content=$(cat "${CONVENTIONS_FILE}" 2>&1 || echo "Error reading AGENTS.md conventions")
 
-# Only AGENTS.md is injected: repo-wide agent conventions (artifact locations,
-# script rules). Skill bodies name actions, not tools, and the harnesses on
+# Only AGENTS.md is injected: repo-wide agent conventions (script rules,
+# skill-source layout). Skill bodies name actions, not tools, and the harnesses on
 # this code path (Claude Code / Cursor / Copilot CLI) already expose a tool
 # for every action -- there is no mapping file to append.
 
@@ -31,7 +31,7 @@ escape_for_json() {
 
 bootstrap_escaped=$(escape_for_json "$bootstrap_content")
 
-session_context="<EXTREMELY_IMPORTANT>\nYou are working in the parking-agents repo.\n\n**Below is this repo's AGENTS.md — agent conventions (artifact/drop-file locations, script rules). Follow them for every file you write here:**\n\n${bootstrap_escaped}\n</EXTREMELY_IMPORTANT>"
+session_context="<EXTREMELY_IMPORTANT>\nYou are working in the parking-agents repo.\n\n**Below is this repo's AGENTS.md — agent conventions (script rules, skill-source layout). Follow them for every file you write here:**\n\n${bootstrap_escaped}\n</EXTREMELY_IMPORTANT>"
 
 # Output context injection as JSON.
 # Cursor hooks expect additional_context (snake_case).

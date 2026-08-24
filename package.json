@@ -5,7 +5,7 @@
   "type": "module",
   "main": ".opencode/plugins/parking-skills.js",
   "scripts": {
-    "check:repo": "node skills/making-skills-cross-platform/scripts/check-skill-repo.mjs . --allow skills/claude-to-vscode-skill-converter/,skills/making-skills-cross-platform/references/",
+    "check:repo": "node .agents/skills/making-skills-cross-platform/scripts/check-skill-repo.mjs . --skills skills/engineering --bootstrap none && node .agents/skills/making-skills-cross-platform/scripts/check-skill-repo.mjs . --skills skills/productivity --bootstrap none && node .agents/skills/making-skills-cross-platform/scripts/check-skill-repo.mjs . --skills skills/pub --bootstrap none",
     "install:skills:agents": "node scripts/install-skills-agents.mjs",
     "install:skills:claude": "node scripts/install-skills-claude.mjs",
     "uninstall:skills:agents": "node scripts/uninstall-skills-agents.mjs",

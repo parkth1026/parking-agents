@@ -52,10 +52,9 @@ function assertInjectedContent(ctx, label) {
 		ctx.includes("AGENTS.md — 本仓库 Agent 约定"),
 		`${label}: missing the AGENTS.md title — the conventions file failed to load`
 	);
-	check(
-		ctx.includes("docs/reports/"),
-		`${label}: missing the artifact-location table — agents would default to the repo root`
-	);
+	// No per-section content assertions beyond the title: AGENTS.md is prose that
+	// evolves (the artifact-location table was deliberately removed in ef02bed),
+	// and pinning its wording here makes every doc edit a test failure.
 	// No mapping file is appended on this code path: these harnesses expose a
 	// tool for every action skills describe.
 	check(

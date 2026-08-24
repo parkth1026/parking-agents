@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import test from "node:test";
@@ -9,7 +8,6 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, "../..");
 const packageJsonPath = resolve(repoRoot, "package.json");
 const extensionPath = resolve(repoRoot, ".pi/extensions/parking-skills.ts");
-const piToolsPath = resolve(repoRoot, "skills/using-parking-skills/references/pi-tools.md");
 
 async function loadExtension() {
 	const handlers = new Map();
@@ -123,14 +121,11 @@ test("session_compact injects bootstrap after compaction summaries", async () =>
 	assert.equal(result.messages[2], user);
 });
 
-test("pi-tools.md and the inlined piToolMapping() stay in sync", async () => {
-	// The Pi mapping lives in two places: this reference file (which a human or
-	// a non-pi agent reads) and piToolMapping() inside the extension (which is
-	// what actually gets injected). Drift between them is silent, so assert the
-	// load-bearing mappings appear in both.
-	assert.equal(existsSync(piToolsPath), true, "pi-tools.md should exist");
-	const doc = await readFile(piToolsPath, "utf8");
-
+test("the inlined piToolMapping() carries the load-bearing mappings", async () => {
+	// The Pi mapping's single source of truth is piToolMapping() inside the
+	// extension — the reference file it used to sync with was removed together
+	// with the bootstrap skill (048efac). These assertions pin the mappings and
+	// degradation guidance that stop the model inventing calls Pi does not have.
 	const { handlers } = await loadExtension();
 	const sessionStart = firstHandler(handlers, "session_start");
 	const context = firstHandler(handlers, "context");
@@ -140,41 +135,28 @@ test("pi-tools.md and the inlined piToolMapping() stay in sync", async () => {
 			.messages[0]
 	);
 
-	const rows = doc.split("\n").filter((line) => line.startsWith("|"));
-	assert.ok(rows.length > 5, "pi-tools.md should still contain a mapping table");
-
 	for (const [action, piTool] of [
 		["Read a file", "read"],
 		["Run a shell command", "bash"],
 		["Search file contents", "grep"],
 	]) {
 		assert.ok(
-			rows.some((row) => row.includes(action) && row.includes(`\`${piTool}\``)),
-			`pi-tools.md table should map "${action}" → ${piTool}`
-		);
-		assert.ok(
 			injected.includes(action) && injected.includes(`\`${piTool}\``),
 			`injected mapping should cover "${action}" → ${piTool}`
 		);
 	}
 
-	// Both copies must speak the action vocabulary, not any harness's tool names.
-	for (const copy of [
-		[doc, "pi-tools.md"],
-		[injected, "injected mapping"],
-	]) {
-		assert.ok(
-			copy[0].includes("Skills speak in actions"),
-			`${copy[1]} should open with the action-vocabulary statement`
-		);
-		assert.ok(
-			copy[0].includes("Subagent (general-purpose):"),
-			`${copy[1]} should name the subagent dispatch template it translates`
-		);
-	}
+	// The mapping must speak the action vocabulary, not any harness's tool names.
+	assert.ok(
+		injected.includes("Skills speak in actions"),
+		"injected mapping should open with the action-vocabulary statement"
+	);
+	assert.ok(
+		injected.includes("Subagent (general-purpose):"),
+		"injected mapping should name the subagent dispatch template it translates"
+	);
 
 	for (const topic of [/subagent/i, /todo|TODO\.md/]) {
-		assert.match(doc, topic, "pi-tools.md should document this degradation");
 		assert.match(injected, topic, "injected mapping should document this degradation");
 	}
 });

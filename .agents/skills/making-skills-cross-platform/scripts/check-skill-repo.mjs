@@ -12,6 +12,7 @@
  * Usage:
  *   node check-skill-repo.mjs [repoRoot]
  *   node check-skill-repo.mjs /path/to/repo --bootstrap using-my-skills
+ *   node check-skill-repo.mjs /path/to/repo --bootstrap none   (repo has no bootstrap skill by design)
  *   node check-skill-repo.mjs /path/to/repo --skills skills/engineering
  *   node check-skill-repo.mjs . --allow skills/tool-converter/,skills/x/references/
  *   node check-skill-repo.mjs . --json
@@ -178,6 +179,10 @@ else pass("frontmatter parses and name matches dir", `${frontmatterExamined} exa
 // actually read IS the bootstrap -- and fall back to name heuristics.
 function detectBootstrap() {
 	const explicit = flag("bootstrap");
+	// `--bootstrap none` declares the repo bootstrap-less BY DESIGN: the
+	// injectors (session-start hook, in-process plugins, manifest instructions)
+	// carry their mappings inline instead of reading a skills/using-* skill.
+	if (explicit === "none") return null;
 	if (explicit) return explicit;
 
 	const injectors = [
@@ -235,8 +240,10 @@ if (toolNameHits.length) {
 // --- 4. bootstrap skill -------------------------------------------------------
 // Without a bootstrap the skills are inert: present on disk, never invoked.
 
-if (!bootstrap) {
-	fail("a bootstrap skill exists", "no skills/using-* found — pass --bootstrap <name> if it is named differently");
+if (flag("bootstrap") === "none") {
+	skip("a bootstrap skill exists", "--bootstrap none declared — the injectors carry inline mappings");
+} else if (!bootstrap) {
+	fail("a bootstrap skill exists", "no skills/using-* found — pass --bootstrap <name> if it is named differently, or --bootstrap none if the injectors inline their mappings");
 } else if (!skillDirs.includes(bootstrap)) {
 	fail("a bootstrap skill exists", `skills/${bootstrap}/ not found`);
 } else {
@@ -354,9 +361,11 @@ if (existsSync(claudeHooks) && existsSync(cursorHooks)) {
 const geminiCtx = join(repoRoot, "GEMINI.md");
 if (existsSync(join(repoRoot, "gemini-extension.json")) && existsSync(geminiCtx)) {
 	// A dangling @-include loads EMPTY, silently. The bootstrap just never arrives.
+	// Gemini accepts `@AGENTS.md`, `@./AGENTS.md`, and `@/abs/path` forms — the
+	// leading `@` (plus optional `./`) is stripped, never a path segment.
 	const includes = readFileSync(geminiCtx, "utf8").split(/\r?\n/)
 		.filter((l) => l.trim().startsWith("@"))
-		.map((l) => l.trim().replace(/^@\.?\//, ""));
+		.map((l) => l.trim().replace(/^@(\.\/)?/, ""));
 	const dangling = includes.filter((p) => !existsSync(join(repoRoot, p)));
 	if (dangling.length) fail("GEMINI.md @-includes resolve", `${dangling.join(", ")} — loads empty, silently`);
 	else if (includes.length) pass("GEMINI.md @-includes resolve", `${includes.length} include(s)`);

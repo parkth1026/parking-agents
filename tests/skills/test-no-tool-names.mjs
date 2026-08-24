@@ -8,9 +8,9 @@
  * named tool. Neither failure is visible until someone runs that skill on that
  * platform.
  *
- * The fix for a missing capability is ALWAYS a line in
- * skills/using-parking-skills/references/<harness>-tools.md, never an edit to a
- * skill body. This test is what keeps that true.
+ * The fix for a missing capability is ALWAYS a line in that harness's inline
+ * mapping (.pi/extensions, .opencode/plugins, .kimi-plugin skillInstructions),
+ * never an edit to a skill body. This test is what keeps that true.
  *
  * Run: node tests/skills/test-no-tool-names.mjs
  */
@@ -72,23 +72,15 @@ const DENIED = {
 
 // Paths (repo-relative, forward slashes) exempt from the rule, and why.
 //
-// The bundled checker (skills/making-skills-cross-platform/scripts/check-skill-repo.mjs)
-// applies the same invariant via its --allow flag. It auto-allows the bootstrap's
-// own references/ (using-parking-skills), so only the two non-bootstrap exemptions
-// below are duplicated as --allow in package.json's check:repo script. Keep both
-// in sync when you add or remove an exemption.
-const ALLOWLIST = [
-	// The tool-name conversion table IS this skill's subject matter.
-	// Also passed to the checker as --allow in package.json.
-	"skills/claude-to-vscode-skill-converter/",
-	// The adapter layer itself -- naming real tools is the entire point.
-	// Auto-allowed by the checker (bootstrap references).
-	"skills/using-parking-skills/references/",
-	// The porting blueprint: telling a porter which tool each harness exposes
-	// IS the deliverable. Its SKILL.md is still held to the rule.
-	// Also passed to the checker as --allow in package.json.
-	"skills/making-skills-cross-platform/references/",
-];
+// The dev-side checker (.agents/skills/making-skills-cross-platform/scripts/
+// check-skill-repo.mjs) applies the same invariant via its --allow flag. Every
+// exemption added here must also be passed as --allow in package.json's
+// check:repo script — keep both in sync.
+//
+// Currently empty: the skills whose subject matter IS tool names
+// (claude-to-vscode-skill-converter, making-skills-cross-platform) live only on
+// the dev side (.agents/skills/), outside this scan.
+const ALLOWLIST = [];
 
 const failures = [];
 

@@ -19,7 +19,6 @@ import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const refs = join(repoRoot, "skills", "using-parking-skills", "references");
 
 const readJSON = (rel) => JSON.parse(readFileSync(join(repoRoot, rel), "utf8"));
 const readText = (rel) => readFileSync(join(repoRoot, rel), "utf8");
@@ -58,14 +57,19 @@ test("Gemini extension points at a context file that exists", () => {
 });
 
 test("GEMINI.md @-includes resolve to real files", () => {
+	// The bootstrap skill and its gemini-tools.md mapping were removed in
+	// 048efac; GEMINI.md now carries the repo conventions via @AGENTS.md. What
+	// stays load-bearing: every @-include must resolve, because a dangling one
+	// loads EMPTY, silently.
 	const lines = readText("GEMINI.md")
 		.split(/\r?\n/)
 		.filter((l) => l.trim().startsWith("@"));
 
-	assert.equal(lines.length, 2, "GEMINI.md should include the bootstrap and the tool mapping");
+	assert.ok(lines.length >= 1, "GEMINI.md should @-include at least the repo conventions");
 
 	for (const line of lines) {
-		const rel = line.trim().replace(/^@\.?\//, "");
+		// Gemini accepts `@AGENTS.md`, `@./AGENTS.md`, and `@/abs/path` forms.
+		const rel = line.trim().replace(/^@(\.\/)?/, "");
 		assert.ok(
 			existsSync(join(repoRoot, rel)),
 			`GEMINI.md includes '${rel}' which does not exist — Gemini would load nothing`
@@ -73,52 +77,20 @@ test("GEMINI.md @-includes resolve to real files", () => {
 	}
 });
 
-test("gemini-tools.md maps actions onto real Gemini tools", () => {
-	const doc = readFileSync(join(refs, "gemini-tools.md"), "utf8");
-	assert.match(doc, /Skills speak in actions/);
-	for (const tool of ["read_file", "write_file", "replace", "run_shell_command", "activate_skill"]) {
-		assert.ok(doc.includes(`\`${tool}\``), `gemini-tools.md should name ${tool}`);
-	}
-	assert.match(
-		doc,
-		/invoke_agent.*generalist/s,
-		"subagent dispatch must resolve to invoke_agent with the generalist agent"
-	);
-	assert.match(doc, /write_todos/, "task tracking must resolve to write_todos");
-	assert.match(doc, /Subagent \(general-purpose\):/, "must name the dispatch template it translates");
-});
+// --- Kimi Code (skills + inline mapping; no session-start skill since 048efac) --
 
-// --- Antigravity (reuses the Claude Code plugin path) ------------------------
-
-test("antigravity-tools.md documents only what actually differs", () => {
-	const doc = readFileSync(join(refs, "antigravity-tools.md"), "utf8");
-	assert.match(doc, /invoke_subagent/);
-	assert.match(doc, /`self`/, "must document the self subagent type");
-	assert.match(doc, /`research`/, "must document the research subagent type");
-	// The task-artifact detail is the whole reason this file exists.
-	assert.match(doc, /IsArtifact/);
-	assert.match(doc, /ArtifactType/);
-	assert.match(
-		doc,
-		/\*\*Not\*\* `manage_task`/,
-		"must warn that manage_task is for background processes, not todos"
-	);
-});
-
-// --- Kimi Code (manifest-declared bootstrap + inline mapping) ----------------
-
-test("Kimi manifest declares a session-start skill and an inline mapping", () => {
+test("Kimi manifest declares skills, no ghost bootstrap, and an inline mapping", () => {
 	const m = readJSON(".kimi-plugin/plugin.json");
 	assert.equal(m.skills, "./skills/");
-	assert.equal(
-		m.sessionStart?.skill,
-		"using-parking-skills",
-		"without sessionStart.skill nothing bootstraps and the skills are inert"
-	);
-	assert.ok(
-		existsSync(join(repoRoot, "skills", m.sessionStart.skill, "SKILL.md")),
-		"sessionStart.skill must name a skill that exists"
-	);
+	// The bootstrap skill was removed in 048efac. A sessionStart.skill pointing
+	// at a skill that is not on disk bootstraps NOTHING, silently — so if the
+	// field exists at all, it must resolve.
+	if (m.sessionStart?.skill) {
+		assert.ok(
+			existsSync(join(repoRoot, "skills", m.sessionStart.skill, "SKILL.md")),
+			"sessionStart.skill must name a skill that exists"
+		);
+	}
 
 	const instr = m.skillInstructions;
 	assert.equal(typeof instr, "string");

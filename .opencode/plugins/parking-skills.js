@@ -3,12 +3,11 @@
 // Shape B (in-process bootstrap): OpenCode has no session-start shell hook, so
 // this plugin does two things at runtime:
 //   1. `config`  -- registers skills/ so OpenCode's native skill tool finds them
-//   2. `experimental.chat.messages.transform` -- injects the using-parking-skills
-//      bootstrap as the first user message of the conversation
+//   2. `experimental.chat.messages.transform` -- injects the OpenCode tool
+//      mapping as the first user message of the conversation
 //
 // This repo intentionally ships no node_modules, so there is nothing to import
 // beyond node builtins.
-import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -17,11 +16,6 @@ const EXTREMELY_IMPORTANT_MARKER = "<EXTREMELY_IMPORTANT>";
 const pluginDir = dirname(fileURLToPath(import.meta.url));
 const packageRoot = resolve(pluginDir, "../..");
 const skillsDir = resolve(packageRoot, "skills");
-const bootstrapSkillPath = resolve(skillsDir, "using-parking-skills", "SKILL.md");
-
-// Module-level cache: `transform` fires on EVERY agent step, and re-reading
-// SKILL.md from disk each time would be pure waste.
-let cachedBootstrap;
 
 export default async function parkingSkillsOpenCodePlugin() {
 	return {
@@ -42,7 +36,6 @@ export default async function parkingSkillsOpenCodePlugin() {
 					// to inspect the messages themselves for an already-injected copy.
 					transform: async ({ messages }) => {
 						const bootstrap = getBootstrapContent();
-						if (!bootstrap) return { messages };
 
 						const firstUser = messages.find((m) => m?.info?.role === "user");
 						if (!firstUser) return { messages };
@@ -62,29 +55,17 @@ export default async function parkingSkillsOpenCodePlugin() {
 	};
 }
 
+// The bootstrap-skill era ended in 048efac (skills/using-parking-skills
+// removed); the mapping below is now the single source of truth for OpenCode
+// and is built without touching the filesystem.
 function getBootstrapContent() {
-	if (cachedBootstrap !== undefined) return cachedBootstrap;
-
-	try {
-		const body = stripFrontmatter(readFileSync(bootstrapSkillPath, "utf8"));
-		cachedBootstrap = `${EXTREMELY_IMPORTANT_MARKER}
+	return `${EXTREMELY_IMPORTANT_MARKER}
 You have the parking skills.
 
-The using-parking-skills skill content is included below and is already loaded for this OpenCode session. Follow it now. Do not try to load using-parking-skills again.
-
-${body}
+The tool mapping below is already loaded for this OpenCode session. Follow it now.
 
 ${openCodeToolMapping()}
 </EXTREMELY_IMPORTANT>`;
-	} catch {
-		cachedBootstrap = null;
-	}
-	return cachedBootstrap;
-}
-
-function stripFrontmatter(content) {
-	const match = content.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n([\s\S]*)$/);
-	return (match ? match[1] : content).trim();
 }
 
 // There is no references/opencode-tools.md -- OpenCode's mapping lives here and
