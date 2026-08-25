@@ -10,6 +10,7 @@
 | --- | --- | --- |
 | 脚手架、校验、聚合、打包 | Node 内置模块的确定性 `.mjs` 脚本 | Windows 本机无需 Python 或 npm 依赖，脆弱步骤保持可复现 |
 | agent 执行与主观评审 | 文字流程 + subagent/人工评审 | 这些步骤依赖当前宿主能力，脚本不伪造真实 agent 证据 |
+| 无嵌套 Agent 的触发探针 | 主会话预置进程环境 + 单轮 headless launcher；能力不足则交回主会话 | 保留同宿主同模型对照，同时隔离共享配置、凭据落盘和编排器自答风险 |
 | Prompt 语言 | Chinese-first；English 只保留 machine contract 和通过四道 gate 的少量核心 term | 本技能自身是中文 Prompt，逐句加入 English 会增加噪声并削弱用户可读性 |
 | 术语数量 | 短 Prompt 最多 2 个，普通文章最多 5 个，不足不凑数 | 用硬上限和信息增益排序阻止“术语化翻译”蔓延 |
 | 评测产物 | `<skill-dir>/../../evals/<skill>-workspace/` | `evals/` 与 `skills/` 平行，产物与技能根隔离，避免 `SKILL.md` 夹具冒充技能 |
@@ -32,6 +33,7 @@
 | AC-9 | `SKILL.md`、writing guide 和 UI default prompt 明确 Chinese-first；English 只用于 machine contract 或通过四道 gate 的少量核心 term | manual/script |
 | AC-10 | `--history` 沉淀通道同轮整写 `output-evals.json`（题面+断言含 ac），clone 接收方不依赖 workspace 即可重建评测用例；无旗标时不写、写入失败干净拒绝 | script |
 | AC-11 | 评测 subagent 分批受限并发：输出评测同一 eval 的各 gate 同批、默认每批 2 eval；触发探针按整条 query 分批、默认每批 3 条；grader 同口径；并发受限宿主可降级串行 | manual |
+| AC-12 | 无嵌套 Agent 工具时，headless 触发探针固定逐字 prompt 和单轮调用；只从进程环境接收凭据，不读写共享 CLI 配置、不输出或落盘 key；失败不自答；清理私有 Temp 后对授权扫描根的内容、文件名和路径做前缀残留检查，命中路径输出不得泄漏前缀 | script/manual |
 
 ## 迭代记录
 
@@ -46,3 +48,7 @@
 | 2026-08-20 | karpathy-llm-wiki 两轮历史监控验证（16 执行臂）后按钢人裁决固化两条流程纪律（裁定：三候选缺口均为流程欠账/有意取舍，零代码改动进清单）：6.3 完成通知到达即核对产物落盘、空产物按执行臂故障纠偏续跑（draft 事故教训）；6.1 重要轮次可同轮 run-2 池化采样；另以 analyst pass 后置补跑实测验证其可捕捉 token 离群（1.92× 重尾被 notes 点名） | 109 项自测通过；quick-validate 通过；卫生门禁通过 | 未命中；保持单一流水线技能 |
 | 2026-08-20 | realraw 专项轮暴露 output-evals.json 子集整写缺口（部分场景轮把题库缩写成本轮集合）：buildOutputEvals 支持 keepExisting 合成、CLI 新增 --keep-evals（专项轮保留存量、stdout 明示保留数；全量轮换代默认整写不变），SKILL.md 6.4 与 schemas.md 同步 | 112 项自测通过（+3）；quick-validate 通过 | 未命中；保持单一流水线技能 |
 | 2026-08-25 | 评测并发由同回合全量 spawn 改为分批受限：6.1 输出评测同一 eval 各 gate 同批（对照公平不靠大并发）、默认每批 2 eval，触发探针按整条 query 分批、默认每批 3 条，grader 同口径 ≤4 在飞；依据官方 claude-skill-creator run_eval.py worker-pool（默认 10 并发上限）与 Cowork 超时允许退化串行的口径，适配低并发宿主（codingplan） | 121 项自测通过；quick-validate 通过 | 未命中；保持单一流水线技能 |
+| 2026-08-25 | 为无嵌套 Agent 工具的宿主加入 headless 触发探针 fallback：固定逐字 prompt 与单轮调用，凭据仅从进程环境注入，私有空 settings 隔离共享配置，失败不自答，Temp 清理前后做前缀残留检查；能力或授权不足时交回主会话直跑 | 135 项自测通过；仅使用假凭据 fixture；真实 Provider 与全盘扫描未执行 | 未命中；保持单一流水线技能 |
+| 2026-08-25 | 修复私有 Temp 命中后过早退出：私有清理后始终完成外部扫描并记录摘要，再统一报告 Provider、协议和全部残留失败；增加私有与外部双位置同时泄漏回归 | 136 项自测通过；双位置假凭据均被检出，私有 Temp 清零且外部路径进入审计 | 未命中；保持单一流水线技能 |
+| 2026-08-25 | 修复 secret-derived filename/path 输出泄漏：扫描文件内容时同步检查文件名和父路径，命中路径含 key 前缀时整条脱敏；保留双位置扫描顺序与统一失败审计 | 137 项自测通过；12 字符假前缀文件名被检出，stdout/stderr 不含完整 key、前缀或原路径 | 未命中；保持单一流水线技能 |
+| 2026-08-25 | 移除 headless fallback 的本机 zcode 绝对路径，Windows + Git Bash 示例改用 `command -v zcode` 发现入口；回归扫描随包 Markdown，拒绝硬编码用户主目录 | 139 项自测通过；quick-validate、Node 语法和 diff-check 通过；真实 Provider 仍为 runtime debt | 未命中；保持单一流水线技能 |
