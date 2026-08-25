@@ -2,13 +2,11 @@
 // Goal Contract AC-006：联网读取 GitHub 原生 parent / blocked-by 图并 fail closed。
 // --issues-fixture 提供同一份完整 issue-list 的可重复离线 seam；默认仍走 gh live。
 import { createHash } from 'node:crypto';
-import { execFile } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { promisify } from 'node:util';
-import { HEADLESS_CHILD_OPTIONS } from './headless.mjs';
+import { loadConfig, REPO_ROOT } from './collect.mjs';
+import { prepareGithubAccess, runGithubJson } from './github-identity.mjs';
 
-const pExecFile = promisify(execFile);
 const REPO = option('--repo', 'parkth1026/parking-agents');
 const ISSUES_FIXTURE = option('--issues-fixture', null);
 const failures = [];
@@ -285,21 +283,20 @@ function parseFixture(fixturePath) {
   return { issues: payload.issues, source: `fixture:${path}` };
 }
 
-async function ghJson(args) {
-  const { stdout } = await pExecFile('gh', args, {
-    ...HEADLESS_CHILD_OPTIONS,
-    timeout: 60_000,
-    maxBuffer: 64 * 1024 * 1024,
-  });
-  return JSON.parse(stdout);
-}
-
 async function loadIssues() {
   if (ISSUES_FIXTURE) return parseFixture(ISSUES_FIXTURE);
-  const issues = await ghJson([
+  const config = loadConfig();
+  const auth = await prepareGithubAccess({
+    config,
+    issueRepo: REPO,
+    account: option('--account', undefined),
+    host: option('--hostname', undefined),
+    cwd: REPO_ROOT,
+  });
+  const issues = await runGithubJson([
     'issue', 'list', '--repo', REPO, '--state', 'all', '--limit', '1000',
     '--json', GRAPH_FIELDS,
-  ]);
+  ], { auth, cwd: REPO_ROOT, timeout: 60_000, maxBuffer: 64 * 1024 * 1024 });
   if (!Array.isArray(issues) || !issues.length) throw new Error(`gh 返回空 issue 图: ${REPO}`);
   return { issues, source: 'live:gh issue list' };
 }

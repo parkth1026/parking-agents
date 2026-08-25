@@ -54,6 +54,7 @@ merge gate，Task create 从 fresh Issue labels 自动推导该 interaction clas
 - server API 使用专属 `aes-worktree-board/1` marker 与完整 status schema；端口冲突探测只有验证 v3、generatedAt、repo、graph（issues/edges/stats）与 worktrees 后才比较 identity。另一目标仓返回可诊断的 `REPO_MISMATCH`，同仓或 marker 正确但 status 不完整的服务返回 `PORT_CONFLICT`；任何冲突都拒绝把旧实例当成本次启动成功。
 - 配置输入以目标仓为锚：环境覆盖优先，其次是 `<目标仓根>/.aes-worktree-board/board.config.json`，最后才是技能目录默认；collect、server、fixture capture 与 dispatch 共用这条解析链。
 - Issue graph 保留 live GitHub 与完整离线 fixture 的 labels，并在缓存回退中承接已有 labels，使 `ready-for-agent` 不会因采集输入链被丢失而退出 eligible frontier。
+- GitHub live 操作先绑定显式 host/account：同 host 多账号未声明时 fail closed；viewer identity 与目标仓库 permission 必须由同一进程级凭据验证，token 不进入 argv、prompt、日志、fixture、runtime 或配置。
 
 ## 验收条件
 
@@ -92,6 +93,7 @@ merge gate，Task create 从 fresh Issue labels 自动推导该 interaction clas
 | AC-31 | superseded reviewer binding 只能经授权、幂等、append-only dead-letter receipt 收敛；合法事件和任意 reason fail closed。 |
 | AC-32 | 显式目标仓、runtime 旧快照和 server 监听端口形成同一 repo identity 边界；跨项目错配以 exit 2 fail closed，当前项目 API 的仓、Issue 图谱与 worktree 列表必须同源。 |
 | AC-33 | 锁内二次 identity 校验阻止空 runtime 的双仓并发覆盖；repo-shaped 非 board JSON 或 marker 正确但缺 repo/graph/worktrees 的不完整 status 未通过完整 schema 时只能判为 `PORT_CONFLICT`。 |
+| AC-34 | 多账号 GitHub 操作显式绑定目标账号；live collect、fixture capture、Issue 读写和 server/CLI fallback 在执行前验证 viewer 与仓库权限，错误分型为 `IDENTITY_REQUIRED` / `IDENTITY_MISMATCH` / `PERMISSION_DENIED` / `REPO_NOT_FOUND` / `NETWORK_FAILURE`，凭据仅进程级继承且不泄露。 |
 
 ## 迭代记录
 
@@ -108,3 +110,4 @@ merge gate，Task create 从 fresh Issue labels 自动推导该 interaction clas
 | 2026-08-25 | 锁定跨项目 repo identity：拒绝错误 runtime 快照，并在端口占用时区分另一仓 server 与普通冲突。 | repo-root 跨项目 runtime/port/API 回归 + 八域回归 + 真实 parking-agents API smoke。 | 沿用既有 `/api/status?fast=1`，不增加监听地址、路由或第三方依赖。 |
 | 2026-08-25 | BLOCK 1/3 follow-up：目标仓 integration 配置落为 `dev`，collect 增加锁内 identity 复核，端口探测增加专属 board marker/schema。 | 双仓 barrier 并发回归、repo-shaped 伪服务回归、无 env 目标主仓 live API/Playwright。 | marker 是 additive v3 字段与响应头；页面仍可降级读取旧 v2/v3 快照。 |
 | 2026-08-25 | Issue #24：固定环境覆盖 > 目标仓 `board.config.json` > 技能默认，并让完整 Issue labels 穿过 live、fixture 与缓存 collect 输入链。 | 完整 labels fixture、跨仓 `main`/`trunk` 配置回归、环境覆盖回归、八域回归与显式 `collect-live`。 | 保留现有 label 对象形状，不新增多仓聚合或 label 业务推导。 |
+| 2026-08-25 | Issue #45：增加显式 GitHub host/account 绑定、viewer/repository permission preflight、进程级 `GH_TOKEN` 继承和 Issue 读写 wrapper；多账号与 remote URL 用户名均 fail closed。 | fake `gh` 隔离回归覆盖单/多账号、身份不匹配、权限/404/网络错误、capture/collect/Issue wrapper 与 fallback 子进程无密钥继承；默认离线域保持不触网。 | `GH_TOKEN` 只存在父/子进程环境；真实账号 token 不写入任何仓库或 runtime 产物。 |

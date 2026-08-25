@@ -1,16 +1,11 @@
 #!/usr/bin/env node
 // 把 GitHub issue 星图保存为可离线复现的页面/collect 测试 fixture。
 import { createHash } from 'node:crypto';
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
 import { dirname, resolve, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { loadConfig, SKILL_DIR } from './collect.mjs';
-import { HEADLESS_CHILD_OPTIONS } from './headless.mjs';
+import { loadConfig, REPO_ROOT, SKILL_DIR } from './collect.mjs';
+import { prepareGithubAccess, runGithubJson } from './github-identity.mjs';
 
-const pExecFile = promisify(execFile);
-const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_OUTPUT = join(SKILL_DIR, 'fixtures', 'aes-agent-issues.json');
 const ISSUE_FIELDS = [
   'assignees', 'author', 'blockedBy', 'blocking', 'body', 'closed', 'closedAt',
@@ -24,20 +19,15 @@ function option(name, fallback) {
   return index >= 0 && process.argv[index + 1] ? process.argv[index + 1] : fallback;
 }
 
-async function ghJson(args) {
-  const { stdout } = await pExecFile('gh', args, {
-    ...HEADLESS_CHILD_OPTIONS,
-    timeout: 60_000,
-    maxBuffer: 64 * 1024 * 1024,
-  });
-  return JSON.parse(stdout);
+async function ghJson(args, auth) {
+  return runGithubJson(args, { auth, cwd: REPO_ROOT, timeout: 60_000, maxBuffer: 64 * 1024 * 1024 });
 }
 
-async function reopened(issueRepo, number) {
+async function reopened(issueRepo, number, auth) {
   const pages = await ghJson([
-    'api', '--paginate', '--slurp', `repos/${issueRepo}/issues/${number}/timeline`,
+    'api', '--hostname', auth.host, '--paginate', '--slurp', `repos/${issueRepo}/issues/${number}/timeline`,
     '-H', 'Accept: application/vnd.github+json',
-  ]);
+  ], auth);
   return pages.flat().some((event) => event.event === 'reopened');
 }
 
@@ -70,15 +60,23 @@ async function main() {
   const config = loadConfig();
   const issueRepo = option('--repo', config.issueRepo);
   const output = resolve(option('--output', DEFAULT_OUTPUT));
+  const auth = await prepareGithubAccess({
+    config,
+    issueRepo,
+    account: option('--account', undefined),
+    host: option('--hostname', undefined),
+    cwd: REPO_ROOT,
+  });
   const listed = await ghJson([
     'issue', 'list', '--repo', issueRepo, '--state', 'all', '--limit', '1000',
     '--json', ISSUE_FIELDS,
-  ]);
+  ], auth);
   const closed = listed.filter((issue) => issue.state === 'CLOSED');
   const reopenedFlags = new Map(await mapConcurrent(closed, 6, async (issue) => {
     try {
-      return [issue.number, await reopened(issueRepo, issue.number)];
-    } catch {
+      return [issue.number, await reopened(issueRepo, issue.number, auth)];
+    } catch (error) {
+      if (error?.code) throw error;
       return [issue.number, false];
     }
   }));

@@ -13,6 +13,7 @@ import {
   RUNTIME_DIR, SKILL_DIR, TASKS_DIR,
 } from './collect.mjs';
 import { HEADLESS_CHILD_OPTIONS } from './headless.mjs';
+import { githubIdentityPrompt, prepareGithubAccess } from './github-identity.mjs';
 import { canonicalWorktreeId, completeFallbackDispatch, registerFallbackDispatch } from './orchestrate.mjs';
 import { readRegistry, withRuntimeLock, writeTextAtomic } from './runtime-store.mjs';
 
@@ -194,6 +195,30 @@ async function handleDispatch(request, response) {
   const targetName = target.path.split('/').pop();
   const worktreeId = canonicalWorktreeId(targetName);
 
+  const requiresGithub = agent !== 'test' || payload.githubAccess === true;
+  let githubAuth = null;
+  if (requiresGithub) {
+    try {
+      githubAuth = await prepareGithubAccess({
+        config,
+        issueRepo: config.issueRepo,
+        account: payload.githubAccount,
+        host: payload.githubHost,
+        cwd: main.path,
+      });
+    } catch (error) {
+      const status = error.code === 'PERMISSION_DENIED'
+        ? 403
+        : error.code === 'REPO_NOT_FOUND' ? 404 : 400;
+      return sendJson(response, status, {
+        ok: false,
+        code: error.code || 'NETWORK_FAILURE',
+        message: error.message,
+        ...(error.details || {}),
+      });
+    }
+  }
+
   const lease = readRegistry(RUNTIME_DIR).leases[worktreeId];
   if (lease) {
     return sendJson(response, 409, {
@@ -220,7 +245,7 @@ async function handleDispatch(request, response) {
     const registration = registerFallbackDispatch({
       worktree: worktreeId,
       agent,
-      prompt,
+      prompt: `${prompt}${githubIdentityPrompt(githubAuth)}`,
       fallbackAuthorized: payload.fallbackAuthorized || null,
     });
     taskId = registration.taskId;
@@ -242,6 +267,9 @@ async function handleDispatch(request, response) {
     join(SKILL_DIR, 'scripts', 'dispatch.mjs'), targetName,
     '--agent', agent, '--task-id', taskId, '--prompt-file', requestPath, '--delete-prompt-file', '--registered',
   ];
+  if (payload.githubAccess === true) args.push('--github-access');
+  if (githubAuth?.targetAccount) args.push('--github-account', githubAuth.targetAccount);
+  if (githubAuth?.host) args.push('--github-host', githubAuth.host);
   if (payload.fallbackAuthorized) args.push('--fallback-authorized', payload.fallbackAuthorized);
   if (payload.confirmDirty) args.push('--confirm-dirty');
   const child = spawn(process.execPath, args, {
@@ -249,7 +277,10 @@ async function handleDispatch(request, response) {
     detached: true,
     stdio: 'ignore',
     cwd: SKILL_DIR,
-    env: { ...process.env, AES_WORKTREE_BOARD_REPO_ROOT: main.path },
+    env: {
+      ...(githubAuth?.env || process.env),
+      AES_WORKTREE_BOARD_REPO_ROOT: main.path,
+    },
   });
   child.on('error', () => {
     withRuntimeLock(RUNTIME_DIR, () => {
