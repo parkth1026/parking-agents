@@ -27,6 +27,7 @@ const SCRIPT_DIR = resolve(SKILL_DIR, 'scripts');
 const SELF = fileURLToPath(import.meta.url);
 const ROOT = resolve(SKILL_DIR, '..', '..', '..');
 const ISSUE_FIXTURE = join(SKILL_DIR, 'fixtures', 'aes-agent-issues.json');
+const ISSUE_GRAPH_FIXTURE = join(SKILL_DIR, 'fixtures', 'parking-agents-issues.json');
 const ORCHESTRATION_FIXTURE = join(SKILL_DIR, 'fixtures', 'orchestration-events.json');
 
 function tempDirectory(label) {
@@ -3318,8 +3319,10 @@ async function orchestrationContractMarkers() {
   assert.ok(!TASK_STATES.includes('orchestration-stop'));
   const skill = readFileSync(join(SKILL_DIR, 'SKILL.md'), 'utf8');
   for (const marker of [
-    'Desktop `create_thread`', 'registry.json', 'inbox pending', '三维 verdict',
-    'runtime=NOT_RUN', 'stop eval --write', '--fallback-authorized', 'Map / List',
+    'Desktop `create_thread`', 'wait_threads', 'read_thread', 'send_message_to_thread',
+    'registry.json', 'inbox pending', '三维 verdict', 'BLOCK 熔断', '全局停止', 'orchestration-stop',
+    'runtime=NOT_RUN', 'stop eval --write', '--fallback-authorized', 'cli-fallback', 'Map / List',
+    'heartbeat', '只读归档证据', '脚本只负责 collect/record/lock/validate/render', '不负责自主调度',
     'aes.worktree-board.executor-final/v1', 'next-actions', 'action receipt', 'action verify',
     'claim reservation', 'verificationRun', 'octopus merge', 'schema 校验先于 terminal-noop', 'CLAIM_NEXT_ISSUE',
     'handoff recover', 'authorization-id', 'already-recovered',
@@ -3334,8 +3337,54 @@ async function orchestrationContractMarkers() {
   ]) {
     assert.match(selftestSource, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
-  assert.doesNotMatch(skill, /派发 headless 任务/);
-  assert.doesNotMatch(skill, /只给合并建议，不执行 merge/);
+  for (const legacyMarker of [
+    'headless 正常路径', 'headless dispatch', '派发 headless 任务',
+    '只给合并建议', '只建议不 merge', '只给合并建议，不执行 merge',
+  ]) assert.doesNotMatch(skill, new RegExp(legacyMarker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+
+  const graphChecker = readFileSync(join(SCRIPT_DIR, 'check-issue-graph.mjs'), 'utf8');
+  for (const marker of [
+    '--issues-fixture', 'gh issue list', 'subIssues', 'blockedBy', 'blocking',
+    'fixture 必须是完整 github-issue-fixture', '控制面追加段必须位于',
+  ]) assert.match(graphChecker, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.ok(existsSync(ISSUE_GRAPH_FIXTURE), '缺少 issue graph 完整离线 fixture');
+  const graphFixture = JSON.parse(readFileSync(ISSUE_GRAPH_FIXTURE, 'utf8'));
+  assert.equal(graphFixture.kind, 'github-issue-fixture');
+  assert.equal(graphFixture.repo, 'parkth1026/parking-agents');
+  assert.equal(graphFixture.query.state, 'all');
+  assert.ok(graphFixture.query.limit >= 1000, 'issue graph fixture 必须来自完整 issue-list limit');
+  assert.ok(graphFixture.issues.length >= 40, 'issue graph fixture 必须是完整图，不得使用最小 mock');
+  assert.equal(graphFixture.issueCount, graphFixture.issues.length);
+  const graphProbe = spawnSync(process.execPath, [
+    join(SCRIPT_DIR, 'check-issue-graph.mjs'),
+    '--repo', graphFixture.repo,
+    '--issues-fixture', ISSUE_GRAPH_FIXTURE,
+  ], { ...HEADLESS_CHILD_OPTIONS, cwd: ROOT, encoding: 'utf8', timeout: 30_000 });
+  assert.equal(graphProbe.status, 0, graphProbe.stderr || graphProbe.stdout);
+  const brokenFixtureRoot = tempDirectory('issue-graph-contract');
+  try {
+    const brokenFixture = {
+      ...graphFixture,
+      issues: graphFixture.issues.map((issue) => issue.number === 34
+        ? {
+          ...issue,
+          blockedBy: { ...issue.blockedBy, nodes: issue.blockedBy.nodes.filter((node) => Number(node.number) !== 33) },
+          blockedByNumbers: issue.blockedByNumbers.filter((number) => Number(number) !== 33),
+        }
+        : issue),
+    };
+    const brokenPath = join(brokenFixtureRoot, 'broken.json');
+    writeFileSync(brokenPath, `${JSON.stringify(brokenFixture, null, 2)}\n`);
+    const negativeProbe = spawnSync(process.execPath, [
+      join(SCRIPT_DIR, 'check-issue-graph.mjs'),
+      '--repo', graphFixture.repo,
+      '--issues-fixture', brokenPath,
+    ], { ...HEADLESS_CHILD_OPTIONS, cwd: ROOT, encoding: 'utf8', timeout: 30_000 });
+    assert.equal(negativeProbe.status, 1, '破坏 #34 blocked-by 的 fixture 必须 fail closed');
+    assert.match(negativeProbe.stderr, /#34 blocked-by/);
+  } finally {
+    await cleanTemp(brokenFixtureRoot);
+  }
 
   const board = readFileSync(join(SKILL_DIR, 'board.html'), 'utf8');
   for (const marker of ['id="orch-pill"', 'GOAL', 'nextAction', 'unclassifiedFinalCount', 'whyNotComplete', 'goalState', "registryTask.nextAction || '—'", '未分类 final', 'task-state', 'registry-section', 'transition-history', 'workerTiming', '本轮开始', 'fallback-authorized', 'id="v2-note"', '无编排数据：v2 旧快照未携带 registry', '>Map<', '>List<']) {
@@ -3407,7 +3456,7 @@ async function orchestrationDomain() {
 async function layoutDomain() {
   const required = [
     'SKILL.md', 'board.html', 'board.config.json', 'run-tests.mjs', 'references/design.md',
-    'fixtures/aes-agent-issues.json', 'fixtures/orchestration-events.json',
+    'fixtures/aes-agent-issues.json', 'fixtures/parking-agents-issues.json', 'fixtures/orchestration-events.json',
     'scripts/collect.mjs', 'scripts/capture-issues-fixture.mjs', 'scripts/assess.mjs', 'scripts/check-issue-graph.mjs', 'scripts/command.mjs', 'scripts/dispatch.mjs',
     'scripts/headless.mjs', 'scripts/orchestrate.mjs', 'scripts/runtime-store.mjs',
     'scripts/server.mjs', 'scripts/selftest.mjs',
