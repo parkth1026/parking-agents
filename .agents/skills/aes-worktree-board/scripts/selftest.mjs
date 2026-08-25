@@ -3345,7 +3345,8 @@ async function orchestrationContractMarkers() {
   const graphChecker = readFileSync(join(SCRIPT_DIR, 'check-issue-graph.mjs'), 'utf8');
   for (const marker of [
     '--issues-fixture', 'gh issue list', 'subIssues', 'blockedBy', 'blocking',
-    'fixture 必须是完整 github-issue-fixture', '控制面追加段必须位于',
+    'FIXTURE_ISSUE_COUNT', 'FIXTURE_ISSUE_NUMBERS_SHA256', 'REQUIRED_ISSUE_FIELDS', 'validateIssueShape',
+    'fixture 必须是完整 github-issue-fixture', 'fixture 缺失锁定 Issue', '控制面追加段必须位于',
   ]) assert.match(graphChecker, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.ok(existsSync(ISSUE_GRAPH_FIXTURE), '缺少 issue graph 完整离线 fixture');
   const graphFixture = JSON.parse(readFileSync(ISSUE_GRAPH_FIXTURE, 'utf8'));
@@ -3353,8 +3354,13 @@ async function orchestrationContractMarkers() {
   assert.equal(graphFixture.repo, 'parkth1026/parking-agents');
   assert.equal(graphFixture.query.state, 'all');
   assert.ok(graphFixture.query.limit >= 1000, 'issue graph fixture 必须来自完整 issue-list limit');
-  assert.ok(graphFixture.issues.length >= 40, 'issue graph fixture 必须是完整图，不得使用最小 mock');
-  assert.equal(graphFixture.issueCount, graphFixture.issues.length);
+  assert.equal(graphFixture.issueCount, 45, 'issue graph fixture issueCount 必须锁定为 45');
+  assert.equal(graphFixture.issues.length, 45, 'issue graph fixture 实际数组必须保留 45 条 Issue');
+  assert.deepEqual(graphFixture.integrity.issueNumbers, Array.from({ length: 45 }, (_, index) => index + 1));
+  assert.equal(
+    graphFixture.integrity.issueNumbersSha256,
+    'ab6cf16b6160344f12d9a043415b4c216d7825c1578152f2904de281e82d22bc',
+  );
   const graphProbe = spawnSync(process.execPath, [
     join(SCRIPT_DIR, 'check-issue-graph.mjs'),
     '--repo', graphFixture.repo,
@@ -3368,7 +3374,11 @@ async function orchestrationContractMarkers() {
       issues: graphFixture.issues.map((issue) => issue.number === 34
         ? {
           ...issue,
-          blockedBy: { ...issue.blockedBy, nodes: issue.blockedBy.nodes.filter((node) => Number(node.number) !== 33) },
+          blockedBy: {
+            ...issue.blockedBy,
+            nodes: issue.blockedBy.nodes.filter((node) => Number(node.number) !== 33),
+            totalCount: issue.blockedBy.totalCount - 1,
+          },
           blockedByNumbers: issue.blockedByNumbers.filter((number) => Number(number) !== 33),
         }
         : issue),
@@ -3382,6 +3392,37 @@ async function orchestrationContractMarkers() {
     ], { ...HEADLESS_CHILD_OPTIONS, cwd: ROOT, encoding: 'utf8', timeout: 30_000 });
     assert.equal(negativeProbe.status, 1, '破坏 #34 blocked-by 的 fixture 必须 fail closed');
     assert.match(negativeProbe.stderr, /#34 blocked-by/);
+
+    const missingIssuePath = join(brokenFixtureRoot, 'missing-issue-1.json');
+    writeFileSync(missingIssuePath, `${JSON.stringify({
+      ...graphFixture,
+      issues: graphFixture.issues.filter((issue) => issue.number !== 1),
+    }, null, 2)}\n`);
+    const missingIssueProbe = spawnSync(process.execPath, [
+      join(SCRIPT_DIR, 'check-issue-graph.mjs'),
+      '--repo', graphFixture.repo,
+      '--issues-fixture', missingIssuePath,
+    ], { ...HEADLESS_CHILD_OPTIONS, cwd: ROOT, encoding: 'utf8', timeout: 30_000 });
+    assert.equal(missingIssueProbe.status, 1, '删除无关 #1 的 fixture 必须 fail closed');
+    assert.match(missingIssueProbe.stderr, /issueCount/);
+    assert.match(missingIssueProbe.stderr, /缺失锁定 Issue: #1/);
+
+    const missingFieldPath = join(brokenFixtureRoot, 'missing-issue-1-field.json');
+    writeFileSync(missingFieldPath, `${JSON.stringify({
+      ...graphFixture,
+      issues: graphFixture.issues.map((issue) => {
+        if (issue.number !== 1) return issue;
+        const { blockedBy, ...withoutBlockedBy } = issue;
+        return withoutBlockedBy;
+      }),
+    }, null, 2)}\n`);
+    const missingFieldProbe = spawnSync(process.execPath, [
+      join(SCRIPT_DIR, 'check-issue-graph.mjs'),
+      '--repo', graphFixture.repo,
+      '--issues-fixture', missingFieldPath,
+    ], { ...HEADLESS_CHILD_OPTIONS, cwd: ROOT, encoding: 'utf8', timeout: 30_000 });
+    assert.equal(missingFieldProbe.status, 1, '保留 45 条但删除 #1 字段的 fixture 必须 fail closed');
+    assert.match(missingFieldProbe.stderr, /#1 缺少字段: blockedBy/);
   } finally {
     await cleanTemp(brokenFixtureRoot);
   }

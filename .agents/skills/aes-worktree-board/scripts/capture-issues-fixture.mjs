@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // 把 GitHub issue 星图保存为可离线复现的页面/collect 测试 fixture。
+import { createHash } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { dirname, resolve, join } from 'node:path';
@@ -61,6 +62,10 @@ function numbers(nodes) {
     .sort((a, b) => a - b);
 }
 
+function issueNumbersDigest(issueNumbers) {
+  return createHash('sha256').update(JSON.stringify(issueNumbers)).digest('hex');
+}
+
 async function main() {
   const config = loadConfig();
   const issueRepo = option('--repo', config.issueRepo);
@@ -98,6 +103,11 @@ async function main() {
     repo: issueRepo,
     query: { state: 'all', limit: 1000, fields: ISSUE_FIELDS.split(',') },
     issueCount: issues.length,
+    integrity: {
+      issueCount: issues.length,
+      issueNumbers: issues.map((issue) => issue.number),
+      issueNumbersSha256: issueNumbersDigest(issues.map((issue) => issue.number)),
+    },
     issues,
   };
   mkdirSync(dirname(output), { recursive: true });

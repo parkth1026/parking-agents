@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Goal Contract AC-006：联网读取 GitHub 原生 parent / blocked-by 图并 fail closed。
 // --issues-fixture 提供同一份完整 issue-list 的可重复离线 seam；默认仍走 gh live。
+import { createHash } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -12,6 +13,12 @@ const REPO = option('--repo', 'parkth1026/parking-agents');
 const ISSUES_FIXTURE = option('--issues-fixture', null);
 const failures = [];
 
+const FIXTURE_ISSUE_COUNT = 45;
+const FIXTURE_ISSUE_NUMBERS = Object.freeze(Array.from({ length: FIXTURE_ISSUE_COUNT }, (_, index) => index + 1));
+const FIXTURE_ISSUE_NUMBERS_SHA256 = 'ab6cf16b6160344f12d9a043415b4c216d7825c1578152f2904de281e82d22bc';
+const REQUIRED_ISSUE_FIELDS = ['number', 'title', 'state', 'body', 'labels', 'parent', 'subIssues', 'blockedBy', 'blocking'];
+const REQUIRED_LABEL_FIELDS = ['id', 'name', 'description', 'color'];
+const REQUIRED_RELATION_NODE_FIELDS = ['id', 'number', 'state', 'title', 'url'];
 const GRAPH_FIELDS = [
   'number', 'title', 'state', 'body', 'labels', 'parent', 'subIssues', 'blockedBy', 'blocking',
 ].join(',');
@@ -106,6 +113,119 @@ function sameNumbers(actual, expected) {
   return JSON.stringify(numbers(actual)) === JSON.stringify(numbers(expected));
 }
 
+function hasOwn(value, field) {
+  return Object.prototype.hasOwnProperty.call(value, field);
+}
+
+function isRecord(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function issueNumbersDigest(issueNumbers) {
+  return createHash('sha256').update(JSON.stringify(issueNumbers)).digest('hex');
+}
+
+function validateStringField(owner, field, label, errors) {
+  if (!hasOwn(owner, field)) {
+    errors.push(`${label} 缺少字段: ${field}`);
+  } else if (typeof owner[field] !== 'string') {
+    errors.push(`${label}.${field} 类型错误: expected string`);
+  }
+}
+
+function validateRelationNode(value, label, errors) {
+  if (!isRecord(value)) {
+    errors.push(`${label} 结构错误: expected object`);
+    return;
+  }
+  for (const field of REQUIRED_RELATION_NODE_FIELDS) {
+    if (!hasOwn(value, field)) {
+      errors.push(`${label} 缺少字段: ${field}`);
+      continue;
+    }
+    if (field === 'number') {
+      if (!Number.isInteger(value[field]) || value[field] < 1) errors.push(`${label}.number 类型错误: expected positive integer`);
+    } else if (field === 'state' && !['OPEN', 'CLOSED'].includes(value[field])) {
+      errors.push(`${label}.state 类型错误: expected OPEN or CLOSED`);
+    } else if (typeof value[field] !== 'string') {
+      errors.push(`${label}.${field} 类型错误: expected string`);
+    }
+  }
+}
+
+function validateRelation(value, label, errors) {
+  if (!isRecord(value)) {
+    errors.push(`${label} 结构错误: expected object`);
+    return;
+  }
+  if (!hasOwn(value, 'nodes')) errors.push(`${label} 缺少字段: nodes`);
+  if (!hasOwn(value, 'totalCount')) errors.push(`${label} 缺少字段: totalCount`);
+  if (!Array.isArray(value.nodes)) {
+    if (hasOwn(value, 'nodes')) errors.push(`${label}.nodes 类型错误: expected array`);
+  } else {
+    for (const [index, node] of value.nodes.entries()) validateRelationNode(node, `${label}.nodes[${index}]`, errors);
+  }
+  if (hasOwn(value, 'totalCount') && (!Number.isInteger(value.totalCount) || value.totalCount < 0)) {
+    errors.push(`${label}.totalCount 类型错误: expected non-negative integer`);
+  }
+  if (Array.isArray(value.nodes) && Number.isInteger(value.totalCount) && value.totalCount !== value.nodes.length) {
+    errors.push(`${label}.totalCount 不等于 nodes 数量: ${value.totalCount} != ${value.nodes.length}`);
+  }
+}
+
+function validateIssueShape(issue, index, errors) {
+  const label = isRecord(issue) && Number.isInteger(issue.number) ? `#${issue.number}` : `issues[${index}]`;
+  if (!isRecord(issue)) {
+    errors.push(`${label} 类型错误: expected object`);
+    return;
+  }
+  for (const field of REQUIRED_ISSUE_FIELDS) {
+    if (!hasOwn(issue, field)) errors.push(`${label} 缺少字段: ${field}`);
+  }
+  if (hasOwn(issue, 'number') && (!Number.isInteger(issue.number) || issue.number < 1)) {
+    errors.push(`${label}.number 类型错误: expected positive integer`);
+  }
+  validateStringField(issue, 'title', label, errors);
+  validateStringField(issue, 'body', label, errors);
+  if (hasOwn(issue, 'state') && !['OPEN', 'CLOSED'].includes(issue.state)) {
+    errors.push(`${label}.state 类型错误: expected OPEN or CLOSED`);
+  }
+  if (hasOwn(issue, 'labels')) {
+    if (!Array.isArray(issue.labels)) {
+      errors.push(`${label}.labels 类型错误: expected array`);
+    } else {
+      for (const [labelIndex, issueLabel] of issue.labels.entries()) {
+        const labelName = `${label}.labels[${labelIndex}]`;
+        if (!isRecord(issueLabel)) {
+          errors.push(`${labelName} 类型错误: expected object`);
+          continue;
+        }
+        for (const field of REQUIRED_LABEL_FIELDS) validateStringField(issueLabel, field, labelName, errors);
+      }
+    }
+  }
+  for (const field of ['subIssues', 'blockedBy', 'blocking']) {
+    if (hasOwn(issue, field)) validateRelation(issue[field], `${label}.${field}`, errors);
+  }
+  if (hasOwn(issue, 'parent') && issue.parent !== null) validateRelationNode(issue.parent, `${label}.parent`, errors);
+}
+
+function sortedIssueNumbers(issues) {
+  return issues
+    .map((issue) => issue?.number)
+    .filter((number) => Number.isInteger(number))
+    .sort((left, right) => left - right);
+}
+
+function numberSetDifference(expected, actual) {
+  const actualSet = new Set(actual);
+  const expectedSet = new Set(expected);
+  return {
+    missing: expected.filter((number) => !actualSet.has(number)),
+    extra: actual.filter((number, index) => !expectedSet.has(number) || actual.indexOf(number) !== index),
+  };
+}
+
 function parseFixture(fixturePath) {
   const path = resolve(fixturePath);
   let payload;
@@ -123,15 +243,45 @@ function parseFixture(fixturePath) {
   if (String(payload.repo || '').toLowerCase() !== REPO.toLowerCase()) {
     throw new Error(`fixture repo 与 --repo 不一致: expected ${REPO}, actual ${payload.repo || '<missing>'}`);
   }
-  if (Number(payload.issueCount) !== payload.issues.length) {
-    throw new Error(`fixture issueCount 不等于 issues 数量: ${payload.issueCount} != ${payload.issues.length}`);
+  const integrityErrors = [];
+  if (payload.issueCount !== FIXTURE_ISSUE_COUNT) {
+    integrityErrors.push(`fixture issueCount 必须锁定为 ${FIXTURE_ISSUE_COUNT}: actual ${payload.issueCount}`);
+  }
+  if (payload.issues.length !== FIXTURE_ISSUE_COUNT) {
+    integrityErrors.push(`fixture issueCount/实际 issues 数量不一致: declared ${payload.issueCount}, actual ${payload.issues.length}`);
+  }
+  const actualIssueNumbers = sortedIssueNumbers(payload.issues);
+  const numberDifference = numberSetDifference(FIXTURE_ISSUE_NUMBERS, actualIssueNumbers);
+  if (numberDifference.missing.length) integrityErrors.push(`fixture 缺失锁定 Issue: ${numberDifference.missing.map((number) => `#${number}`).join(', ')}`);
+  if (numberDifference.extra.length) integrityErrors.push(`fixture 存在未知/重复 Issue: ${numberDifference.extra.map((number) => `#${number}`).join(', ')}`);
+  if (issueNumbersDigest(actualIssueNumbers) !== FIXTURE_ISSUE_NUMBERS_SHA256) {
+    integrityErrors.push('fixture 实际 Issue 集合 digest 不匹配锁定 Issue 集合');
+  }
+  if (!isRecord(payload.integrity)) {
+    integrityErrors.push('fixture 缺少 integrity metadata');
+  } else {
+    if (payload.integrity.issueCount !== FIXTURE_ISSUE_COUNT) {
+      integrityErrors.push(`fixture integrity.issueCount 必须锁定为 ${FIXTURE_ISSUE_COUNT}: actual ${payload.integrity.issueCount}`);
+    }
+    if (!Array.isArray(payload.integrity.issueNumbers)) {
+      integrityErrors.push('fixture integrity.issueNumbers 类型错误: expected array');
+    } else if (payload.integrity.issueNumbers.some((number) => !Number.isInteger(number))) {
+      integrityErrors.push('fixture integrity.issueNumbers 类型错误: expected integer array');
+    } else if (!sameNumbers(payload.integrity.issueNumbers, FIXTURE_ISSUE_NUMBERS)) {
+      integrityErrors.push('fixture integrity.issueNumbers 不匹配锁定 Issue 集合');
+    }
+    if (payload.integrity.issueNumbersSha256 !== FIXTURE_ISSUE_NUMBERS_SHA256) {
+      integrityErrors.push('fixture integrity.issueNumbersSha256 不匹配锁定 Issue 集合');
+    }
   }
   if (payload.query?.state !== 'all' || Number(payload.query?.limit) < 1000) {
-    throw new Error('fixture 必须来自 state=all、limit>=1000 的完整 issue-list 查询');
+    integrityErrors.push('fixture 必须来自 state=all、limit>=1000 的完整 issue-list 查询');
   }
   const requiredFields = ['body', 'labels', 'parent', 'subIssues', 'blockedBy', 'blocking'];
   const missingFields = requiredFields.filter((field) => !payload.query.fields?.includes(field));
-  if (missingFields.length) throw new Error(`fixture 缺少图断言字段: ${missingFields.join(', ')}`);
+  if (missingFields.length) integrityErrors.push(`fixture 缺少图断言字段: ${missingFields.join(', ')}`);
+  for (const [index, issue] of payload.issues.entries()) validateIssueShape(issue, index, integrityErrors);
+  if (integrityErrors.length) throw new Error(`fixture 完整性失败:\n${integrityErrors.map((error) => `- ${error}`).join('\n')}`);
   return { issues: payload.issues, source: `fixture:${path}` };
 }
 
