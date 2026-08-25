@@ -145,10 +145,12 @@ async function invokeGh(args, { env = process.env, cwd, timeout = 60_000, maxBuf
 }
 
 function responseStatus(result) {
-  if (Number.isInteger(result.status)) return result.status;
   const source = `${result.stderr}\n${result.stdout}`;
+  if (/Could not resolve to a Repository/i.test(source)) return 404;
   const match = source.match(/(?:HTTP|status(?: code)?)\s*[:=]?\s*([45]\d\d)\b/i);
   return match ? Number(match[1]) : null;
+  if (Number.isInteger(result.status)) return result.status;
+  return null;
 }
 
 function remoteError(result, context, details = {}, token = '') {
@@ -276,7 +278,7 @@ export async function prepareGithubAccess({
     } catch (error) {
       if (!supplied) throw error;
     }
-  } else if (statusResult.error?.code === 'ENOENT') {
+  } else if (statusResult.status !== 0 || statusResult.error) {
     throw remoteError(statusResult, 'gh auth status', { host: target.host, issueRepo: repo }, supplied?.value);
   }
 

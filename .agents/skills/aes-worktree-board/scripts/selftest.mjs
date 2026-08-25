@@ -1409,6 +1409,7 @@ function fail(message, status = 1) {
 }
 
 if (args[0] === 'auth' && args[1] === 'status') {
+  if (mode === 'auth-status-network') fail('network unreachable', 1);
   console.log(JSON.stringify({ hosts: {
     [process.env.GH_HOST || 'github.com']: accounts.map((login) => ({
       state: 'success', active: login === accounts[0], login,
@@ -1421,6 +1422,7 @@ if (args[0] === 'auth' && args[1] === 'status') {
   console.log(viewer);
 } else if (args[0] === 'repo' && args[1] === 'view') {
   if (mode === 'not-found') fail('gh: Not Found (HTTP 404)', 4);
+  if (mode === 'repo-graphql-not-found') fail('GraphQL: Could not resolve to a Repository with the name owner/repo.', 1);
   if (mode === 'network-repo') fail('network unreachable', 1);
   console.log(JSON.stringify({
     nameWithOwner: args[2] || 'owner/repo', viewerPermission: permission, isPrivate: true,
@@ -1432,8 +1434,12 @@ if (args[0] === 'auth' && args[1] === 'status') {
   }]));
 } else if (args[0] === 'issue' && args[1] === 'view') {
   console.log(JSON.stringify({ number: Number(args[2] || 1), title: 'fake issue', state: 'OPEN' }));
-} else if (args[0] === 'issue' && ['create', 'edit', 'comment', 'close', 'reopen'].includes(args[1])) {
+} else if (args[0] === 'issue' && [
+  'create', 'edit', 'comment', 'close', 'reopen', 'delete', 'lock', 'unlock', 'pin', 'unpin', 'transfer', 'develop',
+].includes(args[1])) {
   console.log('issue write ok');
+} else if (args[0] === 'issue') {
+  console.log('issue command ok');
 } else if (args[0] === 'api' && String(args[2] || '').includes('/timeline')) {
   console.log(JSON.stringify([]));
 } else {
@@ -1530,6 +1536,20 @@ async function identityDomain() {
       }),
       'NETWORK_FAILURE',
     );
+    await expectGithubError(
+      prepareGithubAccess({
+        config: { ...config, githubAccount: 'alice' }, issueRepo,
+        env: fakeGithubEnv(fake, root, { accounts: ['alice'], viewer: 'alice', mode: 'repo-graphql-not-found' }), cwd: root,
+      }),
+      'REPO_NOT_FOUND',
+    );
+    await expectGithubError(
+      prepareGithubAccess({
+        config: { ...config, githubAccount: 'alice' }, issueRepo,
+        env: fakeGithubEnv(fake, root, { accounts: ['alice'], viewer: 'alice', mode: 'auth-status-network' }), cwd: root,
+      }),
+      'NETWORK_FAILURE',
+    );
 
     const supplied = await prepareGithubAccess({
       config: { ...config, githubAccount: 'bob' }, issueRepo,
@@ -1566,6 +1586,42 @@ async function identityDomain() {
     assert.equal(issueView.status, 0, issueView.stderr);
     assert.match(issueView.stdout, /fake issue/);
     assert.doesNotMatch(`${issueView.stdout}\n${issueView.stderr}`, /test-secret/);
+    const boundIssueView = traceRecords(fake.trace)
+      .filter((record) => record.args[0] === 'issue' && record.args[1] === 'view' && record.args[2] === '1')
+      .at(-1);
+    assert.deepEqual(boundIssueView?.args.slice(-2), ['--repo', issueRepo],
+      'Issue wrapper 必须把 preflight 绑定的 auth.issueRepo 注入实际 gh args');
+
+    for (const conflictArgs of [
+      ['--repo', 'evil/repo'], ['-R', 'evil/repo'], ['--repo=evil/repo'],
+    ]) {
+      const conflict = spawnSync(process.execPath, [
+        join(SCRIPT_DIR, 'github-issue.mjs'), '--repo', issueRepo, '--account', 'alice', '--',
+        'issue', 'view', '1', ...conflictArgs,
+      ], { ...HEADLESS_CHILD_OPTIONS, cwd: fixture.main, env: liveEnv, encoding: 'utf8' });
+      assert.notEqual(conflict.status, 0, `冲突 repo 参数必须 fail closed: ${conflictArgs.join(' ')}`);
+      assert.match(conflict.stderr, /repo|仓库|冲突/i);
+    }
+
+    const writeCommands = ['create', 'edit', 'close', 'reopen', 'comment', 'delete', 'lock', 'unlock', 'pin', 'unpin', 'transfer', 'develop'];
+    const readOnlyEnv = boardEnv(runtimeDir, {
+      ...fakeGithubEnv(fake, fixture.main, { accounts: ['alice'], viewer: 'alice', permission: 'READ' }),
+      AES_WORKTREE_BOARD_CONFIG: configText,
+    });
+    for (const subcommand of writeCommands) {
+      const writeProbe = spawnSync(process.execPath, [
+        join(SCRIPT_DIR, 'github-issue.mjs'), '--repo', issueRepo, '--account', 'alice', '--',
+        'issue', subcommand, '1',
+      ], { ...HEADLESS_CHILD_OPTIONS, cwd: fixture.main, env: readOnlyEnv, encoding: 'utf8' });
+      assert.notEqual(writeProbe.status, 0, `写操作 ${subcommand} 不得按 read 权限放行`);
+      assert.match(`${writeProbe.stdout}\n${writeProbe.stderr}`, /PERMISSION_DENIED|权限不足/i);
+    }
+    const unknown = spawnSync(process.execPath, [
+      join(SCRIPT_DIR, 'github-issue.mjs'), '--repo', issueRepo, '--account', 'alice', '--',
+      'issue', 'future-command', '1',
+    ], { ...HEADLESS_CHILD_OPTIONS, cwd: fixture.main, env: readOnlyEnv, encoding: 'utf8' });
+    assert.notEqual(unknown.status, 0, '未知 Issue 子命令必须 fail closed');
+    assert.match(`${unknown.stdout}\n${unknown.stderr}`, /unknown|未知|unsupported|不支持/i);
 
     const issueEdit = spawnSync(process.execPath, [
       join(SCRIPT_DIR, 'github-issue.mjs'), '--repo', issueRepo, '--account', 'alice', '--', 'issue', 'edit', '1', '--title', 'safe',
