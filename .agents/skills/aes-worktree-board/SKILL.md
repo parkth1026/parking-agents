@@ -26,7 +26,7 @@ $worker = "dev1"
 
 collect preflight 必须验证目标仓存在 `mainBranch`；真实 GitHub 采集还必须验证 `issueRepo` 可访问，错配退出 2 并点名字段。
 
-runtime 选址链保持不变：`AES_WORKTREE_BOARD_RUNTIME_DIR` 优先，否则 `<目标仓根>/.aes-worktree-board/runtime/`。目标仓应忽略这个目录。技能目录历史 `runtime/`（含 03:21 快照与 `orchestration-stop.json`）只是只读归档证据：不得删除、移动或由脚本继续读写。
+runtime 选址链保持不变：`AES_WORKTREE_BOARD_RUNTIME_DIR` 优先，否则 `<目标仓根>/.aes-worktree-board/runtime/`。已有 `status.json` 的 `repo.root / issueRepo / mainBranch` 必须与本次目标 identity 一致，否则以 `REPO_MISMATCH`、exit 2 拒绝复用，不能沿用其中的 Issue 或控制面事实。collect 在锁前快检一次、取得 runtime 锁并重读最终快照后再校验一次，阻止两个目标仓从同一空 runtime 并发写成 last-writer-wins。目标仓应忽略这个目录。技能目录历史 `runtime/`（含 03:21 快照与 `orchestration-stop.json`）只是只读归档证据：不得删除、移动或由脚本继续读写。
 
 ## 不可越过的边界
 
@@ -282,7 +282,7 @@ dirty 现场仍需另加 `--confirm-dirty`。server 看板的 fallback POST 还�
 - fixture 刷新：`node "$skillDir/scripts/capture-issues-fixture.mjs"`。
 - 离线生成：`node "$skillDir/scripts/collect.mjs" --no-gh --issues-fixture "$skillDir/fixtures/aes-agent-issues.json"`。
 
-看板 v3 只在既有控制面挂点显示信息：全局编排胶囊、Workers Task/工作时长徽章、详情 Task/时间/transition 区、fallback 授权提示、v2 降级条、Map/List 文案。页面不自行推导业务状态，工作时长只用 status 投影的 registry executor 时间；旧 CLI activeTask 仅在没有 registry Task 时兼容显示。
+看板 v3 只在既有控制面挂点显示信息：全局编排胶囊、Workers Task/工作时长徽章、详情 Task/时间/transition 区、fallback 授权提示、v2 降级条、Map/List 文案。页面不自行推导业务状态，工作时长只用 status 投影的 registry executor 时间；旧 CLI activeTask 仅在没有 registry Task 时兼容显示。server API 响应携带专属 `aes-worktree-board/1` marker；监听端口已被占用时只有 marker、v3、generatedAt、repo、graph（issues/edges/stats）与 worktrees 完整通过 schema 校验后才比较既有 `/api/status?fast=1` identity。另一目标仓返回 `REPO_MISMATCH`，同仓、repo-shaped 非 board 或 marker 正确但 status 不完整的进程返回 `PORT_CONFLICT`，均 exit 2，且不得把既有实例输出成当前启动成功。
 
 `POST /api/dispatch` 的锁定字段名是 `worker`；server 为旧调用方兼容接收 `worktree`，但页面与新调用方统一发送 `worker`。500 报文使用 `message`。
 

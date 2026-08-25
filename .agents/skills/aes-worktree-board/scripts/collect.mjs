@@ -16,6 +16,7 @@ import {
 const pExecFile = promisify(execFile);
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 export const SKILL_DIR = dirname(SCRIPT_DIR);
+export const BOARD_API = Object.freeze({ marker: 'aes-worktree-board', protocolVersion: 1 });
 // 默认沿用调用方当前目录，显式环境变量可把看板指向另一个同级 worktree 仓库。
 // skill 本身可以放在独立的工具仓库中，不再把 skill 目录误当成目标仓库根。
 export const REPO_ROOT = resolve(process.env.AES_WORKTREE_BOARD_REPO_ROOT || process.cwd());
@@ -162,6 +163,48 @@ export function readTasks(runtimeDir = RUNTIME_DIR) {
 
 function loadPrevious(runtimeDir) {
   return readJson(runtimePaths(runtimeDir).statusJson, null);
+}
+
+function identityPathKey(value) {
+  if (!value) return null;
+  const key = norm(resolve(String(value)));
+  return process.platform === 'win32' ? key.toLowerCase() : key;
+}
+
+export function repoIdentity(root, config) {
+  return {
+    root: root ? norm(resolve(String(root))) : '',
+    issueRepo: String(config.issueRepo || ''),
+    mainBranch: String(config.mainBranch || ''),
+  };
+}
+
+export function repoIdentityMatches(expected, actual) {
+  return Boolean(actual)
+    && identityPathKey(expected.root) === identityPathKey(actual.root)
+    && expected.issueRepo.toLowerCase() === String(actual.issueRepo || '').toLowerCase()
+    && expected.mainBranch === String(actual.mainBranch || '');
+}
+
+export function assertRuntimeIdentity(runtimeDir, expected, snapshot = undefined) {
+  const existing = snapshot === undefined ? loadPrevious(runtimeDir) : snapshot;
+  if (!existing) return;
+  const actual = repoIdentity(existing.repo?.root || '', {
+    issueRepo: existing.repo?.issueRepo,
+    mainBranch: existing.repo?.mainBranch,
+  });
+  if (repoIdentityMatches(expected, actual)) return;
+  const error = new Error(
+    `[runtime] repo mismatch：${norm(resolve(runtimeDir))} 属于 `
+    + `${actual.root || '(missing root)'} | ${actual.issueRepo || '(missing issueRepo)'} | ${actual.mainBranch || '(missing mainBranch)'}，`
+    + `当前目标是 ${expected.root} | ${expected.issueRepo} | ${expected.mainBranch}`,
+  );
+  error.code = 'REPO_MISMATCH';
+  error.exitCode = 2;
+  error.expected = expected;
+  error.actual = actual;
+  error.runtimeDir = norm(resolve(runtimeDir));
+  throw error;
 }
 
 function latestRegistryTask(registry, worktreeName) {
@@ -424,12 +467,15 @@ export async function collectStatus({
   skipGh = false,
   runtimeDir = RUNTIME_DIR,
   issuesFixture = null,
+  beforeWrite = null,
 } = {}) {
   const config = loadConfig();
   const fixturePath = issuesFixture || process.env.AES_WORKTREE_BOARD_ISSUES_FIXTURE || null;
   const { main, siblings } = await listWorktrees();
+  const expectedIdentity = repoIdentity(main.path, config);
   await preflightConfig(config, { skipIssueRepo: Boolean(skipGh || fixturePath) });
   const previous = loadPrevious(runtimeDir);
+  assertRuntimeIdentity(runtimeDir, expectedIdentity, previous);
   const registry = readRegistry(runtimeDir);
   const previousWorktrees = new Map((previous?.worktrees || []).map((worker) => [worker.name, worker]));
   const tasks = readTasks(runtimeDir);
@@ -535,13 +581,14 @@ export async function collectStatus({
   });
   const status = {
     schemaVersion: 3,
+    board: BOARD_API,
     generatedAt: new Date().toISOString(),
     repo: {
-      root: norm(main.path),
+      root: expectedIdentity.root,
       name: basename(main.path),
-      mainBranch: config.mainBranch,
+      mainBranch: expectedIdentity.mainBranch,
       mainHead,
-      issueRepo: config.issueRepo,
+      issueRepo: expectedIdentity.issueRepo,
     },
     orchestration: registry.orchestration,
     graph,
@@ -552,9 +599,11 @@ export async function collectStatus({
   const snapshotPage = readFileSync(join(SKILL_DIR, 'board.html'), 'utf8')
     .replace('__WORKBOARD_STATUS__', 'status.js');
   mkdirSync(paths.tasksDir, { recursive: true });
+  if (beforeWrite) await beforeWrite({ expectedIdentity, runtimeDir });
   withRuntimeLock(runtimeDir, () => {
     // collect 计算期间 assess/registry 可能已更新；临写前重新承接，避免旧快照复活。
     const latestSnapshot = readJson(paths.statusJson, null);
+    assertRuntimeIdentity(runtimeDir, expectedIdentity, latestSnapshot);
     const latestAssessments = new Map((latestSnapshot?.worktrees || []).map((worker) => [worker.name, worker.assessment]));
     const latestRegistry = readRegistry(runtimeDir);
     status.orchestration = latestRegistry.orchestration;

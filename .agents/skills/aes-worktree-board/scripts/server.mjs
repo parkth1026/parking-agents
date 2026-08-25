@@ -9,7 +9,8 @@ import {
 } from 'node:fs';
 import { join } from 'node:path';
 import {
-  collectStatus, listWorktrees, loadConfig, RUNTIME_DIR, SKILL_DIR, TASKS_DIR,
+  assertRuntimeIdentity, BOARD_API, collectStatus, listWorktrees, loadConfig, repoIdentity, repoIdentityMatches,
+  RUNTIME_DIR, SKILL_DIR, TASKS_DIR,
 } from './collect.mjs';
 import { HEADLESS_CHILD_OPTIONS } from './headless.mjs';
 import { canonicalWorktreeId, completeFallbackDispatch, registerFallbackDispatch } from './orchestrate.mjs';
@@ -20,9 +21,106 @@ const config = loadConfig();
 const requestedPort = process.argv.find((argument, index) => process.argv[index - 1] === '--port');
 const port = Number(requestedPort ?? config.port ?? 8321);
 const boardToken = `btk_${randomBytes(24).toString('hex')}`;
+const boardApiHeader = `${BOARD_API.marker}/${BOARD_API.protocolVersion}`;
+
+function isRecord(value) {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function hasText(value) {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function hasBoardMarker(response, payload) {
+  return response.headers.get('x-aes-worktree-board') === boardApiHeader
+    && payload?.board?.marker === BOARD_API.marker
+    && payload?.board?.protocolVersion === BOARD_API.protocolVersion;
+}
+
+function isRepoIdentity(value, { displayFields = false } = {}) {
+  return isRecord(value)
+    && hasText(value.root)
+    && hasText(value.issueRepo)
+    && hasText(value.mainBranch)
+    && (!displayFields || (hasText(value.name) && hasText(value.mainHead)));
+}
+
+function isBoardStatus(response, payload) {
+  const stats = payload?.graph?.stats;
+  return hasBoardMarker(response, payload)
+    && payload.schemaVersion === 3
+    && hasText(payload.generatedAt)
+    && isRepoIdentity(payload.repo, { displayFields: true })
+    && Array.isArray(payload.graph?.issues)
+    && payload.graph.issues.every((issue) => (
+      isRecord(issue) && Number.isInteger(issue.number) && hasText(issue.title) && hasText(issue.state)
+    ))
+    && Array.isArray(payload.graph?.edges)
+    && payload.graph.edges.every((edge) => (
+      isRecord(edge) && Number.isInteger(edge.from) && Number.isInteger(edge.to)
+    ))
+    && isRecord(stats)
+    && ['total', 'open', 'closed', 'frontier', 'edges', 'warned'].every((field) => Number.isFinite(stats[field]))
+    && Array.isArray(payload.worktrees)
+    && payload.worktrees.every((worktree) => isRecord(worktree) && hasText(worktree.name) && hasText(worktree.path));
+}
+
+function startupDiagnostic(error, fallbackCode = 'STARTUP_FAILED') {
+  return {
+    ok: false,
+    code: error.code || fallbackCode,
+    message: String(error.message || error),
+    ...(error.port !== undefined ? { port: error.port } : {}),
+    ...(error.expected ? { expected: error.expected } : {}),
+    ...(error.actual ? { actual: error.actual } : {}),
+    ...(error.runtimeDir ? { runtimeDir: error.runtimeDir } : {}),
+  };
+}
+
+async function portConflictDiagnostic(expected, requested) {
+  const base = {
+    ok: false,
+    code: 'PORT_CONFLICT',
+    message: `127.0.0.1:${requested} 已被占用；当前 server 未启动`,
+    port: requested,
+    expected,
+  };
+  try {
+    const response = await fetch(`http://127.0.0.1:${requested}/api/status?fast=1`, {
+      signal: AbortSignal.timeout(10_000),
+    });
+    const payload = await response.json();
+    const markedBoardStatus = isBoardStatus(response, payload);
+    const markedBoardError = hasBoardMarker(response, payload)
+      && payload?.apiSchemaVersion === 1
+      && payload?.code === 'REPO_MISMATCH'
+      && isRepoIdentity(payload.actual);
+    if (!markedBoardStatus && !markedBoardError) {
+      return { ...base, detail: '占用者未通过 aes-worktree-board marker/schema 校验' };
+    }
+    const reportedIdentity = payload?.repo || payload?.actual || null;
+    const actual = reportedIdentity
+      ? repoIdentity(reportedIdentity.root || '', reportedIdentity)
+      : null;
+    if (actual && !repoIdentityMatches(expected, actual)) {
+      return {
+        ...base,
+        code: 'REPO_MISMATCH',
+        message: `127.0.0.1:${requested} 正由另一目标仓的 aes-worktree-board 占用`,
+        actual,
+      };
+    }
+    return { ...base, ...(actual ? { actual } : {}) };
+  } catch (cause) {
+    return { ...base, detail: `占用者不是可识别的 aes-worktree-board: ${String(cause.message).slice(0, 160)}` };
+  }
+}
 
 function sendJson(response, statusCode, value) {
-  response.writeHead(statusCode, { 'content-type': 'application/json; charset=utf-8' });
+  response.writeHead(statusCode, {
+    'content-type': 'application/json; charset=utf-8',
+    'x-aes-worktree-board': boardApiHeader,
+  });
   response.end(JSON.stringify(value));
 }
 
@@ -186,9 +284,21 @@ function dispatchSecurity(request, response) {
   return true;
 }
 
+let main;
+let expectedIdentity;
+try {
+  ({ main } = await listWorktrees());
+  expectedIdentity = repoIdentity(main.path, config);
+  assertRuntimeIdentity(RUNTIME_DIR, expectedIdentity);
+} catch (error) {
+  console.error(JSON.stringify(startupDiagnostic(error)));
+  process.exit(error.exitCode || 1);
+}
+
 const server = createServer(async (request, response) => {
   const url = new URL(request.url, `http://127.0.0.1:${port}`);
   try {
+    assertRuntimeIdentity(RUNTIME_DIR, expectedIdentity);
     if (request.method === 'GET' && url.pathname === '/') {
       response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
       const page = readFileSync(join(SKILL_DIR, 'board.html'), 'utf8')
@@ -218,18 +328,35 @@ const server = createServer(async (request, response) => {
     }
     return sendJson(response, 404, { ok: false, error: 'not found' });
   } catch (error) {
-    return sendJson(response, 500, {
+    return sendJson(response, error.code === 'REPO_MISMATCH' ? 409 : 500, {
       ok: false,
+      board: BOARD_API,
+      apiSchemaVersion: 1,
       message: String(error.message).slice(0, 300),
-      code: 'INTERNAL',
+      code: error.code || 'INTERNAL',
+      ...(error.expected ? { expected: error.expected } : {}),
+      ...(error.actual ? { actual: error.actual } : {}),
+      ...(error.runtimeDir ? { runtimeDir: error.runtimeDir } : {}),
     });
   }
 });
 
-await listWorktrees();
+server.on('error', async (error) => {
+  if (error.code === 'EADDRINUSE') {
+    console.error(JSON.stringify(await portConflictDiagnostic(expectedIdentity, port)));
+    process.exitCode = 2;
+    return;
+  }
+  console.error(JSON.stringify(startupDiagnostic(error)));
+  process.exitCode = 1;
+});
 
 server.listen(port, '127.0.0.1', () => {
   const address = server.address();
   const actualPort = typeof address === 'object' ? address.port : port;
-  console.log(`worktree 看板: http://127.0.0.1:${actualPort}/  （仅本机可访问）`);
+  console.log(
+    `worktree 看板: http://127.0.0.1:${actualPort}/  （仅本机可访问）`
+    + ` repo=${expectedIdentity.root} issueRepo=${expectedIdentity.issueRepo}`
+    + ` mainBranch=${expectedIdentity.mainBranch} runtime=${RUNTIME_DIR}`,
+  );
 });

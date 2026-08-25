@@ -181,7 +181,7 @@ node scripts/quick-validate.mjs <技能目录>
 { "total_tokens": 48213, "duration_ms": 137000 }
 ```
 
-数值拿不到就写 `null`（聚合器会跳过并计入 skipped，不报错）。
+数值拿不到就写 `null`（聚合器会跳过并计入 skipped；若本轮某项 timing 全部缺失，会在 `benchmark.json`/终端显著告警，统计保持「未测量」而不是伪造为 0）。
 
 通知到达时同时核对**产物已落盘**——该 run 的 `outputs/` 有文件、任务要求的关键产物存在。空产物是执行臂故障（agent 报完成但没写盘），不是技能回归：先纠偏续跑或重跑该臂补齐，再进评分；纠偏产生的 timing 按各段累计。
 
@@ -196,7 +196,7 @@ node scripts/quick-validate.mjs <技能目录>
 
    产出 `benchmark.json` + `benchmark.md`：pass_rate/time_ms/tokens 的 mean±stddev（样本方差）+ delta（with − baseline）。配置目录名动态发现（with_skill/without_skill/old_skill/自定义都行）。
 
-   `--history` 是评测数据反向写进技能目录的**唯一通道**（聚合默认不碰技能目录，须显式传参）：把本轮各 gate 指标**追加**一条 run 进 `<技能目录>/history.json`（只追加不覆盖，历史可审计），并同通道**整写** `<技能目录>/output-evals.json`——本轮全部 eval 的题面（prompt）与断言（含 `ac` 引用），接收方 clone 仓库后不依赖 workspace 就能重建同一套评测用例（跨轮题面变化由 git 记录）。**专项轮**（只跑题库子集的探针轮）要加 `--keep-evals`：保留题库中本轮未跑的 eval，防止部分场景轮把题库整写成子集；全量轮换代（有意汰换旧场景）不要带该旗标。**从首轮起每轮聚合都带上它**（用户明说不沉淀除外）——某轮忘带则 history 断档，下一轮的对比会静默跳过断档轮。终端多 3 行趋势摘要。history.json 随 .skill 包分发——workspace 会被 clean，成绩沉淀进技能才留得住；但 `vs_previous` 的逐 eval 对比要**现场重算上一轮 iteration 目录**，所以 clean workspace 前先把该轮聚合并沉淀（跨机/跨会话续跑时旧目录可能已不在，对比会记「不可比」而不是报错）。目标目录不可写时拒绝追加（退出码 1），已产出的 benchmark 不回滚。
+   `--history` 是评测数据反向写进技能目录的**唯一通道**（聚合默认不碰技能目录，须显式传参）：把本轮各 gate 指标**追加**一条 run 进 `<技能目录>/history.json`（只追加不覆盖，历史可审计），并同通道**整写** `<技能目录>/output-evals.json`——本轮全部 eval 的题面（prompt）与断言（含 `ac` 引用），接收方 clone 仓库后不依赖 workspace 就能重建同一套评测用例（跨轮题面变化由 git 记录）。**专项轮**（只跑题库子集的探针轮）要加 `--keep-evals`：保留题库中本轮未跑的 eval，防止部分场景轮把题库整写成子集；全量轮换代（有意汰换旧场景）不要带该旗标。**从首轮起每轮聚合都带上它**（用户明说不沉淀除外）——某轮忘带则 history 断档，下一轮的对比会静默跳过断档轮；若当前 `iteration-N` 的同级 `iteration-(N-1)` 目录仍在但 history 没有对应记录，聚合器会在 `benchmark.json` 与终端给出断档警告，但不会伪造或回补丢失历史。终端多 3 行趋势摘要。history.json 随 .skill 包分发——workspace 会被 clean，成绩沉淀进技能才留得住；但 `vs_previous` 的逐 eval 对比要**现场重算上一轮 iteration 目录**，所以 clean workspace 前先把该轮聚合并沉淀（跨机/跨会话续跑时旧目录可能已不在，对比会记「不可比」而不是报错）。目标目录不可写时拒绝追加（退出码 1），已产出的 benchmark 不回滚。
 
    对比与星标口径（防脏数据）：**主 gate** = with_skill，没有 with_skill 时取字典序首个 gate 名。`vs_previous` 与上一条 run 按**同 eval 名**比 won/lost/tie（pass 布尔翻转；本轮新增 eval 计入 total 不计胜负，上轮有本轮没有的 eval 标 dropped）；两轮主 gate 名不同且无共同 with_skill 时记「gate 不连续不可比」，**绝不当失败记 lost**。`current_best` 按主 gate pass_rate 严格更高才推进、平局不推进（防抖）；主 gate 名不同的轮次（纯实验 gate）不参与推进；同一 iteration 重复聚合视为修正——追加一条并在 stdout 提示，星标以该 iteration 最新一条为准（早期半程数据锁不住上限）。`iteration_ref` 存本机绝对路径，仅供本机回溯，跨机时只作轮次标识读。
 3. **分析**：读 benchmark 数据做一轮 analyst pass（读 `agents/analyzer.md` 的 Analyzing Benchmark Results 节）——找聚合看不见的模式：两组全过的无区分度断言、高方差疑似 flaky 的 eval、时间/token 代价。观察写入 benchmark.json 的 `notes` 数组，viewer 会展示。
@@ -251,7 +251,9 @@ node eval-viewer/generate-review.mjs <workspace>/iteration-<N> [--history <技�
 
 ## 触发评测：优化 description 的触发准确率
 
-description 决定技能会不会被调用。技能做完（或触发不准）时主动提议跑触发评测。**机制：同宿主 subagent 探针**——生产环境用哪个 agent 跑就用哪个 agent 测，同宿主同模型，零无头 CLI 依赖。
+description 决定技能会不会被调用。技能做完（或触发不准）时主动提议跑触发评测。**首选机制：同宿主 subagent 探针**——生产环境用哪个 agent 跑就用哪个 agent 测，同宿主同模型。
+
+起跑前先确认**当前编排会话**能否 spawn 探针。若没有嵌套 Agent 工具，读取 `references/headless-trigger-fallback.md`：仅在主会话已把同宿主、同模型凭据预置到进程环境时，用安全 launcher 单轮运行 `zcode --prompt`；严禁读写共享 CLI 配置、key 落盘或编排器自答，运行后删除私有 Temp 并扫描凭据前缀。缺少任一宿主能力或授权时停止，把整轮触发评测交回主会话直跑。
 
 ### 建评测集
 
@@ -370,8 +372,9 @@ node scripts/package-skill.mjs <技能目录> [输出目录]
 ## 参考文件
 
 - `references/writing-guide.md` — 技能写作方法论（渐进披露、自由度分级、description 写法、防泄漏纪律）
+- `references/headless-trigger-fallback.md` — 无嵌套 Agent 工具时的单轮 headless 探针、安全凭据与残留扫描契约
 - `references/schemas.md` — 全部 JSON 契约（eval_metadata 含 ac 字段/grading/timing/benchmark/feedback/history.json/structure-review/触发评测三契约/comparison/analysis）
-- `references/design.md` — 本技能的意图、设计取舍和 AC-1…AC-6 验收依据
+- `references/design.md` — 本技能的意图、设计取舍和 AC-1…AC-12 验收依据
 - `agents/openai.yaml` — 技能列表 UI 元数据，字段值不含宿主路径
 - `agents/grader.md` — grader subagent 指令（评分哲学与 grading.json 契约）
 - `agents/comparator.md` — 盲比较指令（A/B 不知情评审）

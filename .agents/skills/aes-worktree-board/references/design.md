@@ -49,6 +49,9 @@ executor final schema 至少包含：`outcome=COMMITTED`、`commitSha`、`tests.
 测试非零会 fail closed。`needs-manual-test + runtime=NOT_RUN` 仅在 manual debt 显式存在时可过
 merge gate，Task create 从 fresh Issue labels 自动推导该 interaction class；`runtime=FAIL|BLOCKED`
 始终阻断。
+- runtime 中已有快照必须与本次解析出的 `repo.root / issueRepo / mainBranch` 完全同源；任一字段错配都以 `REPO_MISMATCH`、exit 2 拒绝复用，不能从旧快照提取 Issue 或控制面事实。
+- runtime identity 必须在 collect 的锁前快检和取得 runtime 锁后的最终快照上各校验一次；两个目标仓从同一空 runtime 并发 collect 时只能有一个写入，另一方必须 `REPO_MISMATCH`，不得 last-writer-wins。
+- server API 使用专属 `aes-worktree-board/1` marker 与完整 status schema；端口冲突探测只有验证 v3、generatedAt、repo、graph（issues/edges/stats）与 worktrees 后才比较 identity。另一目标仓返回可诊断的 `REPO_MISMATCH`，同仓或 marker 正确但 status 不完整的服务返回 `PORT_CONFLICT`；任何冲突都拒绝把旧实例当成本次启动成功。
 
 ## 验收条件
 
@@ -85,6 +88,8 @@ merge gate，Task create 从 fresh Issue labels 自动推导该 interaction clas
 | AC-29 | 每次 transition/resolution/recovery/stop 原子刷新 task 与 orchestration 投影；APPROVE 后 nextAction 为 EVALUATE_MERGE_GATE。 |
 | AC-30 | direct createTask 也按 Issue 检查跨 worker 未 merged executor Task，不能绕过 claim ledger。 |
 | AC-31 | superseded reviewer binding 只能经授权、幂等、append-only dead-letter receipt 收敛；合法事件和任意 reason fail closed。 |
+| AC-32 | 显式目标仓、runtime 旧快照和 server 监听端口形成同一 repo identity 边界；跨项目错配以 exit 2 fail closed，当前项目 API 的仓、Issue 图谱与 worktree 列表必须同源。 |
+| AC-33 | 锁内二次 identity 校验阻止空 runtime 的双仓并发覆盖；repo-shaped 非 board JSON 或 marker 正确但缺 repo/graph/worktrees 的不完整 status 未通过完整 schema 时只能判为 `PORT_CONFLICT`。 |
 
 ## 迭代记录
 
@@ -98,3 +103,5 @@ merge gate，Task create 从 fresh Issue labels 自动推导该 interaction clas
 | 2026-08-25 | Issue #43 BLOCK 2/3：把 final schema 校验前移到 terminal-noop 之前，并把 merge commit 从“至少双父”收紧为“恰好双父”。 | late-merged malformed final 与真实 octopus merge 负向 probes。 | parked/handoff 仍是显式收敛态；merged 只能由同 commit replacement typed-final 清理 late malformed event。 |
 | 2026-08-25 | Issue #43 人工解除熔断：修复 UNCLASSIFIED 收敛后的 nextAction 残留，并实现授权约束的同 Task handoff recovery。 | Registry/collect/board 投影断言；第三次 BLOCK→handoff→授权恢复→新 commit→reviewer APPROVE host-shaped 回归。 | generic transition 与新 fix Task 仍关闭；恢复只接受显式用户授权并保留审计 ledger。 |
 | 2026-08-25 | Issue #43 恢复 epoch 1：绑定 reviewed/live Git HEAD、恢复 descendant、原 thread、原子投影与跨 worker create，并增加受限 dead-letter。 | 两组 live-HEAD 真实 Git 负测、真实 handoff recovery、direct create 与 short/full SHA replacement 回归。 | append-only inbox 不修改；dead-letter 是独立授权 receipt，不等同 consumed。 |
+| 2026-08-25 | 锁定跨项目 repo identity：拒绝错误 runtime 快照，并在端口占用时区分另一仓 server 与普通冲突。 | repo-root 跨项目 runtime/port/API 回归 + 八域回归 + 真实 parking-agents API smoke。 | 沿用既有 `/api/status?fast=1`，不增加监听地址、路由或第三方依赖。 |
+| 2026-08-25 | BLOCK 1/3 follow-up：目标仓 integration 配置落为 `dev`，collect 增加锁内 identity 复核，端口探测增加专属 board marker/schema。 | 双仓 barrier 并发回归、repo-shaped 伪服务回归、无 env 目标主仓 live API/Playwright。 | marker 是 additive v3 字段与响应头；页面仍可降级读取旧 v2/v3 快照。 |
