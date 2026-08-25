@@ -7,7 +7,7 @@ import { HEADLESS_CHILD_OPTIONS } from './scripts/headless.mjs';
 const skillDir = dirname(fileURLToPath(import.meta.url));
 const selftest = join(skillDir, 'scripts', 'selftest.mjs');
 const domains = [
-  'collect', 'fixture', 'dispatch', 'server', 'repo-root', 'layout', 'windows-hide', 'orchestration',
+  'collect', 'fixture', 'dispatch', 'server', 'repo-root', 'layout', 'windows-hide', 'orchestration', 'identity',
 ];
 
 let passed = 0;

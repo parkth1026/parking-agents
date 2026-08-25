@@ -7,10 +7,11 @@ import {
 } from 'node:fs';
 import { join, resolve, sep } from 'node:path';
 import {
-  collectStatus, listWorktrees, loadConfig, RUNTIME_DIR, TASKS_DIR,
+  collectStatus, listWorktrees, loadConfig, REPO_ROOT, RUNTIME_DIR, TASKS_DIR,
 } from './collect.mjs';
 import { resolveCommand } from './command.mjs';
 import { HEADLESS_CHILD_OPTIONS } from './headless.mjs';
+import { githubIdentityPrompt, prepareGithubAccess } from './github-identity.mjs';
 import {
   completeFallbackDispatch, markFallbackStarted, registerFallbackDispatch,
 } from './orchestrate.mjs';
@@ -46,6 +47,9 @@ let promptStdin = false;
 let deletePromptFile = false;
 let confirmDirty = false;
 let fallbackAuthorized = null;
+let githubAccess = false;
+let githubAccount = null;
+let githubHost = null;
 let registered = false;
 const positional = [];
 for (let index = 0; index < argv.length; index += 1) {
@@ -56,6 +60,9 @@ for (let index = 0; index < argv.length; index += 1) {
   else if (argv[index] === '--delete-prompt-file') deletePromptFile = true;
   else if (argv[index] === '--confirm-dirty') confirmDirty = true;
   else if (argv[index] === '--fallback-authorized') fallbackAuthorized = argv[++index];
+  else if (argv[index] === '--github-access') githubAccess = true;
+  else if (argv[index] === '--github-account') githubAccount = argv[++index];
+  else if (argv[index] === '--github-host') githubHost = argv[++index];
   else if (argv[index] === '--registered') registered = true;
   else positional.push(argv[index]);
 }
@@ -75,7 +82,7 @@ if (agentName !== 'test' && !fallbackAuthorized) {
     code: 'FALLBACK_AUTH_REQUIRED',
   });
 }
-const prompt = promptStdin
+const rawPrompt = promptStdin
   ? await readStdin()
   : promptFile
     ? readFileSync(promptFile, 'utf8')
@@ -87,7 +94,26 @@ if (deletePromptFile && promptFile) {
     if (requestPath.startsWith(`${requestRoot}${sep}`) && existsSync(requestPath)) unlinkSync(requestPath);
   });
 }
-if (!prompt.trim()) fail('prompt 为空：请以位置参数、stdin 或 --prompt-file 提供任务内容', 1, { code: 'BAD_REQUEST' });
+if (!rawPrompt.trim()) fail('prompt 为空：请以位置参数、stdin 或 --prompt-file 提供任务内容', 1, { code: 'BAD_REQUEST' });
+
+// 真实 fallback agent 默认需要显式绑定 GitHub viewer；test agent 只有在
+// --github-access 下才走这条边界，保持离线 selftest 的假 agent 不触网。
+const requiresGithub = agentName !== 'test' || githubAccess;
+let githubAuth = null;
+if (requiresGithub) {
+  try {
+    githubAuth = await prepareGithubAccess({
+      config,
+      issueRepo: config.issueRepo,
+      account: githubAccount,
+      host: githubHost,
+      cwd: REPO_ROOT,
+    });
+  } catch (error) {
+    fail(error.message, error.exitCode || 2, { code: error.code || 'NETWORK_FAILURE', ...(error.details || {}) });
+  }
+}
+const prompt = `${rawPrompt}${githubIdentityPrompt(githubAuth)}`;
 
 const { siblings } = await listWorktrees();
 const target = siblings.find((entry) => {
@@ -150,7 +176,7 @@ const child = spawn(finalArgv[0], finalArgv.slice(1), {
   ...HEADLESS_CHILD_OPTIONS,
   cwd: target.path,
   stdio: ['pipe', logFd, logFd],
-  env: { ...process.env, FORCE_COLOR: '0', NO_COLOR: '1' },
+  env: { ...(githubAuth?.env || process.env), FORCE_COLOR: '0', NO_COLOR: '1' },
 });
 const task = {
   id: taskId,

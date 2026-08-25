@@ -1,9 +1,8 @@
 #!/usr/bin/env node
 // Goal Contract 的机械验收入口：collect / dispatch / server / repo-root / layout。
 import assert from 'node:assert/strict';
-import { execFile, spawn, spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { createServer } from 'node:http';
-import { promisify } from 'node:util';
 import {
   chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync,
 } from 'node:fs';
@@ -15,6 +14,7 @@ import {
 } from './collect.mjs';
 import { resolveCommand } from './command.mjs';
 import { HEADLESS_CHILD_OPTIONS } from './headless.mjs';
+import { prepareGithubAccess, runGithubJson } from './github-identity.mjs';
 import {
   consumeEvent, CONTROL_STATES, createTask, evaluateStop, heartbeatTask, pendingInbox, putInboxEvent,
   EXECUTOR_FINAL_SCHEMA, nextActions, receiveActionReceipt, recordBlock, runPostMergeVerification, setVerdict, startGoal,
@@ -22,7 +22,6 @@ import {
 } from './orchestrate.mjs';
 import { readJson, readJsonLines, readRegistry, writeJsonAtomic } from './runtime-store.mjs';
 
-const pExecFile = promisify(execFile);
 const SCRIPT_DIR = resolve(SKILL_DIR, 'scripts');
 const SELF = fileURLToPath(import.meta.url);
 const ROOT = resolve(SKILL_DIR, '..', '..', '..');
@@ -302,13 +301,8 @@ function transitionViaCli(taskId, to, runtimeDir, options = {}) {
   return result.status === 0 ? parseJsonLine(result.stdout) : parseJsonLine(result.stderr);
 }
 
-async function ghJson(args) {
-  const { stdout } = await pExecFile('gh', args, {
-    ...HEADLESS_CHILD_OPTIONS,
-    timeout: 60_000,
-    maxBuffer: 32 * 1024 * 1024,
-  });
-  return JSON.parse(stdout);
+async function ghJson(args, auth) {
+  return runGithubJson(args, { auth, cwd: ROOT, timeout: 60_000, maxBuffer: 32 * 1024 * 1024 });
 }
 
 async function collectDomain() {
@@ -423,9 +417,10 @@ async function collectLiveDomain() {
   try {
     const status = await collectStatus({ runtimeDir });
     const config = loadConfig();
+    const auth = await prepareGithubAccess({ config, issueRepo: config.issueRepo, cwd: ROOT });
     const allIssues = await ghJson([
       'issue', 'list', '--repo', config.issueRepo, '--state', 'all', '--limit', '1000', '--json', 'number,labels',
-    ]);
+    ], auth);
     assert.equal(status.schemaVersion, 3);
     assert.equal(status.graph.issues.length, allIssues.length, 'live issues 数必须等于 gh 全量 OPEN+CLOSED');
     const byNumber = new Map(status.graph.issues.map((issue) => [issue.number, issue]));
@@ -1386,6 +1381,299 @@ async function serverDomain() {
       await stopped;
     }
     await cleanTemp(runtimeDir);
+  }
+}
+
+function fakeGithubCommand(root) {
+  const script = join(root, 'fake-gh.mjs');
+  const trace = join(root, 'fake-gh-trace.jsonl');
+  writeFileSync(script, String.raw`#!/usr/bin/env node
+import { appendFileSync } from 'node:fs';
+
+const args = process.argv.slice(2);
+const mode = process.env.AES_WORKTREE_BOARD_FAKE_GH_MODE || 'single';
+const accounts = (process.env.AES_WORKTREE_BOARD_FAKE_GH_ACCOUNTS || 'alice')
+  .split(',').map((value) => value.trim()).filter(Boolean);
+const viewer = process.env.AES_WORKTREE_BOARD_FAKE_GH_VIEWER || accounts[0] || 'alice';
+const permission = process.env.AES_WORKTREE_BOARD_FAKE_GH_PERMISSION || 'WRITE';
+const tracePath = process.env.AES_WORKTREE_BOARD_FAKE_GH_TRACE;
+if (tracePath) appendFileSync(tracePath, JSON.stringify({
+  args,
+  host: process.env.GH_HOST || null,
+  hasToken: Boolean(process.env.GH_TOKEN || process.env.GH_ENTERPRISE_TOKEN || process.env.GITHUB_TOKEN),
+}) + '\n');
+
+function fail(message, status = 1) {
+  console.error(message);
+  process.exit(status);
+}
+
+if (args[0] === 'auth' && args[1] === 'status') {
+  if (mode === 'auth-status-network') fail('network unreachable', 1);
+  console.log(JSON.stringify({ hosts: {
+    [process.env.GH_HOST || 'github.com']: accounts.map((login) => ({
+      state: 'success', active: login === accounts[0], login,
+    })),
+  } }));
+} else if (args[0] === 'auth' && args[1] === 'token') {
+  console.log(process.env.AES_WORKTREE_BOARD_FAKE_GH_TOKEN || 'test-secret');
+} else if (args[0] === 'api' && args[1] === 'user') {
+  if (mode === 'network-user') fail('network unreachable', 1);
+  console.log(viewer);
+} else if (args[0] === 'repo' && args[1] === 'view') {
+  if (mode === 'not-found') fail('gh: Not Found (HTTP 404)', 4);
+  if (mode === 'repo-graphql-not-found') fail('GraphQL: Could not resolve to a Repository with the name owner/repo.', 1);
+  if (mode === 'network-repo') fail('network unreachable', 1);
+  console.log(JSON.stringify({
+    nameWithOwner: args[2] || 'owner/repo', viewerPermission: permission, isPrivate: true,
+  }));
+} else if (args[0] === 'issue' && args[1] === 'list') {
+  console.log(JSON.stringify([{
+    number: 1, title: 'fake issue', state: 'OPEN', url: 'https://github.com/owner/repo/issues/1',
+    body: 'fake body', closedAt: null, updatedAt: '2026-08-25T00:00:00Z', labels: [], blockedBy: [], blocking: [],
+  }]));
+} else if (args[0] === 'issue' && args[1] === 'view') {
+  console.log(JSON.stringify({ number: Number(args[2] || 1), title: 'fake issue', state: 'OPEN' }));
+} else if (args[0] === 'issue' && [
+  'create', 'edit', 'comment', 'close', 'reopen', 'delete', 'lock', 'unlock', 'pin', 'unpin', 'transfer', 'develop',
+].includes(args[1])) {
+  console.log('issue write ok');
+} else if (args[0] === 'issue') {
+  console.log('issue command ok');
+} else if (args[0] === 'api' && String(args[2] || '').includes('/timeline')) {
+  console.log(JSON.stringify([]));
+} else {
+  fail('unexpected fake gh command: ' + args.join(' '), 1);
+}
+`);
+  if (process.platform !== 'win32') chmodSync(script, 0o755);
+  return { command: JSON.stringify([process.execPath, script]), trace, token: 'test-secret' };
+}
+
+function fakeGithubEnv(fake, root, options = {}) {
+  const env = { ...process.env,
+    AES_WORKTREE_BOARD_GH_COMMAND: fake.command,
+    AES_WORKTREE_BOARD_FAKE_GH_TRACE: fake.trace,
+    AES_WORKTREE_BOARD_FAKE_GH_MODE: options.mode || 'single',
+    AES_WORKTREE_BOARD_FAKE_GH_ACCOUNTS: (options.accounts || ['alice']).join(','),
+    AES_WORKTREE_BOARD_FAKE_GH_VIEWER: options.viewer || (options.accounts || ['alice'])[0],
+    AES_WORKTREE_BOARD_FAKE_GH_PERMISSION: options.permission || 'WRITE',
+    AES_WORKTREE_BOARD_FAKE_GH_TOKEN: fake.token,
+  };
+  for (const name of ['GH_TOKEN', 'GITHUB_TOKEN', 'GH_ENTERPRISE_TOKEN']) delete env[name];
+  if (options.token) env.GH_TOKEN = options.token;
+  if (root) env.AES_WORKTREE_BOARD_REPO_ROOT = root;
+  return env;
+}
+
+function traceRecords(path) {
+  if (!existsSync(path)) return [];
+  return readFileSync(path, 'utf8').split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line));
+}
+
+async function expectGithubError(operation, code) {
+  await assert.rejects(operation, (error) => {
+    assert.equal(error.code, code, `expected ${code}, actual ${error.code}: ${error.message}`);
+    assert.doesNotMatch(String(error.message), /test-secret|gh[pousr]_|github_pat_/i);
+    return true;
+  });
+}
+
+async function identityDomain() {
+  const root = tempDirectory('identity');
+  const fake = fakeGithubCommand(root);
+  const issueRepo = 'owner/repo';
+  const config = { githubHost: 'github.com' };
+  let liveFixture = null;
+  let liveFixtureCleaned = false;
+  try {
+    const singleEnv = fakeGithubEnv(fake, root, { accounts: ['alice'], viewer: 'alice' });
+    const single = await prepareGithubAccess({ config, issueRepo, env: singleEnv, cwd: root });
+    assert.equal(single.targetAccount, 'alice');
+    assert.equal(single.viewer, 'alice');
+    assert.equal(single.permission, 'WRITE');
+    assert.equal(single.env.GH_TOKEN, fake.token);
+
+    const multipleEnv = fakeGithubEnv(fake, root, { accounts: ['alice', 'bob'], viewer: 'alice' });
+    await expectGithubError(
+      prepareGithubAccess({ config, issueRepo, env: multipleEnv, cwd: root }),
+      'IDENTITY_REQUIRED',
+    );
+
+    const selected = await prepareGithubAccess({
+      config: { ...config, githubAccount: 'bob' }, issueRepo, env: fakeGithubEnv(fake, root, {
+        accounts: ['alice', 'bob'], viewer: 'bob',
+      }), cwd: root,
+    });
+    assert.equal(selected.targetAccount, 'bob');
+    assert.equal(selected.viewer, 'bob');
+
+    await expectGithubError(
+      prepareGithubAccess({
+        config: { ...config, githubAccount: 'alice' }, issueRepo,
+        env: fakeGithubEnv(fake, root, { accounts: ['alice'], viewer: 'bob' }), cwd: root,
+      }),
+      'IDENTITY_MISMATCH',
+    );
+    await expectGithubError(
+      prepareGithubAccess({
+        config: { ...config, githubAccount: 'alice' }, issueRepo,
+        env: fakeGithubEnv(fake, root, { accounts: ['alice'], viewer: 'alice', permission: 'NONE' }), cwd: root,
+      }),
+      'PERMISSION_DENIED',
+    );
+    await expectGithubError(
+      prepareGithubAccess({
+        config: { ...config, githubAccount: 'alice' }, issueRepo,
+        env: fakeGithubEnv(fake, root, { accounts: ['alice'], viewer: 'alice', mode: 'not-found' }), cwd: root,
+      }),
+      'REPO_NOT_FOUND',
+    );
+    await expectGithubError(
+      prepareGithubAccess({
+        config: { ...config, githubAccount: 'alice' }, issueRepo,
+        env: fakeGithubEnv(fake, root, { accounts: ['alice'], viewer: 'alice', mode: 'network-repo' }), cwd: root,
+      }),
+      'NETWORK_FAILURE',
+    );
+    await expectGithubError(
+      prepareGithubAccess({
+        config: { ...config, githubAccount: 'alice' }, issueRepo,
+        env: fakeGithubEnv(fake, root, { accounts: ['alice'], viewer: 'alice', mode: 'repo-graphql-not-found' }), cwd: root,
+      }),
+      'REPO_NOT_FOUND',
+    );
+    await expectGithubError(
+      prepareGithubAccess({
+        config: { ...config, githubAccount: 'alice' }, issueRepo,
+        env: fakeGithubEnv(fake, root, { accounts: ['alice'], viewer: 'alice', mode: 'auth-status-network' }), cwd: root,
+      }),
+      'NETWORK_FAILURE',
+    );
+
+    const supplied = await prepareGithubAccess({
+      config: { ...config, githubAccount: 'bob' }, issueRepo,
+      env: fakeGithubEnv(fake, root, { accounts: ['alice', 'bob'], viewer: 'bob', token: fake.token }), cwd: root,
+    });
+    assert.equal(supplied.env.GH_TOKEN, fake.token, '显式 GH_TOKEN 必须只绑定当前子进程');
+
+    liveFixture = repositoryFixture('identity-live');
+    const fixture = liveFixture;
+    const runtimeDir = join(fixture.root, 'runtime');
+    const configText = JSON.stringify({ mainBranch: 'main', issueRepo, githubAccount: 'alice' });
+    const liveEnv = boardEnv(runtimeDir, {
+      ...fakeGithubEnv(fake, fixture.main, { accounts: ['alice'], viewer: 'alice' }),
+      AES_WORKTREE_BOARD_CONFIG: configText,
+    });
+    const collected = spawnSync(process.execPath, [join(SCRIPT_DIR, 'collect.mjs')], {
+      ...HEADLESS_CHILD_OPTIONS, cwd: fixture.main, env: liveEnv, encoding: 'utf8',
+    });
+    assert.equal(collected.status, 0, collected.stderr);
+    const statusText = readFileSync(join(runtimeDir, 'status.json'), 'utf8');
+    assert.doesNotMatch(`${collected.stdout}\n${collected.stderr}\n${statusText}`, /test-secret/);
+    assert.equal(JSON.parse(statusText).graph.issues.length, 1);
+
+    const capturedPath = join(fixture.root, 'captured.json');
+    const captured = spawnSync(process.execPath, [
+      join(SCRIPT_DIR, 'capture-issues-fixture.mjs'), '--repo', issueRepo, '--output', capturedPath,
+    ], { ...HEADLESS_CHILD_OPTIONS, cwd: fixture.main, env: liveEnv, encoding: 'utf8' });
+    assert.equal(captured.status, 0, captured.stderr);
+    assert.doesNotMatch(`${captured.stdout}\n${captured.stderr}\n${readFileSync(capturedPath, 'utf8')}`, /test-secret/);
+
+    const issueView = spawnSync(process.execPath, [
+      join(SCRIPT_DIR, 'github-issue.mjs'), '--repo', issueRepo, '--account', 'alice', '--', 'issue', 'view', '1', '--comments',
+    ], { ...HEADLESS_CHILD_OPTIONS, cwd: fixture.main, env: liveEnv, encoding: 'utf8' });
+    assert.equal(issueView.status, 0, issueView.stderr);
+    assert.match(issueView.stdout, /fake issue/);
+    assert.doesNotMatch(`${issueView.stdout}\n${issueView.stderr}`, /test-secret/);
+    const boundIssueView = traceRecords(fake.trace)
+      .filter((record) => record.args[0] === 'issue' && record.args[1] === 'view' && record.args[2] === '1')
+      .at(-1);
+    assert.deepEqual(boundIssueView?.args.slice(-2), ['--repo', issueRepo],
+      'Issue wrapper 必须把 preflight 绑定的 auth.issueRepo 注入实际 gh args');
+
+    for (const conflictArgs of [
+      ['--repo', 'evil/repo'], ['-R', 'evil/repo'], ['--repo=evil/repo'],
+    ]) {
+      const conflict = spawnSync(process.execPath, [
+        join(SCRIPT_DIR, 'github-issue.mjs'), '--repo', issueRepo, '--account', 'alice', '--',
+        'issue', 'view', '1', ...conflictArgs,
+      ], { ...HEADLESS_CHILD_OPTIONS, cwd: fixture.main, env: liveEnv, encoding: 'utf8' });
+      assert.notEqual(conflict.status, 0, `冲突 repo 参数必须 fail closed: ${conflictArgs.join(' ')}`);
+      assert.match(conflict.stderr, /repo|仓库|冲突/i);
+    }
+
+    const writeCommands = ['create', 'edit', 'close', 'reopen', 'comment', 'delete', 'lock', 'unlock', 'pin', 'unpin', 'transfer', 'develop'];
+    const readOnlyEnv = boardEnv(runtimeDir, {
+      ...fakeGithubEnv(fake, fixture.main, { accounts: ['alice'], viewer: 'alice', permission: 'READ' }),
+      AES_WORKTREE_BOARD_CONFIG: configText,
+    });
+    for (const subcommand of writeCommands) {
+      const writeProbe = spawnSync(process.execPath, [
+        join(SCRIPT_DIR, 'github-issue.mjs'), '--repo', issueRepo, '--account', 'alice', '--',
+        'issue', subcommand, '1',
+      ], { ...HEADLESS_CHILD_OPTIONS, cwd: fixture.main, env: readOnlyEnv, encoding: 'utf8' });
+      assert.notEqual(writeProbe.status, 0, `写操作 ${subcommand} 不得按 read 权限放行`);
+      assert.match(`${writeProbe.stdout}\n${writeProbe.stderr}`, /PERMISSION_DENIED|权限不足/i);
+    }
+    const unknown = spawnSync(process.execPath, [
+      join(SCRIPT_DIR, 'github-issue.mjs'), '--repo', issueRepo, '--account', 'alice', '--',
+      'issue', 'future-command', '1',
+    ], { ...HEADLESS_CHILD_OPTIONS, cwd: fixture.main, env: readOnlyEnv, encoding: 'utf8' });
+    assert.notEqual(unknown.status, 0, '未知 Issue 子命令必须 fail closed');
+    assert.match(`${unknown.stdout}\n${unknown.stderr}`, /unknown|未知|unsupported|不支持/i);
+
+    const issueEdit = spawnSync(process.execPath, [
+      join(SCRIPT_DIR, 'github-issue.mjs'), '--repo', issueRepo, '--account', 'alice', '--', 'issue', 'edit', '1', '--title', 'safe',
+    ], { ...HEADLESS_CHILD_OPTIONS, cwd: fixture.main, env: liveEnv, encoding: 'utf8' });
+    assert.equal(issueEdit.status, 0, issueEdit.stderr);
+
+    const probePath = join(fixture.root, 'agent-env.json');
+    const serverRuntime = join(fixture.root, 'server-runtime');
+    const probeCode = "require('node:fs').writeFileSync(process.env.AES_WORKTREE_BOARD_IDENTITY_PROBE, JSON.stringify({hasToken:Boolean(process.env.GH_TOKEN),host:process.env.GH_HOST}));";
+    const serverConfig = JSON.stringify({
+      mainBranch: 'main', issueRepo, githubAccount: 'alice',
+      agents: { test: ['node', '-e', probeCode] },
+    });
+    let server = null;
+    try {
+      server = await startServer(serverRuntime, {
+        ...fakeGithubEnv(fake, fixture.main, { accounts: ['alice'], viewer: 'alice' }),
+        AES_WORKTREE_BOARD_CONFIG: serverConfig,
+        AES_WORKTREE_BOARD_IDENTITY_PROBE: probePath,
+      });
+      const response = await authorizedDispatch(server, {
+        worktree: basename(fixture.sibling), prompt: 'server identity', agent: 'test',
+        githubAccess: true, confirmDirty: true,
+      });
+      const responseText = await response.text();
+      assert.equal(response.status, 202, responseText);
+      const payload = JSON.parse(responseText);
+      const task = await waitTask(server.origin, payload.taskId);
+      assert.equal(task.task.status, 'done');
+      const probe = JSON.parse(readFileSync(probePath, 'utf8'));
+      assert.deepEqual(probe, { hasToken: true, host: 'github.com' });
+    } finally {
+      if (server?.child && server.child.exitCode === null) {
+        const stopped = waitForExit(server.child);
+        server.child.kill();
+        await stopped;
+      }
+      await cleanRepositoryFixture(fixture);
+      liveFixtureCleaned = true;
+    }
+
+    const records = traceRecords(fake.trace);
+    assert.ok(records.some((record) => record.args[0] === 'api' && record.args[1] === 'user' && record.hasToken));
+    assert.ok(records.some((record) => record.args[0] === 'repo' && record.args[1] === 'view' && record.hasToken));
+    assert.ok(records.some((record) => record.args[0] === 'issue' && record.args[1] === 'list' && record.hasToken));
+    assert.ok(records.every((record) => !record.args.includes('switch')), '身份绑定不得调用 gh auth switch');
+    assert.doesNotMatch(readFileSync(fake.trace, 'utf8'), /test-secret/);
+  } finally {
+    if (liveFixture && !liveFixtureCleaned) {
+      await cleanRepositoryFixture(liveFixture).catch(() => {});
+    }
+    if (existsSync(root)) await cleanTemp(root);
   }
 }
 
@@ -3170,8 +3458,9 @@ async function orchestrationServerBoundary() {
     response = await authorizedDispatch(server, {
       worker: basename(fixture.sibling), prompt: 'boundary authorized', agent: 'test',
     });
-    assert.equal(response.status, 202);
-    const payload = await response.json();
+    const boundaryBody = await response.text();
+    if (response.status !== 202) throw new Error(`server fallback response ${response.status}: ${boundaryBody}`);
+    const payload = JSON.parse(boundaryBody);
     assert.match(payload.taskId, /^tk-.+-\d+-g\d+$/, 'server success 必须返回 registry generation taskId');
     await waitTask(server.origin, payload.taskId);
   } finally {
@@ -3187,6 +3476,7 @@ async function orchestrationServerBoundary() {
   const failureRuntime = join(failureFixture.root, 'runtime');
   let failureServer = null;
   try {
+    const failureFakeGh = fakeGithubCommand(failureFixture.root);
     const configDir = join(failureFixture.main, '.aes-worktree-board');
     mkdirSync(configDir);
     writeFileSync(join(configDir, 'board.config.json'), JSON.stringify({
@@ -3194,7 +3484,10 @@ async function orchestrationServerBoundary() {
     }));
     failureServer = await startServer(
       failureRuntime,
-      { AES_WORKTREE_BOARD_REPO_ROOT: failureFixture.main },
+      {
+        ...fakeGithubEnv(failureFakeGh, failureFixture.main, { accounts: ['alice'], viewer: 'alice' }),
+        AES_WORKTREE_BOARD_CONFIG: JSON.stringify({ issueRepo: 'owner/repo', githubAccount: 'alice' }),
+      },
       failureFixture.main,
       { observeDispatch: true, observerDir: failureRuntime },
     );
@@ -3500,7 +3793,7 @@ async function layoutDomain() {
     'fixtures/aes-agent-issues.json', 'fixtures/parking-agents-issues.json', 'fixtures/orchestration-events.json',
     'scripts/collect.mjs', 'scripts/capture-issues-fixture.mjs', 'scripts/assess.mjs', 'scripts/check-issue-graph.mjs', 'scripts/command.mjs', 'scripts/dispatch.mjs',
     'scripts/headless.mjs', 'scripts/orchestrate.mjs', 'scripts/runtime-store.mjs',
-    'scripts/server.mjs', 'scripts/selftest.mjs',
+    'scripts/server.mjs', 'scripts/selftest.mjs', 'scripts/github-identity.mjs', 'scripts/github-issue.mjs',
   ];
   for (const path of required) assert.ok(existsSync(join(SKILL_DIR, path)), `缺少 ${path}`);
   assert.equal(existsSync(join(ROOT, 'worktree-board')), false, '顶级 worktree-board/ 必须不存在');
@@ -3522,7 +3815,7 @@ async function layoutDomain() {
   const repoConfig = JSON.parse(readFileSync(repoConfigPath, 'utf8'));
   assert.equal(repoConfig.mainBranch, 'dev', 'parking-agents integration branch 必须为 dev');
   assert.equal(repoConfig.issueRepo, 'parkth1026/parking-agents');
-  const scripts = ['collect.mjs', 'assess.mjs', 'check-issue-graph.mjs', 'command.mjs', 'dispatch.mjs', 'headless.mjs', 'orchestrate.mjs', 'runtime-store.mjs', 'server.mjs', 'selftest.mjs'];
+  const scripts = ['collect.mjs', 'assess.mjs', 'check-issue-graph.mjs', 'command.mjs', 'dispatch.mjs', 'headless.mjs', 'orchestrate.mjs', 'runtime-store.mjs', 'server.mjs', 'selftest.mjs', 'github-identity.mjs', 'github-issue.mjs'];
   for (const script of scripts) {
     const source = readFileSync(join(SCRIPT_DIR, script), 'utf8');
     for (const match of source.matchAll(/from ['"]([^'"]+)['"]/g)) {
@@ -3580,6 +3873,7 @@ const domains = {
   fixture: fixtureDomain,
   dispatch: dispatchDomain,
   server: serverDomain,
+  identity: identityDomain,
   'repo-root': repoRootDomain,
   layout: layoutDomain,
   'windows-hide': windowsHideDomain,

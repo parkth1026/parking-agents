@@ -9,6 +9,7 @@ import {
 } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { prepareGithubAccess, runGithubJson } from './github-identity.mjs';
 import {
   readJson, readJsonLines, readRegistry, TERMINAL_TASK_STATES, withRuntimeLock, writeJsonAtomic, writeTextAtomic,
 } from './runtime-store.mjs';
@@ -36,7 +37,12 @@ function runtimePaths(runtimeDir = RUNTIME_DIR) {
 }
 
 function mergeConfig(base, override = {}) {
-  return { ...base, ...override, agents: { ...(base.agents || {}), ...(override.agents || {}) } };
+  return {
+    ...base,
+    ...override,
+    agents: { ...(base.agents || {}), ...(override.agents || {}) },
+    github: { ...(base.github || {}), ...(override.github || {}) },
+  };
 }
 
 export function loadConfig() {
@@ -53,6 +59,8 @@ export function loadConfig() {
     issueRepo: process.env.AES_WORKTREE_BOARD_ISSUE_REPO,
     port: process.env.AES_WORKTREE_BOARD_PORT ? Number(process.env.AES_WORKTREE_BOARD_PORT) : undefined,
     defaultAgent: process.env.AES_WORKTREE_BOARD_DEFAULT_AGENT,
+    githubAccount: process.env.AES_WORKTREE_BOARD_GITHUB_ACCOUNT,
+    githubHost: process.env.AES_WORKTREE_BOARD_GITHUB_HOST,
   };
   return mergeConfig(config, Object.fromEntries(Object.entries(scalarOverrides).filter(([, value]) => value !== undefined)));
 }
@@ -65,16 +73,18 @@ async function preflightConfig(config, { skipIssueRepo = false } = {}) {
     error.exitCode = 2;
     throw error;
   }
-  if (skipIssueRepo) return;
+  if (skipIssueRepo) return null;
   try {
-    const { stdout } = await pExecFile('gh', [
-      'repo', 'view', config.issueRepo, '--json', 'nameWithOwner', '--jq', '.nameWithOwner',
-    ], { ...HEADLESS_CHILD_OPTIONS, timeout: 30_000, maxBuffer: 1024 * 1024 });
-    if (stdout.trim().toLowerCase() !== String(config.issueRepo).toLowerCase()) throw new Error(`resolved ${stdout.trim()}`);
-  } catch (cause) {
-    const error = new Error(`[preflight] issueRepo 错配或不可访问：${config.issueRepo}`, { cause });
-    error.exitCode = 2;
-    throw error;
+    return await prepareGithubAccess({ config, issueRepo: config.issueRepo, cwd: REPO_ROOT });
+  } catch (error) {
+    if (error?.code) {
+      error.message = `[preflight] issueRepo ${config.issueRepo}: ${error.message}`;
+      throw error;
+    }
+    const wrapped = new Error(`[preflight] issueRepo 错配或不可访问：${config.issueRepo}`, { cause: error });
+    wrapped.code = 'NETWORK_FAILURE';
+    wrapped.exitCode = 2;
+    throw wrapped;
   }
 }
 
@@ -243,12 +253,11 @@ function parseBlockedBy(body, knownNumbers) {
   return [...dependencies].sort((a, b) => a - b);
 }
 
-async function fetchIssueList(issueRepo) {
-  const { stdout } = await pExecFile('gh', [
+async function fetchIssueList(issueRepo, auth) {
+  return runGithubJson([
     'issue', 'list', '--repo', issueRepo, '--state', 'all', '--limit', '1000',
     '--json', 'number,title,state,url,body,closedAt,updatedAt,labels,blockedBy,blocking',
-  ], { ...HEADLESS_CHILD_OPTIONS, timeout: 60_000, maxBuffer: 64 * 1024 * 1024 });
-  return JSON.parse(stdout);
+  ], { auth, cwd: REPO_ROOT, timeout: 60_000, maxBuffer: 64 * 1024 * 1024 });
 }
 
 function issueLabels(issue) {
@@ -292,12 +301,11 @@ export function loadIssueFixture(fixturePath) {
   });
 }
 
-async function timelineHasReopen(issueRepo, number) {
-  const { stdout } = await pExecFile('gh', [
-    'api', '--paginate', '--slurp', `repos/${issueRepo}/issues/${number}/timeline`,
+async function timelineHasReopen(issueRepo, number, auth) {
+  const pages = await runGithubJson([
+    'api', '--hostname', auth.host, '--paginate', '--slurp', `repos/${issueRepo}/issues/${number}/timeline`,
     '-H', 'Accept: application/vnd.github+json',
-  ], { ...HEADLESS_CHILD_OPTIONS, timeout: 30_000, maxBuffer: 16 * 1024 * 1024 });
-  const pages = JSON.parse(stdout);
+  ], { auth, cwd: REPO_ROOT, timeout: 30_000, maxBuffer: 16 * 1024 * 1024 });
   return pages.flat().some((event) => event.event === 'reopened');
 }
 
@@ -315,9 +323,9 @@ async function mapConcurrent(items, concurrency, mapper) {
   return results;
 }
 
-async function fetchIssueSources(issueRepo, previous, issuesFixture = null) {
+async function fetchIssueSources(issueRepo, previous, issuesFixture = null, auth = null) {
   if (issuesFixture) return loadIssueFixture(issuesFixture);
-  const listed = await fetchIssueList(issueRepo);
+  const listed = await fetchIssueList(issueRepo, auth);
   const known = new Set(listed.map((issue) => issue.number));
   const previousWarn = new Map(
     (previous?.graph?.issues || []).map((issue) => [issue.number, Boolean(issue.derived?.warn)]),
@@ -325,8 +333,9 @@ async function fetchIssueSources(issueRepo, previous, issuesFixture = null) {
   const closed = listed.filter((issue) => issue.state === 'CLOSED');
   const warned = new Map(await mapConcurrent(closed, 6, async (issue) => {
     try {
-      return [issue.number, await timelineHasReopen(issueRepo, issue.number)];
-    } catch {
+      return [issue.number, await timelineHasReopen(issueRepo, issue.number, auth)];
+    } catch (error) {
+      if (error?.code) throw error;
       return [issue.number, previousWarn.get(issue.number) || false];
     }
   }));
@@ -478,7 +487,7 @@ export async function collectStatus({
   const fixturePath = issuesFixture || process.env.AES_WORKTREE_BOARD_ISSUES_FIXTURE || null;
   const { main, siblings } = await listWorktrees();
   const expectedIdentity = repoIdentity(main.path, config);
-  await preflightConfig(config, { skipIssueRepo: Boolean(skipGh || fixturePath) });
+  const githubAuth = await preflightConfig(config, { skipIssueRepo: Boolean(skipGh || fixturePath) });
   const previous = loadPrevious(runtimeDir);
   assertRuntimeIdentity(runtimeDir, expectedIdentity, previous);
   const registry = readRegistry(runtimeDir);
@@ -492,14 +501,7 @@ export async function collectStatus({
   } else if (skipGh) {
     issueSources = cachedIssueSources(previous);
   } else {
-    try {
-      issueSources = await fetchIssueSources(config.issueRepo, previous);
-    } catch (error) {
-      issueSources = cachedIssueSources(previous);
-      if (!issueSources.length) {
-        console.error(`gh issue 采集不可用且没有快照可沿用: ${String(error.message).slice(0, 200)}`);
-      }
-    }
+    issueSources = await fetchIssueSources(config.issueRepo, previous, null, githubAuth);
   }
   const sourceByNumber = new Map(issueSources.map((issue) => [issue.number, issue]));
 

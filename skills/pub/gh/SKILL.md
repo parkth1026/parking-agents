@@ -160,6 +160,40 @@ Sometimes useful data isn't on the typed commands. Examples:
   any) is being honored.
 - `gh auth status --json` is supported.
 
+### Multiple accounts and sensitive repository operations
+
+The username embedded in a Git remote URL is not the identity used by `gh`.
+Before reading or writing a sensitive repository, bind the operation to an
+explicit account and verify the viewer identity; never infer it from the
+remote URL or from the default active account.
+
+- Inspect configured accounts with `gh auth status --hostname <host> --json hosts`.
+- If more than one account is configured for the host, fail closed unless the
+  caller declares the target account (for example,
+  `AES_WORKTREE_BOARD_GITHUB_ACCOUNT` in the board environment).
+- Obtain a selected account's credential with
+  `gh auth token --hostname <host> --user <login>`, then pass it only through
+  the current process's `GH_TOKEN`/`GH_ENTERPRISE_TOKEN` environment. Do not
+  run `gh auth switch`, rewrite the global active account, put the token in
+  argv, prompts, logs, fixtures, runtime JSON, or configuration files.
+- Verify both `gh api user --hostname <host> --jq .login` and the target
+  repository's `viewerPermission` before the operation. Distinguish
+  `IDENTITY_REQUIRED`, `IDENTITY_MISMATCH`, `PERMISSION_DENIED`,
+  `REPO_NOT_FOUND`, and network failures; a private-repository 404 must not be
+  collapsed into a generic "gh is unavailable" diagnosis.
+
+For this repository's worktree board, use the no-secret wrapper for Issue
+reads/writes when possible:
+
+```powershell
+node .agents/skills/aes-worktree-board/scripts/github-issue.mjs `
+  --repo owner/name --account target-login -- issue view 45 --comments
+```
+
+Worker/reviewer prompts may carry only the host, account, and repository
+identity requirement. The host boundary injects the process-level credential;
+the worker must not guess the default account or ask for a token.
+
 ## Other notes
 
 - `gh pr checkout <n>` switches branches. Use `gh pr diff <n>` or

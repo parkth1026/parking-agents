@@ -26,6 +26,20 @@ $worker = "dev1"
 2. `<目标仓根>/.aes-worktree-board/board.config.json`；
 3. 技能目录 `board.config.json` 默认值。
 
+GitHub 身份是 live Issue 操作的独立边界：配置可用 `githubAccount` 与
+`githubHost`，也可用嵌套的 `github.account` / `github.host`；环境覆盖为
+`AES_WORKTREE_BOARD_GITHUB_ACCOUNT` / `AES_WORKTREE_BOARD_GITHUB_HOST`。
+同一 host 检测到多个 `gh auth status --json hosts` 账号而未声明目标账号时，
+collect、fixture capture、Issue 读写和 fallback 必须以 `IDENTITY_REQUIRED`
+fail closed。执行前绑定 `gh api user` 的 viewer 与目标仓库
+`viewerPermission`；身份不匹配、权限不足、仓库 404、网络失败分别保持
+`IDENTITY_MISMATCH`、`PERMISSION_DENIED`、`REPO_NOT_FOUND`、
+`NETWORK_FAILURE`，不能依赖 remote URL 用户名或 gh 默认 active account。
+凭据只由宿主在当前进程/子进程注入 `GH_TOKEN`（GHES 使用
+`GH_ENTERPRISE_TOKEN`）；不得切换全局账号，或把 token 写入 argv、prompt、
+日志、fixture、runtime JSON、配置和 Task 记录。worker/reviewer prompt 只能
+带无密钥的 host/account/repository identity 要求。
+
 `collect.mjs`、`server.mjs`、`capture-issues-fixture.mjs` 与 `dispatch.mjs` 必须共用 `loadConfig()` 这条解析链，不得各自回读技能目录配置或把目标仓配置当成运行时产物。
 
 collect preflight 必须验证目标仓存在 `mainBranch`；真实 GitHub 采集还必须验证 `issueRepo` 可访问，错配退出 2 并点名字段。
@@ -290,6 +304,7 @@ dirty 现场仍需另加 `--confirm-dirty`。server 看板的 fallback POST 还�
 - 快照：先 collect，再打开 `<目标仓根>/.aes-worktree-board/runtime/board.html`；它只读同目录 `status.js`，派发区降级为只读提示。技能目录的 `board.html` 是 server 模板，不再读取历史 runtime。
 - fixture 刷新：`node "$skillDir/scripts/capture-issues-fixture.mjs"`。
 - 离线生成：`node "$skillDir/scripts/collect.mjs" --no-gh --issues-fixture "$skillDir/fixtures/aes-agent-issues.json"`。
+- Issue 读写：`node "$skillDir/scripts/github-issue.mjs" --repo owner/name --account target-login -- issue view 45 --comments`。
 
 看板 v3 只在既有控制面挂点显示信息：全局编排胶囊、Workers Task/工作时长徽章、详情 Task/时间/transition 区、fallback 授权提示、v2 降级条、Map/List 文案。页面不自行推导业务状态，工作时长只用 status 投影的 registry executor 时间；旧 CLI activeTask 仅在没有 registry Task 时兼容显示。server API 响应携带专属 `aes-worktree-board/1` marker；监听端口已被占用时只有 marker、v3、generatedAt、repo、graph（issues/edges/stats）与 worktrees 完整通过 schema 校验后才比较既有 `/api/status?fast=1` identity。另一目标仓返回 `REPO_MISMATCH`，同仓、repo-shaped 非 board 或 marker 正确但 status 不完整的进程返回 `PORT_CONFLICT`，均 exit 2，且不得把既有实例输出成当前启动成功。
 
@@ -313,6 +328,12 @@ node "$skillDir/scripts/selftest.mjs" orchestration --scenario contract
 
 ```powershell
 node "$skillDir/run-tests.mjs"
+```
+
+身份隔离专项回归也可单独运行：
+
+```powershell
+node "$skillDir/scripts/selftest.mjs" identity
 ```
 
 设计意图、AC 与本轮修复记录见 `references/design.md`；改契约时先更新该文件，再同步 SKILL 与回归断言。
