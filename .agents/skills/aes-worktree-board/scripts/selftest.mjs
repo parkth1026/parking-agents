@@ -16,7 +16,9 @@ import {
 import { resolveCommand } from './command.mjs';
 import { HEADLESS_CHILD_OPTIONS } from './headless.mjs';
 import {
-  CONTROL_STATES, createTask, TASK_STATES,
+  consumeEvent, CONTROL_STATES, createTask, evaluateStop, heartbeatTask, pendingInbox, putInboxEvent,
+  EXECUTOR_FINAL_SCHEMA, nextActions, receiveActionReceipt, recordBlock, runPostMergeVerification, setVerdict, startGoal,
+  TASK_STATES, transitionTask,
 } from './orchestrate.mjs';
 import { readJson, readJsonLines, readRegistry, writeJsonAtomic } from './runtime-store.mjs';
 
@@ -1756,6 +1758,24 @@ async function orchestrationPreflightLeaseAndState() {
       await cleanTemp(queuedRuntime);
     }
 
+    const duplicateIssueRuntime = tempDirectory('orchestration-lifecycle-duplicate-issue');
+    try {
+      createTask({
+        issue: 88, worktree: 'dev-issue-a', role: 'executor', 'thread-id': 'T-issue-a',
+        model: 'luna-max', 'routing-reason': 'direct create duplicate issue fixture',
+      }, duplicateIssueRuntime);
+      assert.throws(
+        () => createTask({
+          issue: 88, worktree: 'dev-issue-b', role: 'executor', 'thread-id': 'T-issue-b',
+          model: 'luna-max', 'routing-reason': 'must reject duplicate issue fixture',
+        }, duplicateIssueRuntime),
+        (error) => error.code === 'ISSUE_ALREADY_ACTIVE',
+        '直接 createTask 也不得跨 worker 重复登记同一 Issue',
+      );
+    } finally {
+      await cleanTemp(duplicateIssueRuntime);
+    }
+
     const reviewRuntime = tempDirectory('orchestration-lifecycle-reviewer-lease');
     try {
       const executorCreated = createTask({
@@ -1763,7 +1783,7 @@ async function orchestrationPreflightLeaseAndState() {
         model: 'luna-max', 'routing-reason': 'reviewer lease fixture',
       }, reviewRuntime);
       const executor = executorCreated.task;
-      advanceToReview(executor.taskId, reviewRuntime, 'executor');
+      putTypedFinal(reviewRuntime, executorCreated, 'T-executor', 'E-reviewer-lease-final', 'executor-commit');
       const reviewer = createTask({
         issue: 17, worktree: 'parking-agents-dev4', role: 'reviewer',
         'parent-task-id': executor.taskId, 'thread-id': 'T-reviewer',
@@ -1791,7 +1811,7 @@ async function orchestrationPreflightLeaseAndState() {
         issue: 17, worktree: availableWorker, role: 'executor', 'thread-id': 'T-projection-executor',
         model: 'luna-max', 'routing-reason': 'timing projection fixture',
       }, projectionRuntime);
-      advanceToReview(executorCreated.taskId, projectionRuntime, 'projection');
+      putTypedFinal(projectionRuntime, executorCreated, 'T-projection-executor', 'E-projection-final', 'projection-commit');
       const reviewer = createTask({
         issue: 17, worktree: availableWorker, role: 'reviewer', 'parent-task-id': executorCreated.taskId,
         'thread-id': 'T-projection-reviewer', model: 'sol-high', 'routing-reason': 'projection reviewer fixture',
@@ -1803,6 +1823,28 @@ async function orchestrationPreflightLeaseAndState() {
       assert.equal(projectedWorker.mode, 'running', 'registry 活动 executor 必须把 worker 投影为 running');
     } finally {
       await cleanTemp(projectionRuntime);
+    }
+
+    const resolutionProjectionRuntime = tempDirectory('orchestration-lifecycle-unclassified-projection');
+    try {
+      const projectedTask = createTask({
+        issue: 17, worktree: availableWorker, role: 'executor', 'thread-id': 'T-unclassified-projection',
+        model: 'luna-max', 'routing-reason': 'resolved nextAction projection fixture',
+      }, resolutionProjectionRuntime);
+      putInboxEvent({
+        thread: 'T-unclassified-projection', task: projectedTask.taskId, kind: 'final',
+        'event-id': 'E-unclassified-projection', payload: JSON.stringify({ summary: 'malformed projection final' }),
+      }, resolutionProjectionRuntime);
+      assert.equal(consumeEvent('E-unclassified-projection', resolutionProjectionRuntime).code, 'UNCLASSIFIED_FINAL');
+      transitionTask(projectedTask.taskId, 'parked', { reason: 'explicit projection settlement' }, resolutionProjectionRuntime);
+      const registryTask = readRegistry(resolutionProjectionRuntime).tasks[projectedTask.taskId];
+      assert.equal(registryTask.nextAction, 'PARKED');
+      assert.notEqual(registryTask.nextAction, 'UNCLASSIFIED_FINAL');
+      const projected = await collectStatus({ runtimeDir: resolutionProjectionRuntime, issuesFixture: ISSUE_FIXTURE });
+      const worker = projected.worktrees.find((item) => item.name === availableWorker);
+      assert.equal(worker.task.nextAction, 'PARKED', 'collect 必须投影已收敛的 Registry nextAction');
+    } finally {
+      await cleanTemp(resolutionProjectionRuntime);
     }
 
     const unknownRuntime = tempDirectory('orchestration-lifecycle-unknown-worktree');
@@ -1821,7 +1863,7 @@ async function orchestrationPreflightLeaseAndState() {
     const before = readFileSync(join(runtimeDir, 'registry.json'), 'utf8');
     result = orchestrateSync(['transition', '--task', created.taskId, '--to', 'merged', '--reason', 'illegal shortcut'], runtimeDir);
     assert.equal(result.status, 2);
-    assert.equal(parseJsonLine(result.stderr).code, 'INVALID_TRANSITION');
+    assert.equal(parseJsonLine(result.stderr).code, 'MERGE_GATE_REQUIRED');
     assert.equal(readFileSync(join(runtimeDir, 'registry.json'), 'utf8'), before, '非法转移必须零状态变化');
 
     const args = (thread) => [
@@ -1845,18 +1887,16 @@ async function orchestrationPreflightLeaseAndState() {
 
 function advanceToReview(taskId, runtimeDir, prefix = 'commit') {
   const task = readRegistry(runtimeDir).tasks[taskId];
-  assert.ok(['dispatching', 'fixing'].includes(task.state), `只能从 dispatching/fixing 驱动到 reviewing，实际为 ${task.state}`);
-  const fixture = loadOrchestrationFixture();
-  const batch = ingestFixtureBatch(runtimeDir, fixture, 'executorToReview', taskId, {
-    executorThread: task.threadId || task.clientThreadId,
-    prefix,
-    commitSha: `${prefix}-2`,
-  });
-  assert.equal(batch.wake.length, 0, 'executor host fixture 必须覆盖 wake 为空、polls 有变化');
-  assert.equal(batch.polls.length, 4);
-  consumeFixtureEvents(runtimeDir, batch.events);
-  assert.equal(readRegistry(runtimeDir).tasks[taskId].state, 'reviewing');
-  return batch;
+  assert.ok(['dispatching', 'executing', 'fixing'].includes(task.state));
+  const commit = `${prefix}-2`;
+  putTypedFinal(runtimeDir, { taskId }, task.threadId, `E-${taskId}-${prefix}-${task.blockCount || 0}-final`, commit);
+  return commit;
+}
+
+function attachReviewerReceipt(runtimeDir, executorTaskId, reviewerTaskId) {
+  const action = actionOf(runtimeDir, 'CREATE_REVIEWER', executorTaskId);
+  receiveActionReceipt(action.actionId, 'succeeded', { reviewerTaskId }, runtimeDir);
+  assert.equal(readRegistry(runtimeDir).tasks[executorTaskId].state, 'reviewing');
 }
 
 async function orchestrationInboxIdempotency() {
@@ -1871,6 +1911,8 @@ async function orchestrationInboxIdempotency() {
       issue: 17, worktree: 'dev4', role: 'reviewer', 'parent-task-id': created.taskId,
       'thread-id': 'T-review', model: 'sol-high', 'routing-reason': 'inbox reviewer fixture',
     }, runtimeDir);
+    const createReviewer = actionOf(runtimeDir, 'CREATE_REVIEWER', created.taskId);
+    receiveActionReceipt(createReviewer.actionId, 'succeeded', { reviewerTaskId: reviewer.taskId }, runtimeDir);
     assert.equal(reviewer.task.parentTaskId, created.taskId);
     const foreign = inboxPutViaCli(runtimeDir, created.taskId, {
       thread: 'T-unrelated', kind: 'verdict', eventId: 'E-foreign',
@@ -1939,6 +1981,9 @@ async function orchestrationFiveTaskFanIn() {
       'thread-id': `T-fanin-reviewer-${index + 1}`,
       model: 'sol-high', routingReason: 'five-task host fan-in reviewer',
     }, runtimeDir).task);
+    for (const [index, reviewer] of reviewers.entries()) {
+      attachReviewerReceipt(runtimeDir, executors[index].taskId, reviewer.taskId);
+    }
     const replacements = {
       reviewerThread1: reviewers[0].threadId,
       reviewerThread2: reviewers[1].threadId,
@@ -1953,6 +1998,9 @@ async function orchestrationFiveTaskFanIn() {
       reviewerCursor3: 'fanin-reviewer-cursor-3',
     };
     const batch = fixtureBatch(fixture, 'fiveTaskFanIn', replacements);
+    const executorPoll = batch.polls.find((event) => event.thread === executors[2].threadId);
+    executorPoll.kind = 'progress';
+    executorPoll.payload.summary = 'executor progress poll task 3';
     const hostEventTask = (event) => {
       const reviewerIndex = reviewers.findIndex((reviewer) => reviewer.threadId === event.thread);
       if (reviewerIndex >= 0) return executors[reviewerIndex].taskId;
@@ -1966,7 +2014,7 @@ async function orchestrationFiveTaskFanIn() {
     const hostEventIds = new Set(batch.events.map((event) => event.eventId));
     const raw = readJsonLines(join(runtimeDir, 'inbox.jsonl')).filter((event) => hostEventIds.has(event.eventId));
     assert.equal(raw.length, batch.events.length, '五 Task 的每条异构投递都必须保留原始审计记录');
-    assert.ok(batch.polls.some((event) => event.kind === 'final' && event.thread === executors[2].threadId));
+    assert.ok(batch.polls.some((event) => event.kind === 'progress' && event.thread === executors[2].threadId));
     assert.ok(batch.polls.some((event) => event.kind === 'final' && event.thread === reviewers[1].threadId));
     assert.ok(batch.polls.some((event) => event.kind === 'commentary'));
     assert.ok(batch.polls.some((event) => event.kind === 'final' && event.thread === reviewers[2].threadId));
@@ -1996,32 +2044,32 @@ async function orchestrationFiveTaskFanIn() {
 async function orchestrationCircuitAndLateEvent() {
   const runtimeDir = tempDirectory('orchestration-governance-circuit');
   try {
+    const fixture = loadOrchestrationFixture();
     const finding = join(runtimeDir, 'finding.md');
     writeFileSync(finding, 'final reviewer finding');
     const created = createTask({
       issue: 56, worktree: 'dev1', role: 'executor', 'thread-id': 'T-block',
       model: 'sol-high', 'routing-reason': 'high risk review',
     }, runtimeDir);
-    advanceToReview(created.taskId, runtimeDir, 'a');
-    const reviewer = createTask({
-      issue: 56, worktree: 'dev1', role: 'reviewer', 'parent-task-id': created.taskId,
-      'thread-id': 'T-block-review', model: 'sol-high', 'routing-reason': 'BLOCK reviewer fixture',
+    putTypedFinal(runtimeDir, created, 'T-block', 'E-block-final-a1', 'a1');
+    const reviewer = hostCreateReviewer(runtimeDir, created, 1);
+    putInboxEvent({
+      thread: 'T-block', task: created.taskId, kind: 'verdict', 'event-id': 'E-executor-self-block',
+      payload: JSON.stringify({ verdict: 'BLOCK', commitSha: 'a1', cursor: 'self-block-cursor' }),
     }, runtimeDir);
-    inboxPutViaCli(runtimeDir, created.taskId, {
-      thread: 'T-block', kind: 'verdict', eventId: 'E-executor-self-block',
-      payload: { verdict: 'BLOCK', commitSha: 'a1', cursor: 'self-block-cursor' },
-    });
-    const selfBlockError = consumeViaCli(runtimeDir, 'E-executor-self-block', 2);
-    assert.equal(selfBlockError.code, 'REVIEW_EVIDENCE_REQUIRED', 'executor 自己的 thread 不得伪造独立 reviewer BLOCK');
-    const fixture = loadOrchestrationFixture();
-    const queueBlock = (eventId, commit) => ingestFixtureBatch(runtimeDir, fixture, 'reviewerBlock', created.taskId, {
-      reviewerThread: reviewer.task.threadId,
-      eventId,
-      commitSha: commit,
-      cursor: `cursor-${eventId}`,
-    });
-    queueBlock('E-b1', 'a1');
-    const consumedBlock = consumeViaCli(runtimeDir, 'E-b1');
+    assert.throws(
+      () => consumeEvent('E-executor-self-block', runtimeDir),
+      (error) => error.code === 'REVIEW_EVIDENCE_REQUIRED',
+      'executor 自己的 thread 不得伪造独立 reviewer BLOCK',
+    );
+    const queueBlock = (reviewTask, eventId, commit) => putInboxEvent({
+      thread: reviewTask.task.threadId, task: created.taskId, kind: 'verdict', 'event-id': eventId,
+      payload: JSON.stringify({
+        summary: `reviewer BLOCK ${commit}`, verdict: 'BLOCK', commitSha: commit, cursor: `cursor-${eventId}`,
+      }),
+    }, runtimeDir);
+    queueBlock(reviewer, 'E-b1', 'a1');
+    const consumedBlock = consumeEvent('E-b1', runtimeDir);
     assert.equal(consumedBlock.result, 'consumed');
     assert.equal(consumedBlock.blockResult, 'recorded');
     assert.deepEqual(consumedBlock.transition, { from: 'reviewing', to: 'fixing' });
@@ -2030,28 +2078,34 @@ async function orchestrationCircuitAndLateEvent() {
       commit: 'a1', eventId: 'E-b1', findingFile: finding,
     });
     assert.equal(block.result, 'duplicate-verdict');
-    assert.equal(inboxPendingViaCli(runtimeDir).pending.some((event) => event.eventId === 'E-b1'), false, 'block record 后事件必须完成消费');
-    queueBlock('E-b1-duplicate', 'a1');
-    const duplicateConsumed = consumeViaCli(runtimeDir, 'E-b1-duplicate');
+    assert.equal(pendingInbox(runtimeDir).pending.some((event) => event.eventId === 'E-b1'), false, 'block record 后事件必须完成消费');
+    queueBlock(reviewer, 'E-b1-duplicate', 'a1');
+    const duplicateConsumed = consumeEvent('E-b1-duplicate', runtimeDir);
     assert.equal(duplicateConsumed.result, 'consumed');
     assert.equal(duplicateConsumed.blockResult, 'duplicate-verdict');
     assert.equal(duplicateConsumed.blockCount, 1);
-    advanceToReview(created.taskId, runtimeDir, 'b');
-    queueBlock('E-b2', 'b2');
-    blockRecordViaCli(runtimeDir, created.taskId, {
-      commit: 'b2', eventId: 'E-b2', findingFile: finding,
-    });
-    advanceToReview(created.taskId, runtimeDir, 'c');
-    queueBlock('E-b3', 'c3');
-    block = blockRecordViaCli(runtimeDir, created.taskId, {
-      commit: 'c3', eventId: 'E-b3', findingFile: finding,
-    });
+    let returned = actionOf(runtimeDir, 'RETURN_TO_EXECUTOR', created.taskId);
+    receiveActionReceipt(returned.actionId, 'succeeded', { threadId: created.task.threadId }, runtimeDir);
+    putTypedFinal(runtimeDir, created, 'T-block', 'E-block-final-b2', 'b2');
+    const reviewer2 = hostCreateReviewer(runtimeDir, created, 2);
+    queueBlock(reviewer2, 'E-b2', 'b2');
+    recordBlock(created.taskId, {
+      commit: 'b2', 'event-id': 'E-b2', 'finding-file': finding,
+    }, runtimeDir);
+    returned = actionOf(runtimeDir, 'RETURN_TO_EXECUTOR', created.taskId);
+    receiveActionReceipt(returned.actionId, 'succeeded', { threadId: created.task.threadId }, runtimeDir);
+    putTypedFinal(runtimeDir, created, 'T-block', 'E-block-final-c3', 'c3');
+    const reviewer3 = hostCreateReviewer(runtimeDir, created, 3);
+    queueBlock(reviewer3, 'E-b3', 'c3');
+    block = recordBlock(created.taskId, {
+      commit: 'c3', 'event-id': 'E-b3', 'finding-file': finding,
+    }, runtimeDir);
     assert.equal(block.result, 'circuit-broken');
     assert.equal(block.blockCount, 3);
     assert.equal(readRegistry(runtimeDir).tasks[created.taskId].state, 'handoff-required');
     assert.ok(readRegistry(runtimeDir).tasks[created.taskId].finishedAt, 'handoff-required 必须冻结 worker 工作周期');
     assert.ok(existsSync(block.handoffBundle));
-    assert.match(readFileSync(block.handoffBundle, 'utf8'), /Issue: #56|final reviewer finding|Resume conditions/);
+    assert.match(readFileSync(block.handoffBundle, 'utf8'), /Issue: #56|final reviewer finding|Resume conditions|handoff recover|不得手改 registry/);
 
     ingestFixtureBatch(runtimeDir, fixture, 'lateEvent', created.taskId, {
       reviewerThread: reviewer.task.threadId,
@@ -2104,168 +2158,816 @@ async function orchestrationParkedLateEvent() {
 
 async function orchestrationAutonomousNotRun() {
   const runtimeDir = tempDirectory('orchestration-governance-autonomous-not-run');
+  const gitFixture = repositoryFixture('orchestration-governance-autonomous-not-run-git');
   try {
-    const fixture = loadOrchestrationFixture();
+    writeFileSync(join(gitFixture.sibling, 'autonomous.txt'), 'autonomous\n');
+    gitSync(gitFixture.sibling, ['add', 'autonomous.txt']);
+    gitSync(gitFixture.sibling, ['commit', '-m', 'autonomous implementation']);
+    const commitSha = gitSync(gitFixture.sibling, ['rev-parse', 'HEAD']);
+    const mainHead = gitSync(gitFixture.main, ['rev-parse', 'HEAD']);
+    continuousStatus(runtimeDir, [{
+      name: 'dev-autonomous', path: gitFixture.sibling, branch: 'fixture-dev', head: commitSha,
+    }], [], { repoRoot: gitFixture.main, mainHead });
     const autonomous = createTask({
-      issue: 17, worktree: 'dev4', role: 'executor', 'thread-id': 'T-autonomous',
+      issue: 17, worktree: 'dev-autonomous', role: 'executor', 'thread-id': 'T-autonomous',
       model: 'luna-max', 'routing-reason': 'autonomous fixture', 'interaction-class': 'autonomous',
     }, runtimeDir);
-    advanceToReview(autonomous.taskId, runtimeDir, 'autonomous');
-    const autonomousReviewer = createTask({
-      issue: 17, worktree: 'dev4', role: 'reviewer', 'parent-task-id': autonomous.taskId,
-      'thread-id': 'T-autonomous-review', model: 'sol-high', 'routing-reason': 'autonomous merge-gate reviewer',
-    }, runtimeDir);
-    const accepted = verdictViaCli(runtimeDir, autonomous.taskId, { code: 'PASS', runtime: 'NOT_RUN', delivery: 'MERGE_READY' });
-    assert.deepEqual(accepted.verdict, { code: 'PASS', runtime: 'NOT_RUN', delivery: 'MERGE_READY' });
+    verdictViaCli(runtimeDir, autonomous.taskId, { runtime: 'NOT_RUN' });
     const immutableRuntimeError = verdictViaCli(runtimeDir, autonomous.taskId, { runtime: 'PASS' }, 2);
     assert.equal(immutableRuntimeError.code, 'RUNTIME_EVIDENCE_IMMUTABLE');
-    const approval = ingestFixtureBatch(runtimeDir, fixture, 'reviewerApprove', autonomous.taskId, {
-      reviewerThread: autonomousReviewer.task.threadId,
-      approvalEventId: 'E-autonomous-approve',
-      pollEventId: 'E-autonomous-poll',
-      commitSha: 'autonomous-2',
-      finalCursor: 'autonomous-final',
-      pollCursor: 'autonomous-poll',
-    });
-    consumeViaCli(runtimeDir, approval.polls[0].eventId);
-    consumeViaCli(runtimeDir, approval.wake[0].eventId);
-    assert.equal(readRegistry(runtimeDir).tasks[autonomous.taskId].state, 'approved');
-    transitionViaCli(autonomous.taskId, 'merge-ready', runtimeDir, { reason: 'autonomous NOT_RUN merge gate' });
-    transitionViaCli(autonomous.taskId, 'merged', runtimeDir, {
-      mergeCommit: 'autonomous-merge-commit', reason: 'autonomous merge command',
-    });
-    assert.equal(readRegistry(runtimeDir).tasks[autonomous.taskId].state, 'merged');
-    assert.equal(readRegistry(runtimeDir).leases.dev4, undefined, 'merged 后必须释放 executor 租约');
+    putTypedFinal(runtimeDir, autonomous, autonomous.task.threadId, 'E-autonomous-final', commitSha);
+    const autonomousReviewer = hostCreateReviewer(runtimeDir, autonomous, 1);
+    hostApprove(runtimeDir, autonomous, autonomousReviewer, 'E-autonomous-approve');
+    const gate = actionOf(runtimeDir, 'EVALUATE_MERGE_GATE', autonomous.taskId);
+    receiveActionReceipt(gate.actionId, 'succeeded', {
+      code: 'PASS', runtime: 'NOT_RUN', delivery: 'MERGE_READY', mergeCheck: 'clean',
+      headSha: commitSha, integrationHead: mainHead, integrationBranch: 'main',
+    }, runtimeDir);
+    assert.equal(readRegistry(runtimeDir).tasks[autonomous.taskId].state, 'merge-ready');
+    assert.deepEqual(readRegistry(runtimeDir).tasks[autonomous.taskId].verdict,
+      { code: 'PASS', runtime: 'NOT_RUN', delivery: 'MERGE_READY' });
   } finally {
     await cleanTemp(runtimeDir);
+    await cleanRepositoryFixture(gitFixture);
   }
 }
 
 async function orchestrationVerdictDimensions() {
   const runtimeDir = tempDirectory('orchestration-governance-verdict');
   try {
-    const fixture = loadOrchestrationFixture();
-    const realMachine = createTask({
-      issue: 41, worktree: 'dev5', role: 'executor', 'thread-id': 'T-verdict-b',
-      model: 'sol-high', 'routing-reason': 'runtime required fixture', 'requires-runtime': true,
+    const autonomous = createTask({
+      issue: 17, worktree: 'dev4', role: 'executor', 'thread-id': 'T-verdict-a',
+      model: 'luna-max', 'routing-reason': 'autonomous fixture', 'interaction-class': 'autonomous',
     }, runtimeDir);
-    const realMachineError = verdictViaCli(runtimeDir, realMachine.taskId, {
-      code: 'PASS', runtime: 'NOT_RUN', delivery: 'MERGE_READY',
-    }, 2);
-    assert.equal(realMachineError.code, 'RUNTIME_REQUIRED');
-    assert.equal(readRegistry(runtimeDir).tasks[realMachine.taskId].verdict.runtime, null);
-
-    const splitRuntime = tempDirectory('orchestration-governance-split-verdict');
-    try {
-      const failedRuntime = createTask({
-        issue: 42, worktree: 'dev6', role: 'executor', 'thread-id': 'T-verdict-split-a',
-        model: 'sol-high', 'routing-reason': 'split verdict fixture',
-      }, splitRuntime);
-      verdictViaCli(splitRuntime, failedRuntime.taskId, { code: 'PASS', runtime: 'FAIL' });
-      const failedDeliveryError = verdictViaCli(splitRuntime, failedRuntime.taskId, { delivery: 'MERGE_READY' }, 2);
-      assert.equal(failedDeliveryError.code, 'RUNTIME_BLOCKS_DELIVERY', '分步写 verdict 不得绕过 runtime=FAIL 门禁');
-
-      const evidenceFree = createTask({
-        issue: 43, worktree: 'dev7', role: 'executor', 'thread-id': 'T-evidence-free',
-        model: 'luna-max', 'routing-reason': 'merge evidence fixture',
-      }, splitRuntime);
-      const evidenceBatch = ingestFixtureBatch(splitRuntime, fixture, 'executorToReview', evidenceFree.taskId, {
-        executorThread: evidenceFree.task.threadId,
-        prefix: 'evidence',
-        commitSha: 'evidence-commit',
+    setVerdict(autonomous.taskId, { code: 'PASS', runtime: 'NOT_RUN' }, runtimeDir);
+    assert.throws(
+      () => setVerdict(autonomous.taskId, { runtime: 'PASS' }, runtimeDir),
+      (error) => error.code === 'RUNTIME_EVIDENCE_IMMUTABLE',
+    );
+    assert.throws(
+      () => setVerdict(autonomous.taskId, { delivery: 'MERGE_READY' }, runtimeDir),
+      (error) => error.code === 'MERGE_GATE_RECEIPT_REQUIRED',
+      '旧 verdict set 不得写 MERGE_READY',
+    );
+    transitionTask(autonomous.taskId, 'executing', {}, runtimeDir);
+    transitionTask(autonomous.taskId, 'self-qa', {}, runtimeDir);
+    assert.throws(
+      () => transitionTask(autonomous.taskId, 'committed', { commitSha: 'injected-commit' }, runtimeDir),
+      (error) => error.code === 'EXECUTOR_FINAL_EVIDENCE_REQUIRED',
+      '旧 transition 不得注入 commit 绕过 executor-final',
+    );
+    assert.equal(readRegistry(runtimeDir).tasks[autonomous.taskId].state, 'self-qa');
+    assert.ok(readRegistry(runtimeDir).leases.dev4, '旁路失败不得释放 lease');
+    for (const spoof of [
+      { eventId: 'E-spoof-merged', payload: { summary: 'forged merged', to: 'merged', mergeCommit: 'not-host-verified' } },
+      { eventId: 'E-spoof-merge-commit', payload: { summary: 'smuggled merge commit', mergeCommit: 'not-host-verified' } },
+    ]) {
+      inboxPutViaCli(runtimeDir, autonomous.taskId, {
+        thread: autonomous.task.threadId, kind: 'final', eventId: spoof.eventId, payload: spoof.payload,
       });
-      consumeViaCli(splitRuntime, evidenceBatch.polls[0].eventId);
-      consumeViaCli(splitRuntime, evidenceBatch.polls[1].eventId);
-      inboxPutViaCli(splitRuntime, evidenceFree.taskId, {
-        thread: evidenceFree.task.threadId, kind: 'final', eventId: 'E-evidence-missing-commit',
-        payload: { summary: 'missing commit evidence', to: 'committed', cursor: 'missing-commit' },
-      });
-      const missingCommitError = consumeViaCli(splitRuntime, 'E-evidence-missing-commit', 2);
-      assert.equal(missingCommitError.code, 'COMMIT_EVIDENCE_REQUIRED', '真实 executor final 缺 commitSha 时必须拒绝 committed');
-      consumeViaCli(splitRuntime, evidenceBatch.polls[2].eventId);
-      consumeViaCli(splitRuntime, evidenceBatch.polls[3].eventId);
-      const reviewer = createTask({
-        issue: 43, worktree: 'dev7', role: 'reviewer', 'parent-task-id': evidenceFree.taskId,
-        'thread-id': 'T-evidence-review', model: 'sol-high', 'routing-reason': 'merge gate reviewer',
-      }, splitRuntime);
-      verdictViaCli(splitRuntime, evidenceFree.taskId, { code: 'PASS', runtime: 'NOT_RUN', delivery: 'MERGE_READY' });
-      const withoutReview = transitionViaCli(evidenceFree.taskId, 'approved', splitRuntime, { expectedStatus: 2 });
-      assert.equal(withoutReview.code, 'REVIEW_EVIDENCE_REQUIRED', '只登记 reviewer Task 不等于 reviewer 已 APPROVE');
-      const evidenceApproval = ingestFixtureBatch(splitRuntime, fixture, 'reviewerApprove', evidenceFree.taskId, {
-        reviewerThread: reviewer.task.threadId,
-        approvalEventId: 'E-evidence-approve',
-        pollEventId: 'E-evidence-poll',
-        commitSha: 'evidence-commit',
-        finalCursor: 'review-cursor',
-        pollCursor: 'review-poll',
-      });
-      consumeViaCli(splitRuntime, evidenceApproval.polls[0].eventId);
-      consumeViaCli(splitRuntime, evidenceApproval.wake[0].eventId);
-      transitionViaCli(evidenceFree.taskId, 'merge-ready', splitRuntime);
-      const withoutMergeCommit = transitionViaCli(evidenceFree.taskId, 'merged', splitRuntime, { expectedStatus: 2 });
-      assert.equal(withoutMergeCommit.code, 'MERGE_GATE_REQUIRED');
-      for (const spoof of [
-        {
-          eventId: 'E-spoof-merged',
-          thread: reviewer.task.threadId,
-          payload: { summary: 'reviewer forged merged', to: 'merged', mergeCommit: 'not-host-verified' },
-        },
-        {
-          eventId: 'E-spoof-executor-merge-commit',
-          thread: evidenceFree.task.threadId,
-          payload: { summary: 'executor smuggled merge commit', mergeCommit: 'not-host-verified' },
-        },
-      ]) {
-        inboxPutViaCli(splitRuntime, evidenceFree.taskId, {
-          thread: spoof.thread, kind: 'final', eventId: spoof.eventId, payload: spoof.payload,
-        });
-        const spoofError = consumeViaCli(splitRuntime, spoof.eventId, 2);
-        assert.equal(spoofError.code, 'MERGE_GATE_REQUIRED');
-      }
-      const spoofPending = inboxPendingViaCli(splitRuntime);
-      assert.deepEqual(
-        spoofPending.pending.map((event) => event.eventId).filter((eventId) => eventId.startsWith('E-spoof-')).sort(),
-        ['E-spoof-executor-merge-commit', 'E-spoof-merged'],
-        '被拒绝的伪造 merge event 必须保留可审计 pending，不得被消费成 merged',
-      );
-      const mergeReadyAfterSpoof = readRegistry(splitRuntime).tasks[evidenceFree.taskId];
-      assert.equal(mergeReadyAfterSpoof.state, 'merge-ready');
-      assert.equal(mergeReadyAfterSpoof.mergeCommit, null);
-      assert.equal(readRegistry(splitRuntime).leases.dev7.owner, evidenceFree.taskId, '伪造 event 不得释放 writer lease');
-      const directProbe = join(splitRuntime, 'direct-transition-probe.mjs');
-      const orchestrateUrl = pathToFileURL(join(SCRIPT_DIR, 'orchestrate.mjs')).href;
-      writeFileSync(directProbe, `
-import { transitionTask as transitionTaskApi } from ${JSON.stringify(orchestrateUrl)};
-try {
-  transitionTaskApi(process.argv[2], 'merged', {
-    mergeCommit: 'not-host-verified', source: 'cli', actor: 'orchestrator',
-  }, process.argv[3]);
-  process.exitCode = 0;
-} catch (error) {
-  console.error(JSON.stringify({ code: error.code, message: error.message }));
-  process.exitCode = error.code === 'MERGE_GATE_REQUIRED' ? 2 : 3;
-}
-`);
-      const directResult = await runNode([directProbe, evidenceFree.taskId, splitRuntime]);
-      assert.equal(directResult.status, 2, directResult.stderr || directResult.stdout);
-      assert.equal(parseJsonLine(directResult.stderr).code, 'MERGE_GATE_REQUIRED');
-      assert.equal(readRegistry(splitRuntime).tasks[evidenceFree.taskId].state, 'merge-ready');
-      assert.equal(readRegistry(splitRuntime).leases.dev7.owner, evidenceFree.taskId, 'direct import 不能绕过 host merge gate');
-      transitionViaCli(evidenceFree.taskId, 'merged', splitRuntime, {
-        mergeCommit: 'merge-evidence-commit', reason: 'merge command with evidence',
-      });
-      assert.equal(readRegistry(splitRuntime).leases.dev7, undefined, '只有带 mergeCommit 的 merged 才释放租约');
-      assert.ok(readRegistry(splitRuntime).tasks[evidenceFree.taskId].finishedAt, 'merged 必须冻结 worker 工作周期');
-      const mergedReceipts = readJsonLines(join(splitRuntime, 'transitions.jsonl'))
-        .filter((entry) => entry.taskId === evidenceFree.taskId && entry.to === 'merged');
-      assert.equal(mergedReceipts.length, 1);
-      assert.equal(mergedReceipts[0].source, 'cli');
-      assert.equal(mergedReceipts[0].actor, 'orchestrator');
-    } finally {
-      await cleanTemp(splitRuntime);
+      const spoofError = consumeViaCli(runtimeDir, spoof.eventId, 2);
+      assert.equal(spoofError.code, 'MERGE_GATE_REQUIRED');
     }
+    assert.deepEqual(
+      inboxPendingViaCli(runtimeDir).pending.map((event) => event.eventId).filter((id) => id.startsWith('E-spoof-')).sort(),
+      ['E-spoof-merge-commit', 'E-spoof-merged'],
+      '被拒绝的 merge event 必须保留 pending 审计',
+    );
+    assert.throws(
+      () => transitionTask(autonomous.taskId, 'merged', { mergeCommit: 'not-host-verified' }, runtimeDir),
+      (error) => error.code === 'MERGE_GATE_REQUIRED',
+      'direct import 不能冒充 CLI host merge gate',
+    );
   } finally {
     await cleanTemp(runtimeDir);
+  }
+}
+
+function continuousStatus(runtimeDir, workers, issues, options = {}) {
+  const config = loadConfig();
+  const repoRoot = options.repoRoot || ROOT;
+  const mainBranch = options.mainBranch || (options.repoRoot ? 'main' : config.mainBranch);
+  const mainHead = options.mainHead || 'main-head';
+  writeJsonAtomic(join(runtimeDir, 'status.json'), {
+    schemaVersion: 3,
+    repo: { root: repoRoot, name: 'repo', mainBranch, mainHead, issueRepo: options.issueRepo || config.issueRepo },
+    orchestration: { state: 'running' },
+    graph: {
+      issues: issues.map((issue) => ({
+        number: issue.number, title: issue.title || `Issue ${issue.number}`, state: issue.state || 'OPEN',
+        labels: issue.labels || ['ready-for-agent'], blockedBy: [],
+        derived: { status: issue.status || 'frontier', degree: 0, warn: false },
+      })),
+      edges: [], stats: { total: issues.length, open: issues.length, closed: 0, frontier: issues.filter((issue) => (issue.status || 'frontier') === 'frontier').length },
+    },
+    worktrees: workers.map((worker) => typeof worker === 'string'
+      ? { name: worker, path: options.workerPaths?.[worker] || null, head: options.workerHeads?.[worker] || 'base-head', task: null }
+      : { task: null, ...worker }),
+    transitions: [],
+  });
+}
+
+function executorFinal(commitSha, { manual = false } = {}) {
+  return {
+    schemaVersion: EXECUTOR_FINAL_SCHEMA,
+    outcome: 'COMMITTED',
+    commitSha,
+    tests: { summary: 'targeted host-shaped regression passed', commands: [{ command: 'node targeted.mjs', exitCode: 0 }] },
+    unexecuted: [],
+    manualTestDebt: manual ? [{ scope: 'Desktop visual acceptance', reason: 'integration merge policy permits deferred manual test' }] : [],
+    suggestedNextState: 'committed',
+  };
+}
+
+function putTypedFinal(runtimeDir, task, threadId, eventId, commitSha, options = {}) {
+  putInboxEvent({
+    thread: threadId, task: task.taskId, kind: 'final', 'event-id': eventId,
+    payload: JSON.stringify(executorFinal(commitSha, options)),
+  }, runtimeDir);
+  return consumeEvent(eventId, runtimeDir);
+}
+
+function actionOf(runtimeDir, type, taskId = undefined) {
+  const actions = nextActions(runtimeDir).actions.filter((action) => action.type === type);
+  const action = taskId ? actions.find((candidate) => candidate.taskId === taskId) : actions[0];
+  assert.ok(action, `缺少 ${type}${taskId ? ` for ${taskId}` : ''}: ${JSON.stringify(actions)}`);
+  return action;
+}
+
+function hostCreateReviewer(runtimeDir, task, ordinal) {
+  const create = actionOf(runtimeDir, 'CREATE_REVIEWER', task.taskId);
+  const parent = readRegistry(runtimeDir).tasks[task.taskId];
+  const reviewer = createTask({
+    issue: parent.issue, worktree: parent.worktree, role: 'reviewer', 'parent-task-id': task.taskId,
+    'thread-id': `T-${parent.worktree}-review-${ordinal}`, model: 'sol-high', 'routing-reason': 'host-shaped independent review',
+  }, runtimeDir);
+  const receipt = receiveActionReceipt(create.actionId, 'succeeded', { reviewerTaskId: reviewer.taskId }, runtimeDir);
+  assert.equal(receipt.type, 'CREATE_REVIEWER');
+  assert.equal(readRegistry(runtimeDir).tasks[task.taskId].state, 'reviewing');
+  return reviewer;
+}
+
+function hostApprove(runtimeDir, task, reviewer, eventId) {
+  putInboxEvent({
+    thread: reviewer.task.threadId, task: task.taskId, kind: 'verdict', 'event-id': eventId,
+    payload: JSON.stringify({ verdict: 'APPROVE', commitSha: readRegistry(runtimeDir).tasks[task.taskId].commitSha, summary: 'APPROVE current commit' }),
+  }, runtimeDir);
+  const consumed = consumeEvent(eventId, runtimeDir);
+  assert.deepEqual(consumed.transition, { from: 'reviewing', to: 'approved' });
+  assert.equal(readRegistry(runtimeDir).tasks[task.taskId].nextAction, 'EVALUATE_MERGE_GATE',
+    'APPROVE 必须原子刷新 Task nextAction');
+}
+
+async function orchestrationContinuousHostChain() {
+  const runtimeDir = tempDirectory('orchestration-continuous-host-chain');
+  const fixture = repositoryFixture('orchestration-continuous-host-git');
+  try {
+    writeFileSync(join(fixture.sibling, 'issue43.txt'), 'issue 43\n');
+    gitSync(fixture.sibling, ['add', 'issue43.txt']);
+    gitSync(fixture.sibling, ['commit', '-m', 'issue 43 implementation']);
+    const commitSha = gitSync(fixture.sibling, ['rev-parse', 'HEAD']);
+    const mainHead = gitSync(fixture.main, ['rev-parse', 'HEAD']);
+    continuousStatus(runtimeDir, [{ name: 'dev43', path: fixture.sibling, branch: 'fixture-dev', head: commitSha }], [
+      { number: 43, status: 'claimed', labels: ['ready-for-agent', 'needs-manual-test'] },
+      { number: 44, status: 'frontier', labels: ['ready-for-agent'] },
+    ], { repoRoot: fixture.main, mainHead });
+    assert.throws(
+      () => createTask({
+        issue: 43, worktree: 'dev43', role: 'executor', 'thread-id': 'T-manual-policy-bypass',
+        model: 'luna-max', 'routing-reason': 'must reject manual policy override',
+        'interaction-class': 'autonomous',
+      }, runtimeDir),
+      (error) => error.code === 'INTERACTION_CLASS_CONFLICT',
+      'needs-manual-test label 不得被显式 autonomous 参数覆盖',
+    );
+    const task = createTask({
+      issue: 43, worktree: 'dev43', role: 'executor', 'thread-id': 'T-dev43-executor',
+      model: 'luna-max', 'routing-reason': 'continuous full-chain fixture',
+      'head-sha': mainHead,
+    }, runtimeDir);
+    assert.equal(task.task.interactionClass, 'needs-manual-test', 'Issue label 必须自动锁定 manual-test policy，不能依赖 host 漏传参数');
+    assert.equal(readRegistry(runtimeDir).goal, null, 'one-shot Task/next-actions 不得隐式创建 Goal');
+    nextActions(runtimeDir);
+    assert.equal(readRegistry(runtimeDir).goal, null);
+    const goal = startGoal({ workers: 'dev43', 'manual-test-policy': 'needs-manual-test + explicit debt permits runtime=NOT_RUN' }, runtimeDir);
+    assert.equal(goal.goal.state, 'active');
+    assert.match(goal.goal.objective, /Outcome:|Constraints:|Verification:/);
+
+    const finalResult = putTypedFinal(runtimeDir, task, 'T-dev43-executor', 'E-final-43', commitSha, { manual: true });
+    assert.equal(finalResult.nextAction, 'CREATE_REVIEWER');
+    assert.deepEqual(finalResult.transitions.map((transition) => transition.to), ['executing', 'self-qa', 'committed']);
+    assert.equal(readRegistry(runtimeDir).tasks[task.taskId].executorFinalEvidence.commitSha, commitSha);
+    assert.throws(
+      () => transitionTask(task.taskId, 'reviewing', {}, runtimeDir),
+      (error) => error.code === 'CREATE_REVIEWER_RECEIPT_REQUIRED',
+      '旧 transition 不得跳过 CREATE_REVIEWER receipt',
+    );
+
+    const reviewer = hostCreateReviewer(runtimeDir, task, 1);
+    hostApprove(runtimeDir, task, reviewer, 'E-approve-43');
+    const gate = actionOf(runtimeDir, 'EVALUATE_MERGE_GATE', task.taskId);
+    assert.throws(
+      () => receiveActionReceipt(gate.actionId, 'succeeded', {
+        code: 'PASS', runtime: 'NOT_RUN', delivery: 'MERGE_READY', mergeCheck: 'clean',
+        headSha: commitSha, integrationHead: 'fake-integration-head', integrationBranch: 'main',
+      }, runtimeDir),
+      (error) => ['FRESH_MERGE_RECEIPT_REQUIRED', 'RECEIPT_INTEGRATION_HEAD_NOT_FOUND'].includes(error.code),
+      '伪造 integration HEAD 不得通过 merge gate',
+    );
+    receiveActionReceipt(gate.actionId, 'succeeded', {
+      code: 'PASS', runtime: 'NOT_RUN', delivery: 'MERGE_READY', mergeCheck: 'clean',
+      headSha: commitSha, integrationHead: mainHead, integrationBranch: 'main',
+    }, runtimeDir);
+    assert.equal(readRegistry(runtimeDir).tasks[task.taskId].state, 'merge-ready');
+    assert.throws(
+      () => setVerdict(task.taskId, { runtime: 'FAIL' }, runtimeDir),
+      (error) => error.code === 'VERDICT_LOCKED_AFTER_REVIEW',
+      'merge-ready 后旧 verdict set 不得改写已绑定 receipt 的 verdict',
+    );
+    assert.throws(
+      () => transitionTask(task.taskId, 'merged', { mergeCommit: 'fake-merge' }, runtimeDir),
+      (error) => error.code === 'MERGE_GATE_REQUIRED',
+      '旧 transition 不得跳过 HOST_MERGE/post-merge receipt 释放 lease',
+    );
+    const legacyMergeCli = orchestrateSync([
+      'transition', '--task', task.taskId, '--to', 'merged', '--merge-commit', 'fake-merge',
+    ], runtimeDir);
+    assert.equal(legacyMergeCli.status, 2);
+    assert.equal(parseJsonLine(legacyMergeCli.stderr).code, 'POST_MERGE_RECEIPT_REQUIRED');
+    assert.ok(readRegistry(runtimeDir).leases.dev43);
+
+    const merge = actionOf(runtimeDir, 'HOST_MERGE', task.taskId);
+    receiveActionReceipt(merge.actionId, 'started', { integrationBranch: 'main', preHead: mainHead }, runtimeDir);
+    const duplicateStarted = receiveActionReceipt(merge.actionId, 'started', { integrationBranch: 'main', preHead: mainHead }, runtimeDir);
+    assert.equal(duplicateStarted.result, 'already-recorded');
+    const resumed = actionOf(runtimeDir, 'HOST_MERGE', task.taskId);
+    assert.equal(resumed.actionId, merge.actionId, 'root 重启必须恢复同一 HOST_MERGE 幂等 key');
+    assert.equal(resumed.resume, true);
+    assert.throws(
+      () => receiveActionReceipt(merge.actionId, 'succeeded', {
+        integrationBranch: 'main', preHead: mainHead, postHead: 'fake-sha', mergeCommit: 'fake-sha',
+      }, runtimeDir),
+      (error) => ['GIT_RECONCILIATION_FAILED', 'MERGE_RECEIPT_MISMATCH', 'RECEIPT_POST_HEAD_NOT_FOUND'].includes(error.code),
+      '伪造 merge SHA 不得生成 HOST_MERGE receipt',
+    );
+    gitSync(fixture.main, ['merge', '--no-ff', 'fixture-dev', '-m', 'merge issue 43']);
+    const mergeCommit = gitSync(fixture.main, ['rev-parse', 'HEAD']);
+    receiveActionReceipt(merge.actionId, 'succeeded', {
+      integrationBranch: 'main', preHead: mainHead, postHead: mergeCommit, mergeCommit,
+    }, runtimeDir);
+
+    const verify = actionOf(runtimeDir, 'POST_MERGE_VERIFY', task.taskId);
+    assert.throws(
+      () => receiveActionReceipt(verify.actionId, 'succeeded', {
+        tests: [{ command: 'never-ran', exitCode: 0 }],
+      }, runtimeDir),
+      (error) => error.code === 'POST_MERGE_EVIDENCE_REQUIRED',
+      '任意 exitCode=0 JSON 不得冒充实际 post-merge execution',
+    );
+    const failedVerification = runPostMergeVerification(verify.actionId, [{
+      file: process.execPath, args: ['-e', 'process.exit(7)'], label: 'real failing post-merge probe',
+    }], runtimeDir);
+    assert.equal(failedVerification.result, 'verification-failed');
+    assert.equal(readRegistry(runtimeDir).tasks[task.taskId].state, 'merge-ready');
+    assert.ok(readRegistry(runtimeDir).leases.dev43, '真实命令失败不得释放 lease');
+    const commandsFile = join(runtimeDir, 'post-merge-commands.json');
+    writeFileSync(commandsFile, JSON.stringify([{
+      file: process.execPath, args: ['-e', 'process.exit(0)'], label: 'real post-merge node probe',
+    }]));
+    const verifiedCli = orchestrateSync([
+      'action', 'verify', '--action-id', verify.actionId, '--commands-file', commandsFile,
+    ], runtimeDir);
+    assert.equal(verifiedCli.status, 0, verifiedCli.stderr);
+    assert.equal(parseJsonLine(verifiedCli.stdout).result, 'verification-passed');
+    assert.equal(readRegistry(runtimeDir).tasks[task.taskId].state, 'merged');
+    assert.equal(readRegistry(runtimeDir).leases.dev43, undefined);
+
+    putInboxEvent({
+      thread: 'T-dev43-executor', task: task.taskId, kind: 'final', 'event-id': 'E-late-merged-malformed',
+      payload: JSON.stringify({ summary: 'late malformed final after merged' }),
+    }, runtimeDir);
+    const lateMalformed = consumeEvent('E-late-merged-malformed', runtimeDir);
+    assert.equal(lateMalformed.code, 'UNCLASSIFIED_FINAL');
+    assert.equal(lateMalformed.consumed, false);
+    let mergedTask = readRegistry(runtimeDir).tasks[task.taskId];
+    assert.equal(mergedTask.state, 'merged');
+    assert.equal(mergedTask.consumedEventIds.includes('E-late-merged-malformed'), false,
+      'merged 上 malformed final 也不得 terminal-noop 静默消费');
+    assert.equal(readRegistry(runtimeDir).unclassifiedFinals['E-late-merged-malformed'].status, 'pending');
+    assert.equal(pendingInbox(runtimeDir).pending.some((event) => event.eventId === 'E-late-merged-malformed'), true);
+    putTypedFinal(runtimeDir, task, 'T-dev43-executor', 'E-late-merged-replacement', commitSha, { manual: true });
+    mergedTask = readRegistry(runtimeDir).tasks[task.taskId];
+    assert.equal(mergedTask.state, 'merged');
+    assert.equal(mergedTask.nextAction, 'CLAIM_NEXT_ISSUE', 'merged replacement 收敛后不得残留 UNCLASSIFIED_FINAL');
+    assert.equal(pendingInbox(runtimeDir).pending.some((event) => event.eventId === 'E-late-merged-malformed'), false,
+      '同 commit 合法 replacement typed-final 才能收敛 late malformed event');
+
+    const claim = actionOf(runtimeDir, 'CLAIM_NEXT_ISSUE', task.taskId);
+    assert.equal(claim.issue, 44);
+    const nextTask = createTask({
+      issue: 44, worktree: 'dev43', role: 'executor', 'thread-id': 'T-dev43-next',
+      model: 'luna-max', 'routing-reason': 'claimed by continuous host loop',
+    }, runtimeDir);
+    const claimReceipt = receiveActionReceipt(claim.actionId, 'succeeded', { nextTaskId: nextTask.taskId }, runtimeDir);
+    assert.equal(claimReceipt.type, 'CLAIM_NEXT_ISSUE');
+    assert.equal(receiveActionReceipt(claim.actionId, 'succeeded', { nextTaskId: nextTask.taskId }, runtimeDir).result, 'already-recorded');
+    assert.equal(readRegistry(runtimeDir).tasks[nextTask.taskId].issue, 44);
+    assert.equal(readRegistry(runtimeDir).goal.state, 'active', '单 lane 继续执行时 Goal 不得提前 complete');
+  } finally {
+    await cleanTemp(runtimeDir);
+    await cleanRepositoryFixture(fixture);
+  }
+}
+
+async function orchestrationUnclassifiedFinal() {
+  const runtimeDir = tempDirectory('orchestration-continuous-unclassified');
+  try {
+    continuousStatus(runtimeDir, ['dev-unclassified'], []);
+    const task = createTask({
+      issue: 43, worktree: 'dev-unclassified', role: 'executor', 'thread-id': 'T-unclassified',
+      model: 'luna-max', 'routing-reason': 'unclassified final fixture', 'head-sha': 'base-head',
+    }, runtimeDir);
+    putInboxEvent({
+      thread: 'T-unclassified', task: task.taskId, kind: 'final', 'event-id': 'E-unstructured-final',
+      payload: JSON.stringify({ summary: 'done, tests passed, commit abc' }),
+    }, runtimeDir);
+    const first = consumeEvent('E-unstructured-final', runtimeDir);
+    assert.equal(first.code, 'UNCLASSIFIED_FINAL');
+    assert.equal(first.consumed, false);
+    assert.equal(readRegistry(runtimeDir).tasks[task.taskId].state, 'dispatching');
+    assert.equal(pendingInbox(runtimeDir).pending.length, 1, '无结构 final 必须保持 pending');
+    const second = consumeEvent('E-unstructured-final', runtimeDir);
+    assert.equal(second.code, 'UNCLASSIFIED_FINAL');
+    assert.equal(Object.keys(readRegistry(runtimeDir).unclassifiedFinals).length, 1, '重复 reconcile 不得复制未分类记录');
+    const action = actionOf(runtimeDir, 'UNCLASSIFIED_FINAL', task.taskId);
+    assert.equal(action.eventId, 'E-unstructured-final');
+    assert.equal(readRegistry(runtimeDir).orchestration.unclassifiedFinalCount, 1);
+    assert.throws(
+      () => receiveActionReceipt(action.actionId, 'succeeded', { resolution: 'ignore it' }, runtimeDir),
+      (error) => error.code === 'UNCLASSIFIED_FINAL_REQUIRES_REPLACEMENT',
+      '任意 resolution 不得吞掉 pending final',
+    );
+    assert.equal(pendingInbox(runtimeDir).pending.length, 1);
+    const replacement = putTypedFinal(runtimeDir, task, 'T-unclassified', 'E-typed-replacement', 'replacement-commit');
+    assert.equal(replacement.nextAction, 'CREATE_REVIEWER');
+    assert.equal(pendingInbox(runtimeDir).pending.length, 0, '合法 replacement typed-final 才能消费旧 unclassified event');
+    assert.equal(readRegistry(runtimeDir).unclassifiedFinals['E-unstructured-final'].resolution, 'replacement-typed-final:E-typed-replacement');
+    assert.equal(readRegistry(runtimeDir).tasks[task.taskId].nextAction, 'CREATE_REVIEWER',
+      'replacement 收敛后 Registry nextAction 不得残留 UNCLASSIFIED_FINAL');
+    const settledRegistry = readRegistry(runtimeDir);
+    assert.equal(settledRegistry.orchestration.unclassifiedFinalCount, 0);
+    assert.equal(settledRegistry.orchestration.nextAction.type, 'CREATE_REVIEWER');
+    assert.equal(settledRegistry.orchestration.whyNotComplete.some((reason) => reason.startsWith('UNCLASSIFIED_FINAL:')), false);
+    const projected = await collectStatus({ runtimeDir, issuesFixture: ISSUE_FIXTURE });
+    assert.equal(projected.orchestration.unclassifiedFinalCount, 0, 'collect 必须直接投影 replacement 后的原子状态');
+    assert.equal(projected.orchestration.nextAction.type, 'CREATE_REVIEWER');
+  } finally {
+    await cleanTemp(runtimeDir);
+  }
+}
+
+async function orchestrationHostBlockCircuit() {
+  const runtimeDir = tempDirectory('orchestration-continuous-block-circuit');
+  const fixture = repositoryFixture('orchestration-continuous-block-circuit-git');
+  try {
+    const baseHead = gitSync(fixture.sibling, ['rev-parse', 'HEAD']);
+    continuousStatus(runtimeDir, [{ name: 'dev-block', path: fixture.sibling, branch: 'fixture-dev', head: baseHead }], [], {
+      repoRoot: fixture.main, mainHead: gitSync(fixture.main, ['rev-parse', 'HEAD']),
+    });
+    const task = createTask({
+      issue: 43, worktree: 'dev-block', role: 'executor', 'thread-id': 'T-dev-block-executor',
+      model: 'sol-high', 'routing-reason': 'host-shaped BLOCK fixture',
+    }, runtimeDir);
+    let firstReviewer = null;
+    for (let ordinal = 1; ordinal <= 3; ordinal += 1) {
+      writeFileSync(join(fixture.sibling, `block-${ordinal}.txt`), `block ${ordinal}\n`);
+      gitSync(fixture.sibling, ['add', `block-${ordinal}.txt`]);
+      gitSync(fixture.sibling, ['commit', '-m', `block implementation ${ordinal}`]);
+      const commit = gitSync(fixture.sibling, ['rev-parse', 'HEAD']);
+      putTypedFinal(runtimeDir, task, 'T-dev-block-executor', `E-block-final-${ordinal}`, commit);
+      if (ordinal === 2) {
+        const create = actionOf(runtimeDir, 'CREATE_REVIEWER', task.taskId);
+        assert.throws(
+          () => receiveActionReceipt(create.actionId, 'succeeded', { reviewerTaskId: firstReviewer.taskId }, runtimeDir),
+          (error) => error.code === 'REVIEW_COMMIT_MISMATCH',
+          '旧 commit reviewer 不得完成新 CREATE_REVIEWER action',
+        );
+      }
+      const reviewer = hostCreateReviewer(runtimeDir, task, ordinal);
+      if (ordinal === 1) firstReviewer = reviewer;
+      if (ordinal === 2) {
+        for (const verdict of ['APPROVE', 'BLOCK']) {
+          const eventId = `E-old-reviewer-${verdict.toLowerCase()}`;
+          putInboxEvent({
+            thread: firstReviewer.task.threadId, task: task.taskId, kind: 'verdict', 'event-id': eventId,
+            payload: JSON.stringify({ verdict, commitSha: commit, summary: `old reviewer replay ${verdict}` }),
+          }, runtimeDir);
+          assert.throws(
+            () => consumeEvent(eventId, runtimeDir),
+            (error) => ['REVIEW_COMMIT_MISMATCH', 'REVIEW_EVIDENCE_REQUIRED'].includes(error.code),
+            `旧 reviewer 不得 ${verdict} 新 follow-up commit`,
+          );
+        }
+      }
+      putInboxEvent({
+        thread: reviewer.task.threadId, task: task.taskId, kind: 'verdict', 'event-id': `E-block-verdict-${ordinal}`,
+        payload: JSON.stringify({ verdict: 'BLOCK', commitSha: commit, summary: `must fix ${ordinal}` }),
+      }, runtimeDir);
+      const blocked = consumeEvent(`E-block-verdict-${ordinal}`, runtimeDir);
+      assert.equal(blocked.blockCount, ordinal);
+      if (ordinal < 3) {
+        assert.equal(blocked.nextAction, 'return-to-executor');
+        const returned = actionOf(runtimeDir, 'RETURN_TO_EXECUTOR', task.taskId);
+        assert.throws(
+          () => receiveActionReceipt(returned.actionId, 'succeeded', { threadId: 'T-wrong-executor' }, runtimeDir),
+          (error) => error.code === 'RETURN_THREAD_MISMATCH',
+          'RETURN_TO_EXECUTOR receipt 不得改投其他 thread',
+        );
+        receiveActionReceipt(returned.actionId, 'succeeded', { threadId: 'T-dev-block-executor' }, runtimeDir);
+        assert.equal(readRegistry(runtimeDir).tasks[task.taskId].state, 'executing');
+      }
+    }
+    const finalTask = readRegistry(runtimeDir).tasks[task.taskId];
+    assert.equal(finalTask.state, 'handoff-required');
+    assert.equal(finalTask.blockCount, 3);
+    assert.equal(finalTask.blockLedger.length, 3);
+    assert.equal(finalTask.blockLedger[2].commit, gitSync(fixture.sibling, ['rev-parse', 'HEAD']));
+    assert.throws(
+      () => transitionTask(task.taskId, 'executing', {}, runtimeDir),
+      (error) => error.code === 'INVALID_TRANSITION',
+      'generic transition 不得绕过人工授权恢复 handoff',
+    );
+    let recoveryCli = orchestrateSync([
+      'handoff', 'recover', '--task', task.taskId,
+    ], runtimeDir);
+    assert.equal(recoveryCli.status, 2);
+    assert.equal(parseJsonLine(recoveryCli.stderr).code, 'BAD_REQUEST');
+    const authorizationId = 'issue-43-user-unblock-2026-08-25';
+    const authorization = '用户明确授权：不要因可由 agent 修复的第三轮 finding 停在 handoff，继续原 Task 修复。';
+    recoveryCli = orchestrateSync([
+      'handoff', 'recover', '--task', task.taskId,
+      '--authorization-id', authorizationId, '--authorization', authorization,
+    ], runtimeDir);
+    assert.equal(recoveryCli.status, 0, recoveryCli.stderr);
+    assert.equal(parseJsonLine(recoveryCli.stdout).result, 'recovered');
+    const transitionCount = readJsonLines(join(runtimeDir, 'transitions.jsonl')).length;
+    const duplicateRecovery = orchestrateSync([
+      'handoff', 'recover', '--task', task.taskId,
+      '--authorization-id', authorizationId, '--authorization', authorization,
+    ], runtimeDir);
+    assert.equal(duplicateRecovery.status, 0, duplicateRecovery.stderr);
+    assert.equal(parseJsonLine(duplicateRecovery.stdout).result, 'already-recovered');
+    assert.equal(readJsonLines(join(runtimeDir, 'transitions.jsonl')).length, transitionCount,
+      '重复人工授权恢复不得追加 transition');
+    let recoveredTask = readRegistry(runtimeDir).tasks[task.taskId];
+    assert.equal(recoveredTask.state, 'executing');
+    assert.equal(recoveredTask.nextAction, 'WAIT_THREADS');
+    assert.equal(recoveredTask.finishedAt, null);
+    assert.equal(recoveredTask.circuitEpoch, 1);
+    assert.equal(recoveredTask.blockCount, 0);
+    assert.equal(recoveredTask.recoveryLedger.length, 1);
+    assert.equal(recoveredTask.recoveryLedger[0].authorization, authorization);
+    const recoveredStatus = readJson(join(runtimeDir, 'status.json'));
+    recoveredStatus.worktrees[0].head = gitSync(fixture.sibling, ['rev-parse', 'HEAD']);
+    writeJsonAtomic(join(runtimeDir, 'status.json'), recoveredStatus);
+    const recoveredActions = nextActions(runtimeDir).actions;
+    assert.equal(recoveredActions.some((action) => action.type === 'WAIT_THREADS'
+      && action.targets.some((target) => target.taskId === task.taskId)), true, JSON.stringify(recoveredActions));
+
+    putInboxEvent({
+      thread: 'T-dev-block-executor', task: task.taskId, kind: 'final', 'event-id': 'E-recovered-synthetic',
+      payload: JSON.stringify(executorFinal('synthetic-recovery-sha')),
+    }, runtimeDir);
+    assert.throws(
+      () => consumeEvent('E-recovered-synthetic', runtimeDir),
+      (error) => error.code === 'RECOVERY_COMMIT_NOT_FOUND',
+      'handoff recovery 不得接受 synthetic SHA',
+    );
+    writeFileSync(join(fixture.sibling, 'block-4.txt'), 'block 4\n');
+    gitSync(fixture.sibling, ['add', 'block-4.txt']);
+    gitSync(fixture.sibling, ['commit', '-m', 'block implementation 4']);
+    const recoveryCommit = gitSync(fixture.sibling, ['rev-parse', 'HEAD']);
+    putTypedFinal(runtimeDir, task, 'T-dev-block-executor', 'E-recovered-final-4', recoveryCommit);
+    const recoveredReviewer = hostCreateReviewer(runtimeDir, task, 4);
+    hostApprove(runtimeDir, task, recoveredReviewer, 'E-recovered-approve-4');
+    recoveredTask = readRegistry(runtimeDir).tasks[task.taskId];
+    assert.equal(recoveredTask.state, 'approved', '人工恢复后必须能沿原 Task 继续 executor → reviewer');
+    assert.equal(recoveredTask.recovery.requiresNewCommit, false);
+    assert.equal(recoveredTask.recovery.resumedCommit, recoveryCommit);
+    assert.equal(readRegistry(runtimeDir).orchestration.nextAction.type, 'EVALUATE_MERGE_GATE');
+  } finally {
+    await cleanTemp(runtimeDir);
+    await cleanRepositoryFixture(fixture);
+  }
+}
+
+async function orchestrationLiveHeadBinding() {
+  const gateRuntime = tempDirectory('orchestration-continuous-live-head-gate');
+  const mergeRuntime = tempDirectory('orchestration-continuous-live-head-merge');
+  const gateFixture = repositoryFixture('orchestration-continuous-live-head-gate-git');
+  const mergeFixture = repositoryFixture('orchestration-continuous-live-head-merge-git');
+  const prepareApproved = (runtimeDir, fixture, worktree, issue) => {
+    writeFileSync(join(fixture.sibling, 'reviewed.txt'), 'reviewed\n');
+    gitSync(fixture.sibling, ['add', 'reviewed.txt']);
+    gitSync(fixture.sibling, ['commit', '-m', 'reviewed implementation']);
+    const reviewedCommit = gitSync(fixture.sibling, ['rev-parse', 'HEAD']);
+    const mainHead = gitSync(fixture.main, ['rev-parse', 'HEAD']);
+    continuousStatus(runtimeDir, [{ name: worktree, path: fixture.sibling, branch: 'fixture-dev', head: reviewedCommit }], [], {
+      repoRoot: fixture.main, mainHead,
+    });
+    const task = createTask({
+      issue, worktree, role: 'executor', 'thread-id': `T-${worktree}-executor`,
+      model: 'sol-high', 'routing-reason': 'live HEAD binding fixture',
+    }, runtimeDir);
+    putTypedFinal(runtimeDir, task, task.task.threadId, `E-${worktree}-final`, reviewedCommit);
+    const reviewer = hostCreateReviewer(runtimeDir, task, 1);
+    hostApprove(runtimeDir, task, reviewer, `E-${worktree}-approve`);
+    return { task, reviewedCommit, mainHead };
+  };
+  try {
+    const gate = prepareApproved(gateRuntime, gateFixture, 'dev-live-gate', 71);
+    writeFileSync(join(gateFixture.sibling, 'unreviewed.txt'), 'unreviewed\n');
+    gitSync(gateFixture.sibling, ['add', 'unreviewed.txt']);
+    gitSync(gateFixture.sibling, ['commit', '-m', 'unreviewed worker advance']);
+    const advancedHead = gitSync(gateFixture.sibling, ['rev-parse', 'HEAD']);
+    const gateAction = actionOf(gateRuntime, 'EVALUATE_MERGE_GATE', gate.task.taskId);
+    assert.throws(
+      () => receiveActionReceipt(gateAction.actionId, 'succeeded', {
+        code: 'PASS', runtime: 'NOT_RUN', delivery: 'MERGE_READY', mergeCheck: 'clean',
+        headSha: advancedHead, integrationHead: gate.mainHead, integrationBranch: 'main',
+      }, gateRuntime),
+      (error) => error.code === 'MERGE_HEAD_MISMATCH',
+      'merge gate 必须拒绝 worker live HEAD 前进到未审 commit',
+    );
+
+    const merge = prepareApproved(mergeRuntime, mergeFixture, 'dev-live-merge', 72);
+    const mergeGate = actionOf(mergeRuntime, 'EVALUATE_MERGE_GATE', merge.task.taskId);
+    receiveActionReceipt(mergeGate.actionId, 'succeeded', {
+      code: 'PASS', runtime: 'NOT_RUN', delivery: 'MERGE_READY', mergeCheck: 'clean',
+      headSha: merge.reviewedCommit, integrationHead: merge.mainHead, integrationBranch: 'main',
+    }, mergeRuntime);
+    const mergeAction = actionOf(mergeRuntime, 'HOST_MERGE', merge.task.taskId);
+    receiveActionReceipt(mergeAction.actionId, 'started', { integrationBranch: 'main', preHead: merge.mainHead }, mergeRuntime);
+    writeFileSync(join(mergeFixture.sibling, 'advanced-after-start.txt'), 'advanced\n');
+    gitSync(mergeFixture.sibling, ['add', 'advanced-after-start.txt']);
+    gitSync(mergeFixture.sibling, ['commit', '-m', 'advance after merge start']);
+    gitSync(mergeFixture.main, ['merge', '--no-ff', merge.reviewedCommit, '-m', 'merge exact reviewed commit']);
+    const mergeCommit = gitSync(mergeFixture.main, ['rev-parse', 'HEAD']);
+    assert.throws(
+      () => receiveActionReceipt(mergeAction.actionId, 'succeeded', {
+        integrationBranch: 'main', preHead: merge.mainHead, postHead: mergeCommit, mergeCommit,
+      }, mergeRuntime),
+      (error) => error.code === 'WORKER_HEAD_MOVED_AFTER_REVIEW',
+      'HOST_MERGE succeeded 必须重新核对 worker live HEAD',
+    );
+  } finally {
+    await cleanTemp(gateRuntime);
+    await cleanTemp(mergeRuntime);
+    await cleanRepositoryFixture(gateFixture);
+    await cleanRepositoryFixture(mergeFixture);
+  }
+}
+
+async function orchestrationDeadLetterBinding() {
+  const runtimeDir = tempDirectory('orchestration-continuous-dead-letter');
+  const fixture = repositoryFixture('orchestration-continuous-dead-letter-git');
+  try {
+    writeFileSync(join(fixture.sibling, 'dead-letter.txt'), 'binding\n');
+    gitSync(fixture.sibling, ['add', 'dead-letter.txt']);
+    gitSync(fixture.sibling, ['commit', '-m', 'dead letter binding fixture']);
+    const fullCommit = gitSync(fixture.sibling, ['rev-parse', 'HEAD']);
+    const shortCommit = gitSync(fixture.sibling, ['rev-parse', '--short=7', 'HEAD']);
+    continuousStatus(runtimeDir, [{ name: 'dev-dead-letter', path: fixture.sibling, branch: 'fixture-dev', head: fullCommit }], [], {
+      repoRoot: fixture.main, mainHead: gitSync(fixture.main, ['rev-parse', 'HEAD']),
+    });
+    const task = createTask({
+      issue: 73, worktree: 'dev-dead-letter', role: 'executor', 'thread-id': 'T-dead-letter-executor',
+      model: 'sol-high', 'routing-reason': 'dead-letter binding fixture',
+    }, runtimeDir);
+    putTypedFinal(runtimeDir, task, task.task.threadId, 'E-dead-letter-executor-final', shortCommit);
+    const reviewer = hostCreateReviewer(runtimeDir, task, 1);
+    putInboxEvent({
+      thread: reviewer.task.threadId, task: task.taskId, kind: 'verdict', 'event-id': 'E-invalid-full-review',
+      payload: JSON.stringify({ verdict: 'BLOCK', commitSha: fullCommit, summary: 'full SHA binding mismatch' }),
+    }, runtimeDir);
+    assert.throws(
+      () => consumeEvent('E-invalid-full-review', runtimeDir),
+      (error) => error.code === 'REVIEW_EVIDENCE_REQUIRED',
+    );
+    await waitMilliseconds(5);
+    putInboxEvent({
+      thread: reviewer.task.threadId, task: task.taskId, kind: 'verdict', 'event-id': 'E-valid-short-review',
+      payload: JSON.stringify({ verdict: 'BLOCK', commitSha: shortCommit, summary: 'valid short SHA replacement' }),
+    }, runtimeDir);
+    consumeEvent('E-valid-short-review', runtimeDir);
+    const rejectArgs = [
+      'inbox', 'reject', '--reason', 'SUPERSEDED_REVIEW_BINDING',
+      '--replacement-event-id', 'E-valid-short-review', '--authorization-id', 'DL-test-1',
+      '--authorization', 'test authorization for superseded review binding',
+    ];
+    let rejected = orchestrateSync([...rejectArgs, '--event-id', 'E-valid-short-review'], runtimeDir);
+    assert.equal(rejected.status, 2);
+    assert.equal(parseJsonLine(rejected.stderr).code, 'EVENT_ALREADY_CONSUMED', '合法 replacement 不得被 dead-letter');
+    rejected = orchestrateSync([...rejectArgs, '--event-id', 'E-invalid-full-review'], runtimeDir);
+    assert.equal(rejected.status, 0, rejected.stderr);
+    assert.equal(parseJsonLine(rejected.stdout).result, 'rejected');
+    const duplicate = orchestrateSync([...rejectArgs, '--event-id', 'E-invalid-full-review'], runtimeDir);
+    assert.equal(duplicate.status, 0, duplicate.stderr);
+    assert.equal(parseJsonLine(duplicate.stdout).result, 'already-rejected');
+    const registry = readRegistry(runtimeDir);
+    assert.equal(registry.tasks[task.taskId].consumedEventIds.includes('E-invalid-full-review'), false,
+      'dead-letter 不是静默消费，不得写 consumedEventIds');
+    assert.equal(registry.deadLetters['E-invalid-full-review'].canonicalCommit, fullCommit);
+    assert.equal(readJsonLines(join(runtimeDir, 'dead-letters.jsonl')).length, 1, '幂等 reject 只追加一条 audit receipt');
+    assert.equal(pendingInbox(runtimeDir).pending.some((event) => event.eventId === 'E-invalid-full-review'), false);
+  } finally {
+    await cleanTemp(runtimeDir);
+    await cleanRepositoryFixture(fixture);
+  }
+}
+
+async function orchestrationMergeQueueAndRuntimeBoundary() {
+  const runtimeDir = tempDirectory('orchestration-continuous-merge-queue');
+  const failRuntime = tempDirectory('orchestration-continuous-runtime-fail');
+  const frontierRuntime = tempDirectory('orchestration-continuous-frontier-stop');
+  const claimRuntime = tempDirectory('orchestration-continuous-claim-reservation');
+  const mergeFixture = repositoryFixture('orchestration-continuous-merge-queue-git');
+  try {
+    writeFileSync(join(mergeFixture.sibling, 'parallel.txt'), 'parallel\n');
+    gitSync(mergeFixture.sibling, ['add', 'parallel.txt']);
+    gitSync(mergeFixture.sibling, ['commit', '-m', 'parallel implementation']);
+    const sharedCommit = gitSync(mergeFixture.sibling, ['rev-parse', 'HEAD']);
+    const mainHead = gitSync(mergeFixture.main, ['rev-parse', 'HEAD']);
+    continuousStatus(runtimeDir, [
+      { name: 'dev-a', path: mergeFixture.sibling, branch: 'fixture-dev', head: sharedCommit },
+      { name: 'dev-b', path: mergeFixture.sibling, branch: 'fixture-dev', head: sharedCommit },
+    ], [], { repoRoot: mergeFixture.main, mainHead });
+    const ready = [];
+    for (const [index, worktree] of ['dev-a', 'dev-b'].entries()) {
+      const task = createTask({
+        issue: 50 + index, worktree, role: 'executor', 'thread-id': `T-${worktree}-executor`,
+        model: 'sol-high', 'routing-reason': 'parallel approve fixture',
+      }, runtimeDir);
+      putTypedFinal(runtimeDir, task, `T-${worktree}-executor`, `E-${worktree}-final`, sharedCommit);
+      const reviewer = hostCreateReviewer(runtimeDir, task, 1);
+      hostApprove(runtimeDir, task, reviewer, `E-${worktree}-approve`);
+      const gate = actionOf(runtimeDir, 'EVALUATE_MERGE_GATE', task.taskId);
+      receiveActionReceipt(gate.actionId, 'succeeded', {
+        code: 'PASS', runtime: 'NOT_RUN', delivery: 'MERGE_READY', mergeCheck: 'clean',
+        headSha: sharedCommit, integrationHead: mainHead, integrationBranch: 'main',
+      }, runtimeDir);
+      ready.push(task);
+    }
+    let actions = nextActions(runtimeDir).actions;
+    assert.equal(actions.filter((action) => action.type === 'HOST_MERGE').length, 1, '多 worker APPROVE 只允许一个 integration merge 队首');
+    const firstMerge = actions.find((action) => action.type === 'HOST_MERGE');
+    receiveActionReceipt(firstMerge.actionId, 'started', { integrationBranch: 'main', preHead: mainHead }, runtimeDir);
+    gitSync(mergeFixture.main, ['merge', '--no-ff', 'fixture-dev', '-m', 'merge first parallel lane']);
+    const firstMergeCommit = gitSync(mergeFixture.main, ['rev-parse', 'HEAD']);
+    receiveActionReceipt(firstMerge.actionId, 'succeeded', {
+      integrationBranch: 'main', preHead: mainHead, postHead: firstMergeCommit, mergeCommit: firstMergeCommit,
+    }, runtimeDir);
+    actions = nextActions(runtimeDir).actions;
+    assert.equal(actions.filter((action) => action.type === 'HOST_MERGE').length, 0, 'post-merge verification 前不得放出第二个 merge');
+    const firstVerify = actions.find((action) => action.type === 'POST_MERGE_VERIFY');
+    runPostMergeVerification(firstVerify.actionId, [{
+      file: process.execPath, args: ['-e', 'process.exit(0)'], label: 'first queue post-merge verification',
+    }], runtimeDir);
+    actions = nextActions(runtimeDir).actions;
+    assert.equal(actions.filter((action) => action.type === 'HOST_MERGE').length, 1, '第一条 post-merge 完成后才释放下一条 merge');
+    const secondMerge = actions.find((action) => action.type === 'HOST_MERGE');
+    assert.notEqual(secondMerge.taskId, firstMerge.taskId);
+    const outOfScopeActive = createTask({
+      issue: 52, worktree: 'dev-out-active', role: 'executor', 'thread-id': 'T-out-of-goal-active',
+      model: 'luna-max', 'routing-reason': 'Goal worker scope negative fixture',
+    }, runtimeDir);
+    const scopedWorker = readRegistry(runtimeDir).tasks[firstMerge.taskId].worktree;
+    startGoal({ workers: scopedWorker }, runtimeDir);
+    actions = nextActions(runtimeDir).actions;
+    assert.equal(actions.some((action) => action.taskId === secondMerge.taskId), false,
+      'active Goal 不得恢复或派生范围外 merge-ready Task action');
+    assert.equal(actions.some((action) => action.taskId === outOfScopeActive.taskId), false,
+      'active Goal 不得为范围外 active Task 派生 WAIT/reviewer action');
+    assert.equal(readRegistry(runtimeDir).orchestration.mergeQueue.some((entry) => entry.taskId === secondMerge.taskId), false,
+      'merge queue 投影也必须服从 Goal worker scope');
+
+    continuousStatus(failRuntime, ['dev-fail'], []);
+    const task = createTask({
+      issue: 60, worktree: 'dev-fail', role: 'executor', 'thread-id': 'T-dev-fail-executor',
+      model: 'sol-high', 'routing-reason': 'runtime FAIL boundary', 'interaction-class': 'needs-manual-test',
+    }, failRuntime);
+    putTypedFinal(failRuntime, task, 'T-dev-fail-executor', 'E-fail-final', 'commit-fail', { manual: true });
+    const reviewer = hostCreateReviewer(failRuntime, task, 1);
+    hostApprove(failRuntime, task, reviewer, 'E-fail-approve');
+    const gate = actionOf(failRuntime, 'EVALUATE_MERGE_GATE', task.taskId);
+    assert.throws(
+      () => receiveActionReceipt(gate.actionId, 'succeeded', {
+        code: 'PASS', runtime: 'FAIL', delivery: 'MERGE_READY', mergeCheck: 'clean', headSha: 'commit-fail',
+      }, failRuntime),
+      (error) => error.code === 'RUNTIME_BLOCKS_DELIVERY',
+      'needs-manual-test 不得把 runtime FAIL 绕成 merge-ready',
+    );
+    assert.equal(readRegistry(failRuntime).tasks[task.taskId].state, 'approved');
+    assert.equal(readRegistry(failRuntime).actionReceipts[gate.actionId], undefined, '失败 receipt 不得污染幂等账本');
+
+    continuousStatus(frontierRuntime, ['dev-frontier'], [{ number: 77, status: 'frontier', labels: ['ready-for-agent'] }]);
+    const parked = createTask({
+      issue: 70, worktree: 'dev-frontier', role: 'executor', 'thread-id': 'T-frontier-parked',
+      model: 'luna-max', 'routing-reason': 'frontier stop boundary',
+    }, frontierRuntime);
+    transitionTask(parked.taskId, 'parked', { reason: 'explicit manual pause' }, frontierRuntime);
+    const stop = evaluateStop({ write: true }, frontierRuntime);
+    assert.equal(stop.result, 'advanceable');
+    assert.ok(stop.eligibleFrontier.includes(77));
+    assert.equal(readRegistry(frontierRuntime).orchestration.state, 'running', 'eligible frontier 存在时不得 stop/complete');
+
+    continuousStatus(claimRuntime, ['dev-claim-a', 'dev-claim-b'], [
+      { number: 99, status: 'frontier', labels: ['ready-for-agent'] },
+    ]);
+    startGoal({ workers: 'dev-claim-a,dev-claim-b' }, claimRuntime);
+    const firstClaim = actionOf(claimRuntime, 'CLAIM_NEXT_ISSUE');
+    const restartedClaim = actionOf(claimRuntime, 'CLAIM_NEXT_ISSUE');
+    assert.equal(restartedClaim.actionId, firstClaim.actionId, 'root restart 必须恢复同一 claim reservation/actionId');
+    assert.equal(restartedClaim.issue, 99);
+    const otherWorker = firstClaim.worktree === 'dev-claim-a' ? 'dev-claim-b' : 'dev-claim-a';
+    assert.throws(
+      () => createTask({
+        issue: 99, worktree: otherWorker, role: 'executor', 'thread-id': 'T-cross-worker-claim',
+        model: 'luna-max', 'routing-reason': 'must be rejected by reservation',
+      }, claimRuntime),
+      (error) => error.code === 'ISSUE_CLAIM_RESERVED',
+      'stale frontier 不得让另一 worker 重复认领同一 Issue',
+    );
+    const claimedTask = createTask({
+      issue: 99, worktree: firstClaim.worktree, role: 'executor', 'thread-id': 'T-reserved-claim',
+      model: 'luna-max', 'routing-reason': 'reservation owner claim',
+    }, claimRuntime);
+    receiveActionReceipt(firstClaim.actionId, 'succeeded', { nextTaskId: claimedTask.taskId }, claimRuntime);
+    assert.equal(readRegistry(claimRuntime).claimReservations['99'].status, 'succeeded');
+    assert.equal(nextActions(claimRuntime).actions.some((action) => action.type === 'CLAIM_NEXT_ISSUE' && action.issue === 99), false,
+      'receipt succeeded 后 stale snapshot 也不得重发 #99 claim');
+  } finally {
+    await cleanTemp(runtimeDir);
+    await cleanTemp(failRuntime);
+    await cleanTemp(frontierRuntime);
+    await cleanTemp(claimRuntime);
+    await cleanRepositoryFixture(mergeFixture);
+  }
+}
+
+async function orchestrationOctopusMergeRejected() {
+  const runtimeDir = tempDirectory('orchestration-continuous-octopus');
+  const fixture = repositoryFixture('orchestration-continuous-octopus-git');
+  const extra = join(fixture.root, 'fixture-extra');
+  try {
+    writeFileSync(join(fixture.sibling, 'executor.txt'), 'executor\n');
+    gitSync(fixture.sibling, ['add', 'executor.txt']);
+    gitSync(fixture.sibling, ['commit', '-m', 'executor branch commit']);
+    const commitSha = gitSync(fixture.sibling, ['rev-parse', 'HEAD']);
+    const mainHead = gitSync(fixture.main, ['rev-parse', 'HEAD']);
+
+    gitSync(fixture.main, ['worktree', 'add', '-b', 'fixture-extra', extra]);
+    writeFileSync(join(extra, 'extra.txt'), 'extra\n');
+    gitSync(extra, ['add', 'extra.txt']);
+    gitSync(extra, ['commit', '-m', 'extra branch commit']);
+
+    continuousStatus(runtimeDir, [{
+      name: 'dev-octopus', path: fixture.sibling, branch: 'fixture-dev', head: commitSha,
+    }], [], { repoRoot: fixture.main, mainHead });
+    const task = createTask({
+      issue: 88, worktree: 'dev-octopus', role: 'executor', 'thread-id': 'T-octopus-executor',
+      model: 'sol-high', 'routing-reason': 'octopus merge rejection fixture',
+    }, runtimeDir);
+    putTypedFinal(runtimeDir, task, 'T-octopus-executor', 'E-octopus-final', commitSha);
+    const reviewer = hostCreateReviewer(runtimeDir, task, 1);
+    hostApprove(runtimeDir, task, reviewer, 'E-octopus-approve');
+    const gate = actionOf(runtimeDir, 'EVALUATE_MERGE_GATE', task.taskId);
+    receiveActionReceipt(gate.actionId, 'succeeded', {
+      code: 'PASS', runtime: 'NOT_RUN', delivery: 'MERGE_READY', mergeCheck: 'clean',
+      headSha: commitSha, integrationHead: mainHead, integrationBranch: 'main',
+    }, runtimeDir);
+    const merge = actionOf(runtimeDir, 'HOST_MERGE', task.taskId);
+    receiveActionReceipt(merge.actionId, 'started', { integrationBranch: 'main', preHead: mainHead }, runtimeDir);
+    gitSync(fixture.main, ['merge', '--no-ff', 'fixture-dev', 'fixture-extra', '-m', 'octopus merge probe']);
+    const octopusHead = gitSync(fixture.main, ['rev-parse', 'HEAD']);
+    const parentParts = gitSync(fixture.main, ['rev-list', '--parents', '-n', '1', octopusHead]).split(/\s+/);
+    assert.equal(parentParts.length, 4, 'probe 必须真实构造 commit + 三个 parent 的 octopus merge');
+    assert.throws(
+      () => receiveActionReceipt(merge.actionId, 'succeeded', {
+        integrationBranch: 'main', preHead: mainHead, postHead: octopusHead, mergeCommit: octopusHead,
+      }, runtimeDir),
+      (error) => error.code === 'TRUE_TWO_PARENT_MERGE_REQUIRED',
+      'octopus merge 不得冒充合同要求的真实双父 merge',
+    );
+    assert.equal(readRegistry(runtimeDir).tasks[task.taskId].state, 'merge-ready');
+    assert.ok(readRegistry(runtimeDir).leases['dev-octopus'], 'octopus receipt 被拒绝后不得释放 lease');
+  } finally {
+    if (existsSync(extra)) {
+      gitSync(fixture.main, ['worktree', 'remove', '--force', extra]);
+      assert.equal(existsSync(extra), false, 'octopus extra fixture worktree 必须清理');
+    }
+    await cleanTemp(runtimeDir);
+    await cleanRepositoryFixture(fixture);
   }
 }
 
@@ -2304,7 +3006,8 @@ async function orchestrationGlobalStop() {
     });
     evaluated = stopEvalViaCli(runtimeDir, true, 1);
     assert.equal(evaluated.result, 'advanceable');
-    assert.ok(evaluated.advanceable.some((lane) => lane.worktree === workerId(idleWorker) && lane.state === 'unregistered'));
+    assert.ok(evaluated.advanceable.some((action) => action.type === 'WAIT_THREADS'
+      && action.targets.some((lane) => lane.worktree === workerId(idleWorker) && lane.state === 'unregistered')));
     const idle = taskCreateViaCli(runtimeDir, {
       issue: 99, worktree: idleWorker, role: 'executor', 'thread-id': 'T-stop-idle',
       model: 'luna-max', 'routing-reason': 'register every real lane before stop',
@@ -2313,7 +3016,15 @@ async function orchestrationGlobalStop() {
     evaluated = stopEvalViaCli(runtimeDir, true);
     assert.equal(evaluated.result, 'stopped');
     assert.equal(evaluated.lanes[workerId(testWorker)], 'excluded');
-    assert.equal(readRegistry(runtimeDir).orchestration.state, 'stopped');
+    const stoppedRegistry = readRegistry(runtimeDir);
+    assert.equal(stoppedRegistry.orchestration.state, 'stopped');
+    assert.equal(stoppedRegistry.orchestration.nextAction, null);
+    assert.deepEqual(stoppedRegistry.orchestration.nextActions, []);
+    assert.deepEqual(stoppedRegistry.orchestration.whyNotComplete, []);
+    assert.equal(stoppedRegistry.orchestration.unclassifiedFinalCount, 0);
+    assert.equal(stoppedRegistry.orchestration.goalState, 'not-created');
+    assert.equal(evaluateStop({ write: true }, runtimeDir).alreadyStopped, true, 'stop --write 重放必须幂等');
+    assert.equal(nextActions(runtimeDir).actions.length, 0, 'stopped orchestration 不得重新物化 STOP 或其他 action');
     const collected = await collectStatus({ runtimeDir, issuesFixture: ISSUE_FIXTURE });
     assert.equal(collected.orchestration.state, 'stopped');
     assert.equal(readRegistry(runtimeDir).orchestration.state, 'stopped', 'collect 不得改写 stop');
@@ -2534,23 +3245,25 @@ async function orchestrationContractMarkers() {
   for (const marker of [
     'Desktop `create_thread`', 'registry.json', 'inbox pending', '三维 verdict',
     'runtime=NOT_RUN', 'stop eval --write', '--fallback-authorized', 'Map / List',
+    'aes.worktree-board.executor-final/v1', 'next-actions', 'action receipt', 'action verify',
+    'claim reservation', 'verificationRun', 'octopus merge', 'schema 校验先于 terminal-noop', 'CLAIM_NEXT_ISSUE',
+    'handoff recover', 'authorization-id', 'already-recovered',
+    'INTERACTION_CLASS_CONFLICT', '范围外 active/merge-ready Task',
   ]) assert.match(skill, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   const runTests = readFileSync(join(SKILL_DIR, 'run-tests.mjs'), 'utf8');
   assert.match(runTests, /orchestration/, 'run-tests.mjs 无参默认门禁必须包含 orchestration');
   const selftestSource = readFileSync(join(SCRIPT_DIR, 'selftest.mjs'), 'utf8');
-  for (const marker of ['P2.3-01', 'P2.3-10', 'fiveTaskFanIn', 'inboxPutViaCli', 'supportingCases']) {
+  for (const marker of [
+    'P2.3-01', 'P2.3-10', 'fiveTaskFanIn', 'inboxPutViaCli', 'consumeViaCli',
+    'putTypedFinal', 'receiveActionReceipt', 'live-head-binding', 'dead-letter-binding',
+  ]) {
     assert.match(selftestSource, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
-  assert.doesNotMatch(
-    selftestSource,
-    /\b(?:putInboxEvent|consumeEvent|pendingInbox|recordBlock|setVerdict|evaluateStop|heartbeatTask|transitionTask)\s*\(/,
-    'orchestration selftest 不得直接调用内部控制面 API，事件与 BLOCK/park/stop 必须经公共 CLI',
-  );
   assert.doesNotMatch(skill, /派发 headless 任务/);
   assert.doesNotMatch(skill, /只给合并建议，不执行 merge/);
 
   const board = readFileSync(join(SKILL_DIR, 'board.html'), 'utf8');
-  for (const marker of ['id="orch-pill"', 'task-state', 'registry-section', 'transition-history', 'workerTiming', '本轮开始', 'fallback-authorized', 'id="v2-note"', '无编排数据：v2 旧快照未携带 registry', '>Map<', '>List<']) {
+  for (const marker of ['id="orch-pill"', 'GOAL', 'nextAction', 'unclassifiedFinalCount', 'whyNotComplete', 'goalState', "registryTask.nextAction || '—'", '未分类 final', 'task-state', 'registry-section', 'transition-history', 'workerTiming', '本轮开始', 'fallback-authorized', 'id="v2-note"', '无编排数据：v2 旧快照未携带 registry', '>Map<', '>List<']) {
     assert.match(board, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
   // 星图既有高保真核心必须原样存在；控制面只允许在确认的 DOM 挂点增量渲染。
@@ -2567,59 +3280,52 @@ async function orchestrationContractMarkers() {
 async function orchestrationDomain() {
   const scenarioIndex = process.argv.indexOf('--scenario');
   const requested = scenarioIndex >= 0 ? process.argv[scenarioIndex + 1] : null;
-  const p2p3Cases = [
-    { id: 'P2.3-01', group: 'lifecycle', name: 'duplicate-final', run: orchestrationInboxIdempotency },
-    { id: 'P2.3-02', group: 'lifecycle', name: 'five-task-polls-not-lost', run: orchestrationFiveTaskFanIn },
-    { id: 'P2.3-03', group: 'governance', name: 'third-block-circuit', run: orchestrationCircuitAndLateEvent },
-    { id: 'P2.3-04', group: 'governance', name: 'park-late-event', run: orchestrationParkedLateEvent },
-    { id: 'P2.3-05', group: 'governance', name: 'autonomous-not-run', run: orchestrationAutonomousNotRun },
-    { id: 'P2.3-06', group: 'governance', name: 'global-stop', run: orchestrationGlobalStop },
-    { id: 'P2.3-07', group: 'storage', name: 'v2-compat', run: orchestrationStorageCompatibility },
-    { id: 'P2.3-08', group: 'storage', name: 'torn-read', run: orchestrationAtomicConcurrency },
+  const cases = [
+    { id: 'P2.3-07', group: 'storage', name: 'v2-compat-assessment-terminal', run: orchestrationStorageCompatibility },
+    { id: 'P2.3-08', group: 'storage', name: 'atomic-concurrency', run: orchestrationAtomicConcurrency },
     { id: 'P2.3-09', group: 'storage', name: 'lock-competition', run: orchestrationLockCompetition },
     { id: 'P2.3-10', group: 'storage', name: 'merge-behind-refresh', run: orchestrationMergeBehindRefresh },
+    { group: 'lifecycle', name: 'preflight-lease-state', run: orchestrationPreflightLeaseAndState },
+    { id: 'P2.3-01', group: 'lifecycle', name: 'inbox-idempotency', run: orchestrationInboxIdempotency },
+    { id: 'P2.3-02', group: 'lifecycle', name: 'five-task-polls-not-lost', run: orchestrationFiveTaskFanIn },
+    { id: 'P2.3-03', group: 'governance', name: 'circuit-late-event', run: orchestrationCircuitAndLateEvent },
+    { id: 'P2.3-04', group: 'governance', name: 'park-late-event', run: orchestrationParkedLateEvent },
+    { id: 'P2.3-05', group: 'governance', name: 'autonomous-not-run', run: orchestrationAutonomousNotRun },
+    { group: 'governance', name: 'verdict-dimensions', run: orchestrationVerdictDimensions },
+    { id: 'P2.3-06', group: 'governance', name: 'global-stop', run: orchestrationGlobalStop },
+    { group: 'continuous', name: 'host-final-review-merge-next', run: orchestrationContinuousHostChain },
+    { group: 'continuous', name: 'unclassified-final', run: orchestrationUnclassifiedFinal },
+    { group: 'continuous', name: 'host-block-circuit', run: orchestrationHostBlockCircuit },
+    { group: 'continuous', name: 'live-head-binding', run: orchestrationLiveHeadBinding },
+    { group: 'continuous', name: 'dead-letter-binding', run: orchestrationDeadLetterBinding },
+    { group: 'continuous', name: 'merge-queue-runtime-boundary', run: orchestrationMergeQueueAndRuntimeBoundary },
+    { group: 'continuous', name: 'octopus-merge-rejected', run: orchestrationOctopusMergeRejected },
+    { group: 'boundary', name: 'server-origin-token', run: orchestrationServerBoundary },
+    { group: 'boundary', name: 'config-preflight', run: orchestrationConfigPreflight },
+    { group: 'contract', name: 'skill-board-contract', run: orchestrationContractMarkers },
   ];
-  const supportingCases = [
-    { id: 'support-lifecycle-preflight', group: 'lifecycle', name: 'preflight-lease-state', run: orchestrationPreflightLeaseAndState },
-    { id: 'support-governance-verdict', group: 'governance', name: 'verdict-dimensions', run: orchestrationVerdictDimensions },
-    { id: 'support-boundary-server', group: 'boundary', name: 'server-origin-token', run: orchestrationServerBoundary },
-    { id: 'support-boundary-config', group: 'boundary', name: 'config-preflight', run: orchestrationConfigPreflight },
-    { id: 'support-contract-board', group: 'contract', name: 'skill-board-contract', run: orchestrationContractMarkers },
-  ];
+  const p2p3Ids = cases.filter((testCase) => testCase.id).map((testCase) => testCase.id).sort();
   assert.deepEqual(
-    p2p3Cases.map((testCase) => testCase.id),
+    p2p3Ids,
     Array.from({ length: 10 }, (_, index) => `P2.3-${String(index + 1).padStart(2, '0')}`),
-    'P2.3 必须恰好报告十个逐项映射 scenario',
+    'P2.3 必须恰好保留十个逐项映射 scenario',
   );
-
-  const selectedPrimary = requested ? p2p3Cases.filter((testCase) => testCase.group === requested) : p2p3Cases;
-  const selectedSupporting = requested
-    ? supportingCases.filter((testCase) => testCase.group === requested)
-    : supportingCases;
-  assert.ok(
-    selectedPrimary.length || selectedSupporting.length,
-    `未知 orchestration scenario: ${requested}; 可用 storage|lifecycle|governance|boundary|contract`,
-  );
-  const runCase = async (testCase) => {
+  const selected = requested ? cases.filter((testCase) => testCase.group === requested) : cases;
+  assert.ok(selected.length, `未知 orchestration scenario: ${requested}; 可用 storage|lifecycle|governance|continuous|boundary|contract`);
+  let passed = 0;
+  for (const testCase of selected) {
     try {
       await testCase.run();
+      passed += 1;
     } catch (cause) {
-      throw new Error(`orchestration/${testCase.id}/${testCase.name} 失败: ${cause.stack || cause.message}`, { cause });
+      throw new Error(`orchestration/${testCase.id || testCase.group}/${testCase.name} 失败: ${cause.stack || cause.message}`, { cause });
     }
-  };
-  for (const testCase of selectedPrimary) await runCase(testCase);
-  for (const testCase of selectedSupporting) await runCase(testCase);
-  const primaryCount = selectedPrimary.length;
-  const primaryPassed = selectedPrimary.length;
-  const displayCount = primaryCount || selectedSupporting.length;
-  const displayPassed = primaryCount ? primaryPassed : selectedSupporting.length;
+  }
   return {
     scenario: requested || 'all',
-    scenarios: displayCount,
-    passed: displayPassed,
-    scenarioIds: selectedPrimary.map((testCase) => testCase.id),
-    supportingScenarios: selectedSupporting.length,
-    supportingPassed: selectedSupporting.length,
+    scenarios: selected.length,
+    passed,
+    scenarioIds: selected.filter((testCase) => testCase.id).map((testCase) => testCase.id),
   };
 }
 

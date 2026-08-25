@@ -567,8 +567,13 @@ button { cursor:pointer; }
     const orchestration = state.status.orchestration;
     const pill = $('#orch-pill');
     pill.classList.toggle('stopped', orchestration?.state === 'stopped');
+    const nextAction = orchestration?.nextAction?.type || 'RECONCILE';
+    const lastAction = orchestration?.lastAction ? `${orchestration.lastAction.type}:${orchestration.lastAction.status}` : 'none';
+    const mergeQueue = orchestration?.mergeQueue?.length || 0;
+    const unclassified = orchestration?.unclassifiedFinalCount || 0;
+    pill.title = (orchestration?.whyNotComplete || []).join('\n') || '当前无未完成原因';
     pill.innerHTML = orchestration
-      ? `ORCH ${esc(orchestration.state.toUpperCase())}<small>${esc(orchestration.reason || 'active')} · ${esc(orchestration.evaluatedAt?.slice(5,16).replace('T',' ') || '')}</small>`
+      ? `ORCH ${esc(orchestration.state.toUpperCase())} · GOAL ${esc((orchestration.goalState || 'not-created').toUpperCase())}<small>next ${esc(nextAction)} · last ${esc(lastAction)} · merge ${mergeQueue} · unclassified ${unclassified}</small>`
       : 'ORCH <small>无编排数据</small>';
   }
 
@@ -608,7 +613,7 @@ button { cursor:pointer; }
     const workerOptions = (idleWorkers.length ? idleWorkers : state.status.worktrees).map((item) => `<option value="${esc(item.name)}" ${worker?.name === item.name ? 'selected' : ''}>${esc(shortName(item.name))}${item.dirty.modified + item.dirty.untracked ? ' · dirty' : ''}</option>`).join('');
     const prompt = `处理 #${issue.number}：${issue.title}\n先读取 issue 正文与仓库规则，按其验收条件完成；不要关闭 issue，不要合并到 main。`;
     const registrySection = registryTask
-      ? `<div class="registry-section"><h3>任务（registry）</h3><div class="kv"><span>Task</span><span>${esc(registryTask.taskId)} · ${esc(registryTask.threadId || registryTask.clientThreadId || 'cli-fallback')} · ${esc(registryTask.role)}</span></div><div class="kv"><span>工作时长</span><span>${esc(timingLabel(worker) || '—')}</span></div><div class="kv"><span>本轮开始</span><span>${esc(timestampLabel(timing?.startedAt))}</span></div><div class="kv"><span>本轮结束</span><span>${esc(timing?.active ? '进行中' : timestampLabel(timing?.finishedAt))}</span></div><div class="kv"><span>模型</span><span>${esc(registryTask.modelTier || '—')}（${esc(registryTask.routingReason || '未记录') }）</span></div><div class="verdict-chips"><span class="verdict-chip">code ${esc(registryTask.verdict?.code || '—')}</span><span class="verdict-chip">runtime ${esc(registryTask.verdict?.runtime || '—')}</span><span class="verdict-chip">delivery ${esc(registryTask.verdict?.delivery || '—')}</span></div><div class="kv"><span>转移</span><span>${transitions.length ? '' : '暂无历史'}</span></div>${transitions.length ? `<ol class="transition-history">${transitions.map((item) => `<li>${esc(item.ts?.slice(11,16))} ${esc(item.from)} → ${esc(item.to)}${item.eventId ? ` · ${esc(item.eventId)}` : ''}</li>`).join('')}</ol>` : ''}</div>`
+      ? `<div class="registry-section"><h3>任务（registry）</h3><div class="kv"><span>Task</span><span>${esc(registryTask.taskId)} · ${esc(registryTask.threadId || registryTask.clientThreadId || 'cli-fallback')} · ${esc(registryTask.role)}</span></div><div class="kv"><span>工作时长</span><span>${esc(timingLabel(worker) || '—')}</span></div><div class="kv"><span>本轮开始</span><span>${esc(timestampLabel(timing?.startedAt))}</span></div><div class="kv"><span>本轮结束</span><span>${esc(timing?.active ? '进行中' : timestampLabel(timing?.finishedAt))}</span></div><div class="kv"><span>模型</span><span>${esc(registryTask.modelTier || '—')}（${esc(registryTask.routingReason || '未记录') }）</span></div><div class="kv"><span>Next action</span><span>${esc(registryTask.nextAction || '—')}</span></div><div class="kv"><span>未分类 final</span><span>${esc(registryTask.unclassifiedFinal?.eventId || '—')}</span></div><div class="verdict-chips"><span class="verdict-chip">code ${esc(registryTask.verdict?.code || '—')}</span><span class="verdict-chip">runtime ${esc(registryTask.verdict?.runtime || '—')}</span><span class="verdict-chip">delivery ${esc(registryTask.verdict?.delivery || '—')}</span></div><div class="kv"><span>转移</span><span>${transitions.length ? '' : '暂无历史'}</span></div>${transitions.length ? `<ol class="transition-history">${transitions.map((item) => `<li>${esc(item.ts?.slice(11,16))} ${esc(item.from)} → ${esc(item.to)}${item.eventId ? ` · ${esc(item.eventId)}` : ''}</li>`).join('')}</ol>` : ''}</div>`
       : state.status.schemaVersion === 2
         ? '<div class="registry-section"><h3>任务（registry）</h3><div class="snapshot-note">无编排数据：v2 旧快照未携带 registry、verdict 或 transitions。</div></div>'
         : '';
