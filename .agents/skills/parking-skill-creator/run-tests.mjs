@@ -64,6 +64,20 @@ check("fallback 文档固化三禁、单轮与扫描边界", [
   "RESIDUE_SCAN_OK",
   "BLOCKED",
 ].every((s) => fallbackDoc.includes(s)));
+check("fallback 文档用 PATH 发现 Git Bash zcode 入口", fallbackDoc.includes('ZCODE_BIN="$(command -v zcode)"')
+  && fallbackDoc.includes('--command-arg "$ZCODE_BIN"'));
+function markdownFilesUnder(dir) {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) return markdownFilesUnder(path);
+    return entry.isFile() && entry.name.endsWith(".md") ? [path] : [];
+  });
+}
+const publishedDocPaths = markdownFilesUnder(CREATOR_DIR);
+const hardcodedUserDir = /(?:[a-z]:[\\/](?:users|documents and settings)[\\/][^\s<]+|\/(?:[a-z]\/)?users\/[^\s<]+|\/(?:home|root)\/[^\s<]+)/i;
+const userPathOffenders = publishedDocPaths.filter((path) => hardcodedUserDir.test(readFileSync(path, "utf8")));
+check(`发布文档不硬编码用户目录绝对路径${userPathOffenders.length ? `: ${userPathOffenders.join(", ")}` : ""}`,
+  userPathOffenders.length === 0);
 
 const fallbackRoot = mkdtempSync(join(tmpdir(), "headless-probe-test-"));
 try {

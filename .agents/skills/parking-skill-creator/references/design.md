@@ -51,3 +51,4 @@
 | 2026-08-25 | 为无嵌套 Agent 工具的宿主加入 headless 触发探针 fallback：固定逐字 prompt 与单轮调用，凭据仅从进程环境注入，私有空 settings 隔离共享配置，失败不自答，Temp 清理前后做前缀残留检查；能力或授权不足时交回主会话直跑 | 135 项自测通过；仅使用假凭据 fixture；真实 Provider 与全盘扫描未执行 | 未命中；保持单一流水线技能 |
 | 2026-08-25 | 修复私有 Temp 命中后过早退出：私有清理后始终完成外部扫描并记录摘要，再统一报告 Provider、协议和全部残留失败；增加私有与外部双位置同时泄漏回归 | 136 项自测通过；双位置假凭据均被检出，私有 Temp 清零且外部路径进入审计 | 未命中；保持单一流水线技能 |
 | 2026-08-25 | 修复 secret-derived filename/path 输出泄漏：扫描文件内容时同步检查文件名和父路径，命中路径含 key 前缀时整条脱敏；保留双位置扫描顺序与统一失败审计 | 137 项自测通过；12 字符假前缀文件名被检出，stdout/stderr 不含完整 key、前缀或原路径 | 未命中；保持单一流水线技能 |
+| 2026-08-25 | 移除 headless fallback 的本机 zcode 绝对路径，Windows + Git Bash 示例改用 `command -v zcode` 发现入口；回归扫描随包 Markdown，拒绝硬编码用户主目录 | 139 项自测通过；quick-validate、Node 语法和 diff-check 通过；真实 Provider 仍为 runtime debt | 未命中；保持单一流水线技能 |

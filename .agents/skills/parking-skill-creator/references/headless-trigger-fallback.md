@@ -40,11 +40,16 @@ launcher 固定生成下列模板；`<query 原文>` 与 `<技能清单>` 是仅
 先把技能清单写入不含凭据的普通文本文件，再逐 query 串行或按宿主许可受限并发调用。Windows + Git Bash 的本机入口示例：
 
 ```bash
+ZCODE_BIN="$(command -v zcode)" || {
+  echo "找不到 zcode：请先把可执行入口加入 PATH" >&2
+  exit 1
+}
+
 node scripts/run-headless-trigger-probe.mjs \
   --query "<query 原文>" \
   --skills-file "<workspace>/visible-skills.txt" \
   --command bash \
-  --command-arg /c/Users/parking/bin/zcode \
+  --command-arg "$ZCODE_BIN" \
   --temp-root "<workspace>/tmp" \
   --scan-root "<workspace>" \
   --scan-root "$TEMP" \
