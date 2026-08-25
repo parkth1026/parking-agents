@@ -18,8 +18,9 @@
 - 连续编排不靠自然语言猜测 worker 结果：executor final 使用 `aes.worktree-board.executor-final/v1`；无法校验的 final 保持 inbox pending，并投影为 `UNCLASSIFIED_FINAL`。
 - 宿主动作由稳定 actionId 驱动，receipt 写回 registry。root 重启只重算同一 actionId；`HOST_MERGE` 在 post-merge verification 完成前独占 integration merge mutex。
 - `committed → reviewing → approved → merge-ready → merged` 的所有公开入口共用一条证据链；旧 transition/verdict 不能旁路。reviewer、action/event、executor 三方 commit 必须相等。
-- claim reservation 在 next-actions 物化时按 Issue 编号原子占位；active/pending/succeeded claim 都会从 stale frontier 排除。
-- Git merge receipt 由 live repo 校验 pre/post HEAD、integration branch、真实双父 merge commit及 executor commit ancestry；post-merge 只接受脚本实际执行形成的 passed verificationRun。
+- claim reservation 在 next-actions 物化时按 Issue 编号原子占位；active/pending/succeeded claim 与 Registry 中其他 worker 的未 merged executor Task 都会阻止重复 create。
+- Git merge receipt 由 live repo 校验 worker HEAD、pre/post HEAD、integration branch，以及第二父精确为 reviewed commit 的真实双父 merge；post-merge 只接受脚本实际执行形成的 passed verificationRun。
+- dead-letter 只处理已被较晚合法 replacement 取代的 reviewer commit 字符串绑定错误；原/replacement 必须解析到同一 Git object，并保存 authorization 与独立 append-only receipt。
 - Goal 只能由显式 `goal start` 创建。Goal 是 root 的持久完成条件，不代替 Desktop `create_thread` / `wait_threads`，也不扩大 merge、dirty 或人工决策权限。
 
 ## Continuous orchestration loop
@@ -79,6 +80,11 @@ merge gate，Task create 从 fresh Issue labels 自动推导该 interaction clas
 | AC-24 | handoff 仅能由显式 authorization-id + 原文恢复同一 Task；恢复幂等、可审计、开启新熔断 epoch，并强制新 follow-up commit 后重新 review。 |
 | AC-25 | fresh Issue label `needs-manual-test` 强制 interaction class；调用方不能用 autonomous 参数覆盖。 |
 | AC-26 | active Goal 的 actions、pending、WAIT 与 merge queue 仅包含锁定 worker 范围；范围外 Task 不被该 Goal 调度。 |
+| AC-27 | merge gate、HOST_MERGE started/succeeded 均重读 worker live HEAD；双父 merge 第二父必须精确等于 reviewed commit。 |
+| AC-28 | handoff follow-up 必须是 blocked commit 的新 descendant、原 executor worktree live HEAD；RETURN_TO_EXECUTOR 绑定原 thread。 |
+| AC-29 | 每次 transition/resolution/recovery/stop 原子刷新 task 与 orchestration 投影；APPROVE 后 nextAction 为 EVALUATE_MERGE_GATE。 |
+| AC-30 | direct createTask 也按 Issue 检查跨 worker 未 merged executor Task，不能绕过 claim ledger。 |
+| AC-31 | superseded reviewer binding 只能经授权、幂等、append-only dead-letter receipt 收敛；合法事件和任意 reason fail closed。 |
 
 ## 迭代记录
 
@@ -91,3 +97,4 @@ merge gate，Task create 从 fresh Issue labels 自动推导该 interaction clas
 | 2026-08-25 | Issue #43 BLOCK 1/3：封闭旧入口、旧 reviewer、重复 claim、任意 final resolution 与伪造 merge/post-merge receipt 五类旁路。 | 临时真实 Git merge + CLI verification 正向链，以及对应负向 probes。 | receipt 控制面仍在 registry v3 additive 字段中，保持旧快照可读。 |
 | 2026-08-25 | Issue #43 BLOCK 2/3：把 final schema 校验前移到 terminal-noop 之前，并把 merge commit 从“至少双父”收紧为“恰好双父”。 | late-merged malformed final 与真实 octopus merge 负向 probes。 | parked/handoff 仍是显式收敛态；merged 只能由同 commit replacement typed-final 清理 late malformed event。 |
 | 2026-08-25 | Issue #43 人工解除熔断：修复 UNCLASSIFIED 收敛后的 nextAction 残留，并实现授权约束的同 Task handoff recovery。 | Registry/collect/board 投影断言；第三次 BLOCK→handoff→授权恢复→新 commit→reviewer APPROVE host-shaped 回归。 | generic transition 与新 fix Task 仍关闭；恢复只接受显式用户授权并保留审计 ledger。 |
+| 2026-08-25 | Issue #43 恢复 epoch 1：绑定 reviewed/live Git HEAD、恢复 descendant、原 thread、原子投影与跨 worker create，并增加受限 dead-letter。 | 两组 live-HEAD 真实 Git 负测、真实 handoff recovery、direct create 与 short/full SHA replacement 回归。 | append-only inbox 不修改；dead-letter 是独立授权 receipt，不等同 consumed。 |

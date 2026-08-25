@@ -135,8 +135,8 @@ node "$skillDir/scripts/orchestrate.mjs" action receipt --action-id A-... --stat
 `reviewer.reviewCommit === task.commitSha === action/event.commitSha`。`EVALUATE_MERGE_GATE`
 receipt 必须绑定 live worktree HEAD、integration HEAD、integration branch，并由脚本实时运行
 `git merge-tree`。`HOST_MERGE started/succeeded` 分别绑定 live preHead 与 postHead；succeeded
-只接受恰好两个 parent、第一父提交为 preHead、且包含 executor commit 的真实 Git merge commit；
-octopus merge 明确拒绝。
+会再次读取 worker live HEAD，并只接受恰好两个 parent、第一父为 preHead、第二父精确等于已 review
+commit 的真实 Git merge commit；worker 前进到未审 commit、octopus merge 均明确拒绝。
 
 `POST_MERGE_VERIFY` 不接受宿主自报的 `exitCode=0` JSON。先把 executable/args 写入 commands file，
 由脚本在 integration repo root 实际执行：
@@ -148,7 +148,8 @@ node "$skillDir/scripts/orchestrate.mjs" action verify --action-id A-... --comma
 脚本生成与 action/mergeCommit/live HEAD 绑定的 `verificationRun`，全部真实命令 exit 0 且 HEAD
 未变化后，才原子写 POST receipt、进入 `merged`、释放 lease。`CLAIM_NEXT_ISSUE` 在 action 生成时
 即按 Issue 编号写 claim reservation；active/pending/succeeded claim 都从 stale frontier 排除，
-receipt 必须绑定同 reservation/worktree 的新 executor Task。多 worker 可并行
+直接 `task create` 还会扫描 Registry 内其他 worker 的未 merged executor Task，不能绕过
+reservation 重复认领；receipt 必须绑定同 reservation/worktree 的新 executor Task。多 worker 可并行
 执行/review，但只放出一个 `HOST_MERGE`；post-merge verification 前不会放出队列下一项。
 
 Goal/stop 只有在 fresh registry + inbox + Git + Issue frontier 同时证明 pending 为空、无 active /
@@ -242,7 +243,17 @@ node "$skillDir/scripts/orchestrate.mjs" handoff recover --task tk-dev1-56-g1 --
 相同 authorization-id + 原文重放返回 `already-recovered` 且零状态变化，同 id 不同原文 fail closed。
 恢复会开启新 circuit epoch、清除旧 commit 的交付证据并回到同一 Task/thread 的 `executing`；原
 executor 必须提交不同于第三次 BLOCK commit 的新 follow-up commit，之后重新创建独立 reviewer。
+该 commit 必须是可解析的 Git object、等于原 executor worktree live HEAD，且是 blocked commit 的
+新 descendant；`RETURN_TO_EXECUTOR` receipt 也必须绑定原 executor thread。
 授权恢复可把已停止 orchestration 重新置为 running，但不扩大 merge、dirty 或 worktree 权限。
+
+已入箱但因 full/short SHA 字符串绑定不一致而无效、且已有同 reviewer/thread/verdict 的较晚合法
+replacement 被消费时，可用受审计 dead-letter 命令收敛；它不写 `consumedEventIds`，也不接受任意
+reason 或合法事件：
+
+```powershell
+node "$skillDir/scripts/orchestrate.mjs" inbox reject --event-id E-old --reason SUPERSEDED_REVIEW_BINDING --replacement-event-id E-new --authorization-id decision-1 --authorization "<用户授权原文>"
+```
 
 ## 全局停止
 

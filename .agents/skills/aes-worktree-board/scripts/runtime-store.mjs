@@ -129,6 +129,7 @@ export function emptyRegistry(now = new Date().toISOString()) {
     claimReservations: {},
     verificationRuns: {},
     unclassifiedFinals: {},
+    deadLetters: {},
     goal: null,
   };
 }
@@ -143,6 +144,7 @@ export function readRegistry(runtimeDir) {
   registry.claimReservations ||= {};
   registry.verificationRuns ||= {};
   registry.unclassifiedFinals ||= {};
+  registry.deadLetters ||= {};
   registry.goal ||= null;
   registry.orchestration ||= emptyRegistry().orchestration;
   const leases = {};

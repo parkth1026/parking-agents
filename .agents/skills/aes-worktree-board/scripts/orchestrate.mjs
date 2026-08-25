@@ -110,6 +110,14 @@ function gitValue(cwd, args) {
   return runGit(cwd, args).stdout;
 }
 
+function resolveCommitObject(cwd, commitSha, errorCode = 'GIT_COMMIT_REQUIRED') {
+  const result = runGit(cwd, ['rev-parse', '--verify', `${commitSha}^{commit}`], { allowFailure: true });
+  if (result.status !== 0 || !result.stdout) {
+    throw controlError(errorCode, `${commitSha || '(空)'} 不是可解析的 Git commit object`);
+  }
+  return result.stdout;
+}
+
 function repositoryContext(runtimeDir, task) {
   const status = readJson(join(runtimeDir, 'status.json'), null);
   const repoRoot = status?.repo?.root ? resolve(status.repo.root) : null;
@@ -124,6 +132,26 @@ function repositoryContext(runtimeDir, task) {
   return { status, repoRoot, integrationBranch, worker, worktreePath };
 }
 
+function reconcileRecoveryFollowUp(runtimeDir, task, submittedCommit) {
+  const context = repositoryContext(runtimeDir, task);
+  const followUpCommit = resolveCommitObject(context.worktreePath, submittedCommit, 'RECOVERY_COMMIT_NOT_FOUND');
+  const workerHead = resolveCommitObject(context.worktreePath, 'HEAD');
+  const blockedCommit = resolveCommitObject(
+    context.worktreePath, task.recovery.requiresNewCommitFrom, 'RECOVERY_BLOCKED_COMMIT_NOT_FOUND',
+  );
+  if (followUpCommit !== workerHead) {
+    throw controlError('RECOVERY_HEAD_MISMATCH', `recovery follow-up ${followUpCommit} 必须等于原 executor worktree live HEAD ${workerHead}`);
+  }
+  if (followUpCommit === blockedCommit) {
+    throw controlError('FOLLOW_UP_COMMIT_REQUIRED', `handoff recovery 后必须产生不同于 blocked commit ${blockedCommit} 的新 commit`);
+  }
+  const descendant = runGit(context.worktreePath, ['merge-base', '--is-ancestor', blockedCommit, followUpCommit], { allowFailure: true });
+  if (descendant.status !== 0) {
+    throw controlError('RECOVERY_DESCENDANT_REQUIRED', `${followUpCommit} 必须是 blocked commit ${blockedCommit} 的新 descendant`);
+  }
+  return { followUpCommit, workerHead, blockedCommit };
+}
+
 function assertCleanMergeCandidate(context, commitSha) {
   const result = runGit(context.repoRoot, ['merge-tree', '--write-tree', context.integrationBranch, commitSha], { allowFailure: true });
   if (result.status !== 0) {
@@ -135,19 +163,23 @@ function assertCleanMergeCandidate(context, commitSha) {
 
 function reconcileMergeGate(runtimeDir, task, action, payload) {
   const context = repositoryContext(runtimeDir, task);
-  const workerHead = gitValue(context.worktreePath, ['rev-parse', 'HEAD']);
-  const integrationHead = gitValue(context.repoRoot, ['rev-parse', context.integrationBranch]);
-  if (action.commitSha !== task.commitSha || workerHead !== task.commitSha) {
+  const workerHead = resolveCommitObject(context.worktreePath, 'HEAD');
+  const reviewedCommit = resolveCommitObject(context.worktreePath, task.commitSha, 'REVIEWED_COMMIT_NOT_FOUND');
+  const integrationHead = resolveCommitObject(context.repoRoot, context.integrationBranch);
+  const receiptWorkerHead = resolveCommitObject(context.worktreePath, payload.headSha, 'RECEIPT_WORKER_HEAD_NOT_FOUND');
+  const receiptIntegrationHead = resolveCommitObject(context.repoRoot, payload.integrationHead, 'RECEIPT_INTEGRATION_HEAD_NOT_FOUND');
+  if (resolveCommitObject(context.worktreePath, action.commitSha, 'ACTION_COMMIT_NOT_FOUND') !== reviewedCommit
+    || workerHead !== reviewedCommit) {
     throw controlError('MERGE_HEAD_MISMATCH', `merge gate 必须绑定 reviewed commit ${task.commitSha}，action=${action.commitSha}，live HEAD=${workerHead}`);
   }
-  if (payload.headSha !== workerHead || payload.integrationHead !== integrationHead
+  if (receiptWorkerHead !== workerHead || receiptIntegrationHead !== integrationHead
     || payload.integrationBranch !== context.integrationBranch || payload.mergeCheck !== 'clean') {
     throw controlError('FRESH_MERGE_RECEIPT_REQUIRED', 'merge gate receipt 必须精确绑定 live worktree/integration HEAD、integration branch 与 mergeCheck=clean', {
       workerHead, integrationHead, integrationBranch: context.integrationBranch,
     });
   }
-  assertCleanMergeCandidate(context, task.commitSha);
-  return { context, workerHead, integrationHead };
+  assertCleanMergeCandidate(context, reviewedCommit);
+  return { context, workerHead, integrationHead, reviewedCommit };
 }
 
 function assertIntegrationBranch(context) {
@@ -160,20 +192,28 @@ function assertIntegrationBranch(context) {
 
 function verifyMergeCommit(context, task, started, payload) {
   assertIntegrationBranch(context);
-  const liveHead = gitValue(context.repoRoot, ['rev-parse', 'HEAD']);
+  const workerHead = resolveCommitObject(context.worktreePath, 'HEAD');
+  const reviewedCommit = resolveCommitObject(context.worktreePath, task.commitSha, 'REVIEWED_COMMIT_NOT_FOUND');
+  if (workerHead !== reviewedCommit || started.workerHead !== reviewedCommit || started.commitSha !== task.commitSha) {
+    throw controlError('WORKER_HEAD_MOVED_AFTER_REVIEW', `HOST_MERGE receipt 前 worker HEAD 必须仍为 reviewed commit ${reviewedCommit}，实际 ${workerHead}`);
+  }
+  const liveHead = resolveCommitObject(context.repoRoot, 'HEAD');
+  const receiptPreHead = resolveCommitObject(context.repoRoot, payload.preHead, 'RECEIPT_PRE_HEAD_NOT_FOUND');
+  const receiptPostHead = resolveCommitObject(context.repoRoot, payload.postHead, 'RECEIPT_POST_HEAD_NOT_FOUND');
+  const receiptMergeCommit = resolveCommitObject(context.repoRoot, payload.mergeCommit, 'RECEIPT_MERGE_COMMIT_NOT_FOUND');
   if (payload.integrationBranch !== context.integrationBranch
-    || payload.preHead !== started.preHead
-    || payload.postHead !== liveHead
-    || payload.mergeCommit !== liveHead) {
+    || receiptPreHead !== started.preHead
+    || receiptPostHead !== liveHead
+    || receiptMergeCommit !== liveHead) {
     throw controlError('MERGE_RECEIPT_MISMATCH', 'HOST_MERGE receipt 未绑定 live integration branch/preHead/postHead', {
       integrationBranch: context.integrationBranch, preHead: started.preHead, liveHead,
     });
   }
   const parts = gitValue(context.repoRoot, ['rev-list', '--parents', '-n', '1', liveHead]).split(/\s+/);
-  if (parts.length !== 3 || parts[1] !== started.preHead) {
-    throw controlError('TRUE_TWO_PARENT_MERGE_REQUIRED', `${liveHead} 必须恰为 commit + 两个 parent，且第一父提交为 ${started.preHead}`);
+  if (parts.length !== 3 || parts[1] !== started.preHead || parts[2] !== reviewedCommit) {
+    throw controlError('TRUE_TWO_PARENT_MERGE_REQUIRED', `${liveHead} 必须恰为 commit + 两个 parent，第一父为 ${started.preHead}，第二父为 reviewed commit ${reviewedCommit}`);
   }
-  const ancestor = runGit(context.repoRoot, ['merge-base', '--is-ancestor', task.commitSha, liveHead], { allowFailure: true });
+  const ancestor = runGit(context.repoRoot, ['merge-base', '--is-ancestor', reviewedCommit, liveHead], { allowFailure: true });
   if (ancestor.status !== 0) throw controlError('MERGED_COMMIT_NOT_INCLUDED', `merge commit ${liveHead} 未包含 executor commit ${task.commitSha}`);
   return liveHead;
 }
@@ -228,6 +268,7 @@ export function canonicalWorktreeId(value) {
 function shortWorker(worktree) { return canonicalWorktreeId(worktree); }
 function transitionsPath(runtimeDir) { return join(runtimeDir, 'transitions.jsonl'); }
 function inboxPath(runtimeDir) { return join(runtimeDir, 'inbox.jsonl'); }
+function deadLettersPath(runtimeDir) { return join(runtimeDir, 'dead-letters.jsonl'); }
 function heartbeatPath(runtimeDir, worktree) { return join(runtimeDir, 'heartbeats', `${worktree}.json`); }
 
 function requireValue(options, name) {
@@ -389,13 +430,14 @@ function applyTransition(registry, runtimeDir, task, to, details = {}) {
   task.updatedAt = timestamp;
   task.lastProgressAt = timestamp;
   applyTaskTiming(task, from, to, timestamp);
-  task.nextAction = details.nextAction ?? task.nextAction;
+  task.nextAction = nextActionForState({ ...task, state: to });
   if (details.commitSha) task.commitSha = details.commitSha;
   if (details.mergeCommit) task.mergeCommit = details.mergeCommit;
   if (details.reviewTaskId) task.reviewTaskId = details.reviewTaskId;
   if (to === 'merged' && registry.leases[task.worktree]?.owner === task.taskId) delete registry.leases[task.worktree];
   if (['parked', 'handoff-required'].includes(to)) resolvePendingUnclassifiedFinals(registry, task, `lane-${to}`);
   appendTransition(runtimeDir, task, from, to, details);
+  refreshOrchestrationProjection(registry, runtimeDir);
   return { from, to };
 }
 
@@ -470,6 +512,13 @@ export function createTask(options, runtimeDir = RUNTIME_DIR) {
       const ordinal = Object.values(registry.tasks).filter((task) => task.parentTaskId === parentTaskId && task.role === 'reviewer').length + 1;
       taskId = options['task-id'] || options.taskId || `${parentTaskId}-review-${ordinal}`;
     } else {
+      const existingIssueTask = Object.values(registry.tasks).find((candidate) => candidate.role === 'executor'
+        && candidate.issue === issue && candidate.worktree !== worktree && candidate.state !== 'merged');
+      if (existingIssueTask) {
+        throw controlError('ISSUE_ALREADY_ACTIVE', `Issue #${issue} 已由 ${existingIssueTask.worktree} 的 ${existingIssueTask.taskId} 占用`, {
+          taskId: existingIssueTask.taskId, worktree: existingIssueTask.worktree, state: existingIssueTask.state,
+        });
+      }
       const previous = latestExecutorForWorktree(registry, worktree);
       if (previous && previous.agent !== 'test' && ['parked', 'handoff-required'].includes(previous.state) && !previous.retryable) {
         throw controlError('LANE_CLOSED', `${worktree} 当前为 ${previous.state}，禁止后续派发`, { taskId: previous.taskId });
@@ -511,6 +560,7 @@ export function createTask(options, runtimeDir = RUNTIME_DIR) {
       actor: 'orchestrator', reason: taskKind === 'desktop-thread' ? 'Desktop create_thread registered' : 'authorized cli-fallback registered',
       evidence: threadId ? [`thread:${threadId}`] : [],
     });
+    refreshOrchestrationProjection(registry, runtimeDir);
     return { result: 'created', taskId, state: task.state, lease: role === 'executor' ? worktree : null, task };
   });
 }
@@ -529,6 +579,7 @@ export function attachTaskThread(taskId, options, runtimeDir = RUNTIME_DIR) {
     task.hostId = options['host-id'] || task.hostId;
     task.projectId = options['project-id'] || task.projectId;
     task.updatedAt = now();
+    refreshOrchestrationProjection(registry, runtimeDir);
     return { result: 'thread-attached', taskId, threadId, clientThreadId: task.clientThreadId };
   });
 }
@@ -602,9 +653,10 @@ export function putInboxEvent(options, runtimeDir = RUNTIME_DIR) {
 export function pendingInbox(runtimeDir = RUNTIME_DIR) {
   const registry = readRegistry(runtimeDir);
   const consumed = new Set(Object.values(registry.tasks).flatMap((task) => task.consumedEventIds || []));
+  const rejected = new Set(Object.keys(registry.deadLetters));
   const unique = new Map();
   for (const event of readJsonLines(inboxPath(runtimeDir))) {
-    if (!consumed.has(event.eventId) && !unique.has(event.eventId)) unique.set(event.eventId, event);
+    if (!consumed.has(event.eventId) && !rejected.has(event.eventId) && !unique.has(event.eventId)) unique.set(event.eventId, event);
   }
   const cursors = {};
   for (const task of Object.values(registry.tasks)) {
@@ -612,6 +664,72 @@ export function pendingInbox(runtimeDir = RUNTIME_DIR) {
     for (const [threadId, cursor] of Object.entries(task.threadCursors || {})) cursors[threadId] = cursor;
   }
   return { pending: [...unique.values()], cursors, orchestration: registry.orchestration.state };
+}
+
+export function rejectInboxEvent(eventId, options, runtimeDir = RUNTIME_DIR) {
+  const reason = String(requireValue(options, 'reason')).trim();
+  const replacementEventId = String(requireValue(options, 'replacement-event-id')).trim();
+  const authorizationId = String(requireValue(options, 'authorization-id')).trim();
+  const authorization = String(requireValue(options, 'authorization')).trim();
+  if (reason !== 'SUPERSEDED_REVIEW_BINDING') {
+    throw controlError('REJECT_REASON_NOT_ALLOWED', 'inbox reject 只允许 SUPERSEDED_REVIEW_BINDING，禁止任意吞掉合法事件');
+  }
+  const authorizationDigest = stableDigest(authorization);
+  return updateRegistry(runtimeDir, (registry) => {
+    const events = readJsonLines(inboxPath(runtimeDir));
+    const event = events.find((candidate) => candidate.eventId === eventId);
+    const replacement = events.find((candidate) => candidate.eventId === replacementEventId);
+    if (!event) throw controlError('UNKNOWN_EVENT', `未知 eventId: ${eventId}`);
+    if (!replacement) throw controlError('UNKNOWN_REPLACEMENT_EVENT', `未知 replacement eventId: ${replacementEventId}`);
+    const eventDigest = stableDigest(event);
+    const existing = registry.deadLetters[eventId];
+    if (existing) {
+      if (existing.reason !== reason || existing.replacementEventId !== replacementEventId
+        || existing.authorizationId !== authorizationId || existing.authorizationDigest !== authorizationDigest
+        || existing.eventDigest !== eventDigest) {
+        throw controlError('DEAD_LETTER_CONFLICT', `${eventId} 已绑定不同 dead-letter receipt`);
+      }
+      refreshOrchestrationProjection(registry, runtimeDir);
+      return { result: 'already-rejected', eventId, deadLetter: existing };
+    }
+    const task = taskById(registry, event.taskId);
+    const consumed = new Set(task.consumedEventIds || []);
+    if (consumed.has(eventId)) throw controlError('EVENT_ALREADY_CONSUMED', `${eventId} 已消费，不能 dead-letter`);
+    if (!consumed.has(replacementEventId)) {
+      throw controlError('CONSUMED_REPLACEMENT_REQUIRED', `${replacementEventId} 必须已由同 Task 合法消费`);
+    }
+    const reviewer = registry.tasks[event.sourceTaskId];
+    const originalVerdict = String(event.payload?.verdict || '').toUpperCase();
+    const replacementVerdict = String(replacement.payload?.verdict || '').toUpperCase();
+    if (event.taskId !== replacement.taskId || event.sourceTaskId !== replacement.sourceTaskId
+      || event.threadId !== replacement.threadId || !['final', 'verdict'].includes(event.kind)
+      || !['final', 'verdict'].includes(replacement.kind) || !['APPROVE', 'PASS', 'BLOCK'].includes(originalVerdict)
+      || originalVerdict !== replacementVerdict || String(replacement.receivedAt) <= String(event.receivedAt)
+      || !reviewer || reviewer.role !== 'reviewer' || reviewer.parentTaskId !== task.taskId) {
+      throw controlError('INVALID_SUPERSEDED_REVIEW_BINDING', 'dead-letter 只接受同 reviewer/thread/verdict 的较早无效绑定，且必须有较晚已消费 replacement');
+    }
+    if (replacement.payload?.commitSha !== task.commitSha || reviewer.reviewCommit !== task.commitSha
+      || event.payload?.commitSha === task.commitSha) {
+      throw controlError('VALID_REVIEW_EVENT_REJECTED', 'replacement 必须精确匹配 task/reviewer commit，原事件必须因字符串绑定不匹配而无效');
+    }
+    const context = repositoryContext(runtimeDir, task);
+    const originalCommit = resolveCommitObject(context.worktreePath, event.payload?.commitSha, 'REJECTED_COMMIT_NOT_FOUND');
+    const replacementCommit = resolveCommitObject(context.worktreePath, replacement.payload?.commitSha, 'REPLACEMENT_COMMIT_NOT_FOUND');
+    const taskCommit = resolveCommitObject(context.worktreePath, task.commitSha, 'TASK_COMMIT_NOT_FOUND');
+    if (originalCommit !== replacementCommit || replacementCommit !== taskCommit) {
+      throw controlError('REPLACEMENT_GIT_OBJECT_MISMATCH', '原事件、replacement 与 Task 必须解析到同一 Git commit object');
+    }
+    const deadLetter = {
+      schemaVersion: 'aes.worktree-board.dead-letter/v1', eventId, replacementEventId,
+      taskId: task.taskId, reviewerTaskId: reviewer.taskId, threadId: event.threadId,
+      reason, canonicalCommit: taskCommit, eventDigest, authorizationId, authorizationDigest,
+      authorization, rejectedAt: now(),
+    };
+    registry.deadLetters[eventId] = deadLetter;
+    appendJsonLineAtomic(deadLettersPath(runtimeDir), deadLetter);
+    refreshOrchestrationProjection(registry, runtimeDir);
+    return { result: 'rejected', eventId, deadLetter };
+  });
 }
 
 function desiredTransition(event) {
@@ -652,6 +770,7 @@ function applyBlockRecord(registry, runtimeDir, task, event, { commit, finding, 
   task.blockLedger ||= [];
   task.circuitEpoch ||= 0;
   if (task.blockLedger.some((entry) => entry.commit === commit && entry.verdict === 'BLOCK')) {
+    refreshOrchestrationProjection(registry, runtimeDir);
     return { result: 'duplicate-verdict', blockCount: task.blockCount, state: task.state, transition: null };
   }
   if (task.state === 'handoff-required' || task.blockCount >= 3) {
@@ -679,6 +798,7 @@ function applyBlockRecord(registry, runtimeDir, task, event, { commit, finding, 
       eventId: event.eventId, actor: 'reviewer', reason: `final BLOCK ${task.blockCount}/3 on ${commit}`,
       evidence: [findingPath || `thread:${event.threadId}`],
     });
+    refreshOrchestrationProjection(registry, runtimeDir);
     return { result: 'recorded', blockCount: task.blockCount, state: task.state, transition: { from, to: 'fixing' } };
   }
   task.state = 'handoff-required';
@@ -693,6 +813,7 @@ function applyBlockRecord(registry, runtimeDir, task, event, { commit, finding, 
     eventId: event.eventId, actor: 'orchestrator', reason: 'third final BLOCK on a new follow-up commit',
     evidence: [findingPath || `thread:${event.threadId}`],
   });
+  refreshOrchestrationProjection(registry, runtimeDir);
   return {
     result: 'circuit-broken', blockCount: task.blockCount, state: task.state,
     handoffBundle: handoffPath, transition: { from, to: 'handoff-required' },
@@ -720,11 +841,13 @@ function consumeExecutorFinal(registry, runtimeDir, task, event, sourceTask) {
     if (['parked', 'handoff-required'].includes(task.state)) {
       resolvePendingUnclassifiedFinals(registry, task, `lane-${task.state}`);
       consumeRecordedEvent(task, event);
+      refreshOrchestrationProjection(registry, runtimeDir);
       return {
         result: 'consumed', eventId: event.eventId, taskId: task.taskId,
         transition: null, nextAction: 'terminal-noop', resolution: `lane-${task.state}`,
       };
     }
+    refreshOrchestrationProjection(registry, runtimeDir);
     return {
       result: 'unclassified-final', eventId: event.eventId, taskId: task.taskId,
       code: 'UNCLASSIFIED_FINAL', errors: validation.errors, consumed: false, nextAction: 'UNCLASSIFIED_FINAL',
@@ -737,14 +860,15 @@ function consumeExecutorFinal(registry, runtimeDir, task, event, sourceTask) {
     resolvePendingUnclassifiedFinals(registry, task, `replacement-typed-final:${event.eventId}`);
     consumeRecordedEvent(task, event);
     task.updatedAt = now();
+    refreshOrchestrationProjection(registry, runtimeDir);
     return { result: 'consumed', eventId: event.eventId, taskId: task.taskId, transition: null, nextAction: 'terminal-noop' };
   }
   if (!['dispatching', 'executing', 'self-qa', 'committed'].includes(task.state)) {
     throw controlError('INVALID_EXECUTOR_FINAL_STATE', `executor final 不能从 ${task.state} 推进`, { taskId: task.taskId });
   }
-  if (task.recovery?.requiresNewCommit && event.payload.commitSha === task.recovery.requiresNewCommitFrom) {
-    throw controlError('FOLLOW_UP_COMMIT_REQUIRED', `handoff recovery 后必须产生不同于 blocked commit ${task.recovery.requiresNewCommitFrom} 的新 commit`);
-  }
+  const finalCommitSha = task.recovery?.requiresNewCommit
+    ? reconcileRecoveryFollowUp(runtimeDir, task, event.payload.commitSha).followUpCommit
+    : event.payload.commitSha;
   if (task.commitSha && task.state === 'committed' && task.commitSha !== event.payload.commitSha) {
     throw controlError('EXECUTOR_FINAL_COMMIT_MISMATCH', `Task 当前 commit ${task.commitSha} 与 final ${event.payload.commitSha} 不一致`);
   }
@@ -753,7 +877,7 @@ function consumeExecutorFinal(registry, runtimeDir, task, event, sourceTask) {
     eventId: event.eventId,
     threadId: event.threadId,
     outcome: event.payload.outcome,
-    commitSha: event.payload.commitSha,
+    commitSha: finalCommitSha,
     tests: event.payload.tests,
     unexecuted: event.payload.unexecuted,
     manualTestDebt: event.payload.manualTestDebt,
@@ -770,20 +894,21 @@ function consumeExecutorFinal(registry, runtimeDir, task, event, sourceTask) {
     transitions.push(applyTransition(registry, runtimeDir, task, to, {
       actor: 'executor-final', eventId: event.eventId,
       reason: `typed executor final ${event.payload.schemaVersion}`,
-      commitSha: to === 'committed' ? event.payload.commitSha : undefined,
+      commitSha: to === 'committed' ? finalCommitSha : undefined,
       evidence: [`thread:${event.threadId}`, `event:${event.eventId}`],
     }));
   }
-  task.commitSha = event.payload.commitSha;
-  task.headSha = event.payload.commitSha;
+  task.commitSha = finalCommitSha;
+  task.headSha = finalCommitSha;
   if (task.recovery?.requiresNewCommit) {
     task.recovery.requiresNewCommit = false;
-    task.recovery.resumedCommit = event.payload.commitSha;
+    task.recovery.resumedCommit = finalCommitSha;
     task.recovery.resumedAt = now();
   }
   task.nextAction = 'CREATE_REVIEWER';
   consumeRecordedEvent(task, event);
   task.updatedAt = now();
+  refreshOrchestrationProjection(registry, runtimeDir);
   return {
     result: 'consumed', eventId: event.eventId, taskId: task.taskId,
     transition: transitions.at(-1) || null, transitions, nextAction: 'CREATE_REVIEWER',
@@ -841,6 +966,7 @@ export function consumeEvent(eventId, runtimeDir = RUNTIME_DIR) {
       const transitionTimestamp = now();
       task.state = to;
       task.phase = to;
+      task.nextAction = nextActionForState(task);
       applyTaskTiming(task, from, to, transitionTimestamp);
       transition = { from, to };
       nextAction = to === 'approved' ? 'merge-gate' : 'continue';
@@ -857,6 +983,7 @@ export function consumeEvent(eventId, runtimeDir = RUNTIME_DIR) {
     task.threadCursors[event.threadId] = task.cursor;
     task.lastEventId = eventId;
     task.updatedAt = now();
+    refreshOrchestrationProjection(registry, runtimeDir);
     return { result: 'consumed', eventId, taskId: task.taskId, transition, nextAction };
   });
 }
@@ -887,6 +1014,7 @@ export function setVerdict(taskId, verdict, runtimeDir = RUNTIME_DIR) {
     assertEffectiveVerdict(task, effective);
     task.verdict = effective;
     task.updatedAt = now();
+    refreshOrchestrationProjection(registry, runtimeDir);
     return { result: 'verdict-set', taskId, verdict: task.verdict };
   });
 }
@@ -921,6 +1049,7 @@ export function recoverHandoff(taskId, options, runtimeDir = RUNTIME_DIR) {
       if (existing.authorizationDigest !== authorizationDigest) {
         throw controlError('AUTHORIZATION_CONFLICT', `authorization-id ${authorizationId} 已绑定不同授权原文`);
       }
+      refreshOrchestrationProjection(registry, runtimeDir);
       return { result: 'already-recovered', taskId, recoveryId: existing.recoveryId, state: task.state, recovery: existing };
     }
     if (task.role !== 'executor' || task.state !== 'handoff-required') {
@@ -984,6 +1113,7 @@ export function recoverHandoff(taskId, options, runtimeDir = RUNTIME_DIR) {
       actor: 'human-authorized-recovery', reason: `authorized recovery ${authorizationId}`,
       evidence: [`recovery:${recoveryId}`, `authorization:${authorizationId}`, `authorization-digest:${authorizationDigest}`],
     });
+    refreshOrchestrationProjection(registry, runtimeDir);
     return { result: 'recovered', taskId, recoveryId, state: task.state, circuitEpoch: task.circuitEpoch, recovery };
   });
 }
@@ -1013,8 +1143,10 @@ function typedAction(type, identity, details = {}) {
 function deriveActionCandidates(registry, runtimeDir, status) {
   const actions = [];
   const consumed = new Set(Object.values(registry.tasks).flatMap((task) => task.consumedEventIds || []));
+  const rejected = new Set(Object.keys(registry.deadLetters));
   const pendingEvents = readJsonLines(inboxPath(runtimeDir)).filter((event, index, all) => (
     !consumed.has(event.eventId)
+    && !rejected.has(event.eventId)
     && workerInGoalScope(registry, registry.tasks[event.taskId]?.worktree)
     && all.findIndex((candidate) => candidate.eventId === event.eventId) === index
   ));
@@ -1163,42 +1295,64 @@ function deriveActionCandidates(registry, runtimeDir, status) {
   return actions;
 }
 
+function materializeActions(registry, actions) {
+  for (const action of actions) {
+    registry.actions[action.actionId] ||= { ...action, createdAt: now() };
+    if (action.type !== 'CLAIM_NEXT_ISSUE') continue;
+    const key = String(action.issue);
+    const current = registry.claimReservations[key];
+    if (current && current.actionId !== action.actionId && ['pending', 'succeeded'].includes(current.status)) {
+      throw controlError('ISSUE_CLAIM_RESERVED', `Issue #${action.issue} 已由 ${current.actionId} 保留`, current);
+    }
+    registry.claimReservations[key] ||= {
+      schemaVersion: 'aes.worktree-board.claim-reservation/v1', issue: action.issue,
+      actionId: action.actionId, worktree: action.worktree, status: 'pending', reservedAt: now(),
+    };
+  }
+}
+
+function setStoppedProjection(registry) {
+  registry.orchestration.goalState = registry.goal?.state || 'not-created';
+  registry.orchestration.nextAction = null;
+  registry.orchestration.nextActions = [];
+  registry.orchestration.mergeQueue = [];
+  registry.orchestration.unclassifiedFinalCount = Object.values(registry.unclassifiedFinals).filter((entry) => entry.status === 'pending').length;
+  registry.orchestration.whyNotComplete = [];
+}
+
+function refreshOrchestrationProjection(registry, runtimeDir, status = readJson(join(runtimeDir, 'status.json'), null)) {
+  if (registry.orchestration.state === 'stopped') {
+    setStoppedProjection(registry);
+    registry.orchestration.evaluatedAt = now();
+    return [];
+  }
+  const actions = deriveActionCandidates(registry, runtimeDir, status);
+  materializeActions(registry, actions);
+  const mergeQueue = [...latestExecutors(registry).values()]
+    .filter((task) => task.agent !== 'test' && task.worktree !== 'test' && task.state === 'merge-ready'
+      && workerInGoalScope(registry, task.worktree))
+    .sort((left, right) => String(left.updatedAt).localeCompare(String(right.updatedAt)) || left.taskId.localeCompare(right.taskId))
+    .map((task, index) => ({
+      position: index + 1, taskId: task.taskId, worktree: task.worktree, commitSha: task.commitSha,
+      phase: task.hostMergeReceipt ? 'post-merge-verification' : 'awaiting-host-merge',
+    }));
+  registry.orchestration = {
+    ...registry.orchestration,
+    evaluatedAt: now(),
+    goalState: registry.goal?.state || 'not-created',
+    nextAction: actions[0] || null,
+    nextActions: actions,
+    mergeQueue,
+    unclassifiedFinalCount: Object.values(registry.unclassifiedFinals).filter((entry) => entry.status === 'pending').length,
+    whyNotComplete: actions.filter((action) => action.type !== 'STOP').map((action) => `${action.type}:${action.reason}`),
+  };
+  return actions;
+}
+
 export function nextActions(runtimeDir = RUNTIME_DIR) {
   return updateRegistry(runtimeDir, (registry) => {
     const status = readJson(join(runtimeDir, 'status.json'), null);
-    const actions = deriveActionCandidates(registry, runtimeDir, status);
-    for (const action of actions) {
-      registry.actions[action.actionId] ||= { ...action, createdAt: now() };
-      if (action.type === 'CLAIM_NEXT_ISSUE') {
-        const key = String(action.issue);
-        const current = registry.claimReservations[key];
-        if (current && current.actionId !== action.actionId && ['pending', 'succeeded'].includes(current.status)) {
-          throw controlError('ISSUE_CLAIM_RESERVED', `Issue #${action.issue} 已由 ${current.actionId} 保留`, current);
-        }
-        registry.claimReservations[key] ||= {
-          schemaVersion: 'aes.worktree-board.claim-reservation/v1', issue: action.issue,
-          actionId: action.actionId, worktree: action.worktree, status: 'pending', reservedAt: now(),
-        };
-      }
-    }
-    const mergeQueue = [...latestExecutors(registry).values()]
-      .filter((task) => task.agent !== 'test' && task.worktree !== 'test' && task.state === 'merge-ready'
-        && workerInGoalScope(registry, task.worktree))
-      .sort((left, right) => String(left.updatedAt).localeCompare(String(right.updatedAt)) || left.taskId.localeCompare(right.taskId))
-      .map((task, index) => ({
-        position: index + 1, taskId: task.taskId, worktree: task.worktree, commitSha: task.commitSha,
-        phase: task.hostMergeReceipt ? 'post-merge-verification' : 'awaiting-host-merge',
-      }));
-    registry.orchestration = {
-      ...registry.orchestration,
-      evaluatedAt: now(),
-      goalState: registry.goal?.state || 'not-created',
-      nextAction: actions[0] || null,
-      nextActions: actions,
-      mergeQueue,
-      unclassifiedFinalCount: Object.values(registry.unclassifiedFinals).filter((entry) => entry.status === 'pending').length,
-      whyNotComplete: actions.filter((action) => action.type !== 'STOP').map((action) => `${action.type}:${action.reason}`),
-    };
+    const actions = refreshOrchestrationProjection(registry, runtimeDir, status);
     return { result: 'next-actions', goal: registry.goal, actions };
   });
 }
@@ -1223,7 +1377,10 @@ export function receiveActionReceipt(actionIdValue, status, payload = {}, runtim
     const action = registry.actions[actionIdValue];
     if (!action) throw controlError('UNKNOWN_ACTION', `未知 action: ${actionIdValue}；先运行 next-actions`);
     const recorded = recordActionReceipt(registry, action, status, payload);
-    if (recorded.duplicate) return { result: 'already-recorded', actionId: actionIdValue, receiptId: recorded.current.latestReceiptId };
+    if (recorded.duplicate) {
+      refreshOrchestrationProjection(registry, runtimeDir);
+      return { result: 'already-recorded', actionId: actionIdValue, receiptId: recorded.current.latestReceiptId };
+    }
     if (action.type === 'HOST_MERGE' && status === 'started') {
       const other = Object.entries(registry.actionReceipts).find(([id, receipt]) => id !== actionIdValue
         && registry.actions[id]?.type === 'HOST_MERGE' && receipt.latestStatus === 'started');
@@ -1232,17 +1389,22 @@ export function receiveActionReceipt(actionIdValue, status, payload = {}, runtim
       assertTransitionEvidence(registry, task, 'merge-ready', { ...task, verdict: { ...task.verdict } });
       const context = repositoryContext(runtimeDir, task);
       assertIntegrationBranch(context);
-      const preHead = gitValue(context.repoRoot, ['rev-parse', 'HEAD']);
-      if (action.commitSha !== task.commitSha || payload.integrationBranch !== context.integrationBranch
-        || payload.preHead !== preHead) {
+      const preHead = resolveCommitObject(context.repoRoot, 'HEAD');
+      const receiptPreHead = resolveCommitObject(context.repoRoot, payload.preHead, 'RECEIPT_PRE_HEAD_NOT_FOUND');
+      const reviewedCommit = resolveCommitObject(context.worktreePath, task.commitSha, 'REVIEWED_COMMIT_NOT_FOUND');
+      const actionCommit = resolveCommitObject(context.worktreePath, action.commitSha, 'ACTION_COMMIT_NOT_FOUND');
+      const workerHead = resolveCommitObject(context.worktreePath, 'HEAD');
+      if (actionCommit !== reviewedCommit || workerHead !== reviewedCommit
+        || payload.integrationBranch !== context.integrationBranch || receiptPreHead !== preHead) {
         throw controlError('HOST_MERGE_START_MISMATCH', 'HOST_MERGE started receipt 必须绑定当前 task commit、integration branch 与 live preHead', {
-          taskCommit: task.commitSha, integrationBranch: context.integrationBranch, preHead,
+          taskCommit: task.commitSha, reviewedCommit, workerHead, integrationBranch: context.integrationBranch, preHead,
         });
       }
-      assertCleanMergeCandidate(context, task.commitSha);
+      assertCleanMergeCandidate(context, reviewedCommit);
       task.hostMergeStarted = {
         actionId: action.actionId, receiptId: recorded.receipt.receiptId,
-        integrationBranch: context.integrationBranch, preHead, commitSha: task.commitSha, startedAt: now(),
+        integrationBranch: context.integrationBranch, preHead, commitSha: task.commitSha,
+        reviewedCommit, workerHead, startedAt: now(),
       };
     }
     if (status === 'succeeded') {
@@ -1262,6 +1424,9 @@ export function receiveActionReceipt(actionIdValue, status, payload = {}, runtim
           evidence: [`action:${action.actionId}`, `reviewer:${reviewer.taskId}`],
         });
       } else if (action.type === 'RETURN_TO_EXECUTOR') {
+        if (action.threadId !== task.threadId || payload.threadId !== task.threadId) {
+          throw controlError('RETURN_THREAD_MISMATCH', `RETURN_TO_EXECUTOR 必须绑定原 executor thread ${task.threadId}`);
+        }
         if (task.state === 'fixing') applyTransition(registry, runtimeDir, task, 'executing', {
           actor: 'action-receipt', reason: 'RETURN_TO_EXECUTOR succeeded', evidence: [`action:${action.actionId}`],
         });
@@ -1279,6 +1444,7 @@ export function receiveActionReceipt(actionIdValue, status, payload = {}, runtim
         task.verdict = effective;
         task.mergeGateReceipt = {
           actionId: action.actionId, receiptId: recorded.receipt.receiptId, commitSha: task.commitSha,
+          reviewedCommit: reconciled.reviewedCommit,
           integrationBranch: reconciled.context.integrationBranch,
           workerHead: reconciled.workerHead, integrationHead: reconciled.integrationHead,
           mergeCheck: 'clean', recordedAt: now(),
@@ -1296,7 +1462,8 @@ export function receiveActionReceipt(actionIdValue, status, payload = {}, runtim
         task.hostMergeReceipt = {
           actionId: action.actionId, receiptId: recorded.receipt.receiptId,
           integrationBranch: context.integrationBranch, preHead: task.hostMergeStarted.preHead,
-          mergeCommit, postHead: mergeCommit, mergedAt: now(),
+          commitSha: task.commitSha, reviewedCommit: task.hostMergeStarted.reviewedCommit,
+          workerHead: task.hostMergeStarted.workerHead, mergeCommit, postHead: mergeCommit, mergedAt: now(),
         };
       } else if (action.type === 'POST_MERGE_VERIFY') {
         const run = registry.verificationRuns[payload.verificationRunId];
@@ -1348,6 +1515,8 @@ export function receiveActionReceipt(actionIdValue, status, payload = {}, runtim
         }
       }
     }
+    if (action.type !== 'STOP' || status !== 'succeeded') refreshOrchestrationProjection(registry, runtimeDir);
+    else setStoppedProjection(registry);
     return { result: 'receipt-recorded', actionId: actionIdValue, type: action.type, status, receipt: recorded.receipt };
   });
 }
@@ -1456,7 +1625,10 @@ export function startGoal(options = {}, runtimeDir = RUNTIME_DIR) {
     const identity = [status.repo.root, status.repo.mainBranch, status.repo.issueRepo, workers, manualTestPolicy, permissions];
     const goalId = `G-${stableDigest(identity)}`;
     if (registry.goal?.state === 'active') {
-      if (registry.goal.goalId === goalId) return { result: 'already-active', goal: registry.goal };
+      if (registry.goal.goalId === goalId) {
+        refreshOrchestrationProjection(registry, runtimeDir, status);
+        return { result: 'already-active', goal: registry.goal };
+      }
       throw controlError('GOAL_ALREADY_ACTIVE', `已有 active Goal ${registry.goal.goalId}`);
     }
     const timestamp = now();
@@ -1477,6 +1649,7 @@ export function startGoal(options = {}, runtimeDir = RUNTIME_DIR) {
     registry.orchestration.state = 'running';
     registry.orchestration.reason = 'explicit-goal-active';
     registry.orchestration.goalState = 'active';
+    refreshOrchestrationProjection(registry, runtimeDir, status);
     return { result: 'goal-started', goal: registry.goal };
   });
 }
@@ -1484,6 +1657,14 @@ export function startGoal(options = {}, runtimeDir = RUNTIME_DIR) {
 export function evaluateStop({ write = false } = {}, runtimeDir = RUNTIME_DIR) {
   return withRuntimeLock(runtimeDir, () => {
     const registry = readRegistry(runtimeDir);
+    if (registry.orchestration.state === 'stopped') {
+      if (write) {
+        setStoppedProjection(registry);
+        registry.orchestration.evaluatedAt = now();
+        writeJsonAtomic(join(runtimeDir, 'registry.json'), registry);
+      }
+      return { result: 'stopped', reason: registry.orchestration.reason, lanes: {}, written: write, alreadyStopped: true };
+    }
     const snapshot = readJson(join(runtimeDir, 'status.json'), null);
     const latest = latestExecutors(registry);
     const lanes = Object.fromEntries([...latest].map(([worktree, task]) => [shortWorker(worktree), task.agent === 'test' ? 'excluded' : task.state]));
@@ -1512,6 +1693,7 @@ export function evaluateStop({ write = false } = {}, runtimeDir = RUNTIME_DIR) {
         registry.goal.state = 'complete';
         registry.goal.completedAt = timestamp;
       }
+      setStoppedProjection(registry);
       writeJsonAtomic(join(runtimeDir, 'registry.json'), registry);
     }
     return { result: 'stopped', reason: 'goal-completion-conditions-satisfied', lanes, written: write };
@@ -1605,6 +1787,7 @@ export async function main(argv = process.argv.slice(2), runtimeDir = RUNTIME_DI
   }, runtimeDir);
   if (command === 'inbox' && action === 'put') return putInboxEvent(options, runtimeDir);
   if (command === 'inbox' && action === 'pending') return pendingInbox(runtimeDir);
+  if (command === 'inbox' && action === 'reject') return rejectInboxEvent(requireValue(options, 'event-id'), options, runtimeDir);
   if (command === 'consume') return consumeEvent(requireValue(options, 'event-id'), runtimeDir);
   if (command === 'next-actions') return nextActions(runtimeDir);
   if (command === 'action' && action === 'receipt') {
@@ -1624,7 +1807,7 @@ export async function main(argv = process.argv.slice(2), runtimeDir = RUNTIME_DI
   }, runtimeDir);
   if (command === 'block' && action === 'record') return recordBlock(requireValue(options, 'task'), options, runtimeDir);
   if (command === 'stop' && action === 'eval') return evaluateStop({ write: Boolean(options.write) }, runtimeDir);
-  throw controlError('BAD_REQUEST', '用法: orchestrate.mjs task create|task heartbeat|task attach-thread|inbox put|inbox pending|consume|next-actions|action receipt|action verify|handoff recover|goal start|transition|verdict set|block record|stop eval');
+  throw controlError('BAD_REQUEST', '用法: orchestrate.mjs task create|task heartbeat|task attach-thread|inbox put|inbox pending|inbox reject|consume|next-actions|action receipt|action verify|handoff recover|goal start|transition|verdict set|block record|stop eval');
 }
 
 if (resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url))) {
