@@ -246,9 +246,13 @@ function parseBlockedBy(body, knownNumbers) {
 async function fetchIssueList(issueRepo) {
   const { stdout } = await pExecFile('gh', [
     'issue', 'list', '--repo', issueRepo, '--state', 'all', '--limit', '1000',
-    '--json', 'number,title,state,url,body,closedAt,updatedAt,blockedBy,blocking',
+    '--json', 'number,title,state,url,body,closedAt,updatedAt,labels,blockedBy,blocking',
   ], { ...HEADLESS_CHILD_OPTIONS, timeout: 60_000, maxBuffer: 64 * 1024 * 1024 });
   return JSON.parse(stdout);
+}
+
+function issueLabels(issue) {
+  return Array.isArray(issue?.labels) ? issue.labels : [];
 }
 
 function nativeBlockedBy(issue, knownNumbers) {
@@ -280,6 +284,7 @@ export function loadIssueFixture(fixturePath) {
       ...issue,
       number: Number(issue.number),
       state,
+      labels: issueLabels(issue),
       blockedBy: nativeBlockedBy(issue, knownNumbers)
         .filter((number) => number !== Number(issue.number)),
       warn: state === 'CLOSED' && Boolean(issue.warn ?? issue.reopenedBeforeClose),
@@ -338,7 +343,7 @@ function cachedIssueSources(previous) {
     title: issue.title,
     state: issue.state,
     url: issue.url,
-    labels: issue.labels || [],
+    labels: issueLabels(issue),
     blockedBy: [...issue.blockedBy],
     warn: Boolean(issue.derived?.warn),
     closedAt: null,
@@ -426,7 +431,7 @@ function buildGraph(sources, claims) {
       title: issue.title,
       state: issue.state,
       url: issue.url,
-      labels: (issue.labels || []).map((label) => typeof label === 'string' ? label : label?.name).filter(Boolean),
+      labels: issueLabels(issue),
       blockedBy: issue.blockedBy,
       claimedBy: worker,
       derived: {
