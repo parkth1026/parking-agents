@@ -3338,7 +3338,7 @@ async function orchestrationContractMarkers() {
   assert.doesNotMatch(skill, /只给合并建议，不执行 merge/);
 
   const board = readFileSync(join(SKILL_DIR, 'board.html'), 'utf8');
-  for (const marker of ['id="orch-pill"', 'GOAL', 'nextAction', 'unclassifiedFinalCount', 'whyNotComplete', 'goalState', "registryTask.nextAction || '—'", '未分类 final', 'task-state', 'registry-section', 'transition-history', 'workerTiming', '本轮开始', 'fallback-authorized', 'id="v2-note"', '>Map<', '>List<']) {
+  for (const marker of ['id="orch-pill"', 'GOAL', 'nextAction', 'unclassifiedFinalCount', 'whyNotComplete', 'goalState', "registryTask.nextAction || '—'", '未分类 final', 'task-state', 'registry-section', 'transition-history', 'workerTiming', '本轮开始', 'fallback-authorized', 'id="v2-note"', '无编排数据：v2 旧快照未携带 registry', '>Map<', '>List<']) {
     assert.match(board, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
   // 星图既有高保真核心必须原样存在；控制面只允许在确认的 DOM 挂点增量渲染。
