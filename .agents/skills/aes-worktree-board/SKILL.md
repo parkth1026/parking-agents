@@ -7,6 +7,8 @@ description: 在主仓巡检并编排同级既有 worktree：采集全仓 Issue 
 
 把主仓对话作为 Orchestrator，把 Desktop Task 作为正常执行单元，把看板作为同一份事实的可视入口。宿主工具负责 `create_thread`、`wait_threads` 与合并动作；脚本不模拟宿主工具，只把每次宿主动作登记为可恢复、幂等、可审计的控制面事实。
 
+脚本只负责 collect/record/lock/validate/render；脚本不负责自主调度、任务选择或替代宿主的 Desktop Task 生命周期。
+
 开发侧活跃真源是 `.agents/skills/aes-worktree-board/`。PowerShell 中先解析用户级 junction；未安装 junction 时把 `$skillDir` 换成活跃真源绝对路径：
 
 ```powershell
@@ -34,7 +36,7 @@ runtime 选址链保持不变：`AES_WORKTREE_BOARD_RUNTIME_DIR` 优先，否则
 
 - 只操作 `git worktree list` 中与主仓同级的既有 worktree；`task create` 会把短名与完整 basename 规范化为同一 worker identity，并拒绝不存在的 worktree；不创建、不删除 worktree；`test` worktree 不参与自动调度。
 - dirty worktree 必须先复述修改数与未跟踪数；用户确认后才可继续，确认不能越过 registry 租约。
-- 正常派发只用 Desktop `create_thread`。真实 CLI fallback 必须保留用户授权原话；`test` 假 agent 仅供 selftest 豁免。
+- 正常派发只用 Desktop `create_thread`。真实 CLI fallback（`cli-fallback`）必须保留用户授权原话；`test` 假 agent 仅供 selftest 豁免。
 - 模型只用 `luna-max` / `sol-high` 两档；每个 TaskRecord 必须记录 `modelTier` 与 `routingReason`。
 - 不把 `runtime=NOT_RUN` 改写为 `PASS`；不把 handoff/park/stop 伪装成 BLOCK；不重复消费同一 eventId。
 - 不清理、reset、强杀或覆盖用户现场。连续三次有效 BLOCK 后停止该线路的 Task/reviewer 自动创建，等待人工交接。
@@ -68,9 +70,10 @@ collect 的 `graph.issues[].labels` 必须保留 GitHub/fixture 输入的 labels
 
 ## Desktop create_thread 正常路径
 
-1. 根据 Issue、AC、风险与模型档组织自包含 prompt。
-2. 调用宿主 `create_thread` 创建侧边栏可见 Task；记录返回的真实 `threadId`（或排队时的 `clientThreadId`，拿到真实 id 后补齐）。
-3. 立刻原子登记 Task 与 worktree 租约：
+1. 先用宿主 `list_projects` 找到既有 worktree 对应的 saved project，使用 `environment: local`；不得为已登记 worktree 创建额外 worktree。
+2. 根据 Issue、AC、风险与模型档组织自包含 prompt。
+3. 调用宿主 `create_thread` 创建侧边栏可见 Task；记录返回的真实 `threadId`（或排队时的 `clientThreadId`，拿到真实 id 后补齐）。
+4. 立刻原子登记 Task 与 worktree 租约：
 
 ```powershell
 node "$skillDir/scripts/orchestrate.mjs" task create --issue 17 --worktree dev4 --role executor --thread-id T-01HXYZ --model luna-max --routing-reason "单包 AC 明确，自动测试可覆盖"
@@ -81,6 +84,8 @@ Task create 与租约占用是同一笔 registry 原子更新。相同 worktree 
 ```powershell
 node "$skillDir/scripts/orchestrate.mjs" task heartbeat --task tk-dev4-17-g1
 ```
+
+宿主用 `wait_threads` fan-in 事件；每个返回的 Task 由 `read_thread` 核对最终消息、阶段与交付证据。reviewer 的 finding、修复要求和后续指令通过 `send_message_to_thread` 返回原 executor Task；不要让脚本或页面猜测 Task 结果，也不要默认创建新的 fix Task。
 
 排队创建只拿到 `clientThreadId` 时仍登记为 `desktop-thread`；拿到真实 id 后原子补齐：
 
@@ -192,7 +197,7 @@ Task create 会从 fresh Issue labels 自动推导 `needs-manual-test` interacti
 `--interaction-class` 也不能绕过 manual debt；显式传入冲突的 `autonomous` 会 fail closed 为
 `INTERACTION_CLASS_CONFLICT`。`runtime=FAIL|BLOCKED` 始终阻断 merge gate。
 
-## 状态机、三维 verdict 与熔断
+## 状态机、三维 verdict 与 BLOCK 熔断
 
 Task 状态按锁定闭集转移：
 
@@ -269,7 +274,7 @@ node "$skillDir/scripts/orchestrate.mjs" stop eval --write
 
 仍有 pending inbox、typed action、merge/post-merge、eligible frontier 或未收敛 lane 时退出 1 并点名；只有完整 Goal 完成条件成立才写入 `stopped/goal-completion-conditions-satisfied`。stop 的读取、重算、复核与写入和 `task create` 共用同一临界区，不能产生 `stopped + active Task`。停止后不再创建 Task、派 Issue 或 merge，也不强杀、reset 或删除现场。collect 重跑必须保留停止记录。
 
-## CLI fallback（只在明确授权时）
+## CLI fallback（`cli-fallback`，只在明确授权时）
 
 兼容入口 `dispatch.mjs` 只作显式 fallback；真实 agent 缺授权原话必须退出 2：
 
