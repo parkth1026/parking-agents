@@ -75,6 +75,10 @@ merge gate，Task create 从 fresh Issue labels 自动推导该 interaction clas
 | AC-20 | UNCLASSIFIED_FINAL 只有 replacement typed-final 或显式 parked/handoff-required 才能消费。 |
 | AC-21 | fake SHA、非 live branch/head、octopus merge、任意 exitCode JSON 均不能形成 merge/post-merge receipt；只接受恰好双父 merge，CLI action verify 正向链必须真实执行。 |
 | AC-22 | schema 校验先于 terminal-noop；late 到 merged 的 malformed final 仍为 pending UNCLASSIFIED，只有同 commit replacement typed-final 才收敛。 |
+| AC-23 | UNCLASSIFIED 收敛同时重算 nextAction；Registry、collect、board 三层均不得残留 UNCLASSIFIED_FINAL。 |
+| AC-24 | handoff 仅能由显式 authorization-id + 原文恢复同一 Task；恢复幂等、可审计、开启新熔断 epoch，并强制新 follow-up commit 后重新 review。 |
+| AC-25 | fresh Issue label `needs-manual-test` 强制 interaction class；调用方不能用 autonomous 参数覆盖。 |
+| AC-26 | active Goal 的 actions、pending、WAIT 与 merge queue 仅包含锁定 worker 范围；范围外 Task 不被该 Goal 调度。 |
 
 ## 迭代记录
 
@@ -86,3 +90,4 @@ merge gate，Task create 从 fresh Issue labels 自动推导该 interaction clas
 | 2026-08-25 | Issue #43：增加显式 Goal、版本化 executor final、typed next-actions/action receipts、串行 merge queue、post-merge verification 与 next-Issue 连续闭环。 | `orchestration --scenario continuous` 四组 host-shaped 回归；默认八域回归。 | 继续保持宿主执行动作、脚本登记/校验事实的边界，不引入 daemon。 |
 | 2026-08-25 | Issue #43 BLOCK 1/3：封闭旧入口、旧 reviewer、重复 claim、任意 final resolution 与伪造 merge/post-merge receipt 五类旁路。 | 临时真实 Git merge + CLI verification 正向链，以及对应负向 probes。 | receipt 控制面仍在 registry v3 additive 字段中，保持旧快照可读。 |
 | 2026-08-25 | Issue #43 BLOCK 2/3：把 final schema 校验前移到 terminal-noop 之前，并把 merge commit 从“至少双父”收紧为“恰好双父”。 | late-merged malformed final 与真实 octopus merge 负向 probes。 | parked/handoff 仍是显式收敛态；merged 只能由同 commit replacement typed-final 清理 late malformed event。 |
+| 2026-08-25 | Issue #43 人工解除熔断：修复 UNCLASSIFIED 收敛后的 nextAction 残留，并实现授权约束的同 Task handoff recovery。 | Registry/collect/board 投影断言；第三次 BLOCK→handoff→授权恢复→新 commit→reviewer APPROVE host-shaped 回归。 | generic transition 与新 fix Task 仍关闭；恢复只接受显式用户授权并保留审计 ledger。 |

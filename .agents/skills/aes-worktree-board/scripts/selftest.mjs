@@ -1401,6 +1401,28 @@ async function orchestrationPreflightLeaseAndState() {
       await cleanTemp(projectionRuntime);
     }
 
+    const resolutionProjectionRuntime = tempDirectory('orchestration-lifecycle-unclassified-projection');
+    try {
+      const projectedTask = createTask({
+        issue: 17, worktree: availableWorker, role: 'executor', 'thread-id': 'T-unclassified-projection',
+        model: 'luna-max', 'routing-reason': 'resolved nextAction projection fixture',
+      }, resolutionProjectionRuntime);
+      putInboxEvent({
+        thread: 'T-unclassified-projection', task: projectedTask.taskId, kind: 'final',
+        'event-id': 'E-unclassified-projection', payload: JSON.stringify({ summary: 'malformed projection final' }),
+      }, resolutionProjectionRuntime);
+      assert.equal(consumeEvent('E-unclassified-projection', resolutionProjectionRuntime).code, 'UNCLASSIFIED_FINAL');
+      transitionTask(projectedTask.taskId, 'parked', { reason: 'explicit projection settlement' }, resolutionProjectionRuntime);
+      const registryTask = readRegistry(resolutionProjectionRuntime).tasks[projectedTask.taskId];
+      assert.equal(registryTask.nextAction, 'PARKED');
+      assert.notEqual(registryTask.nextAction, 'UNCLASSIFIED_FINAL');
+      const projected = await collectStatus({ runtimeDir: resolutionProjectionRuntime, issuesFixture: ISSUE_FIXTURE });
+      const worker = projected.worktrees.find((item) => item.name === availableWorker);
+      assert.equal(worker.task.nextAction, 'PARKED', 'collect 必须投影已收敛的 Registry nextAction');
+    } finally {
+      await cleanTemp(resolutionProjectionRuntime);
+    }
+
     const unknownRuntime = tempDirectory('orchestration-lifecycle-unknown-worktree');
     try {
       result = orchestrateSync([
@@ -1572,7 +1594,7 @@ async function orchestrationCircuitAndLateEvent() {
     assert.equal(readRegistry(runtimeDir).tasks[created.taskId].state, 'handoff-required');
     assert.ok(readRegistry(runtimeDir).tasks[created.taskId].finishedAt, 'handoff-required 必须冻结 worker 工作周期');
     assert.ok(existsSync(block.handoffBundle));
-    assert.match(readFileSync(block.handoffBundle, 'utf8'), /Issue: #56|final reviewer finding|Resume conditions/);
+    assert.match(readFileSync(block.handoffBundle, 'utf8'), /Issue: #56|final reviewer finding|Resume conditions|handoff recover|不得手改 registry/);
 
     putInboxEvent({
       thread: 'T-block', task: created.taskId, kind: 'progress', 'event-id': 'E-late',
@@ -1709,6 +1731,15 @@ async function orchestrationContinuousHostChain() {
       { number: 43, status: 'claimed', labels: ['ready-for-agent', 'needs-manual-test'] },
       { number: 44, status: 'frontier', labels: ['ready-for-agent'] },
     ], { repoRoot: fixture.main, mainHead });
+    assert.throws(
+      () => createTask({
+        issue: 43, worktree: 'dev43', role: 'executor', 'thread-id': 'T-manual-policy-bypass',
+        model: 'luna-max', 'routing-reason': 'must reject manual policy override',
+        'interaction-class': 'autonomous',
+      }, runtimeDir),
+      (error) => error.code === 'INTERACTION_CLASS_CONFLICT',
+      'needs-manual-test label 不得被显式 autonomous 参数覆盖',
+    );
     const task = createTask({
       issue: 43, worktree: 'dev43', role: 'executor', 'thread-id': 'T-dev43-executor',
       model: 'luna-max', 'routing-reason': 'continuous full-chain fixture',
@@ -1827,6 +1858,7 @@ async function orchestrationContinuousHostChain() {
     putTypedFinal(runtimeDir, task, 'T-dev43-executor', 'E-late-merged-replacement', commitSha, { manual: true });
     mergedTask = readRegistry(runtimeDir).tasks[task.taskId];
     assert.equal(mergedTask.state, 'merged');
+    assert.equal(mergedTask.nextAction, 'CLAIM_NEXT_ISSUE', 'merged replacement 收敛后不得残留 UNCLASSIFIED_FINAL');
     assert.equal(pendingInbox(runtimeDir).pending.some((event) => event.eventId === 'E-late-merged-malformed'), false,
       '同 commit 合法 replacement typed-final 才能收敛 late malformed event');
 
@@ -1880,6 +1912,8 @@ async function orchestrationUnclassifiedFinal() {
     assert.equal(replacement.nextAction, 'CREATE_REVIEWER');
     assert.equal(pendingInbox(runtimeDir).pending.length, 0, '合法 replacement typed-final 才能消费旧 unclassified event');
     assert.equal(readRegistry(runtimeDir).unclassifiedFinals['E-unstructured-final'].resolution, 'replacement-typed-final:E-typed-replacement');
+    assert.equal(readRegistry(runtimeDir).tasks[task.taskId].nextAction, 'CREATE_REVIEWER',
+      'replacement 收敛后 Registry nextAction 不得残留 UNCLASSIFIED_FINAL');
   } finally {
     await cleanTemp(runtimeDir);
   }
@@ -1938,6 +1972,55 @@ async function orchestrationHostBlockCircuit() {
     assert.equal(finalTask.state, 'handoff-required');
     assert.equal(finalTask.blockCount, 3);
     assert.deepEqual(finalTask.blockLedger.map((entry) => entry.commit), ['block-commit-1', 'block-commit-2', 'block-commit-3']);
+    assert.throws(
+      () => transitionTask(task.taskId, 'executing', {}, runtimeDir),
+      (error) => error.code === 'INVALID_TRANSITION',
+      'generic transition 不得绕过人工授权恢复 handoff',
+    );
+    let recoveryCli = orchestrateSync([
+      'handoff', 'recover', '--task', task.taskId,
+    ], runtimeDir);
+    assert.equal(recoveryCli.status, 2);
+    assert.equal(parseJsonLine(recoveryCli.stderr).code, 'BAD_REQUEST');
+    const authorizationId = 'issue-43-user-unblock-2026-08-25';
+    const authorization = '用户明确授权：不要因可由 agent 修复的第三轮 finding 停在 handoff，继续原 Task 修复。';
+    recoveryCli = orchestrateSync([
+      'handoff', 'recover', '--task', task.taskId,
+      '--authorization-id', authorizationId, '--authorization', authorization,
+    ], runtimeDir);
+    assert.equal(recoveryCli.status, 0, recoveryCli.stderr);
+    assert.equal(parseJsonLine(recoveryCli.stdout).result, 'recovered');
+    const transitionCount = readJsonLines(join(runtimeDir, 'transitions.jsonl')).length;
+    const duplicateRecovery = orchestrateSync([
+      'handoff', 'recover', '--task', task.taskId,
+      '--authorization-id', authorizationId, '--authorization', authorization,
+    ], runtimeDir);
+    assert.equal(duplicateRecovery.status, 0, duplicateRecovery.stderr);
+    assert.equal(parseJsonLine(duplicateRecovery.stdout).result, 'already-recovered');
+    assert.equal(readJsonLines(join(runtimeDir, 'transitions.jsonl')).length, transitionCount,
+      '重复人工授权恢复不得追加 transition');
+    let recoveredTask = readRegistry(runtimeDir).tasks[task.taskId];
+    assert.equal(recoveredTask.state, 'executing');
+    assert.equal(recoveredTask.nextAction, 'WAIT_THREADS');
+    assert.equal(recoveredTask.finishedAt, null);
+    assert.equal(recoveredTask.circuitEpoch, 1);
+    assert.equal(recoveredTask.blockCount, 0);
+    assert.equal(recoveredTask.recoveryLedger.length, 1);
+    assert.equal(recoveredTask.recoveryLedger[0].authorization, authorization);
+    const recoveredStatus = readJson(join(runtimeDir, 'status.json'));
+    recoveredStatus.worktrees[0].head = 'block-commit-3';
+    writeJsonAtomic(join(runtimeDir, 'status.json'), recoveredStatus);
+    const recoveredActions = nextActions(runtimeDir).actions;
+    assert.equal(recoveredActions.some((action) => action.type === 'WAIT_THREADS'
+      && action.targets.some((target) => target.taskId === task.taskId)), true, JSON.stringify(recoveredActions));
+
+    putTypedFinal(runtimeDir, task, 'T-dev-block-executor', 'E-recovered-final-4', 'block-commit-4');
+    const recoveredReviewer = hostCreateReviewer(runtimeDir, task, 4);
+    hostApprove(runtimeDir, task, recoveredReviewer, 'E-recovered-approve-4');
+    recoveredTask = readRegistry(runtimeDir).tasks[task.taskId];
+    assert.equal(recoveredTask.state, 'approved', '人工恢复后必须能沿原 Task 继续 executor → reviewer');
+    assert.equal(recoveredTask.recovery.requiresNewCommit, false);
+    assert.equal(recoveredTask.recovery.resumedCommit, 'block-commit-4');
   } finally {
     await cleanTemp(runtimeDir);
   }
@@ -1992,7 +2075,21 @@ async function orchestrationMergeQueueAndRuntimeBoundary() {
     }], runtimeDir);
     actions = nextActions(runtimeDir).actions;
     assert.equal(actions.filter((action) => action.type === 'HOST_MERGE').length, 1, '第一条 post-merge 完成后才释放下一条 merge');
-    assert.notEqual(actions.find((action) => action.type === 'HOST_MERGE').taskId, firstMerge.taskId);
+    const secondMerge = actions.find((action) => action.type === 'HOST_MERGE');
+    assert.notEqual(secondMerge.taskId, firstMerge.taskId);
+    const outOfScopeActive = createTask({
+      issue: 52, worktree: 'dev-out-active', role: 'executor', 'thread-id': 'T-out-of-goal-active',
+      model: 'luna-max', 'routing-reason': 'Goal worker scope negative fixture',
+    }, runtimeDir);
+    const scopedWorker = readRegistry(runtimeDir).tasks[firstMerge.taskId].worktree;
+    startGoal({ workers: scopedWorker }, runtimeDir);
+    actions = nextActions(runtimeDir).actions;
+    assert.equal(actions.some((action) => action.taskId === secondMerge.taskId), false,
+      'active Goal 不得恢复或派生范围外 merge-ready Task action');
+    assert.equal(actions.some((action) => action.taskId === outOfScopeActive.taskId), false,
+      'active Goal 不得为范围外 active Task 派生 WAIT/reviewer action');
+    assert.equal(readRegistry(runtimeDir).orchestration.mergeQueue.some((entry) => entry.taskId === secondMerge.taskId), false,
+      'merge queue 投影也必须服从 Goal worker scope');
 
     continuousStatus(failRuntime, ['dev-fail'], []);
     const task = createTask({
@@ -2379,12 +2476,14 @@ async function orchestrationContractMarkers() {
     'runtime=NOT_RUN', 'stop eval --write', '--fallback-authorized', 'Map / List',
     'aes.worktree-board.executor-final/v1', 'next-actions', 'action receipt', 'action verify',
     'claim reservation', 'verificationRun', 'octopus merge', 'schema 校验先于 terminal-noop', 'CLAIM_NEXT_ISSUE',
+    'handoff recover', 'authorization-id', 'already-recovered',
+    'INTERACTION_CLASS_CONFLICT', '范围外 active/merge-ready Task',
   ]) assert.match(skill, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.doesNotMatch(skill, /派发 headless 任务/);
   assert.doesNotMatch(skill, /只给合并建议，不执行 merge/);
 
   const board = readFileSync(join(SKILL_DIR, 'board.html'), 'utf8');
-  for (const marker of ['id="orch-pill"', 'GOAL', 'nextAction', '未分类 final', 'task-state', 'registry-section', 'transition-history', 'workerTiming', '本轮开始', 'fallback-authorized', 'id="v2-note"', '>Map<', '>List<']) {
+  for (const marker of ['id="orch-pill"', 'GOAL', 'nextAction', "registryTask.nextAction || '—'", '未分类 final', 'task-state', 'registry-section', 'transition-history', 'workerTiming', '本轮开始', 'fallback-authorized', 'id="v2-note"', '>Map<', '>List<']) {
     assert.match(board, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
   // 星图既有高保真核心必须原样存在；控制面只允许在确认的 DOM 挂点增量渲染。

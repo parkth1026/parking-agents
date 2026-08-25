@@ -99,7 +99,7 @@ node "$skillDir/scripts/orchestrate.mjs" inbox put --thread T-02R --task tk-dev4
 node "$skillDir/scripts/orchestrate.mjs" consume --event-id E-7f3a
 ```
 
-宿主事件有 id 就沿用；否则 eventId 为 thread/kind/payload 摘要的稳定 SHA-1 前 12 位。入箱与消费都校验 thread→Task 直接归属或 reviewer→parent 关联；foreign thread 必须退出 2 `THREAD_TASK_MISMATCH`，不得覆盖 cursor 或 verdict。`approved` 只接受 reviewer `final|verdict` 的显式 `APPROVE|PASS`；普通 commentary/progress 的 `payload.to` 不能冒充裁决。reviewer `BLOCK` consume 在同一 registry 原子更新内完成 commit 校验、去重、计数与 `fixing|handoff-required` 转移，继续返回锁定的 `result=consumed`；显式 `block record` 复用同一逻辑。同一 eventId 再次消费必须返回 `already-consumed`、退出 0、零状态变化。late event 可以落箱和消费，但不得复活 `merged`、`parked` 或 `handoff-required`。
+宿主事件有 id 就沿用；否则 eventId 为 thread/kind/payload 摘要的稳定 SHA-1 前 12 位。入箱与消费都校验 thread→Task 直接归属或 reviewer→parent 关联；foreign thread 必须退出 2 `THREAD_TASK_MISMATCH`，不得覆盖 cursor 或 verdict。`approved` 只接受 reviewer `final|verdict` 的显式 `APPROVE|PASS`；普通 commentary/progress 的 `payload.to` 不能冒充裁决。reviewer `BLOCK` consume 在同一 registry 原子更新内完成 commit 校验、去重、计数与 `fixing|handoff-required` 转移，继续返回锁定的 `result=consumed`；显式 `block record` 复用同一逻辑。同一 eventId 再次消费必须返回 `already-consumed`、退出 0、零状态变化。合法 late event 可以落箱和消费但不得复活终态；malformed executor final 例外，必须保持 pending `UNCLASSIFIED_FINAL`。
 
 ## 显式 Goal 与连续编排闭环
 
@@ -154,6 +154,8 @@ receipt 必须绑定同 reservation/worktree 的新 executor Task。多 worker �
 Goal/stop 只有在 fresh registry + inbox + Git + Issue frontier 同时证明 pending 为空、无 active /
 reviewing / fixing / merge-ready / post-merge 线路、无 eligible autonomous Issue、全部 lane 均为
 `merged | parked | handoff-required` 时才可 complete。
+active Goal 的 action derivation、pending inbox、merge queue 与 WAIT targets 只读取 Goal 锁定的
+worker 集合；范围外 active/merge-ready Task 不得被该 Goal 恢复、review、merge、claim 或阻止完成。
 
 ### executor final v1
 
@@ -178,8 +180,12 @@ UNCLASSIFIED action 的任意 `resolution` 不会消费事件；只有合法 rep
 显式进入 `parked | handoff-required` 后才会把原事件标为 resolved/consumed。
 schema 校验先于 terminal-noop：malformed final 即使 late 到 `merged` 也保持 pending
 `UNCLASSIFIED_FINAL`；同 commit 的合法 replacement typed-final 才能收敛。
+收敛必须同步重算 `task.nextAction`：committed→`CREATE_REVIEWER`、merged→`CLAIM_NEXT_ISSUE`、
+parked→`PARKED`、handoff-required→`HANDOFF_REQUIRED`，Registry、collect 与 board 不得继续显示
+`UNCLASSIFIED_FINAL`。
 Task create 会从 fresh Issue labels 自动推导 `needs-manual-test` interaction class；宿主漏传
-`--interaction-class` 也不能绕过 manual debt。`runtime=FAIL|BLOCKED` 始终阻断 merge gate。
+`--interaction-class` 也不能绕过 manual debt；显式传入冲突的 `autonomous` 会 fail closed 为
+`INTERACTION_CLASS_CONFLICT`。`runtime=FAIL|BLOCKED` 始终阻断 merge gate。
 
 ## 状态机、三维 verdict 与熔断
 
@@ -200,10 +206,16 @@ approved → merge-ready → merged
 - `delivery`: `MERGE_READY | PARKED | HANDOFF_REQUIRED | BLOCKED`
 
 ```powershell
-node "$skillDir/scripts/orchestrate.mjs" verdict set --task tk-dev4-17-g1 --code PASS --runtime NOT_RUN --delivery MERGE_READY
+node "$skillDir/scripts/orchestrate.mjs" verdict set --task tk-dev4-17-g1 --runtime NOT_RUN
 ```
 
-门禁按合并后的有效 verdict 校验，分多次写字段也不能绕过：`MERGE_READY` 要求 `code=PASS` 与显式 runtime evidence；要求真机时只能是 `runtime=PASS`。`committed` 必须带 `commitSha`；`approved` 必须来自关联 reviewer thread 的最终 `APPROVE` 事件，且 payload `commitSha` 等于 executor 当前 commit；`merged` 必须带 `mergeCommit`。只登记 reviewer Task 不算 review 已完成，证据不齐不得释放租约或写成终态。
+旧入口只可预登记真实 runtime evidence；`code=PASS` 来自 reviewer APPROVE，
+`delivery=MERGE_READY` 只由 EVALUATE_MERGE_GATE succeeded receipt 原子写入。门禁按合并后的
+有效 verdict 校验，分多次写字段也不能绕过：`MERGE_READY` 要求 `code=PASS` 与显式 runtime
+evidence；要求真机时只能是 `runtime=PASS`。`committed` 必须带 `commitSha`；`approved` 必须来自
+关联 reviewer thread 的最终 `APPROVE` 事件，且 payload `commitSha` 等于 executor 当前 commit；
+`merged` 必须带 `mergeCommit`。只登记 reviewer Task 不算 review 已完成，证据不齐不得释放租约
+或写成终态。
 
 所有公开入口共用同一证据链：`executorFinalEvidence → CREATE_REVIEWER receipt + review evidence →
 EVALUATE_MERGE_GATE receipt → HOST_MERGE receipt → passed verificationRun + POST_MERGE_VERIFY receipt`。
@@ -218,6 +230,19 @@ node "$skillDir/scripts/orchestrate.mjs" block record --task tk-dev1-56-g1 --com
 ```
 
 第三次有效 BLOCK 自动进入 `handoff-required`，生成 `runtime/handoff/<taskId>.md`，保留 Issue、HEAD、finding、未执行证据与恢复条件，并封锁该线路后续派发。
+
+`handoff-required` 不开放 generic transition，也不允许创建新 fix Task。只有用户明确授权处置后，
+root 才能恢复原 executor Task：
+
+```powershell
+node "$skillDir/scripts/orchestrate.mjs" handoff recover --task tk-dev1-56-g1 --authorization-id issue-56-user-decision-1 --authorization "<用户授权原文>"
+```
+
+恢复与 writer lease、authorization-id、授权原文 digest、熔断 epoch 和 append-only transition 绑定；
+相同 authorization-id + 原文重放返回 `already-recovered` 且零状态变化，同 id 不同原文 fail closed。
+恢复会开启新 circuit epoch、清除旧 commit 的交付证据并回到同一 Task/thread 的 `executing`；原
+executor 必须提交不同于第三次 BLOCK commit 的新 follow-up commit，之后重新创建独立 reviewer。
+授权恢复可把已停止 orchestration 重新置为 running，但不扩大 merge、dirty 或 worktree 权限。
 
 ## 全局停止
 

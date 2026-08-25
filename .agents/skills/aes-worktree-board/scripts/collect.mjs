@@ -383,7 +383,7 @@ function buildGraph(sources, claims) {
       title: issue.title,
       state: issue.state,
       url: issue.url,
-      labels: (issue.labels || []).map((label) => typeof label === 'string' ? label : label.name).filter(Boolean),
+      labels: (issue.labels || []).map((label) => typeof label === 'string' ? label : label?.name).filter(Boolean),
       blockedBy: issue.blockedBy,
       claimedBy: worker,
       derived: {

@@ -158,6 +158,9 @@ export function readRegistry(runtimeDir) {
   registry.leases = leases;
   for (const task of Object.values(registry.tasks)) {
     task.worktree = canonicalWorktreeKey(task.worktree);
+    task.circuitEpoch ||= 0;
+    task.blockLedger ||= [];
+    task.recoveryLedger ||= [];
     // v3 additive compatibility: old TaskRecords used createdAt/updatedAt only.
     task.startedAt ||= task.createdAt || null;
     if (task.finishedAt === undefined) {

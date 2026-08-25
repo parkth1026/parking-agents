@@ -77,6 +77,10 @@ function labelNames(issue) {
   return (issue?.labels || []).map((label) => typeof label === 'string' ? label : label?.name).filter(Boolean);
 }
 
+function workerInGoalScope(registry, worktree) {
+  return registry.goal?.state !== 'active' || registry.goal.workers.includes(worktree);
+}
+
 function eligibleAutonomousIssues(status) {
   return (status?.graph?.issues || [])
     .filter((issue) => {
@@ -342,16 +346,30 @@ function assertTransitionEvidence(registry, task, to, candidate) {
   }
 }
 
+function nextActionForState(task) {
+  if (task.state === 'merged') return 'CLAIM_NEXT_ISSUE';
+  if (task.state === 'parked') return 'PARKED';
+  if (task.state === 'handoff-required') return 'HANDOFF_REQUIRED';
+  if (task.state === 'committed') return 'CREATE_REVIEWER';
+  if (task.state === 'approved') return 'EVALUATE_MERGE_GATE';
+  if (task.state === 'merge-ready') return task.hostMergeReceipt ? 'POST_MERGE_VERIFY' : 'HOST_MERGE';
+  return 'WAIT_THREADS';
+}
+
 function resolvePendingUnclassifiedFinals(registry, task, resolution) {
   task.consumedEventIds ||= [];
+  let resolved = 0;
   for (const record of Object.values(registry.unclassifiedFinals)) {
     if (record.taskId !== task.taskId || record.status !== 'pending') continue;
     record.status = 'resolved';
     record.resolution = resolution;
     record.resolvedAt = now();
     if (!task.consumedEventIds.includes(record.eventId)) task.consumedEventIds.push(record.eventId);
+    resolved += 1;
   }
   delete task.unclassifiedFinal;
+  if (resolved > 0) task.nextAction = nextActionForState(task);
+  return resolved;
 }
 
 function applyTransition(registry, runtimeDir, task, to, details = {}) {
@@ -408,8 +426,13 @@ export function createTask(options, runtimeDir = RUNTIME_DIR) {
   return updateRegistry(runtimeDir, (registry) => {
     const issueSnapshot = readJson(join(runtimeDir, 'status.json'), null)?.graph?.issues?.find((candidate) => candidate.number === issue);
     const issueLabels = labelNames(issueSnapshot);
-    const interactionClass = options['interaction-class'] || options.interactionClass
-      || (issueLabels.includes('needs-manual-test') ? 'needs-manual-test' : 'autonomous');
+    const requestedInteractionClass = options['interaction-class'] || options.interactionClass || null;
+    if (issueLabels.includes('needs-manual-test') && requestedInteractionClass && requestedInteractionClass !== 'needs-manual-test') {
+      throw controlError('INTERACTION_CLASS_CONFLICT', `Issue #${issue} 带 needs-manual-test，不能覆盖为 ${requestedInteractionClass}`);
+    }
+    const interactionClass = issueLabels.includes('needs-manual-test')
+      ? 'needs-manual-test'
+      : requestedInteractionClass || 'autonomous';
     if (registry.orchestration.state === 'stopped') {
       throw controlError('ORCHESTRATION_STOPPED', '全局编排已停止；先由人工明确恢复，禁止新建 Task');
     }
@@ -476,7 +499,7 @@ export function createTask(options, runtimeDir = RUNTIME_DIR) {
       headSha: options['head-sha'] || null, commitSha: null, mergeCommit: null,
       verdict: { code: null, runtime: null, delivery: null }, reviewTaskId: null, reviewEvidence: null,
       executorFinalEvidence: null, hostMergeReceipt: null, postMergeVerification: null,
-      blockCount: 0, blockLedger: [], lastProgressAt: timestamp,
+      circuitEpoch: 0, blockCount: 0, blockLedger: [], recoveryLedger: [], lastProgressAt: timestamp,
       nextAction: options['next-action'] || 'wait for registered thread events',
       fallbackAuthorized, requiresRuntime: options['requires-runtime'] === true || options['requires-runtime'] === 'true',
       agent, createdAt: timestamp, startedAt: timestamp, finishedAt: null, updatedAt: timestamp,
@@ -627,6 +650,7 @@ function applyBlockRecord(registry, runtimeDir, task, event, { commit, finding, 
   const reviewer = validateBlockEvent(registry, task, event, commit);
   consumeRecordedEvent(task, event);
   task.blockLedger ||= [];
+  task.circuitEpoch ||= 0;
   if (task.blockLedger.some((entry) => entry.commit === commit && entry.verdict === 'BLOCK')) {
     return { result: 'duplicate-verdict', blockCount: task.blockCount, state: task.state, transition: null };
   }
@@ -636,8 +660,11 @@ function applyBlockRecord(registry, runtimeDir, task, event, { commit, finding, 
   if (task.state !== 'reviewing') {
     throw controlError('INVALID_BLOCK_STATE', `最终 reviewer BLOCK 只能在 reviewing 记录，当前为 ${task.state}`);
   }
-  task.blockLedger.push({ commit, verdict: 'BLOCK', eventId: event.eventId, reviewTaskId: reviewer.taskId, at: now() });
-  task.blockCount = task.blockLedger.length;
+  task.blockLedger.push({
+    commit, verdict: 'BLOCK', eventId: event.eventId, reviewTaskId: reviewer.taskId,
+    circuitEpoch: task.circuitEpoch, at: now(),
+  });
+  task.blockCount = task.blockLedger.filter((entry) => Number(entry.circuitEpoch || 0) === task.circuitEpoch).length;
   task.commitSha = commit;
   task.verdict.code = 'BLOCK';
   task.verdict.delivery = task.blockCount >= 3 ? 'HANDOFF_REQUIRED' : 'BLOCKED';
@@ -660,7 +687,8 @@ function applyBlockRecord(registry, runtimeDir, task, event, { commit, finding, 
   task.phase = 'awaiting-human';
   task.nextAction = `人工交接，见 runtime/handoff/${task.taskId}.md`;
   const handoffPath = join(runtimeDir, 'handoff', `${task.taskId}.md`);
-  writeTextAtomic(handoffPath, `# Handoff: ${task.taskId}\n\n- Issue: #${task.issue}\n- Worktree: ${task.worktree}\n- HEAD/follow-up commit: ${commit}\n- blockCount: ${task.blockCount}\n- runtime evidence: ${task.verdict.runtime || 'NOT_RUN (未记录)'}\n- Current state: handoff-required\n\n## Final reviewer finding\n\n${finding}\n\n## Resume conditions\n\n人工确认 finding 的处置方式，明确允许解除熔断后，才可 transition 恢复；当前不会自动创建 Task、merge、reset 或删除现场。\n`);
+  const orchestrateScript = fileURLToPath(import.meta.url);
+  writeTextAtomic(handoffPath, `# Handoff: ${task.taskId}\n\n- Issue: #${task.issue}\n- Worktree: ${task.worktree}\n- HEAD/follow-up commit: ${commit}\n- circuitEpoch: ${task.circuitEpoch}\n- blockCount: ${task.blockCount}\n- runtime evidence: ${task.verdict.runtime || 'NOT_RUN (未记录)'}\n- Current state: handoff-required\n\n## Final reviewer finding\n\n${finding}\n\n## Resume conditions\n\n人工明确授权后，使用受审计命令恢复同一 Task：\n\n    node "${orchestrateScript}" handoff recover --task ${task.taskId} --authorization-id <decision-id> --authorization "<用户授权原文>"\n\n不得手改 registry、不得创建新 fix Task。恢复后必须由原 executor 产生不同于 ${commit} 的新 follow-up commit，才能重新 review。\n`);
   appendTransition(runtimeDir, task, from, 'handoff-required', {
     eventId: event.eventId, actor: 'orchestrator', reason: 'third final BLOCK on a new follow-up commit',
     evidence: [findingPath || `thread:${event.threadId}`],
@@ -714,6 +742,9 @@ function consumeExecutorFinal(registry, runtimeDir, task, event, sourceTask) {
   if (!['dispatching', 'executing', 'self-qa', 'committed'].includes(task.state)) {
     throw controlError('INVALID_EXECUTOR_FINAL_STATE', `executor final 不能从 ${task.state} 推进`, { taskId: task.taskId });
   }
+  if (task.recovery?.requiresNewCommit && event.payload.commitSha === task.recovery.requiresNewCommitFrom) {
+    throw controlError('FOLLOW_UP_COMMIT_REQUIRED', `handoff recovery 后必须产生不同于 blocked commit ${task.recovery.requiresNewCommitFrom} 的新 commit`);
+  }
   if (task.commitSha && task.state === 'committed' && task.commitSha !== event.payload.commitSha) {
     throw controlError('EXECUTOR_FINAL_COMMIT_MISMATCH', `Task 当前 commit ${task.commitSha} 与 final ${event.payload.commitSha} 不一致`);
   }
@@ -745,6 +776,11 @@ function consumeExecutorFinal(registry, runtimeDir, task, event, sourceTask) {
   }
   task.commitSha = event.payload.commitSha;
   task.headSha = event.payload.commitSha;
+  if (task.recovery?.requiresNewCommit) {
+    task.recovery.requiresNewCommit = false;
+    task.recovery.resumedCommit = event.payload.commitSha;
+    task.recovery.resumedAt = now();
+  }
   task.nextAction = 'CREATE_REVIEWER';
   consumeRecordedEvent(task, event);
   task.updatedAt = now();
@@ -871,6 +907,87 @@ export function recordBlock(taskId, options, runtimeDir = RUNTIME_DIR) {
   });
 }
 
+export function recoverHandoff(taskId, options, runtimeDir = RUNTIME_DIR) {
+  const authorizationId = String(requireValue(options, 'authorization-id')).trim();
+  const authorization = String(requireValue(options, 'authorization')).trim();
+  if (!authorizationId || !authorization) throw controlError('HUMAN_AUTHORIZATION_REQUIRED', 'handoff recover 要求非空 authorization-id 与用户授权原文');
+  const authorizationDigest = stableDigest(authorization);
+  const recoveryId = `HR-${stableDigest([taskId, authorizationId])}`;
+  return updateRegistry(runtimeDir, (registry) => {
+    const task = taskById(registry, taskId);
+    task.recoveryLedger ||= [];
+    const existing = task.recoveryLedger.find((entry) => entry.authorizationId === authorizationId);
+    if (existing) {
+      if (existing.authorizationDigest !== authorizationDigest) {
+        throw controlError('AUTHORIZATION_CONFLICT', `authorization-id ${authorizationId} 已绑定不同授权原文`);
+      }
+      return { result: 'already-recovered', taskId, recoveryId: existing.recoveryId, state: task.state, recovery: existing };
+    }
+    if (task.role !== 'executor' || task.state !== 'handoff-required') {
+      throw controlError('HANDOFF_RECOVERY_NOT_ALLOWED', `${taskId} 当前为 ${task.state}，只有 handoff-required executor 可由人工授权恢复`);
+    }
+    if (registry.leases[task.worktree]?.owner !== task.taskId) {
+      throw controlError('HANDOFF_LEASE_REQUIRED', `${taskId} 恢复前必须仍持有 ${task.worktree} writer lease`);
+    }
+    const timestamp = now();
+    const blockedCommit = task.commitSha;
+    const from = task.state;
+    const recovery = {
+      schemaVersion: 'aes.worktree-board.handoff-recovery/v1', recoveryId, authorizationId,
+      authorizationDigest, authorization, blockedCommit, fromCircuitEpoch: Number(task.circuitEpoch || 0),
+      toCircuitEpoch: Number(task.circuitEpoch || 0) + 1, authorizedAt: timestamp,
+    };
+    task.recoveryLedger.push(recovery);
+    task.circuitEpoch = recovery.toCircuitEpoch;
+    task.blockCount = 0;
+    task.state = 'executing';
+    task.phase = 'human-authorized-recovery';
+    task.nextAction = 'WAIT_THREADS';
+    task.startedAt = timestamp;
+    task.finishedAt = null;
+    task.updatedAt = timestamp;
+    task.lastProgressAt = timestamp;
+    task.retryable = false;
+    task.commitSha = null;
+    task.executorFinalEvidence = null;
+    task.reviewTaskId = null;
+    task.reviewEvidence = null;
+    task.mergeCommit = null;
+    task.mergeGateReceipt = null;
+    task.hostMergeStarted = null;
+    task.hostMergeReceipt = null;
+    task.postMergeVerification = null;
+    task.verdict = { code: null, runtime: null, delivery: null };
+    task.recovery = {
+      recoveryId, authorizationId, requiresNewCommitFrom: blockedCommit,
+      requiresNewCommit: true, recoveredAt: timestamp,
+    };
+    const previousOrchestration = { ...registry.orchestration };
+    registry.orchestration = {
+      ...registry.orchestration, state: 'running', reason: 'human-authorized-handoff-recovery',
+      recordedAt: null, evaluatedAt: timestamp, resumedAt: timestamp,
+      lastStop: previousOrchestration.state === 'stopped'
+        ? {
+          reason: previousOrchestration.reason, recordedAt: previousOrchestration.recordedAt,
+          evaluatedAt: previousOrchestration.evaluatedAt,
+        }
+        : previousOrchestration.lastStop || null,
+    };
+    if (registry.goal?.state === 'complete') {
+      registry.goal.completionHistory ||= [];
+      registry.goal.completionHistory.push({ completedAt: registry.goal.completedAt, reopenedAt: timestamp, recoveryId });
+      registry.goal.state = 'active';
+      registry.goal.completedAt = null;
+      registry.goal.reopenedAt = timestamp;
+    }
+    appendTransition(runtimeDir, task, from, 'executing', {
+      actor: 'human-authorized-recovery', reason: `authorized recovery ${authorizationId}`,
+      evidence: [`recovery:${recoveryId}`, `authorization:${authorizationId}`, `authorization-digest:${authorizationDigest}`],
+    });
+    return { result: 'recovered', taskId, recoveryId, state: task.state, circuitEpoch: task.circuitEpoch, recovery };
+  });
+}
+
 function latestExecutors(registry) {
   const latest = new Map();
   for (const task of Object.values(registry.tasks)) {
@@ -897,9 +1014,12 @@ function deriveActionCandidates(registry, runtimeDir, status) {
   const actions = [];
   const consumed = new Set(Object.values(registry.tasks).flatMap((task) => task.consumedEventIds || []));
   const pendingEvents = readJsonLines(inboxPath(runtimeDir)).filter((event, index, all) => (
-    !consumed.has(event.eventId) && all.findIndex((candidate) => candidate.eventId === event.eventId) === index
+    !consumed.has(event.eventId)
+    && workerInGoalScope(registry, registry.tasks[event.taskId]?.worktree)
+    && all.findIndex((candidate) => candidate.eventId === event.eventId) === index
   ));
-  for (const record of Object.values(registry.unclassifiedFinals).filter((entry) => entry.status === 'pending')) {
+  for (const record of Object.values(registry.unclassifiedFinals).filter((entry) => entry.status === 'pending'
+    && workerInGoalScope(registry, registry.tasks[entry.taskId]?.worktree))) {
     actions.push(typedAction('UNCLASSIFIED_FINAL', [record.eventId, record.taskId], {
       taskId: record.taskId, eventId: record.eventId, threadId: record.threadId,
       reason: 'executor final 未通过版本化 schema，事件保持 pending 且未推进 cursor', errors: record.errors,
@@ -907,7 +1027,8 @@ function deriveActionCandidates(registry, runtimeDir, status) {
   }
 
   const latest = latestExecutors(registry);
-  const realLatest = [...latest.values()].filter((task) => task.agent !== 'test' && task.worktree !== 'test');
+  const realLatest = [...latest.values()].filter((task) => task.agent !== 'test' && task.worktree !== 'test'
+    && workerInGoalScope(registry, task.worktree));
   for (const task of realLatest.sort((left, right) => left.taskId.localeCompare(right.taskId))) {
     const workerSnapshot = (status?.worktrees || []).find((worker) => canonicalWorktreeId(worker.name) === task.worktree);
     if (['dispatching', 'executing', 'self-qa', 'fixing'].includes(task.state)
@@ -946,7 +1067,8 @@ function deriveActionCandidates(registry, runtimeDir, status) {
 
   const mergeInFlight = realLatest.find((task) => task.state === 'merge-ready' && task.hostMergeReceipt && !task.postMergeVerification);
   const startedMergeAction = Object.values(registry.actions).find((action) => action.type === 'HOST_MERGE'
-    && registry.actionReceipts[action.actionId]?.latestStatus === 'started');
+    && registry.actionReceipts[action.actionId]?.latestStatus === 'started'
+    && workerInGoalScope(registry, registry.tasks[action.taskId]?.worktree));
   if (mergeInFlight) {
     const action = typedAction('POST_MERGE_VERIFY', [mergeInFlight.taskId, mergeInFlight.hostMergeReceipt.mergeCommit], {
       taskId: mergeInFlight.taskId, worktree: mergeInFlight.worktree, issue: mergeInFlight.issue,
@@ -982,7 +1104,8 @@ function deriveActionCandidates(registry, runtimeDir, status) {
     reservedWorkers.add(reservation.worktree);
     if (reservation.status === 'pending') {
       const existingAction = registry.actions[reservation.actionId];
-      if (existingAction && !receiptSucceeded(registry, existingAction.actionId)) {
+      if (existingAction && workerInGoalScope(registry, reservation.worktree)
+        && !receiptSucceeded(registry, existingAction.actionId)) {
         actions.push({ ...existingAction, resume: true, reason: 'root 重启恢复既有 Issue claim reservation；禁止跨 worker 重复认领' });
       }
     }
@@ -1059,7 +1182,8 @@ export function nextActions(runtimeDir = RUNTIME_DIR) {
       }
     }
     const mergeQueue = [...latestExecutors(registry).values()]
-      .filter((task) => task.agent !== 'test' && task.worktree !== 'test' && task.state === 'merge-ready')
+      .filter((task) => task.agent !== 'test' && task.worktree !== 'test' && task.state === 'merge-ready'
+        && workerInGoalScope(registry, task.worktree))
       .sort((left, right) => String(left.updatedAt).localeCompare(String(right.updatedAt)) || left.taskId.localeCompare(right.taskId))
       .map((task, index) => ({
         position: index + 1, taskId: task.taskId, worktree: task.worktree, commitSha: task.commitSha,
@@ -1493,13 +1617,14 @@ export async function main(argv = process.argv.slice(2), runtimeDir = RUNTIME_DI
     const commandsFile = resolve(requireValue(options, 'commands-file'));
     return runPostMergeVerification(requireValue(options, 'action-id'), JSON.parse(readFileSync(commandsFile, 'utf8')), runtimeDir);
   }
+  if (command === 'handoff' && action === 'recover') return recoverHandoff(requireValue(options, 'task'), options, runtimeDir);
   if (command === 'goal' && action === 'start') return startGoal(options, runtimeDir);
   if (command === 'verdict' && action === 'set') return setVerdict(requireValue(options, 'task'), {
     code: options.code, runtime: options.runtime, delivery: options.delivery,
   }, runtimeDir);
   if (command === 'block' && action === 'record') return recordBlock(requireValue(options, 'task'), options, runtimeDir);
   if (command === 'stop' && action === 'eval') return evaluateStop({ write: Boolean(options.write) }, runtimeDir);
-  throw controlError('BAD_REQUEST', '用法: orchestrate.mjs task create|task heartbeat|task attach-thread|inbox put|inbox pending|consume|next-actions|action receipt|action verify|goal start|transition|verdict set|block record|stop eval');
+  throw controlError('BAD_REQUEST', '用法: orchestrate.mjs task create|task heartbeat|task attach-thread|inbox put|inbox pending|consume|next-actions|action receipt|action verify|handoff recover|goal start|transition|verdict set|block record|stop eval');
 }
 
 if (resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url))) {
