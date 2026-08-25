@@ -18,6 +18,8 @@
 - runtime 中已有快照必须与本次解析出的 `repo.root / issueRepo / mainBranch` 完全同源；任一字段错配都以 `REPO_MISMATCH`、exit 2 拒绝复用，不能从旧快照提取 Issue 或控制面事实。
 - runtime identity 必须在 collect 的锁前快检和取得 runtime 锁后的最终快照上各校验一次；两个目标仓从同一空 runtime 并发 collect 时只能有一个写入，另一方必须 `REPO_MISMATCH`，不得 last-writer-wins。
 - server API 使用专属 `aes-worktree-board/1` marker 与完整 status schema；端口冲突探测只有验证 v3、generatedAt、repo、graph（issues/edges/stats）与 worktrees 后才比较 identity。另一目标仓返回可诊断的 `REPO_MISMATCH`，同仓或 marker 正确但 status 不完整的服务返回 `PORT_CONFLICT`；任何冲突都拒绝把旧实例当成本次启动成功。
+- 配置输入以目标仓为锚：环境覆盖优先，其次是 `<目标仓根>/.aes-worktree-board/board.config.json`，最后才是技能目录默认；collect、server、fixture capture 与 dispatch 共用这条解析链。
+- Issue graph 保留 live GitHub 与完整离线 fixture 的 labels，并在缓存回退中承接已有 labels，使 `ready-for-agent` 不会因采集输入链被丢失而退出 eligible frontier。
 
 ## 验收条件
 
@@ -47,3 +49,4 @@
 | 2026-08-25 | 为 Desktop worker lane 增加可恢复的开始/结束时间投影，统一 registry、collect 与 web 面板的工作时长。 | lifecycle/storage/contract 回归、八域回归与真实浏览器活动/冻结计时验收。 | 复用既有 TaskRecord 与 schema v3，不引入后台计时服务。 |
 | 2026-08-25 | 锁定跨项目 repo identity：拒绝错误 runtime 快照，并在端口占用时区分另一仓 server 与普通冲突。 | repo-root 跨项目 runtime/port/API 回归 + 八域回归 + 真实 parking-agents API smoke。 | 沿用既有 `/api/status?fast=1`，不增加监听地址、路由或第三方依赖。 |
 | 2026-08-25 | BLOCK 1/3 follow-up：目标仓 integration 配置落为 `dev`，collect 增加锁内 identity 复核，端口探测增加专属 board marker/schema。 | 双仓 barrier 并发回归、repo-shaped 伪服务回归、无 env 目标主仓 live API/Playwright。 | marker 是 additive v3 字段与响应头；页面仍可降级读取旧 v2/v3 快照。 |
+| 2026-08-25 | Issue #24：固定环境覆盖 > 目标仓 `board.config.json` > 技能默认，并让完整 Issue labels 穿过 live、fixture 与缓存 collect 输入链。 | 完整 labels fixture、跨仓 `main`/`trunk` 配置回归、环境覆盖回归、八域回归与显式 `collect-live`。 | 保留现有 label 对象形状，不新增多仓聚合或 label 业务推导。 |

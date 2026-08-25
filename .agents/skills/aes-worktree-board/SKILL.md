@@ -24,6 +24,8 @@ $worker = "dev1"
 2. `<目标仓根>/.aes-worktree-board/board.config.json`；
 3. 技能目录 `board.config.json` 默认值。
 
+`collect.mjs`、`server.mjs`、`capture-issues-fixture.mjs` 与 `dispatch.mjs` 必须共用 `loadConfig()` 这条解析链，不得各自回读技能目录配置或把目标仓配置当成运行时产物。
+
 collect preflight 必须验证目标仓存在 `mainBranch`；真实 GitHub 采集还必须验证 `issueRepo` 可访问，错配退出 2 并点名字段。
 
 runtime 选址链保持不变：`AES_WORKTREE_BOARD_RUNTIME_DIR` 优先，否则 `<目标仓根>/.aes-worktree-board/runtime/`。已有 `status.json` 的 `repo.root / issueRepo / mainBranch` 必须与本次目标 identity 一致，否则以 `REPO_MISMATCH`、exit 2 拒绝复用，不能沿用其中的 Issue 或控制面事实。collect 在锁前快检一次、取得 runtime 锁并重读最终快照后再校验一次，阻止两个目标仓从同一空 runtime 并发写成 last-writer-wins。目标仓应忽略这个目录。技能目录历史 `runtime/`（含 03:21 快照与 `orchestration-stop.json`）只是只读归档证据：不得删除、移动或由脚本继续读写。
@@ -59,6 +61,8 @@ collect 只写 schemaVersion 3，承接既有 assessment、终态和全局停止
    `node "$skillDir/scripts/assess.mjs" $worker --merge not-yet --done unknown --task "待确认任务" --reason "证据不足"`
 
 4. 输出每个 worker 的位置、Task state、三维 verdict、BLOCK 次数、完成度和下一动作；另列 frontier 与空闲 worker。
+
+collect 的 `graph.issues[].labels` 必须保留 GitHub/fixture 输入的 labels（包括 `ready-for-agent`）；live 查询与完整离线 fixture 使用同一字段，快照回退也承接已有 labels，不能用空数组覆盖真实标签。
 
 `recommend`/`MERGE_READY` 需要 code/spec 门禁通过、交付条件闭环、Git 可合并和证据诚实。autonomous 类 Issue 可在 `runtime=NOT_RUN` 时进入 MERGE_READY；明确要求真机的 Issue 不可。合并是宿主主 agent 的受门禁动作：合并前重新核对 registry 与 Git，合并后登记 `merged` 和 merge commit，并在 main 复验。
 

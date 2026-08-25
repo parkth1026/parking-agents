@@ -96,19 +96,19 @@ function gitSync(cwd, args) {
   return result.stdout.replace(/\r\n/g, '\n').trimEnd();
 }
 
-function repositoryFixture(label) {
+function repositoryFixture(label, mainBranch = 'main') {
   const root = tempDirectory(label);
   const main = join(root, 'fixture-main');
   const sibling = join(root, 'fixture-dev');
   mkdirSync(main);
-  gitSync(main, ['init', '-b', 'main']);
+  gitSync(main, ['init', '-b', mainBranch]);
   gitSync(main, ['config', 'user.email', 'selftest@example.invalid']);
   gitSync(main, ['config', 'user.name', 'AES Worktree Board Selftest']);
   writeFileSync(join(main, 'fixture.txt'), 'fixture\n');
   gitSync(main, ['add', 'fixture.txt']);
   gitSync(main, ['commit', '-m', 'fixture']);
   gitSync(main, ['worktree', 'add', '-b', 'fixture-dev', sibling]);
-  return { root, main, sibling };
+  return { root, main, sibling, mainBranch };
 }
 
 function boardEnv(runtimeDir, extraEnv = {}) {
@@ -144,6 +144,13 @@ function assertFixtureStatus(runtimeDir, fixture) {
   assert.equal(resolve(status.repo.root), resolve(fixture.main));
   assert.deepEqual(status.worktrees.map((worker) => worker.name), [basename(fixture.sibling)]);
   return status;
+}
+
+function labelNames(labels) {
+  return (Array.isArray(labels) ? labels : [])
+    .map((label) => typeof label === 'string' ? label : label?.name)
+    .filter(Boolean)
+    .sort();
 }
 
 function parseJsonLine(text) {
@@ -311,6 +318,24 @@ async function collectDomain() {
     assert.equal(status.graph.issues.length, fixtureIssues.length, 'issues 数必须等于完整离线 fixture');
 
     const byNumber = new Map(status.graph.issues.map((issue) => [issue.number, issue]));
+    for (const source of fixtureIssues) {
+      assert.deepEqual(
+        labelNames(byNumber.get(source.number)?.labels),
+        labelNames(source.labels),
+        `#${source.number} labels 必须从完整 fixture 投影到 graph`,
+      );
+    }
+    const expectedReadyOpen = fixtureIssues
+      .filter((issue) => issue.state === 'OPEN' && labelNames(issue.labels).includes('ready-for-agent'))
+      .map((issue) => issue.number);
+    const actualReadyOpen = status.graph.issues
+      .filter((issue) => issue.state === 'OPEN' && labelNames(issue.labels).includes('ready-for-agent'))
+      .map((issue) => issue.number);
+    assert.deepEqual(actualReadyOpen, expectedReadyOpen, 'ready-for-agent labels 不得在 collect 中丢失');
+    assert.ok(
+      status.graph.issues.some((issue) => issue.derived.status === 'frontier' && labelNames(issue.labels).includes('ready-for-agent')),
+      '完整 fixture 必须保留至少一个带 ready-for-agent label 的 frontier',
+    );
     const allowedStatuses = new Set(['frontier', 'claimed', 'blocked', 'resolved']);
     const degrees = new Map(status.graph.issues.map((issue) => [issue.number, 0]));
     for (const edge of status.graph.edges) {
@@ -374,6 +399,11 @@ async function collectDomain() {
     let assessment = recollected.worktrees.find((worker) => worker.name === target.name).assessment;
     assert.equal(assessment.currentTask, 'selftest-assessment-preserved');
     assert.equal(assessment.stale, true, '旧于 commit/task end 的 assessment 应 stale');
+    assert.deepEqual(
+      labelNames(recollected.graph.issues.find((issue) => issue.number === 41)?.labels),
+      labelNames(fixtureByNumber.get(41)?.labels),
+      '沿用旧快照时不得把 ready-for-agent labels 缓存成空数组',
+    );
     assessment.assessedAt = '2100-01-01T00:00:00.000Z';
     writeFileSync(statusPath, `${JSON.stringify(recollected, null, 2)}\n`);
     recollected = await collectStatus({ skipGh: true, runtimeDir });
@@ -391,10 +421,18 @@ async function collectLiveDomain() {
     const status = await collectStatus({ runtimeDir });
     const config = loadConfig();
     const allIssues = await ghJson([
-      'issue', 'list', '--repo', config.issueRepo, '--state', 'all', '--limit', '1000', '--json', 'number',
+      'issue', 'list', '--repo', config.issueRepo, '--state', 'all', '--limit', '1000', '--json', 'number,labels',
     ]);
     assert.equal(status.schemaVersion, 3);
     assert.equal(status.graph.issues.length, allIssues.length, 'live issues 数必须等于 gh 全量 OPEN+CLOSED');
+    const byNumber = new Map(status.graph.issues.map((issue) => [issue.number, issue]));
+    for (const liveIssue of allIssues) {
+      assert.deepEqual(
+        labelNames(byNumber.get(liveIssue.number)?.labels),
+        labelNames(liveIssue.labels),
+        `live collect 不得丢失 #${liveIssue.number} labels`,
+      );
+    }
   } finally {
     await cleanTemp(runtimeDir);
   }
@@ -418,6 +456,13 @@ async function fixtureDomain() {
     assert.ok(issue61, 'fixture 必须包含当前 frontier 的 #61');
     assert.deepEqual(issue61.blockedBy, [58, 59, 60]);
     assert.equal(issue61.derived.status, 'blocked');
+    for (const source of fixtureIssues) {
+      const projected = status.graph.issues.find((issue) => issue.number === source.number);
+      assert.deepEqual(labelNames(projected?.labels), labelNames(source.labels), `fixture #${source.number} labels 不得丢失`);
+    }
+    const issue41 = status.graph.issues.find((issue) => issue.number === 41);
+    assert.ok(labelNames(issue41?.labels).includes('ready-for-agent'), 'fixture #41 必须保留 ready-for-agent');
+    assert.equal(issue41?.derived.status, 'frontier', '#41 应作为带 ready-for-agent 的 frontier 保留');
 
     const snapshot = readFileSync(join(runtimeDir, 'status.js'), 'utf8');
     assert.match(snapshot, /window\.WORKBOARD/);
@@ -688,7 +733,10 @@ async function repoRootDomain() {
       encoding: 'utf8',
     });
     assert.equal(collected.status, 0, collected.stderr);
-    assertFixtureStatus(collectRuntime, fixture);
+    const fallbackStatus = assertFixtureStatus(collectRuntime, fixture);
+    const skillDefaults = JSON.parse(readFileSync(join(SKILL_DIR, 'board.config.json'), 'utf8'));
+    assert.equal(fallbackStatus.repo.mainBranch, skillDefaults.mainBranch, '缺少 repo config 时必须回退技能默认 mainBranch');
+    assert.equal(fallbackStatus.repo.issueRepo, skillDefaults.issueRepo, '缺少 repo config 时必须回退技能默认 issueRepo');
 
     const overrideRuntime = join(fixture.root, 'override-runtime');
     const overridden = spawnSync(process.execPath, [join(SCRIPT_DIR, 'collect.mjs'), '--no-gh'], {
@@ -771,7 +819,7 @@ async function repoRootDomain() {
     assert.deepEqual(status.worktrees.map((worker) => worker.name), [basename(fixture.sibling)]);
 
     // #14: 跨仓隔离 —— 默认 runtime 各归各仓，同名 worktree 并发派发互不误判，技能目录不再承载运行时数据。
-    const peer = repositoryFixture('repo-root-peer');
+    const peer = repositoryFixture('repo-root-peer', 'trunk');
     let serverFixture = null;
     let serverPeer = null;
     const observerDirA = tempDirectory('cross-repo-obs-a');
@@ -783,28 +831,55 @@ async function repoRootDomain() {
       const issueRepoB = 'fixture.invalid/project-b';
       const issuesA = join(fixture.root, 'issues-a.json');
       const issuesB = join(peer.root, 'issues-b.json');
-      for (const [repo, issueRepo] of [[fixture, issueRepoA], [peer, issueRepoB]]) {
+      const fullFixture = JSON.parse(readFileSync(ISSUE_FIXTURE, 'utf8'));
+      const repoCases = [
+        [fixture, issueRepoA, 'main', issuesA],
+        [peer, issueRepoB, 'trunk', issuesB],
+      ];
+      for (const [repo, issueRepo, mainBranch, issuesPath] of repoCases) {
         const configDir = join(repo.main, '.aes-worktree-board');
         mkdirSync(configDir, { recursive: true });
-        writeFileSync(join(configDir, 'board.config.json'), `${JSON.stringify({ mainBranch: 'main', issueRepo }, null, 2)}\n`);
+        writeFileSync(join(configDir, 'board.config.json'), `${JSON.stringify({ mainBranch, issueRepo }, null, 2)}\n`);
+        writeFileSync(issuesPath, `${JSON.stringify({ ...fullFixture, repo: issueRepo }, null, 2)}\n`);
       }
-      writeFileSync(issuesA, `${JSON.stringify({ issues: [
-        { number: 4401, title: 'project-a-only', state: 'OPEN', url: null, body: '', blockedByNumbers: [] },
-      ] })}\n`);
-      writeFileSync(issuesB, `${JSON.stringify({ issues: [
-        { number: 4402, title: 'project-b-only', state: 'OPEN', url: null, body: '', blockedByNumbers: [] },
-      ] })}\n`);
 
-      for (const repo of [fixture, peer]) {
-        const defaultCollected = spawnSync(process.execPath, [join(SCRIPT_DIR, 'collect.mjs'), '--no-gh'], {
+      for (const [repo, issueRepo, mainBranch, issuesPath] of repoCases) {
+        const defaultCollected = spawnSync(process.execPath, [
+          join(SCRIPT_DIR, 'collect.mjs'), '--no-gh', '--issues-fixture', issuesPath,
+        ], {
           ...HEADLESS_CHILD_OPTIONS,
           cwd: repo.main,
           encoding: 'utf8',
           env: defaultEnv,
         });
         assert.equal(defaultCollected.status, 0, defaultCollected.stderr);
-        assertFixtureStatus(runtimeOf(repo.main), repo);
+        const status = assertFixtureStatus(runtimeOf(repo.main), repo);
+        assert.equal(status.repo.issueRepo, issueRepo, `${repo.main} 必须读取自己的 issueRepo`);
+        assert.equal(status.repo.mainBranch, mainBranch, `${repo.main} 必须读取自己的 mainBranch`);
+        assert.equal(status.graph.issues.length, fullFixture.issues.length, '跨仓回归必须使用完整 issue fixture');
+        assert.ok(
+          status.graph.issues.some((issue) => labelNames(issue.labels).includes('ready-for-agent')),
+          '跨仓完整 fixture 必须保留 ready-for-agent labels',
+        );
       }
+
+      const envOverrideRuntime = join(fixture.root, 'env-override-runtime');
+      const envOverride = spawnSync(process.execPath, [
+        join(SCRIPT_DIR, 'collect.mjs'), '--no-gh', '--issues-fixture', issuesA,
+      ], {
+        ...HEADLESS_CHILD_OPTIONS,
+        cwd: fixture.main,
+        encoding: 'utf8',
+        env: boardEnv(envOverrideRuntime, {
+          AES_WORKTREE_BOARD_CONFIG: JSON.stringify({ mainBranch: 'trunk', issueRepo: 'fixture.invalid/json-config' }),
+          AES_WORKTREE_BOARD_MAIN_BRANCH: 'main',
+          AES_WORKTREE_BOARD_ISSUE_REPO: 'fixture.invalid/env-override',
+        }),
+      });
+      assert.equal(envOverride.status, 0, envOverride.stderr);
+      const envStatus = readJson(join(envOverrideRuntime, 'status.json'));
+      assert.equal(envStatus.repo.mainBranch, 'main', 'scalar env mainBranch 必须覆盖 JSON env config 与 repo config');
+      assert.equal(envStatus.repo.issueRepo, 'fixture.invalid/env-override', 'scalar env issueRepo 必须覆盖 JSON env config 与 repo config');
 
       // #44 BLOCK 1/3: 两仓必须都在空 runtime 上完成锁前检查，再竞争同一写锁。
       // 只有锁内重读 latestSnapshot 后再校验 identity，才能稳定阻止 last-writer-wins。
@@ -909,14 +984,14 @@ try {
 
       // 跨 server 实例：同名 worktree 并发派发，.requests 与 PID 锁互不可见。
       serverFixture = await startServer(null, {
-        AES_WORKTREE_BOARD_ISSUE_REPO: issueRepoA,
         AES_WORKTREE_BOARD_ISSUES_FIXTURE: issuesA,
       }, fixture.main, { observeDispatch: true, observerDir: observerDirA });
       const currentA = await (await fetch(`${serverFixture.origin}/api/status?fast=1`)).json();
       assert.equal(resolve(currentA.repo.root), resolve(fixture.main));
       assert.equal(currentA.repo.issueRepo, issueRepoA);
       assert.equal(currentA.repo.mainBranch, 'main');
-      assert.deepEqual(currentA.graph.issues.map((issue) => issue.number), [4401]);
+      assert.equal(currentA.graph.issues.length, fullFixture.issues.length);
+      assert.ok(currentA.graph.issues.some((issue) => labelNames(issue.labels).includes('ready-for-agent')));
       assert.deepEqual(currentA.worktrees.map((worker) => worker.name), [basename(fixture.sibling)]);
 
       const wrongRuntime = join(fixture.root, 'wrong-runtime');
@@ -953,7 +1028,6 @@ try {
 
       const occupiedPort = Number(new URL(serverFixture.origin).port);
       const conflict = await probeServerStartup(peer.main, boardEnv(null, {
-        AES_WORKTREE_BOARD_ISSUE_REPO: issueRepoB,
         AES_WORKTREE_BOARD_ISSUES_FIXTURE: issuesB,
       }), 15_000, occupiedPort);
       assert.equal(conflict.status, 2, `跨项目端口冲突必须 exit 2: ${conflict.stderr || conflict.stdout}`);
@@ -976,7 +1050,8 @@ try {
       const currentB = await (await fetch(`${serverPeer.origin}/api/status?fast=1`)).json();
       assert.equal(resolve(currentB.repo.root), resolve(peer.main));
       assert.equal(currentB.repo.issueRepo, issueRepoB);
-      assert.deepEqual(currentB.graph.issues.map((issue) => issue.number), [4402]);
+      assert.equal(currentB.graph.issues.length, fullFixture.issues.length);
+      assert.ok(currentB.graph.issues.some((issue) => labelNames(issue.labels).includes('ready-for-agent')));
       assert.deepEqual(currentB.worktrees.map((worker) => worker.name), [basename(peer.sibling)]);
       isolationResponse = await authorizedDispatch(serverPeer, {
         worktree: basename(peer.sibling), prompt: 'cross-repo server B', agent: 'test',
