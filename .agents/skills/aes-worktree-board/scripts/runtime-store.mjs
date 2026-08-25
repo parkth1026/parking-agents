@@ -124,6 +124,13 @@ export function emptyRegistry(now = new Date().toISOString()) {
     },
     leases: {},
     tasks: {},
+    actions: {},
+    actionReceipts: {},
+    claimReservations: {},
+    verificationRuns: {},
+    unclassifiedFinals: {},
+    deadLetters: {},
+    goal: null,
   };
 }
 
@@ -132,6 +139,13 @@ export function readRegistry(runtimeDir) {
   if (registry.schemaVersion !== 3) throw new Error(`registry.json schemaVersion 必须为 3，实际为 ${registry.schemaVersion}`);
   registry.leases ||= {};
   registry.tasks ||= {};
+  registry.actions ||= {};
+  registry.actionReceipts ||= {};
+  registry.claimReservations ||= {};
+  registry.verificationRuns ||= {};
+  registry.unclassifiedFinals ||= {};
+  registry.deadLetters ||= {};
+  registry.goal ||= null;
   registry.orchestration ||= emptyRegistry().orchestration;
   const leases = {};
   for (const [worktree, lease] of Object.entries(registry.leases)) {
@@ -146,6 +160,9 @@ export function readRegistry(runtimeDir) {
   registry.leases = leases;
   for (const task of Object.values(registry.tasks)) {
     task.worktree = canonicalWorktreeKey(task.worktree);
+    task.circuitEpoch ||= 0;
+    task.blockLedger ||= [];
+    task.recoveryLedger ||= [];
     // v3 additive compatibility: old TaskRecords used createdAt/updatedAt only.
     task.startedAt ||= task.createdAt || null;
     if (task.finishedAt === undefined) {
