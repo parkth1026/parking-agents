@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AES 需求星图</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Serif+4:wght@600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper:#FAF9F5; --line:#E0DACB; --ink:#1F1E1B; --text:#6B675C;
+  --muted:#9A948E; --faint:#B0AA9C; --orange:#C15F3C; --orange-text:#A94F2F;
+  --purple:#7C6BAE; --purple-text:#6A5A9E; --blocked:#A39C8D; --blocked-text:#8D867A;
+  --resolved:#B7AF9F; --star:#DAD4C5; --warning:#B08838; --card:#FFFFFF;
+  --serif:"Source Serif 4","Songti SC",serif;
+  --ui:Archivo,"PingFang SC","Microsoft YaHei",sans-serif;
+  --mono:"IBM Plex Mono","Cascadia Mono",monospace;
+}
+* { box-sizing:border-box; }
+html, body { width:100%; height:100%; margin:0; overflow:hidden; background:var(--paper); color:var(--ink); font-family:var(--ui); }
+button, input, select, textarea { font:inherit; }
+button { cursor:pointer; }
+.app { width:100%; height:100%; position:relative; background:var(--paper); }
+.canvas { position:absolute; inset:0; width:100%; height:100%; touch-action:none; cursor:grab; }
+.canvas.panning { cursor:grabbing; }
+.brand { position:absolute; left:26px; top:20px; z-index:20; pointer-events:none; }
+.brand-line { display:flex; align-items:center; gap:10px; }
+.brand-mark { width:9px; height:9px; background:var(--orange); transform:rotate(45deg); }
+.brand h1 { font:600 18px/1.2 var(--serif); margin:0; letter-spacing:.1px; }
+.brand-sub { margin:5px 0 0 19px; color:var(--muted); font:400 11.5px/1.4 var(--mono); }
+.search-wrap { position:absolute; left:26px; top:78px; width:232px; z-index:30; }
+.search { width:100%; height:34px; border:1px solid var(--line); border-radius:8px; background:#fff; padding:7px 12px; color:var(--ink); font-size:12.5px; outline:none; box-shadow:0 2px 8px rgba(31,30,27,.025); }
+.search::placeholder { color:var(--faint); }
+.search:focus { border-color:#C8BFAE; box-shadow:0 0 0 3px rgba(193,95,60,.08); }
+.search-results { display:none; margin-top:5px; padding:5px; border:1px solid #E8E2D2; border-radius:9px; background:rgba(255,255,255,.96); box-shadow:0 6px 22px rgba(31,30,27,.08); }
+.search-results.open { display:block; }
+.search-result { border:0; width:100%; background:transparent; text-align:left; padding:7px 8px; border-radius:6px; color:var(--text); font-size:11.5px; }
+.search-result:hover { background:#F5F3EB; color:var(--ink); }
+.search-result b { font:600 10.5px var(--mono); color:var(--orange-text); margin-right:6px; }
+.top-tools { position:absolute; top:21px; left:50%; transform:translateX(-50%); z-index:22; display:flex; align-items:center; gap:10px; }
+.view-toggle { display:flex; padding:3px; border:1px solid var(--line); border-radius:999px; background:rgba(255,255,255,.9); box-shadow:0 2px 8px rgba(31,30,27,.04); }
+.view-toggle button { height:28px; min-width:74px; padding:0 13px; border:0; border-radius:999px; color:var(--muted); background:transparent; font-size:11.5px; }
+.view-toggle button.active { color:#fff; background:var(--ink); }
+.mode-badge, .refresh-btn { height:28px; border:1px solid var(--line); border-radius:999px; background:rgba(255,255,255,.9); padding:0 10px; font:500 10.5px var(--mono); color:var(--muted); }
+.mode-badge.live { color:#56724E; border-color:#CAD8C5; background:#F6FAF4; }
+.mode-badge.snapshot { color:#8A6A1F; border-color:#D9C48F; background:#F6EDD8; }
+.orch-pill { min-height:28px; display:flex; align-items:center; gap:7px; border:1px solid #E8E2D2; border-radius:999px; background:#fff; padding:0 10px; color:var(--purple-text); font:600 9.5px var(--mono); }
+.orch-pill::before { content:""; width:7px; height:7px; border-radius:50%; background:var(--purple); }
+.orch-pill.stopped { color:#8A3B2A; }
+.orch-pill.stopped::before { background:#B0453A; }
+.orch-pill small { color:var(--muted); font-weight:400; }
+.v2-note { display:none; position:absolute; z-index:24; top:66px; left:50%; transform:translateX(-50%); max-width:620px; padding:6px 11px; border:1px dashed #D9C48F; border-radius:7px; background:#FBF6E9; color:#8A6A1F; font-size:10px; }
+.v2-note.open { display:block; }
+.refresh-btn:hover { color:var(--orange-text); border-color:#D7B09F; }
+.progress { position:absolute; top:58px; left:50%; width:250px; transform:translateX(-50%); z-index:20; }
+.progress-meta { display:flex; justify-content:space-between; color:var(--muted); font:500 9.5px var(--mono); margin-bottom:4px; }
+.progress-track { height:3px; border-radius:999px; background:#E7E1D2; overflow:hidden; }
+.progress-fill { height:100%; background:var(--orange); transition:width .6s ease; }
+.legend { position:absolute; left:26px; bottom:24px; z-index:20; width:174px; padding:9px 10px; border:1px solid #E8E2D2; border-radius:10px; background:rgba(255,255,255,.88); backdrop-filter:blur(5px); }
+.legend-row { width:100%; height:26px; display:grid; grid-template-columns:18px 1fr auto; align-items:center; border:0; background:transparent; border-radius:6px; padding:0 6px; color:var(--text); font-size:11px; text-align:left; }
+.legend-row:hover, .legend-row.active { background:#F5F3EB; color:var(--ink); }
+.legend-dot { width:9px; height:9px; border-radius:50%; display:block; }
+.legend-dot.frontier { background:var(--orange); box-shadow:0 0 0 3px rgba(193,95,60,.12); }
+.legend-dot.claimed { background:var(--purple); box-shadow:0 0 0 3px rgba(124,107,174,.12); }
+.legend-dot.blocked { background:var(--paper); border:1.4px dashed var(--blocked); }
+.legend-dot.resolved { width:6px; height:6px; margin-left:2px; background:var(--resolved); }
+.legend-count { color:var(--muted); font:500 10.5px var(--mono); }
+.workers, .details { position:absolute; z-index:25; right:22px; top:22px; width:250px; border:1px solid rgba(224,218,203,.9); border-radius:12px; background:#fff; box-shadow:0 6px 22px rgba(31,30,27,.08); }
+.workers { padding:13px 12px 10px; }
+.workers-head { display:flex; align-items:center; justify-content:space-between; padding:0 4px 8px; color:var(--muted); font:600 10px var(--mono); letter-spacing:.8px; }
+.worker-row { display:grid; grid-template-columns:8px 1fr auto; align-items:center; gap:8px; min-height:47px; padding:7px 4px; border-top:1px solid #F0ECE2; }
+.worker-state { width:7px; height:7px; border-radius:50%; background:var(--resolved); }
+.worker-state.running { background:var(--purple); box-shadow:0 0 0 3px rgba(124,107,174,.13); }
+.worker-state.manual { background:#C79B3E; }
+.worker-name { color:var(--ink); font:600 11.5px var(--mono); }
+.worker-position { margin-top:3px; color:var(--muted); font-size:10.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:155px; }
+.badges { display:flex; gap:4px; margin-top:4px; flex-wrap:wrap; }
+.badge { padding:2px 5px; border-radius:999px; background:#F5F3EB; color:var(--muted); font:500 8.5px var(--mono); }
+.badge.dirty, .badge.stale { color:#8A6A1F; background:#F6EDD8; border:1px dashed #D9C48F; }
+.badge.task-state { color:#fff; background:var(--purple); }
+.badge.task-state.handoff-required { background:#B0453A; }
+.badge.task-state.parked { background:var(--warning); }
+.badge.task-state.merged { background:#7C9A6D; }
+.badge.block-count { color:#B0453A; background:#F8E7E4; }
+.badge.model-tier { color:var(--purple-text); background:#EFECF7; }
+.locate { width:25px; height:25px; border:1px solid var(--line); border-radius:999px; background:#fff; color:var(--muted); font-size:13px; padding:0; }
+.locate:hover:not(:disabled) { color:var(--orange); border-color:#D7B09F; }
+.locate:disabled { opacity:.32; cursor:default; }
+.details { display:none; width:340px; padding:17px 17px 15px; box-shadow:0 8px 28px rgba(31,30,27,.10); max-height:calc(100vh - 44px); overflow:auto; }
+.details.open { display:block; }
+.details-top { display:flex; align-items:center; justify-content:space-between; }
+.issue-kicker { display:flex; align-items:center; gap:8px; font:600 11px var(--mono); color:var(--muted); }
+.status-pill { border-radius:999px; padding:3px 7px; font:600 9px var(--mono); }
+.status-pill.frontier { color:var(--orange-text); background:#FBECE5; }
+.status-pill.claimed { color:var(--purple-text); background:#F0EDF8; }
+.status-pill.blocked { color:var(--blocked-text); background:#F0EEE8; }
+.status-pill.resolved { color:#817A6E; background:#EFEBE2; }
+.close { width:26px; height:26px; border:0; border-radius:50%; background:transparent; color:var(--muted); font-size:17px; }
+.close:hover { background:#F5F3EB; }
+.details h2 { margin:12px 0 14px; font:600 19px/1.28 var(--serif); }
+.kv { display:grid; grid-template-columns:52px 1fr; gap:8px; align-items:start; margin:7px 0; font-size:11.5px; }
+.kv span:first-child { color:var(--muted); }
+.kv span:last-child { color:var(--text); word-break:break-word; }
+.stale-note { margin:11px 0; padding:8px 10px; border:1px dashed #D9C48F; border-radius:7px; color:#8A6A1F; background:#FBF6E9; font-size:10.5px; }
+.unlock { margin-top:13px; padding:10px; border-radius:8px; background:#F5F3EB; }
+.unlock-title { margin-bottom:7px; color:var(--muted); font:600 9.5px var(--mono); letter-spacing:.5px; }
+.chips { display:flex; gap:5px; flex-wrap:wrap; }
+.chip { border:1px dashed #CFC7B6; border-radius:5px; padding:3px 6px; background:#fff; color:var(--text); font:500 9.5px var(--mono); }
+.details-actions { display:grid; grid-template-columns:1fr 1fr; gap:7px; margin-top:12px; }
+.btn { min-height:34px; border-radius:7px; padding:7px 10px; border:1px solid var(--line); background:#fff; color:var(--text); font-size:11px; }
+.btn.primary { color:#fff; border-color:var(--orange); background:var(--orange); }
+.btn:hover:not(:disabled) { filter:brightness(.97); }
+.btn:disabled { opacity:.45; cursor:default; }
+.dispatch-box { margin-top:13px; padding-top:12px; border-top:1px solid #EEE9DE; }
+.dispatch-box h3 { margin:0 0 8px; color:var(--ink); font-size:11px; }
+.registry-section { margin-top:13px; padding:10px; border:1px dashed #D7B09F; border-radius:8px; background:#FFFCF8; }
+.registry-section h3 { margin:0 0 8px; font-size:10px; }
+.verdict-chips { display:flex; flex-wrap:wrap; gap:4px; margin:8px 0; }
+.verdict-chip { padding:3px 6px; border-radius:5px; background:#F5F3EB; color:var(--text); font:500 8.5px var(--mono); }
+.transition-history { margin:7px 0 0; padding-left:18px; color:var(--muted); font:400 9px/1.5 var(--mono); }
+.auth-note { margin:7px 0; padding:7px 8px; border:1px dashed #D7B09F; border-radius:7px; background:#FFF8F2; color:#8A3B2A; font-size:9.5px; line-height:1.45; }
+.fallback-auth { width:100%; height:31px; border:1px solid var(--line); border-radius:7px; padding:0 8px; color:var(--text); font-size:10px; }
+.dispatch-box textarea { width:100%; height:70px; resize:vertical; border:1px solid var(--line); border-radius:7px; padding:8px; outline:none; color:var(--text); font:400 10.5px/1.45 var(--ui); }
+.dispatch-controls { display:grid; grid-template-columns:1fr 88px; gap:6px; margin-top:6px; }
+.dispatch-controls select { height:31px; border:1px solid var(--line); border-radius:7px; background:#fff; color:var(--text); padding:0 7px; font-size:10.5px; }
+.snapshot-note { padding:9px; border-radius:7px; background:#F6EDD8; color:#8A6A1F; font-size:10.5px; line-height:1.5; }
+.log-view { display:none; margin-top:9px; max-height:160px; overflow:auto; padding:9px; border-radius:7px; background:#292823; color:#E8E2D2; white-space:pre-wrap; font:400 9.5px/1.45 var(--mono); }
+.log-view.open { display:block; }
+.zoom { position:absolute; right:22px; bottom:22px; z-index:20; display:flex; align-items:center; height:34px; border:1px solid var(--line); border-radius:999px; background:#fff; box-shadow:0 2px 8px rgba(31,30,27,.05); overflow:hidden; }
+.zoom button { width:34px; height:100%; border:0; background:transparent; color:var(--text); font-size:16px; }
+.zoom button:hover { background:#F5F3EB; }
+.zoom-value { width:52px; text-align:center; color:var(--muted); font:500 10px var(--mono); }
+.hint { position:absolute; z-index:15; left:50%; bottom:25px; transform:translateX(-50%); color:#B0A99A; font:400 10.5px var(--mono); pointer-events:none; }
+.map-view { display:none; position:absolute; inset:96px 292px 62px 24px; z-index:10; gap:12px; overflow:auto; padding:2px; }
+.map-view.active { display:grid; grid-template-columns:1.15fr .9fr .9fr .9fr; }
+.map-column { min-width:175px; border:1px solid #E5DFD0; border-radius:11px; background:rgba(255,255,255,.52); overflow:auto; }
+.map-head { position:sticky; top:0; z-index:2; display:flex; justify-content:space-between; align-items:center; padding:12px; background:rgba(250,249,245,.95); border-bottom:1px solid #E8E2D2; backdrop-filter:blur(4px); }
+.map-head h3 { margin:0; font:600 11px var(--mono); color:var(--text); }
+.map-head b { color:var(--muted); font:500 10px var(--mono); }
+.map-list { padding:9px; }
+.map-card { position:relative; width:100%; margin-bottom:8px; border:1px solid #E5DFD0; border-radius:8px; background:#fff; padding:9px 9px 8px; text-align:left; color:var(--text); box-shadow:0 2px 5px rgba(31,30,27,.025); }
+.map-card:hover { border-color:#CFC4B0; transform:translateY(-1px); }
+.map-card.warn { border-style:dashed; border-color:#B08838; }
+.map-card.compact { display:inline-flex; width:auto; margin:3px; padding:6px 7px; }
+.map-id { font:600 10px var(--mono); margin-right:6px; }
+.map-title { font-size:10.5px; line-height:1.35; }
+.map-card.frontier .map-id { color:var(--orange-text); }
+.map-card.claimed .map-id { color:var(--purple-text); }
+.map-card.blocked .map-id { color:var(--blocked-text); }
+.map-card.resolved .map-id { color:#938B7D; }
+.map-worker { display:inline-block; margin-top:6px; padding:3px 6px; border-radius:5px; color:#fff; background:var(--purple); font:600 8.5px var(--mono); }
+.map-warn { margin-top:4px; color:var(--warning); font:500 8.5px var(--mono); }
+.modal-backdrop { display:none; position:absolute; inset:0; z-index:100; background:rgba(31,30,27,.24); align-items:center; justify-content:center; }
+.modal-backdrop.open { display:flex; }
+.modal { width:min(430px,calc(100vw - 32px)); border:1px solid var(--line); border-radius:13px; background:#fff; padding:18px; box-shadow:0 18px 60px rgba(31,30,27,.22); }
+.modal h2 { margin:0 0 8px; font:600 18px var(--serif); }
+.modal p { margin:0; color:var(--text); font-size:11.5px; line-height:1.55; }
+.modal code { font:500 10.5px var(--mono); color:#8A6A1F; }
+.modal-actions { display:grid; grid-template-columns:1fr 1fr 1fr; gap:7px; margin-top:15px; }
+.toast { position:absolute; z-index:120; left:50%; bottom:68px; transform:translate(-50%,14px); opacity:0; pointer-events:none; max-width:520px; padding:9px 13px; border-radius:8px; background:#292823; color:#fff; font-size:11px; transition:.2s ease; }
+.toast.show { opacity:1; transform:translate(-50%,0); }
+.graph-hidden { display:none; }
+.background-stars { transition:opacity 150ms ease-out; }
+.edge { fill:none; stroke:#DFD8C7; stroke-width:1.1; stroke-opacity:.9; transition:opacity 150ms ease-out,stroke 150ms ease-out,stroke-width 150ms ease-out; }
+.edge.blocking { stroke:#CE9A83; stroke-width:1.15; stroke-dasharray:5 4; }
+.issue-node { cursor:pointer; }
+.issue-node .node-visual { transition:opacity 150ms ease-out; }
+.issue-node .node-label { pointer-events:none; }
+.issue-node .node-id { font:500 11.5px var(--mono); text-anchor:middle; }
+.issue-node .node-title { font:400 12px var(--ui); fill:var(--text); text-anchor:middle; }
+.issue-node.frontier .node-id { fill:var(--orange-text); }
+.issue-node.frontier .node-title { font-weight:500; }
+.issue-node.claimed .node-id { fill:var(--purple-text); }
+.issue-node.blocked .node-id { fill:var(--blocked-text); }
+.issue-node.resolved .node-id { fill:#B0A897; font-size:10.5px; }
+.resolved-labels-hidden .issue-node.resolved .node-label { display:none; }
+.worker-flag { opacity:1 !important; pointer-events:none; filter:drop-shadow(0 2px 4px rgba(31,30,27,.10)); }
+.worker-flag text { font:600 11px var(--mono); dominant-baseline:middle; text-anchor:middle; }
+.claimed-pulse { transform-box:fill-box; transform-origin:center; animation:beacon 2s ease-in-out infinite; }
+@keyframes beacon { 0%,100% { opacity:.25; transform:scale(.96); } 50% { opacity:.55; transform:scale(1.06); } }
+.search-hit .node-core { animation:searchBlink .45s ease-in-out 4; }
+@keyframes searchBlink { 0%,100% { stroke-width:0; } 50% { stroke:#C15F3C; stroke-width:4px; } }
+@media (prefers-reduced-motion: reduce) { .claimed-pulse, .search-hit .node-core { animation:none; } * { scroll-behavior:auto !important; } }
+@media (max-width:900px) {
+  .workers, .details { right:10px; top:92px; }
+  .top-tools { left:auto; right:12px; transform:none; }
+  .progress { display:none; }
+  .map-view { right:274px; grid-template-columns:1fr 1fr !important; }
+  .brand { left:14px; }
+  .search-wrap { left:14px; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <svg class="canvas" id="graph" aria-label="Issue 知识图谱"></svg>
+  <div class="map-view" id="map-view"></div>
+  <div class="brand"><div class="brand-line"><i class="brand-mark"></i><h1>AES 需求星图</h1></div><p class="brand-sub" id="brand-sub">读取 issue 星图…</p></div>
+  <div class="search-wrap"><input class="search" id="search" placeholder="搜索 issue / worker…" autocomplete="off"><div class="search-results" id="search-results"></div></div>
+  <div class="top-tools">
+    <div class="view-toggle"><button data-view="graph" class="active">Map</button><button data-view="map">List</button></div>
+    <span class="mode-badge snapshot" id="mode-badge">SNAPSHOT</span>
+    <span class="orch-pill" id="orch-pill">ORCH <small>无编排数据</small></span>
+    <button class="refresh-btn" id="refresh">↻ 刷新</button>
+  </div>
+  <div class="v2-note" id="v2-note">v2 旧快照：星图与 Workers 照常渲染，编排徽章与任务区显示「无编排数据」。建议重跑 collect。</div>
+  <div class="progress"><div class="progress-meta"><span>全仓探明进度</span><b id="progress-label">0 / 0</b></div><div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div></div>
+  <div class="legend" id="legend"></div>
+  <aside class="workers" id="workers"></aside>
+  <aside class="details" id="details"></aside>
+  <div class="zoom" id="zoom"><button data-zoom="out">−</button><span class="zoom-value" id="zoom-value">100%</span><button data-zoom="in">＋</button></div>
+  <div class="hint" id="hint">悬停高亮邻居 · 滚轮缩放 · 拖拽平移</div>
+  <div class="modal-backdrop" id="dirty-modal"><div class="modal"><h2>这个 worktree 有未提交现场</h2><p id="dirty-copy"></p><div class="modal-actions"><button class="btn" data-dirty="cancel">取消</button><button class="btn" data-dirty="inspect">先侦查</button><button class="btn primary" data-dirty="confirm">仍要派发</button></div></div></div>
+  <div class="toast" id="toast"></div>
+</div>
+<script>
+window.WORKBOARD = {"schemaVersion":3,"generatedAt":"2026-08-24T18:28:11.369Z","repo":{"root":"G:/GIT/AI_WorkFlow/aes-agents-v2","name":"aes-agents-v2","mainBranch":"dev","mainHead":"59a5f002","issueRepo":"51world-ai-copilot/aes-agent"},"orchestration":{"state":"running","reason":null,"recordedAt":null,"evaluatedAt":"2026-08-24T17:35:45.162Z"},"graph":{"issues":[{"number":1,"title":"Wayfinder 地图：根除 sidecar 孤儿进程泄漏（强杀 server 后零孤儿）","state":"CLOSED","url":"https://github.com/51world-ai-copilot/aes-agent/issues/1","blockedBy":[],"claimedBy":null,"derived":{"status":"resolved","degree":0,"warn":false}},{"number":2,"title":"上游调研：npm-loader 为何在父死后挂死，@github/copilot 有哪些可用的退出手段","state":"CLOSED","url":"https://github.com/51world-ai-copilot/aes-agent/issues/2","blockedBy":[],"claimedBy":null,"derived":{"status":"resolved","degree":1,"warn":false}},{"number":3,"title":"仓内调研：ChildProcessSpawner 现状、全部子进程 spawn 点清单与可插入的监督接缝","state":"CLOSED","url":"https://github.com/51world-ai-copilot/aes-agent/issues/3","blockedBy":[],"claimedBy":null,"derived":{"status":"resolved","degree":1,"warn":false}},{"number":4,"title":"机制选型：父死亡联动用什么实现（watchdog / Job Object / stdin 约定 / 其他）","state":"CLOSED","url":"https://github.com/51world-ai-copilot/aes-agent/issues/4","blockedBy":[2,3],"claimedBy":null,"derived":{"status":"resolved","degree":3,"warn":false}},{"number":5,"title":"测试与验收：如何安全地真实强杀 server 并断言零孤儿","state":"CLOSED","url":"https://github.com/51world-ai-copilot/aes-agent/issues/5","blockedBy":[4],"claimedBy":null,"derived":{"status":"resolved","degree":1,"warn":false}},{"number":6,"title":"存量处置：142 个孤儿与 5.5 天 dev 栈的去留","state":"CLOSED","url":"https://github.com/51world-ai-copilot/aes-agent/issues/6","blockedBy":[],"claimedBy":null,"derived":{"status":"resolved","degree":0,"warn":false}},{"number":7,"title":"Spec：共享 sidecar 监督与 server 强杀后零孤儿","state":"CLOSED","url":"https://github.com/51world-ai-copilot/aes-agent/issues/7","blockedBy":[],"claimedBy":null,"derived":{"status":"resolved","degree":0,"warn":false}},{"number":8,"title":"实现共享 sidecar watchdog 与 PID 台账的 Copilot tracer bullet","state":"CLOSED","url":"https://github.com/51world-ai-copilot/aes-agent/issues/8","blockedBy":[],"claimedBy":null,"derived":{"status":"resolved","degree":2,"warn":false}},{"number":9,"title":"实现 sidecar 台账启动对账与 PID 复用防护","state":"CLOSED","url":"https://github.com/51world-ai-copilot/aes-agent/issues/9","blockedBy":[8],"claimedBy":null,"derived":{"status":"resolved","degree":2,"warn":false}},{"number":10,"title":"接入七类 sidecar 并锁定 one-shot/unref 语义","state":"CLOSED","url":"https://github.com/51world-ai-copilot/aes-agent/issues/10","blockedBy":[8],"claimedBy":null,"derived":{"status":"resolved","degree":2,"warn":false}},{"number":11,"title":"补齐跨平台 watchdog 验证、生命周期证据与运维文档","state":"CLOSED","url":"https://github.com/51world-ai-copilot/aes-agent/issues/11","blockedBy":[9,10],"claimedBy":null,"derived":{"status":"resolved","degree":3,"warn":false}},{"number":12,"title":"执行隔离 Windows 强杀验收与存量清理","state":"CLOSED","url":"https://github.com/51world-ai-copilot/aes-agent/issues/12","blockedBy":[11],"claimedBy":null,"derived":{"status":"resolved","degree":1,"warn":false}},{"number":13,"title":"Workflow 提问已出现在聊天框，但右侧 Workflow 因 InteractionDocument schema 校验失败而阻塞","state":"CLOSED","url":"https://github.com/51world-ai-copilot/aes-agent/issues/13","blockedBy":[],"claimedBy":null,"derived":{"status":"resolved","degree":0,"warn":false}},{"number":14,"title":"改进 AutoPilot Deep Interview：参考 Goal Contract 的问答界面与交互体验","state":"OPEN","url":"https://github.com/51world-ai-copilot/aes-agent/issues/14","blockedBy":[],"claimedBy":"aes-agents-v2-dev3","derived":{"status":"claimed","degree":0,"warn":false}},{"number":15,"title":"改进 AutoPilot 各阶段结果展示：支持格式化与流式输出，保持主窗口对话体验","state":"CLOSED","url":"https://github.com/51world-ai-copilot/aes-agent/issues/15","blockedBy":[],"claimedBy":null,"derived":{"status":"resolved","degree":0,"warn":false}},{"number":16,"title":"GitHub Copilot provider 无法支持 Copilot CLI 1.0.80：版本门槛为精确匹配，用户装最新版 CLI 即被拒","state":"CLOSED","url":"https://github.com/51world-ai-copilot/aes-agent/issues/16","blockedBy":[],"claimedBy":null,"derived":{"status":"resolved","degree":0,"warn":false}},{"number":17,"title":"聊天侧停止按钮对 Workflow 线程被 Master interrupt 不变量拒绝，用户无从取消卡住的 Run","state":"OPEN","url":"https://github.com/51world-ai-copilot/aes-agent/issues/17","blockedBy":[],"claimedBy":"aes-agents-v2-dev4","derived":{"status":"claimed","degree":0,"warn":false}},{"number":18,"title":"Goal Contract 工作流对齐 workflow-interview skill：界面还原问答 · skill 可手动更新","state":"OPEN","url":"https://github.com/51world-ai-copilot/aes-agent/issues/18","blockedBy":[],"claimedBy":null,"derived":{"status":"frontier","degree":0,"warn":false}},{"number":19,"title":"执行保真立场：skill 文件为真相，还是 typed 状态为真相","state":"CLOSED","url":"https://github.com/51world-ai-copilot/aes-agent/issues/19","blockedBy":[21],"claimedBy":null,"derived":{"status":"resolved","degree":2,"warn":false}},{"number":20,"title":"skill 手动更新通道的形态","state":"CLOSED","url":"https://github.com/51world-ai-copilot/aes-agent/issues/20","blockedBy":[],"claimedBy":null,"derived":{"status":"resolved","degree":1,"warn":false}},{"number":21,"title":"现有插件行为与 skill 源的差异矩阵","state":"CLOSED","url":"https://github.com/51world-ai-copilot/aes-agent/issues/21","blockedBy":[],"claimedBy":null,"derived":{"status":"resolved","degree":1,"warn":false}},{"number":22,"title":"问答界面还原的范围","state":"CLOSED","url":"https://github.com/51world-ai-copilot/aes-agent/issues/22","blockedBy":[19],"claimedBy":null,"derived":{"status":"resolved","degree":1,"warn":false}},{"number":23,"title":"skill 同步脚本原型","state":"CLOSED","url":"https://github.com/51world-ai-copilot/aes-agent/issues/23","blockedBy":[20],"claimedBy":null,"derived":{"status":"resolved","degree":1,"warn":false}},{"number":24,"title":"typed-interaction Workflow 可绑定到无 typed tools 的 provider（OpenCode）：选型时无告知，运行时提问错落主聊天窗","state":"CLOSED","url":"https://github.com/51world-ai-copilot/aes-agent/issues/24","blockedBy":[],"claimedBy":null,"derived":{"status":"resolved","degree":0,"warn":false}},{"number":25,"title":"新 Provider 能力对齐：Copilot / Pi / OpenCode 对标 codex · claude","state":"CLOSED","url":"https://github.com/51world-ai-copilot/aes-agent/issues/25","blockedBy":[],"claimedBy":null,"derived":{"status":"resolved","degree":0,"warn":false}},{"number":26,"title":"能力矩阵盘点：codex · claude 基线 × githubCopilot · pi · opencode 全能力面","state":"CLOSED","url":"https://github.com/51world-ai-copilot/aes-agent/issues/26","blockedBy":[],"claimedBy":null,"derived":{"status":"resolved","degree":1,"warn":false}},{"number":27,"title":"缺口上游可行性：Copilot SDK 1.0.9 · OpenCode SDK v2 · Pi SDK 0.84.1 原生支持调查","state":"CLOSED","url":"https://github.com/51world-ai-copilot/aes-agent/issues/27","blockedBy":[],"claimedBy":null,"derived":{"status":"resolved","degree":1,"warn":false}},{"number":28,"title":"架构维护性评估：transport 分歧 · conformance 测试 · config schema · 进程管理","state":"CLOSED","url":"https://github.com/51world-ai-copilot/aes-agent/issues/28","blockedBy":[],"claimedBy":null,"derived":{"status":"resolved","degree":1,"warn":false}},{"number":29,"title":"差距分诊：must-fix / provider-inherent / wont-fix","state":"CLOSED","url":"https://github.com/51world-ai-copilot/aes-agent/issues/29","blockedBy":[26,27],"claimedBy":null,"derived":{"status":"resolved","degree":3,"warn":false}},{"number":30,"title":"架构收敛决策：conformance suite · config schema · 进程管理模式","state":"CLOSED","url":"https://github.com/51world-ai-copilot/aes-agent/issues/30","blockedBy":[28],"claimedBy":null,"derived":{"status":"resolved","degree":2,"warn":false}},{"number":31,"title":"补齐执行 spec：must-fix 项的落地计划","state":"CLOSED","url":"https://github.com/51world-ai-copilot/aes-agent/issues/31","blockedBy":[29,30],"claimedBy":null,"derived":{"status":"resolved","degree":9,"warn":false}},{"number":32,"title":"能力传导单一事实源：workflow 能力 → provider 能力映射","state":"CLOSED","url":"https://github.com/51world-ai-copilot/aes-agent/issues/32","blockedBy":[],"claimedBy":null,"derived":{"status":"resolved","degree":2,"warn":false}},{"number":33,"title":"派发守卫：typed-interaction Workflow 在 provider turn 派发前校验 typed-tools","state":"CLOSED","url":"https://github.com/51world-ai-copilot/aes-agent/issues/33","blockedBy":[32],"claimedBy":null,"derived":{"status":"resolved","degree":1,"warn":false}},{"number":34,"title":"主会话原生提问对 typed-interaction Workflow 显式失败（消除聊天/工作流分裂）","state":"CLOSED","url":"https://github.com/51world-ai-copilot/aes-agent/issues/34","blockedBy":[],"claimedBy":null,"derived":{"status":"resolved","degree":0,"warn":false}},{"number":35,"title":"OpenCode typedTools 按自管 server 模式如实申报并补 MCP 注入测试","state":"CLOSED","url":"https://github.com/51world-ai-copilot/aes-agent/issues/35","blockedBy":[],"claimedBy":null,"derived":{"status":"resolved","degree":0,"warn":true}},{"number":36,"title":"Model picker 消费 workflow×provider 能力矩阵 + workflow 交互协议 prompt 硬化 + 文档","state":"CLOSED","url":"https://github.com/51world-ai-copilot/aes-agent/issues/36","blockedBy":[32],"claimedBy":null,"derived":{"status":"resolved","degree":1,"warn":false}},{"number":37,"title":"执行：Copilot 契约修复四连（interrupt 就地 · 审批不销毁 · rollback · resume 回读）","state":"CLOSED","url":"https://github.com/51world-ai-copilot/aes-agent/issues/37","blockedBy":[31],"claimedBy":null,"derived":{"status":"resolved","degree":1,"warn":false}},{"number":38,"title":"执行：Compaction 事件双家（Copilot · OpenCode 补 context_compaction 事件链）","state":"CLOSED","url":"https://github.com/51world-ai-copilot/aes-agent/issues/38","blockedBy":[31],"claimedBy":null,"derived":{"status":"resolved","degree":1,"warn":false}},{"number":39,"title":"执行：OpenCode 权限档位（auto-accept-edits 生效）","state":"CLOSED","url":"https://github.com/51world-ai-copilot/aes-agent/issues/39","blockedBy":[31],"claimedBy":null,"derived":{"status":"resolved","degree":1,"warn":false}},{"number":40,"title":"执行：Pi readThread 历史回读","state":"CLOSED","url":"https://github.com/51world-ai-copilot/aes-agent/issues/40","blockedBy":[31],"claimedBy":null,"derived":{"status":"resolved","degree":1,"warn":false}},{"number":41,"title":"Goal Contract 访谈答完三批问题后未经用户确认契约与 mock，直接进入执行","state":"OPEN","url":"https://github.com/51world-ai-copilot/aes-agent/issues/41","blockedBy":[],"claimedBy":"aes-agents-v2-dev5","derived":{"status":"claimed","degree":0,"warn":false}},{"number":42,"title":"执行：Tier-1 conformance 套件 + capabilities rollback 分层","state":"CLOSED","url":"https://github.com/51world-ai-copilot/aes-agent/issues/42","blockedBy":[31],"claimedBy":null,"derived":{"status":"resolved","degree":1,"warn":false}},{"number":43,"title":"执行：runtime service 接线规则固化（文档 + CI 检查）","state":"CLOSED","url":"https://github.com/51world-ai-copilot/aes-agent/issues/43","blockedBy":[31],"claimedBy":null,"derived":{"status":"resolved","degree":1,"warn":false}},{"number":44,"title":"执行：代码级收敛（terminateProcessTree 抽取 + adapterTestTag 归置）","state":"CLOSED","url":"https://github.com/51world-ai-copilot/aes-agent/issues/44","blockedBy":[31],"claimedBy":null,"derived":{"status":"resolved","degree":1,"warn":false}},{"number":45,"title":"file→event 传播缝：workspace 文件状态如何进事件流","state":"CLOSED","url":"https://github.com/51world-ai-copilot/aes-agent/issues/45","blockedBy":[],"claimedBy":null,"derived":{"status":"resolved","degree":0,"warn":false}},{"number":46,"title":"容错解析器的回放语料与回归门槛","state":"CLOSED","url":"https://github.com/51world-ai-copilot/aes-agent/issues/46","blockedBy":[],"claimedBy":null,"derived":{"status":"resolved","degree":0,"warn":false}},{"number":47,"title":"[Bug]: 【P4预览版0817】刷地形闪烁异常，不丝滑","state":"CLOSED","url":"https://github.com/51world-ai-copilot/aes-agent/issues/47","blockedBy":[],"claimedBy":null,"derived":{"status":"resolved","degree":0,"warn":false}},{"number":48,"title":"宿主 web 残留插件业务字面量：WorkflowPanel 按 autopilot.deep-interview.answers 分支渲染","state":"OPEN","url":"https://github.com/51world-ai-copilot/aes-agent/issues/48","blockedBy":[],"claimedBy":null,"derived":{"status":"frontier","degree":0,"warn":false}},{"number":49,"title":"插件边界权威文档与实装相悖：热插拔已落地但文档仍写 no runtime installer","state":"OPEN","url":"https://github.com/51world-ai-copilot/aes-agent/issues/49","blockedBy":[],"claimedBy":null,"derived":{"status":"frontier","degree":0,"warn":false}},{"number":50,"title":"isolated runtime 方法名清单在宿主两处各持一份，应收拢进 workflow-platform SDK","state":"OPEN","url":"https://github.com/51world-ai-copilot/aes-agent/issues/50","blockedBy":[],"claimedBy":null,"derived":{"status":"frontier","degree":0,"warn":false}},{"number":51,"title":"composition.ts 边界例外路径膨胀且生产代码 no-import 规则无守卫","state":"OPEN","url":"https://github.com/51world-ai-copilot/aes-agent/issues/51","blockedBy":[],"claimedBy":null,"derived":{"status":"frontier","degree":0,"warn":false}},{"number":52,"title":"插件 enable/disable 库存态存 plugins.sqlite，游离于事件流权威之外","state":"OPEN","url":"https://github.com/51world-ai-copilot/aes-agent/issues/52","blockedBy":[],"claimedBy":null,"derived":{"status":"frontier","degree":0,"warn":false}},{"number":53,"title":"宿主内终态集与 unavailable→failed 映射多处重复，缺单一来源","state":"OPEN","url":"https://github.com/51world-ai-copilot/aes-agent/issues/53","blockedBy":[],"claimedBy":null,"derived":{"status":"frontier","degree":0,"warn":false}},{"number":54,"title":"边界两侧巨文件：WorkflowPanel.tsx 1636 行、autopilot plugin.ts 2184 行四版本近四份复制","state":"OPEN","url":"https://github.com/51world-ai-copilot/aes-agent/issues/54","blockedBy":[],"claimedBy":null,"derived":{"status":"frontier","degree":0,"warn":false}},{"number":55,"title":"平台基础：Workflow workspace 脚本、文件、round 写回与目录快照能力","state":"CLOSED","url":"https://github.com/51world-ai-copilot/aes-agent/issues/55","blockedBy":[],"claimedBy":null,"derived":{"status":"resolved","degree":3,"warn":false}},{"number":56,"title":"文件真相传播：workspace-files 修订事件、写边界 diff 与读时对账","state":"OPEN","url":"https://github.com/51world-ai-copilot/aes-agent/issues/56","blockedBy":[55],"claimedBy":"aes-agents-v2-dev1","derived":{"status":"claimed","degree":3,"warn":false}},{"number":57,"title":"交互归一化：文本双发解析器、disposition-batch 契约与 golden 回放","state":"OPEN","url":"https://github.com/51world-ai-copilot/aes-agent/issues/57","blockedBy":[],"claimedBy":"aes-agents-v2-dev2","derived":{"status":"claimed","degree":2,"warn":false}},{"number":58,"title":"Goal Contract 运行时迁移：session.mjs 唯一门禁与文件 canonical","state":"OPEN","url":"https://github.com/51world-ai-copilot/aes-agent/issues/58","blockedBy":[55,56,57],"claimedBy":null,"derived":{"status":"blocked","degree":5,"warn":false}},{"number":59,"title":"Goal Contract 界面还原：disposition、Prototype 预览、回退与 rounds","state":"OPEN","url":"https://github.com/51world-ai-copilot/aes-agent/issues/59","blockedBy":[56,57],"claimedBy":null,"derived":{"status":"blocked","degree":3,"warn":false}},{"number":60,"title":"交付闭环：目录字节快照、确认硬闸与 Fresh Handoff Ready 语义","state":"OPEN","url":"https://github.com/51world-ai-copilot/aes-agent/issues/60","blockedBy":[55,58],"claimedBy":null,"derived":{"status":"blocked","degree":3,"warn":false}},{"number":61,"title":"最终验收：真实编排主缝、G1-G8 演进与跨端文档闭环","state":"OPEN","url":"https://github.com/51world-ai-copilot/aes-agent/issues/61","blockedBy":[58,59,60],"claimedBy":null,"derived":{"status":"blocked","degree":3,"warn":false}},{"number":62,"title":"Web 配对链接重复提交后误显示“配对 token 无效”","state":"OPEN","url":"https://github.com/51world-ai-copilot/aes-agent/issues/62","blockedBy":[],"claimedBy":null,"derived":{"status":"frontier","degree":0,"warn":false}},{"number":63,"title":"fix(web): Workflow equal-columns 面板应保留标准拖拽调宽能力","state":"OPEN","url":"https://github.com/51world-ai-copilot/aes-agent/issues/63","blockedBy":[],"claimedBy":null,"derived":{"status":"frontier","degree":0,"warn":false}},{"number":64,"title":"Goal Contract 允许 xhigh Thread 绑定 High Fresh Handoff，model-mismatch 被三次空 Turn 重试改写为 generic blocked","state":"OPEN","url":"https://github.com/51world-ai-copilot/aes-agent/issues/64","blockedBy":[],"claimedBy":null,"derived":{"status":"frontier","degree":0,"warn":false}},{"number":65,"title":"fix(server): 后端重启后 running Workflow Stage execution 永久悬挂","state":"OPEN","url":"https://github.com/51world-ai-copilot/aes-agent/issues/65","blockedBy":[],"claimedBy":null,"derived":{"status":"frontier","degree":0,"warn":false}}],"edges":[{"from":2,"to":4,"satisfied":true},{"from":3,"to":4,"satisfied":true},{"from":4,"to":5,"satisfied":true},{"from":8,"to":9,"satisfied":true},{"from":8,"to":10,"satisfied":true},{"from":9,"to":11,"satisfied":true},{"from":10,"to":11,"satisfied":true},{"from":11,"to":12,"satisfied":true},{"from":21,"to":19,"satisfied":true},{"from":19,"to":22,"satisfied":true},{"from":20,"to":23,"satisfied":true},{"from":26,"to":29,"satisfied":true},{"from":27,"to":29,"satisfied":true},{"from":28,"to":30,"satisfied":true},{"from":29,"to":31,"satisfied":true},{"from":30,"to":31,"satisfied":true},{"from":32,"to":33,"satisfied":true},{"from":32,"to":36,"satisfied":true},{"from":31,"to":37,"satisfied":true},{"from":31,"to":38,"satisfied":true},{"from":31,"to":39,"satisfied":true},{"from":31,"to":40,"satisfied":true},{"from":31,"to":42,"satisfied":true},{"from":31,"to":43,"satisfied":true},{"from":31,"to":44,"satisfied":true},{"from":55,"to":56,"satisfied":true},{"from":55,"to":58,"satisfied":true},{"from":56,"to":58,"satisfied":false},{"from":57,"to":58,"satisfied":false},{"from":56,"to":59,"satisfied":false},{"from":57,"to":59,"satisfied":false},{"from":55,"to":60,"satisfied":true},{"from":58,"to":60,"satisfied":false},{"from":58,"to":61,"satisfied":false},{"from":59,"to":61,"satisfied":false},{"from":60,"to":61,"satisfied":false}],"stats":{"total":65,"open":21,"closed":44,"frontier":12,"edges":36,"warned":1}},"worktrees":[{"name":"aes-agents-v2-dev1","path":"G:/GIT/AI_WorkFlow/aes-agents-v2-dev1","branch":"aes-agents-v2-dev1","head":"1b6a3a91","headSubject":"https://github.com/51world-ai-copilot/aes-agent/issues/56 fix(workflow): 闭合文件真相对账与远程只读边界","lastCommitAt":"2026-08-25T02:14:13+08:00","ahead":3,"behind":4,"dirty":{"modified":1,"untracked":0},"mode":"manual","position":{"kind":"issue","issue":56},"trail":[56],"mergeCheck":{"result":"clean","conflictFiles":[]},"assessment":{"currentTask":"#56 自动化收口执行中","done":null,"merge":"not-yet","reason":"Task tk-dev1-56-g1 已登记，等待提交与独立 review","assessedAt":"2026-08-24T18:03:55.313Z","assessedBy":"claude-main","stale":true},"activeTask":null,"recentTasks":[],"task":{"taskId":"tk-dev1-56-g1","taskKind":"desktop-thread","threadId":"01a034ef-e6e3-7cb1-9b17-bec769041268","clientThreadId":null,"hostId":null,"projectId":null,"issue":56,"worktree":"dev1","role":"executor","parentTaskId":null,"generation":1,"state":"dispatching","phase":"dispatching","interactionClass":"autonomous","modelTier":"sol-high","routingReason":"事件源与多连接模式的 dirty 续作，需严格自动化收口","cursor":"ca32b493-227c-418d-83b6-7c1bb92a0549:1","lastEventId":"E-e711e5cbb977","consumedEventIds":["E-e711e5cbb977"],"headSha":null,"commitSha":null,"mergeCommit":null,"verdict":{"code":null,"runtime":null,"delivery":null},"reviewTaskId":null,"reviewEvidence":null,"blockCount":0,"blockLedger":[],"lastProgressAt":"2026-08-24T18:02:33.704Z","nextAction":"wait for registered thread events","fallbackAuthorized":null,"requiresRuntime":false,"agent":null,"createdAt":"2026-08-24T18:02:33.704Z","updatedAt":"2026-08-24T18:03:13.894Z","threadCursors":{"01a034ef-e6e3-7cb1-9b17-bec769041268":"ca32b493-227c-418d-83b6-7c1bb92a0549:1"}}},{"name":"aes-agents-v2-dev2","path":"G:/GIT/AI_WorkFlow/aes-agents-v2-dev2","branch":"aes-agents-v2-dev2","head":"f5111d5d","headSubject":"(#57)fix(workflow): 闭合真实插件双发与变形回放","lastCommitAt":"2026-08-24T04:15:46+08:00","ahead":3,"behind":4,"dirty":{"modified":1,"untracked":0},"mode":"manual","position":{"kind":"issue","issue":57},"trail":[57],"mergeCheck":{"result":"clean","conflictFiles":[]},"assessment":{"currentTask":"#57 严格自验执行中","done":null,"merge":"not-yet","reason":"Task tk-dev2-57-g1 正在运行长测","assessedAt":"2026-08-24T18:03:55.379Z","assessedBy":"claude-main","stale":false},"activeTask":null,"recentTasks":[],"task":{"taskId":"tk-dev2-57-g1","taskKind":"desktop-thread","threadId":"01a034d7-8de4-7882-b268-70588bf0e15f","clientThreadId":null,"hostId":null,"projectId":null,"issue":57,"worktree":"dev2","role":"executor","parentTaskId":null,"generation":1,"state":"dispatching","phase":"dispatching","interactionClass":"autonomous","modelTier":"luna-max","routingReason":"现有实现已提交且验收边界明确，先做严格自验与交接","cursor":"c85d3e09-1ff0-45bf-884c-6e59fc9d284e:3","lastEventId":"E-87bb20f33db4","consumedEventIds":["E-b3ad17f571e1","E-ef0149244e1a","E-87bb20f33db4"],"headSha":null,"commitSha":null,"mergeCommit":null,"verdict":{"code":null,"runtime":null,"delivery":null},"reviewTaskId":null,"reviewEvidence":null,"blockCount":0,"blockLedger":[],"lastProgressAt":"2026-08-24T17:35:45.162Z","nextAction":"wait for registered thread events","fallbackAuthorized":null,"requiresRuntime":false,"agent":null,"createdAt":"2026-08-24T17:35:45.162Z","updatedAt":"2026-08-24T18:03:14.325Z","threadCursors":{"01a034d7-8de4-7882-b268-70588bf0e15f":"c85d3e09-1ff0-45bf-884c-6e59fc9d284e:3"}}},{"name":"aes-agents-v2-dev3","path":"G:/GIT/AI_WorkFlow/aes-agents-v2-dev3","branch":"aes-agents-v2-dev3","head":"335f6fc7","headSubject":"https://github.com/51world-ai-copilot/aes-agent/issues/14 feat(workflow): 让深度访谈在阶段页签中完成结构化决策","lastCommitAt":"2026-08-25T02:10:12+08:00","ahead":1,"behind":11,"dirty":{"modified":1,"untracked":0},"mode":"manual","position":{"kind":"issue","issue":14},"trail":[14],"mergeCheck":{"result":"clean","conflictFiles":[]},"assessment":{"currentTask":"#14 Deep Interview 续作执行中","done":null,"merge":"not-yet","reason":"Task tk-dev3-14-g1 已登记，人工 UI 后置为 needs-manual-test","assessedAt":"2026-08-24T18:03:55.443Z","assessedBy":"claude-main","stale":true},"activeTask":null,"recentTasks":[],"task":{"taskId":"tk-dev3-14-g1","taskKind":"desktop-thread","threadId":"01a034ee-8b58-7d53-942a-9ead2b0d9cdf","clientThreadId":null,"hostId":null,"projectId":null,"issue":14,"worktree":"dev3","role":"executor","parentTaskId":null,"generation":1,"state":"dispatching","phase":"dispatching","interactionClass":"autonomous","modelTier":"sol-high","routingReason":"跨 Workflow UI 与状态一致性的既有 dirty 续作，自动化可闭合且人工验收后置","cursor":"6f1f03f0-fd67-44ff-b2d8-5a429d0495f9:1","lastEventId":"E-c2b9ac0e1d5e","consumedEventIds":["E-c2b9ac0e1d5e"],"headSha":null,"commitSha":null,"mergeCommit":null,"verdict":{"code":null,"runtime":null,"delivery":null},"reviewTaskId":null,"reviewEvidence":null,"blockCount":0,"blockLedger":[],"lastProgressAt":"2026-08-24T18:00:51.942Z","nextAction":"wait for registered thread events","fallbackAuthorized":null,"requiresRuntime":false,"agent":null,"createdAt":"2026-08-24T18:00:51.942Z","updatedAt":"2026-08-24T18:03:14.971Z","threadCursors":{"01a034ee-8b58-7d53-942a-9ead2b0d9cdf":"6f1f03f0-fd67-44ff-b2d8-5a429d0495f9:1"}}},{"name":"aes-agents-v2-dev4","path":"G:/GIT/AI_WorkFlow/aes-agents-v2-dev4","branch":"aes-agents-v2-dev4","head":"59a5f002","headSubject":"git ignore","lastCommitAt":"2026-08-25T02:05:37+08:00","ahead":0,"behind":0,"dirty":{"modified":0,"untracked":1},"mode":"manual","position":{"kind":"issue","issue":17},"trail":[17],"mergeCheck":{"result":"up-to-date","conflictFiles":[]},"assessment":{"currentTask":"#17 dev 合并后自动复验中","done":null,"merge":"not-yet","reason":"实现已由 ae6f2459 合入 dev，但 post-merge verification 尚未完成","assessedAt":"2026-08-24T18:04:01.515Z","assessedBy":"claude-main","stale":true},"activeTask":null,"recentTasks":[],"task":{"taskId":"tk-dev4-17-g1","taskKind":"desktop-thread","threadId":"01a034ef-f957-7143-a031-fca50b3c77f9","clientThreadId":null,"hostId":null,"projectId":null,"issue":17,"worktree":"dev4","role":"executor","parentTaskId":null,"generation":1,"state":"dispatching","phase":"dispatching","interactionClass":"autonomous","modelTier":"luna-max","routingReason":"代码已合入 dev，仅需合并后针对性自动复验","cursor":"cda9a2f1-3ea2-4a9b-ab4b-30f672dd9c12:1","lastEventId":"E-c3cbf20cc8ce","consumedEventIds":["E-c3cbf20cc8ce"],"headSha":null,"commitSha":null,"mergeCommit":null,"verdict":{"code":null,"runtime":null,"delivery":null},"reviewTaskId":null,"reviewEvidence":null,"blockCount":0,"blockLedger":[],"lastProgressAt":"2026-08-24T18:02:33.908Z","nextAction":"wait for registered thread events","fallbackAuthorized":null,"requiresRuntime":false,"agent":null,"createdAt":"2026-08-24T18:02:33.908Z","updatedAt":"2026-08-24T18:03:15.724Z","threadCursors":{"01a034ef-f957-7143-a031-fca50b3c77f9":"cda9a2f1-3ea2-4a9b-ab4b-30f672dd9c12:1"}}},{"name":"aes-agents-v2-dev5","path":"G:/GIT/AI_WorkFlow/aes-agents-v2-dev5","branch":"aes-agents-v2-dev5","head":"6bd40b2e","headSubject":"(#41)fix(goal-contract): 确认契约后才允许进入执行","lastCommitAt":"2026-08-21T03:43:38+08:00","ahead":1,"behind":11,"dirty":{"modified":33,"untracked":1},"mode":"manual","position":{"kind":"issue","issue":41},"trail":[41],"mergeCheck":{"result":"clean","conflictFiles":[]},"assessment":{"currentTask":"#41 Goal Contract 自动化收口执行中","done":null,"merge":"not-yet","reason":"Task tk-dev5-41-g1 已登记，人工 UI 后置为 needs-manual-test","assessedAt":"2026-08-24T18:03:55.560Z","assessedBy":"claude-main","stale":false},"activeTask":null,"recentTasks":[],"task":{"taskId":"tk-dev5-41-g1","taskKind":"desktop-thread","threadId":"01a034f0-0b86-7c83-a12d-b7527a9062ab","clientThreadId":null,"hostId":null,"projectId":null,"issue":41,"worktree":"dev5","role":"executor","parentTaskId":null,"generation":1,"state":"dispatching","phase":"dispatching","interactionClass":"autonomous","modelTier":"sol-high","routingReason":"插件硬闸与发布链 dirty 续作，需跨包严格收口","cursor":"92266890-37c3-43e5-aca3-cf42db080cb1:1","lastEventId":"E-97a4285c06b9","consumedEventIds":["E-97a4285c06b9"],"headSha":null,"commitSha":null,"mergeCommit":null,"verdict":{"code":null,"runtime":null,"delivery":null},"reviewTaskId":null,"reviewEvidence":null,"blockCount":0,"blockLedger":[],"lastProgressAt":"2026-08-24T18:02:34.126Z","nextAction":"wait for registered thread events","fallbackAuthorized":null,"requiresRuntime":false,"agent":null,"createdAt":"2026-08-24T18:02:34.126Z","updatedAt":"2026-08-24T18:03:17.353Z","threadCursors":{"01a034f0-0b86-7c83-a12d-b7527a9062ab":"92266890-37c3-43e5-aca3-cf42db080cb1:1"}}},{"name":"aes-agents-v2-test","path":"G:/GIT/AI_WorkFlow/aes-agents-v2-test","branch":"aes-agents-v2-test","head":"94c7ae28","headSubject":"docs","lastCommitAt":"2026-08-24T01:47:21+08:00","ahead":0,"behind":4,"dirty":{"modified":0,"untracked":0},"mode":"idle","position":{"kind":"none"},"trail":[],"mergeCheck":{"result":"up-to-date","conflictFiles":[]},"assessment":null,"activeTask":null,"recentTasks":[],"task":null}],"transitions":[{"ts":"2026-08-24T17:35:45.164Z","taskId":"tk-dev2-57-g1","from":"claimed","to":"dispatching","eventId":null,"actor":"orchestrator","reason":"Desktop create_thread registered","evidence":["thread:01a034d7-8de4-7882-b268-70588bf0e15f"]},{"ts":"2026-08-24T18:00:51.944Z","taskId":"tk-dev3-14-g1","from":"claimed","to":"dispatching","eventId":null,"actor":"orchestrator","reason":"Desktop create_thread registered","evidence":["thread:01a034ee-8b58-7d53-942a-9ead2b0d9cdf"]},{"ts":"2026-08-24T18:02:33.706Z","taskId":"tk-dev1-56-g1","from":"claimed","to":"dispatching","eventId":null,"actor":"orchestrator","reason":"Desktop create_thread registered","evidence":["thread:01a034ef-e6e3-7cb1-9b17-bec769041268"]},{"ts":"2026-08-24T18:02:33.911Z","taskId":"tk-dev4-17-g1","from":"claimed","to":"dispatching","eventId":null,"actor":"orchestrator","reason":"Desktop create_thread registered","evidence":["thread:01a034ef-f957-7143-a031-fca50b3c77f9"]},{"ts":"2026-08-24T18:02:34.128Z","taskId":"tk-dev5-41-g1","from":"claimed","to":"dispatching","eventId":null,"actor":"orchestrator","reason":"Desktop create_thread registered","evidence":["thread:01a034f0-0b86-7c83-a12d-b7527a9062ab"]}]};
+
+</script>
+<script>
+(() => {
+  'use strict';
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  const $ = (selector) => document.querySelector(selector);
+  const $$ = (selector) => [...document.querySelectorAll(selector)];
+  const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[char]));
+  const shortName = (name) => String(name || '').replace(/^.*-(dev\d+)$/, '$1');
+  const labels = { frontier:'可开工', claimed:'进行中', blocked:'被阻塞', resolved:'已探明' };
+  const state = {
+    mode:'snapshot', view:'graph', status:null, nodes:[], positions:new Map(),
+    transform:{ x:0, y:0, k:1 }, hovered:null, filter:null, selected:null,
+    dragging:null, pendingDispatch:null, refreshTimer:null,
+  };
+
+  function radius(issue) {
+    const degree = issue.derived.degree;
+    return issue.derived.status === 'frontier' ? 8 + 1.4 * degree
+      : issue.derived.status === 'claimed' ? 9 + 1.4 * degree
+      : issue.derived.status === 'blocked' ? 5 + 1.1 * degree
+      : 3.5 + .8 * degree;
+  }
+
+  function workerFor(issue) {
+    return state.status?.worktrees.find((worker) => worker.name === issue.claimedBy) || null;
+  }
+
+  function elapsed(startedAt) {
+    const milliseconds = Date.now() - Date.parse(startedAt || '');
+    if (!Number.isFinite(milliseconds) || milliseconds < 0) return '0m';
+    const minutes = Math.floor(milliseconds / 60000);
+    return minutes >= 60 ? `${Math.floor(minutes / 60)}h${minutes % 60}m` : `${minutes}m`;
+  }
+
+  function seeded(number) {
+    const value = Math.sin(number * 999.137) * 43758.5453;
+    return value - Math.floor(value);
+  }
+
+  function computeLayout(issues, edges) {
+    const width = innerWidth;
+    const height = innerHeight;
+    const cx = width * .5;
+    const cy = height * .53;
+    const spanX = Math.max(600, width - 180);
+    const spanY = Math.max(520, height - 190);
+    const openIssues = issues.filter((issue) => issue.state === 'OPEN');
+    const openIndex = new Map(openIssues.map((issue, index) => [issue.number, index]));
+    const resolvedIssues = issues.filter((issue) => issue.state === 'CLOSED');
+    const resolvedIndex = new Map(resolvedIssues.map((issue, index) => [issue.number, index]));
+    const points = issues.map((issue, index) => {
+      const previous = state.positions.get(issue.number);
+      if (previous) return { ...previous, issue, vx:0, vy:0, r:radius(issue) };
+      let x; let y;
+      if (issue.state === 'OPEN') {
+        const openI = openIndex.get(issue.number);
+        const angle = -Math.PI / 2 + openI / openIssues.length * Math.PI * 2 + (openI % 2 ? .08 : -.08);
+        const distance = Math.min(spanX, spanY) * (openI % 2 ? .39 : .24);
+        x = cx + Math.cos(angle) * distance * 1.18;
+        y = cy + Math.sin(angle) * distance;
+      } else {
+        const resolvedI = resolvedIndex.get(issue.number);
+        const columns = Math.ceil(Math.sqrt(resolvedIssues.length * width / height));
+        const rows = Math.ceil(resolvedIssues.length / columns);
+        const column = resolvedI % columns; const row = Math.floor(resolvedI / columns);
+        x = 90 + column / Math.max(1, columns - 1) * (width - 180) + (seeded(issue.number) - .5) * 32;
+        y = 130 + row / Math.max(1, rows - 1) * (height - 220) + (seeded(issue.number + 77) - .5) * 28;
+      }
+      return {
+        issue, r:radius(issue), vx:0, vy:0,
+        x, y,
+      };
+    });
+    const byNumber = new Map(points.map((point) => [point.issue.number, point]));
+    for (let tick = 0; tick < 230; tick += 1) {
+      const cooling = 1 - tick / 260;
+      for (let i = 0; i < points.length; i += 1) {
+        const a = points[i];
+        for (let j = i + 1; j < points.length; j += 1) {
+          const b = points[j];
+          let dx = b.x - a.x;
+          let dy = b.y - a.y;
+          const distance2 = Math.max(20, dx * dx + dy * dy);
+          const distance = Math.sqrt(distance2);
+          const bothResolved = a.issue.state === 'CLOSED' && b.issue.state === 'CLOSED';
+          const desired = bothResolved ? a.r + b.r + 20 : a.r + b.r + 105;
+          const repel = distance < desired ? (desired - distance) * .075 : 210 / distance2;
+          dx /= distance; dy /= distance;
+          a.vx -= dx * repel; a.vy -= dy * repel;
+          b.vx += dx * repel; b.vy += dy * repel;
+        }
+      }
+      edges.forEach((edge) => {
+        const a = byNumber.get(edge.from); const b = byNumber.get(edge.to);
+        if (!a || !b) return;
+        const dx = b.x - a.x; const dy = b.y - a.y;
+        const distance = Math.max(1, Math.hypot(dx, dy));
+        const pull = (distance - 155) * .00135;
+        a.vx += dx / distance * pull; a.vy += dy / distance * pull;
+        b.vx -= dx / distance * pull; b.vy -= dy / distance * pull;
+      });
+      points.forEach((point) => {
+        const statusBias = point.issue.derived.status === 'frontier' ? -55
+          : point.issue.derived.status === 'blocked' ? 65 : 0;
+        point.vx += (cx + statusBias - point.x) * .00035;
+        point.vy += (cy - point.y) * .00035;
+        point.vx *= .84; point.vy *= .84;
+        point.x += point.vx * cooling; point.y += point.vy * cooling;
+        point.x = Math.max(90, Math.min(width - 90, point.x));
+        point.y = Math.max(120, Math.min(height - 75, point.y));
+      });
+    }
+    // 标题是视图的一部分：冻结前再做标签盒碰撞，防止力导向只顾圆点不顾可读性。
+    const labeled = points.filter((point) => point.issue.state === 'OPEN' || point.issue.claimedBy);
+    for (let pass = 0; pass < 90; pass += 1) {
+      for (let i = 0; i < labeled.length; i += 1) {
+        for (let j = i + 1; j < labeled.length; j += 1) {
+          const a = labeled[i]; const b = labeled[j];
+          const dx = b.x - a.x; const dy = b.y - a.y;
+          const overlapX = 178 - Math.abs(dx); const overlapY = 44 - Math.abs(dy);
+          if (overlapX <= 0 || overlapY <= 0) continue;
+          if (overlapX / 178 < overlapY / 44) {
+            const shift = overlapX * .27 * (dx >= 0 ? 1 : -1);
+            a.x -= shift; b.x += shift;
+          } else {
+            const shift = overlapY * .34 * (dy >= 0 ? 1 : -1);
+            a.y -= shift; b.y += shift;
+          }
+          a.x = Math.max(90, Math.min(width - 90, a.x)); b.x = Math.max(90, Math.min(width - 90, b.x));
+          a.y = Math.max(120, Math.min(height - 75, a.y)); b.y = Math.max(120, Math.min(height - 75, b.y));
+        }
+      }
+    }
+    state.positions = new Map(points.map((point) => [point.issue.number, { x:point.x, y:point.y }]));
+    return points;
+  }
+
+  function curve(edge, index) {
+    const a = state.positions.get(edge.from); const b = state.positions.get(edge.to);
+    if (!a || !b) return '';
+    const dx = b.x - a.x; const dy = b.y - a.y;
+    const length = Math.max(1, Math.hypot(dx, dy));
+    const sign = index % 2 ? -1 : 1;
+    const offset = length * .09 * sign;
+    const mx = (a.x + b.x) / 2 - dy / length * offset;
+    const my = (a.y + b.y) / 2 + dx / length * offset;
+    return `M ${a.x.toFixed(1)} ${a.y.toFixed(1)} Q ${mx.toFixed(1)} ${my.toFixed(1)} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`;
+  }
+
+  function nodeMarkup(issue) {
+    const point = state.positions.get(issue.number);
+    const r = radius(issue);
+    const status = issue.derived.status;
+    const worker = workerFor(issue);
+    let circles = '';
+    if (status === 'frontier') circles = `<circle r="${r + 10}" fill="rgba(193,95,60,.07)"/><circle r="${r + 4.5}" fill="none" stroke="rgba(193,95,60,.35)" stroke-width="1.1"/><circle class="node-core" r="${r}" fill="#C15F3C"/>`;
+    else if (status === 'claimed') circles = `<circle class="claimed-pulse" r="${r + 15}" fill="rgba(124,107,174,.12)"/><circle r="${r + 9}" fill="none" stroke="rgba(124,107,174,.20)"/><circle r="${r + 4.5}" fill="none" stroke="rgba(124,107,174,.45)"/><circle class="node-core" r="${r}" fill="#7C6BAE"/>`;
+    else if (status === 'blocked') circles = `<circle class="node-core" r="${r}" fill="#FAF9F5" stroke="#A39C8D" stroke-width="1.4" stroke-dasharray="3 3"/>`;
+    else circles = `<circle class="node-core" r="${r}" fill="#B7AF9F" opacity=".95"/>${issue.derived.warn ? `<circle r="${r + 4}" fill="none" stroke="#B08838" stroke-width="1.1" stroke-dasharray="2 3"/>` : ''}`;
+    const title = status === 'resolved' ? '' : `<text class="node-title" y="${r + 23}">${esc(issue.title.length > 20 ? `${issue.title.slice(0, 19)}…` : issue.title)}</text>`;
+    const warning = issue.derived.warn ? `<text y="${r + 18}" text-anchor="middle" fill="#B08838" font-family="var(--mono)" font-size="10">⚠ 回归有波动</text>` : '';
+    let flag = '';
+    if (worker) {
+      const running = worker.mode === 'running';
+      const text = running ? `${shortName(worker.name)} ▶ ${elapsed(worker.activeTask?.startedAt)}` : `${shortName(worker.name)} ✋ 手动推进`;
+      const width = Math.max(76, text.length * 7.1 + 18);
+      const fill = running ? '#7C6BAE' : '#F6EDD8';
+      const stroke = running ? '#6A5A9E' : '#D9C48F';
+      const color = running ? '#FFFFFF' : '#8A6A1F';
+      flag = `<g class="worker-flag" transform="translate(0,${-r - 9})"><line y1="0" y2="-9" stroke="${stroke}"/><g transform="translate(0,-25)"><rect x="${-width / 2}" y="-10" width="${width}" height="22" rx="6" fill="${fill}" stroke="${stroke}"/><text y="1" fill="${color}">${esc(text)}</text></g></g>`;
+    }
+    return `<g class="issue-node ${status}" data-id="${issue.number}" transform="translate(${point.x.toFixed(1)},${point.y.toFixed(1)})"><g class="node-visual"><circle r="${Math.max(18, r + 12)}" fill="transparent"/>${circles}<g class="node-label"><text class="node-id" y="${r + 10}">#${issue.number}</text>${title}${warning}</g></g>${flag}</g>`;
+  }
+
+  function backgroundStars() {
+    let markup = '';
+    for (let index = 0; index < 95; index += 1) {
+      const x = seeded(index + 401) * innerWidth;
+      const y = seeded(index + 821) * innerHeight;
+      const r = 1.6 + seeded(index + 1231) * 1.9;
+      markup += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="#DAD4C5" opacity="${(.28 + seeded(index + 88) * .42).toFixed(2)}"/>`;
+    }
+    return markup;
+  }
+
+  function renderGraph() {
+    if (!state.status) return;
+    const previousPositions = new Map(state.positions);
+    computeLayout(state.status.graph.issues, state.status.graph.edges);
+    const svg = $('#graph');
+    svg.setAttribute('viewBox', `0 0 ${innerWidth} ${innerHeight}`);
+    const edges = state.status.graph.edges.map((edge, index) => {
+      const target = state.status.graph.issues.find((issue) => issue.number === edge.to);
+      const blocking = target?.derived.status === 'blocked' && !edge.satisfied;
+      return `<path class="edge${blocking ? ' blocking' : ''}" data-from="${edge.from}" data-to="${edge.to}" d="${curve(edge, index)}"/>`;
+    }).join('');
+    svg.innerHTML = `<g class="background-stars">${backgroundStars()}</g><g id="viewport" transform="translate(${state.transform.x} ${state.transform.y}) scale(${state.transform.k})"><g class="edges">${edges}</g><g class="nodes">${state.status.graph.issues.map(nodeMarkup).join('')}</g></g>`;
+    $$('.issue-node').forEach((element) => {
+      const id = Number(element.dataset.id);
+      const previous = previousPositions.get(id); const next = state.positions.get(id);
+      if (!previous || !next || Math.hypot(next.x - previous.x, next.y - previous.y) < .5) return;
+      element.setAttribute('transform', `translate(${previous.x.toFixed(1)},${previous.y.toFixed(1)})`);
+      element.style.transition = 'transform 600ms ease';
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        element.setAttribute('transform', `translate(${next.x.toFixed(1)},${next.y.toFixed(1)})`);
+      }));
+    });
+    bindGraph();
+    applyFocus();
+    updateZoom();
+  }
+
+  function bindGraph() {
+    $$('.issue-node').forEach((element) => {
+      const id = Number(element.dataset.id);
+      element.addEventListener('mouseenter', () => { state.hovered = id; applyFocus(); });
+      element.addEventListener('mouseleave', () => { state.hovered = null; applyFocus(); });
+      element.addEventListener('click', (event) => { event.stopPropagation(); selectIssue(id); });
+    });
+  }
+
+  function neighborSet(id) {
+    const result = new Set([id]);
+    state.status.graph.edges.forEach((edge) => {
+      if (edge.from === id) result.add(edge.to);
+      if (edge.to === id) result.add(edge.from);
+    });
+    return result;
+  }
+
+  function applyFocus() {
+    if (!state.status || state.view !== 'graph') return;
+    const focused = state.hovered ? neighborSet(state.hovered) : null;
+    $$('.issue-node').forEach((element) => {
+      const id = Number(element.dataset.id);
+      const issue = state.status.graph.issues.find((item) => item.number === id);
+      const active = focused ? focused.has(id) : state.filter ? issue.derived.status === state.filter : true;
+      const visual = element.querySelector('.node-visual');
+      visual.style.opacity = active ? '1' : issue.claimedBy ? '.5' : '.15';
+      const flag = element.querySelector('.worker-flag');
+      if (flag) flag.style.opacity = '1';
+    });
+    $$('.edge').forEach((element) => {
+      const from = Number(element.dataset.from); const to = Number(element.dataset.to);
+      const filterRelated = state.filter && [from, to].some((id) => state.status.graph.issues.find((issue) => issue.number === id)?.derived.status === state.filter);
+      const related = focused ? focused.has(from) && focused.has(to) : state.filter ? filterRelated : true;
+      element.style.opacity = focused || state.filter ? (related ? '1' : '.1') : '1';
+      element.style.strokeWidth = focused && related ? '1.4' : '';
+      if (focused && related) element.style.stroke = element.classList.contains('blocking') ? '#C15F3C' : '#B9AF97';
+      else element.style.stroke = '';
+    });
+    const stars = $('.background-stars');
+    if (stars) stars.style.opacity = focused || state.filter ? '.3' : '1';
+  }
+
+  function renderLegend() {
+    if (!state.status) return;
+    const counts = Object.fromEntries(Object.keys(labels).map((status) => [status, state.status.graph.issues.filter((issue) => issue.derived.status === status).length]));
+    $('#legend').innerHTML = Object.entries(labels).map(([status, label]) => `<button class="legend-row ${state.filter === status ? 'active' : ''}" data-filter="${status}"><i class="legend-dot ${status}"></i><span>${label}</span><b class="legend-count">${counts[status]}</b></button>`).join('');
+    $$('.legend-row').forEach((button) => button.addEventListener('click', () => {
+      state.filter = state.filter === button.dataset.filter ? null : button.dataset.filter;
+      renderLegend(); applyFocus();
+    }));
+  }
+
+  function verdictText(task) {
+    if (!task?.verdict) return 'C:− R:− D:−';
+    const code = task.verdict.code === 'PASS' ? '✓' : task.verdict.code === 'BLOCK' ? '✗' : '−';
+    const runtime = task.verdict.runtime === 'PASS' ? '✓' : task.verdict.runtime === 'NOT_RUN' ? '−' : task.verdict.runtime || '−';
+    return `C:${code} R:${runtime} D:${task.verdict.delivery || '−'}`;
+  }
+
+  function taskBadges(task) {
+    if (!task) return '';
+    return `<span class="badge task-state ${esc(task.state)}">${esc(task.state)}</span>${task.blockCount ? `<span class="badge block-count">BLOCK ${task.blockCount}/3</span>` : ''}<span class="badge">${esc(verdictText(task))}</span>${task.modelTier ? `<span class="badge model-tier">${esc(task.modelTier)}</span>` : ''}`;
+  }
+
+  function renderWorkers() {
+    if (!state.status) return;
+    const present = state.status.worktrees.filter((worker) => worker.position.kind === 'issue').length;
+    $('#workers').innerHTML = `<div class="workers-head"><span>WORKERS</span><b>${present}/${state.status.worktrees.length} 在场</b></div>${state.status.worktrees.map((worker) => {
+      const issue = worker.position.kind === 'issue' ? state.status.graph.issues.find((item) => item.number === worker.position.issue) : null;
+      const dirty = worker.dirty.modified + worker.dirty.untracked;
+      const position = issue ? `#${issue.number} · ${issue.title}` : '未在场';
+      return `<div class="worker-row"><i class="worker-state ${worker.mode}"></i><div><div class="worker-name">${esc(shortName(worker.name))}</div><div class="worker-position">${esc(position)}</div>${worker.task ? `<div class="badges">${taskBadges(worker.task)}</div>` : ''}<div class="badges">${dirty ? `<span class="badge dirty">dirty ${worker.dirty.modified}+${worker.dirty.untracked}</span>` : ''}${worker.assessment?.stale ? '<span class="badge stale">评估过期</span>' : ''}${worker.mode === 'running' ? `<span class="badge">▶ ${elapsed(worker.activeTask?.startedAt)}</span>` : ''}</div></div><button class="locate" data-locate="${issue?.number || ''}" ${issue ? '' : 'disabled'} title="定位队员">⌖</button></div>`;
+    }).join('')}`;
+    $$('.locate:not(:disabled)').forEach((button) => button.addEventListener('click', () => flyTo(Number(button.dataset.locate))));
+  }
+
+  function renderMap() {
+    if (!state.status) return;
+    const columns = [
+      ['resolved','已探明'], ['claimed','进行中'], ['frontier','可开工'], ['blocked','被阻塞'],
+    ];
+    $('#map-view').innerHTML = columns.map(([status, title]) => {
+      const issues = state.status.graph.issues.filter((issue) => issue.derived.status === status);
+      const cards = issues.map((issue) => {
+        const worker = workerFor(issue);
+        return `<button class="map-card ${status}${status === 'resolved' ? ' compact' : ''}${issue.derived.warn ? ' warn' : ''}" data-map-issue="${issue.number}"><span class="map-id">#${issue.number}</span>${status === 'resolved' ? '' : `<span class="map-title">${esc(issue.title)}</span>`}${worker ? `<span class="map-worker">${esc(shortName(worker.name))} ${worker.mode === 'running' ? '▶' : '✋'}</span>` : ''}${issue.derived.warn ? '<span class="map-warn">⚠ 回归有波动</span>' : ''}</button>`;
+      }).join('');
+      return `<section class="map-column"><header class="map-head"><h3>${title}</h3><b>${issues.length}</b></header><div class="map-list">${cards || '<div class="snapshot-note">当前没有节点</div>'}</div></section>`;
+    }).join('');
+    $$('[data-map-issue]').forEach((button) => button.addEventListener('click', () => selectIssue(Number(button.dataset.mapIssue))));
+  }
+
+  function renderMeta() {
+    const stats = state.status.graph.stats;
+    $('#brand-sub').textContent = `${stats.total} issues · ${stats.closed} 已探明 · 星等 = 依赖连接数`;
+    $('#progress-label').textContent = `${stats.closed} / ${stats.total}`;
+    $('#progress-fill').style.width = `${stats.total ? stats.closed / stats.total * 100 : 0}%`;
+    $('#mode-badge').textContent = state.mode === 'live' ? 'LIVE' : 'SNAPSHOT';
+    $('#mode-badge').className = `mode-badge ${state.mode}`;
+    $('#refresh').textContent = state.mode === 'live' ? '↻ 刷新' : '只读快照';
+    $('#refresh').disabled = state.mode !== 'live';
+    const orchestration = state.status.orchestration;
+    const pill = $('#orch-pill');
+    pill.classList.toggle('stopped', orchestration?.state === 'stopped');
+    pill.innerHTML = orchestration
+      ? `ORCH ${esc(orchestration.state.toUpperCase())}<small>${esc(orchestration.reason || 'active')} · ${esc(orchestration.evaluatedAt?.slice(5,16).replace('T',' ') || '')}</small>`
+      : 'ORCH <small>无编排数据</small>';
+  }
+
+  function renderAll(status) {
+    if (!status || ![2, 3].includes(status.schemaVersion)) {
+      toast('需要先运行 collect.mjs 生成 status.json v3'); return;
+    }
+    state.status = status;
+    $('#v2-note').classList.toggle('open', status.schemaVersion === 2);
+    renderMeta(); renderLegend(); renderWorkers(); renderGraph(); renderMap();
+    if (state.selected) renderDetails();
+  }
+
+  function selectIssue(id) {
+    state.selected = id;
+    renderDetails();
+    $('#workers').style.display = 'none';
+    $('#details').classList.add('open');
+  }
+
+  function closeDetails() {
+    state.selected = null;
+    $('#details').classList.remove('open');
+    $('#workers').style.display = '';
+  }
+
+  function renderDetails() {
+    const issue = state.status?.graph.issues.find((item) => item.number === state.selected);
+    if (!issue) return closeDetails();
+    const worker = workerFor(issue);
+    const downstream = state.status.graph.edges.filter((edge) => edge.from === issue.number).map((edge) => state.status.graph.issues.find((item) => item.number === edge.to)).filter(Boolean);
+    const latestTask = worker?.activeTask || worker?.recentTasks?.[0];
+    const registryTask = worker?.task || null;
+    const transitions = (state.status.transitions || []).filter((item) => item.taskId === registryTask?.taskId).slice(-8);
+    const idleWorkers = state.status.worktrees.filter((item) => item.mode === 'idle');
+    const workerOptions = (idleWorkers.length ? idleWorkers : state.status.worktrees).map((item) => `<option value="${esc(item.name)}" ${worker?.name === item.name ? 'selected' : ''}>${esc(shortName(item.name))}${item.dirty.modified + item.dirty.untracked ? ' · dirty' : ''}</option>`).join('');
+    const prompt = `处理 #${issue.number}：${issue.title}\n先读取 issue 正文与仓库规则，按其验收条件完成；不要关闭 issue，不要合并到 main。`;
+    const registrySection = registryTask ? `<div class="registry-section"><h3>任务（registry）</h3><div class="kv"><span>Task</span><span>${esc(registryTask.taskId)} · ${esc(registryTask.threadId || registryTask.clientThreadId || 'cli-fallback')} · ${esc(registryTask.role)}</span></div><div class="kv"><span>模型</span><span>${esc(registryTask.modelTier || '—')}（${esc(registryTask.routingReason || '未记录') }）</span></div><div class="verdict-chips"><span class="verdict-chip">code ${esc(registryTask.verdict?.code || '—')}</span><span class="verdict-chip">runtime ${esc(registryTask.verdict?.runtime || '—')}</span><span class="verdict-chip">delivery ${esc(registryTask.verdict?.delivery || '—')}</span></div><div class="kv"><span>转移</span><span>${transitions.length ? '' : '暂无历史'}</span></div>${transitions.length ? `<ol class="transition-history">${transitions.map((item) => `<li>${esc(item.ts?.slice(11,16))} ${esc(item.from)} → ${esc(item.to)}${item.eventId ? ` · ${esc(item.eventId)}` : ''}</li>`).join('')}</ol>` : ''}</div>` : '';
+    $('#details').innerHTML = `<div class="details-top"><div class="issue-kicker"><span>#${issue.number}</span><span class="status-pill ${issue.derived.status}">${labels[issue.derived.status]}</span></div><button class="close" aria-label="关闭">×</button></div><h2>${esc(issue.title)}</h2><div class="kv"><span>状态</span><span>${labels[issue.derived.status]} · degree ${issue.derived.degree}${issue.derived.warn ? ' · ⚠ 回归有波动' : ''}</span></div><div class="kv"><span>分支</span><span>${esc(worker?.branch || '尚未认领')}</span></div><div class="kv"><span>来路</span><span>${issue.blockedBy.length ? issue.blockedBy.map((number) => `#${number}`).join(' · ') : '无前置依赖'}</span></div>${worker?.assessment?.stale ? '<div class="stale-note">评估已过期：最新 commit 或任务结束晚于 assessedAt，请以现场为准重新评估。</div>' : ''}${registrySection}<div class="unlock"><div class="unlock-title">完成后解锁</div><div class="chips">${downstream.length ? downstream.map((item) => `<span class="chip">#${item.number}</span>`).join('') : '<span class="chip">无直接下游</span>'}</div></div><div class="details-actions"><button class="btn primary" id="view-log" ${state.mode !== 'live' || !latestTask ? 'disabled' : ''}>查看运行日志</button><button class="btn" id="open-issue">打开 issue</button></div><pre class="log-view" id="log-view"></pre><div class="dispatch-box"><h3>${issue.derived.status === 'frontier' ? '从这里派活' : '派发关联任务'}</h3>${state.mode === 'live' ? `<textarea id="dispatch-prompt">${esc(prompt)}</textarea><div class="dispatch-controls"><select id="dispatch-worker">${workerOptions}</select><select id="dispatch-agent"><option>claude</option><option>codex</option><option>test</option></select></div><div class="auth-note">cli-fallback 需显式授权；正常路径是 Desktop create_thread。真实 fallback 必须记录用户授权原话，token 由页面自动携带。</div><input class="fallback-auth" id="fallback-authorized" placeholder="粘贴用户授权原话（test 假 agent 豁免）"><button class="btn primary" id="dispatch" style="width:100%;margin-top:7px">派发 cli-fallback 任务</button>` : '<div class="snapshot-note">file:// 只读快照不能派发。请启动 server.mjs 后从 LIVE 页面操作。</div>'}</div>`;
+    $('.close').addEventListener('click', closeDetails);
+    $('#open-issue').addEventListener('click', () => window.open(issue.url, '_blank', 'noopener'));
+    if ($('#view-log') && !$('#view-log').disabled) $('#view-log').addEventListener('click', () => showLog(latestTask.id));
+    if ($('#dispatch')) $('#dispatch').addEventListener('click', () => dispatchIssue(issue));
+  }
+
+  async function showLog(taskId) {
+    const output = $('#log-view');
+    output.classList.add('open'); output.textContent = '读取日志…';
+    try {
+      const response = await fetch(`/api/task/${encodeURIComponent(taskId)}`);
+      const payload = await response.json();
+      output.textContent = response.ok ? payload.logTail || '日志为空' : payload.error;
+    } catch (error) { output.textContent = error.message; }
+  }
+
+  async function dispatchIssue(issue, confirmDirty = false, inspect = false) {
+    const worktree = $('#dispatch-worker')?.value || state.pendingDispatch?.worktree;
+    const agent = $('#dispatch-agent')?.value || state.pendingDispatch?.agent;
+    const fallbackAuthorized = $('#fallback-authorized')?.value.trim() || state.pendingDispatch?.fallbackAuthorized || '';
+    let prompt = $('#dispatch-prompt')?.value.trim() || state.pendingDispatch?.prompt;
+    if (!worktree || !prompt) return toast('请选择队员并填写任务指令');
+    if (agent !== 'test' && !fallbackAuthorized) return toast('真实 cli-fallback 必须填写用户授权原话；正常路径请用 Desktop create_thread');
+    if (inspect) prompt = `只读侦查，不修改文件、不提交：先说明当前 worktree 的未提交现场与 #${issue.number} 的关系。\n\n${prompt}`;
+    const body = { worker: worktree, prompt, agent, fallbackAuthorized: fallbackAuthorized || undefined };
+    if (confirmDirty) body.confirmDirty = true;
+    try {
+      const boardToken = document.querySelector('meta[name="board-token"]')?.content || '';
+      const response = await fetch('/api/dispatch', { method:'POST', headers:{'content-type':'application/json','x-board-token':boardToken}, body:JSON.stringify(body) });
+      const payload = await response.json();
+      if (response.status === 409 && payload.code === 'DIRTY') {
+        state.pendingDispatch = { issue, worktree, prompt, agent, fallbackAuthorized, dirty:payload.dirty };
+        $('#dirty-copy').innerHTML = `<code>${esc(shortName(worktree))}</code> 有 ${payload.dirty.modified} 处修改 + ${payload.dirty.untracked} 个未跟踪文件，可能是另一个会话的现场。`;
+        $('#dirty-modal').classList.add('open'); return;
+      }
+      if (!response.ok) return toast(`派发失败：${payload.error || payload.message || payload.code || response.status}`);
+      state.pendingDispatch = null; $('#dirty-modal').classList.remove('open');
+      toast(`已派发 ${payload.taskId}`);
+      setTimeout(() => refresh(true), 500);
+    } catch (error) { toast(`派发失败：${error.message}`); }
+  }
+
+  function searchMatches(query) {
+    const normalized = query.trim().toLowerCase().replace(/^#/, '');
+    if (!normalized) return [];
+    const results = state.status.graph.issues.filter((issue) => String(issue.number) === normalized || issue.title.toLowerCase().includes(normalized) || String(issue.claimedBy || '').toLowerCase().includes(normalized));
+    return results.slice(0, 7);
+  }
+
+  function renderSearch() {
+    const results = searchMatches($('#search').value);
+    const panel = $('#search-results');
+    panel.innerHTML = results.map((issue) => `<button class="search-result" data-search-id="${issue.number}"><b>#${issue.number}</b>${esc(issue.title)}</button>`).join('');
+    panel.classList.toggle('open', results.length > 0);
+    $$('[data-search-id]').forEach((button) => button.addEventListener('click', () => { flyTo(Number(button.dataset.searchId)); panel.classList.remove('open'); }));
+  }
+
+  function flyTo(id) {
+    if (state.view === 'map') setView('graph');
+    const point = state.positions.get(id); if (!point) return;
+    const k = Math.max(1.25, state.transform.k);
+    state.transform = { x:innerWidth / 2 - point.x * k, y:innerHeight / 2 - point.y * k, k };
+    const viewport = $('#viewport');
+    viewport.style.transition = 'transform 450ms ease-in-out';
+    updateTransform();
+    setTimeout(() => { viewport.style.transition = ''; const node = $(`.issue-node[data-id="${id}"]`); node?.classList.add('search-hit'); setTimeout(() => node?.classList.remove('search-hit'), 1900); }, 460);
+  }
+
+  function updateTransform() {
+    const viewport = $('#viewport');
+    if (viewport) viewport.setAttribute('transform', `translate(${state.transform.x} ${state.transform.y}) scale(${state.transform.k})`);
+    $('#graph').classList.toggle('resolved-labels-hidden', state.transform.k < .6);
+    updateZoom();
+  }
+
+  function zoomAt(nextK, x = innerWidth / 2, y = innerHeight / 2) {
+    const oldK = state.transform.k;
+    const k = Math.max(.25, Math.min(4, nextK));
+    const worldX = (x - state.transform.x) / oldK;
+    const worldY = (y - state.transform.y) / oldK;
+    state.transform.x = x - worldX * k; state.transform.y = y - worldY * k; state.transform.k = k;
+    updateTransform();
+  }
+
+  function updateZoom() { $('#zoom-value').textContent = `${Math.round(state.transform.k * 100)}%`; }
+
+  function setView(view) {
+    state.view = view;
+    $$('[data-view]').forEach((button) => button.classList.toggle('active', button.dataset.view === view));
+    $('#graph').classList.toggle('graph-hidden', view !== 'graph');
+    $('#map-view').classList.toggle('active', view === 'map');
+    $('.search-wrap').style.display = view === 'graph' ? '' : 'none';
+    $('#legend').style.display = view === 'graph' ? '' : 'none';
+    $('#zoom').style.display = view === 'graph' ? '' : 'none';
+    $('#hint').textContent = view === 'graph' ? '悬停高亮邻居 · 滚轮缩放 · 拖拽平移' : '四列进度轴 · 点击 issue 查看详情与派活';
+  }
+
+  async function refresh(fast = false) {
+    if (state.mode !== 'live') return;
+    $('#refresh').disabled = true; $('#refresh').textContent = '刷新中…';
+    try {
+      const response = await fetch(`/api/status${fast ? '?fast=1' : ''}`, { cache:'no-store' });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      renderAll(await response.json());
+    } catch (error) { toast(`刷新失败：${error.message}`); }
+    finally { $('#refresh').disabled = false; $('#refresh').textContent = '↻ 刷新'; }
+  }
+
+  function toast(message) {
+    const element = $('#toast'); element.textContent = message; element.classList.add('show');
+    clearTimeout(element.timer); element.timer = setTimeout(() => element.classList.remove('show'), 3200);
+  }
+
+  function bindShell() {
+    $$('[data-view]').forEach((button) => button.addEventListener('click', () => setView(button.dataset.view)));
+    $('#refresh').addEventListener('click', () => refresh(false));
+    $('#search').addEventListener('input', renderSearch);
+    $('#search').addEventListener('keydown', (event) => { if (event.key === 'Enter') { const match = searchMatches(event.target.value)[0]; if (match) flyTo(match.number); } });
+    $('#zoom').addEventListener('click', (event) => { const direction = event.target.dataset.zoom; if (direction) zoomAt(state.transform.k * (direction === 'in' ? 1.25 : .8)); });
+    const svg = $('#graph');
+    svg.addEventListener('wheel', (event) => { event.preventDefault(); zoomAt(state.transform.k * Math.exp(-event.deltaY * .0012), event.clientX, event.clientY); }, { passive:false });
+    svg.addEventListener('pointerdown', (event) => { if (event.target.closest('.issue-node')) return; state.dragging = { x:event.clientX, y:event.clientY, tx:state.transform.x, ty:state.transform.y }; svg.setPointerCapture(event.pointerId); svg.classList.add('panning'); closeDetails(); });
+    svg.addEventListener('pointermove', (event) => { if (!state.dragging) return; state.transform.x = state.dragging.tx + event.clientX - state.dragging.x; state.transform.y = state.dragging.ty + event.clientY - state.dragging.y; updateTransform(); });
+    svg.addEventListener('pointerup', () => { state.dragging = null; svg.classList.remove('panning'); });
+    $('#dirty-modal').addEventListener('click', (event) => {
+      const action = event.target.dataset.dirty; if (!action || !state.pendingDispatch) return;
+      if (action === 'cancel') { state.pendingDispatch = null; $('#dirty-modal').classList.remove('open'); return; }
+      const pending = state.pendingDispatch; dispatchIssue(pending.issue, true, action === 'inspect');
+    });
+    window.addEventListener('resize', () => { if (state.status) renderGraph(); });
+    setInterval(() => { if (state.status) renderWorkers(); if (state.selected) renderDetails(); }, 60000);
+  }
+
+  async function boot() {
+    bindShell();
+    const liveToken = document.querySelector('meta[name="board-token"]')?.content || '';
+    if (location.protocol !== 'file:' && liveToken) {
+      try {
+        const response = await fetch('/api/status?fast=1', { cache:'no-store' });
+        if (response.ok) { state.mode = 'live'; renderAll(await response.json()); return; }
+      } catch { /* 自动降级到 runtime/status.js 快照。 */ }
+    }
+    state.mode = 'snapshot';
+    if (window.WORKBOARD) renderAll(window.WORKBOARD);
+    else toast('没有快照：先运行 collect.mjs');
+  }
+
+  boot();
+})();
+</script>
+</body>
+</html>
