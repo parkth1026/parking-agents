@@ -1,0 +1,114 @@
+{
+  "schemaVersion": "aes.worktree-board.trajectory-replay/v1",
+  "trajectoryId": "T-03-wrong-parent-orphan-reviewer",
+  "provenance": {
+    "desensitized": true,
+    "sourceKind": "historical-orchestration-session",
+    "note": "reviewer 的 receipt 被记到另一个 task 上，以及一个没有父 job 的 parked reviewer 需要主控手工处理。任务 ID 与仓库已脱敏。"
+  },
+  "historicalFailure": {
+    "classes": ["wrong-parent-event", "orphan-reviewer"],
+    "whatWentWrong": "reviewer 是独立 Task，其结果靠自然语言与主控记忆挂回原任务，于是出现挂错父节点与孤儿 reviewer；主控只能手工 park 并逐个辨认。"
+  },
+  "setup": {
+    "workers": [{ "id": "worker-1" }, { "id": "worker-2" }]
+  },
+  "steps": [
+    { "action": "start" },
+    { "action": "claim", "issue": 621, "slot": "worker-1", "as": "job-a" },
+    { "action": "claim", "issue": 622, "slot": "worker-2", "as": "job-b" },
+    { "action": "candidate", "job": "job-a", "file": "a.txt" },
+    { "action": "candidate", "job": "job-b", "file": "b.txt" },
+
+    {
+      "action": "review", "job": "job-a", "outcome": "PASS", "as": "orphan-review",
+      "forgeJobId": "job-does-not-exist",
+      "why": "孤儿 reviewer：receipt 不属于任何在册 job"
+    },
+    {
+      "action": "review", "job": "job-a", "outcome": "PASS", "as": "wrong-parent-review",
+      "forgeAttemptId": "job-621-forged#attempt-9"
+    },
+    {
+      "action": "review", "job": "job-a", "outcome": "PASS", "as": "cross-job-commit",
+      "commitOverride": "job-b"
+    },
+    { "action": "review", "job": "job-a", "outcome": "PASS", "as": "correct-review" },
+    { "action": "qa", "job": "job-a", "outcome": "PASS" },
+    { "action": "terminal", "job": "job-a", "outcome": "READY_TO_MERGE" },
+    { "action": "merge", "job": "job-a" },
+    { "action": "verify", "job": "job-a", "exit": 0 },
+    { "action": "close", "job": "job-a" },
+    { "action": "reconcile", "as": "restart" }
+  ],
+  "expectations": [
+    {
+      "id": "E-1",
+      "check": "step-field",
+      "step": "orphan-review",
+      "path": "code",
+      "equals": "ORPHAN_STAGE_RESULT",
+      "why": "没有在册父 job 的 reviewer receipt 必须被拒收，而不是留给主控手工辨认"
+    },
+    {
+      "id": "E-2",
+      "check": "step-field",
+      "step": "orphan-review",
+      "path": "consumed",
+      "equals": false,
+      "why": "孤儿 receipt 不得被消费，也不得推进任何 job"
+    },
+    {
+      "id": "E-3",
+      "check": "step-field",
+      "step": "wrong-parent-review",
+      "path": "code",
+      "equals": "WRONG_PARENT_STAGE_RESULT",
+      "why": "attemptId 对不上时必须拒收，杜绝挂错父节点"
+    },
+    {
+      "id": "E-4",
+      "check": "step-field",
+      "step": "cross-job-commit",
+      "path": "code",
+      "equals": "STALE_EVIDENCE",
+      "why": "别的 job 的 candidate commit 不得被当作本 job 的证据"
+    },
+    {
+      "id": "E-5",
+      "check": "step-field",
+      "step": "correct-review",
+      "path": "ok",
+      "equals": true,
+      "why": "正确绑定 job + attempt + commit 的 review 必须被接受"
+    },
+    {
+      "id": "E-6",
+      "check": "job-state",
+      "job": "job-b",
+      "equals": "dispatched",
+      "why": "被错挂的 job 不得因为别人的 receipt 而推进状态"
+    },
+    {
+      "id": "E-7",
+      "check": "job-state",
+      "job": "job-a",
+      "equals": "closed",
+      "why": "拒收孤儿与错挂 receipt 后，正确路径仍能走到交付"
+    },
+    {
+      "id": "E-8",
+      "check": "merge-commit-count",
+      "equals": 1,
+      "why": "只有绑定正确的 job 被 merge"
+    },
+    {
+      "id": "E-9",
+      "check": "step-field",
+      "step": "restart",
+      "path": "unexplainedJobs",
+      "equals": 0,
+      "why": "重启后不存在无法解释的孤儿状态"
+    }
+  ]
+}

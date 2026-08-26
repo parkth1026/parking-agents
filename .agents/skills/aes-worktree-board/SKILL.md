@@ -310,10 +310,102 @@ dirty 现场仍需另加 `--confirm-dirty`。server 看板的 fallback POST 还�
 
 `POST /api/dispatch` 的锁定字段名是 `worker`；server 为旧调用方兼容接收 `worktree`，但页面与新调用方统一发送 `worker`。500 报文使用 `message`。
 
+## v4 无人值守控制面（目标 A）
+
+在既有 v3 Task 编排之外，`master.mjs` 提供 runner / job / attempt 分层的无人值守控制面。
+v3 runtime 被**只读封存**：只记录路径与 hash 引用，绝不反向推导 job/attempt。
+
+### runner slot
+
+本机 slot allowlist 是 Git 忽略的 `<目标仓根>/.aes-worktree-board/runner-slots.local.json`
+（schema `aes.worktree-board.runner-slots/v1`），由确定性脚本生成，LLM 只能消费。
+重复生成是幂等 NOOP；改配置必须显式 update。
+
+slot 有四类不可领取状态，每类都带原因与恢复命令：
+
+| 状态 | 触发 | 处置 |
+| --- | --- | --- |
+| `QUARANTINED_CONFIG_DRIFT` | 路径指向别的仓 | 只有显式 `runner update/init` 能修 |
+| `QUARANTINED_DIRTY` | 有 dirty/untracked | **绝不** reset/clean；其余 slot 继续调度 |
+| `QUARANTINED_MISSING` | 路径不存在 | 确认 worktree 后 update |
+| `idle` + `needsBaselineSync` | 未同步到 integration HEAD | `master.mjs release --slot <id>` |
+
+slot allowlist 为空时 Master Goal **拒绝启动**并非零退出，不由 LLM 自动补 slot。
+
+### 一个 job 的完整路径
+
+```bash
+node "$skillDir/scripts/master.mjs" start
+node "$skillDir/scripts/master.mjs" claim --issue-file <issue.json>
+node "$skillDir/scripts/master.mjs" candidate --job <jobId> --commit <sha>
+node "$skillDir/scripts/master.mjs" stage review --job <jobId> --payload-file <stage-result.json>
+node "$skillDir/scripts/master.mjs" stage qa --job <jobId> --payload-file <qa-receipt.json>
+node "$skillDir/scripts/master.mjs" terminal --payload-file <goal-terminal.json>
+node "$skillDir/scripts/master.mjs" gate --job <jobId>
+node "$skillDir/scripts/master.mjs" merge --job <jobId>
+node "$skillDir/scripts/master.mjs" verify --job <jobId> --commands-file <commands.json>
+node "$skillDir/scripts/master.mjs" close --job <jobId>
+node "$skillDir/scripts/master.mjs" release --job <jobId> --slot <slotId>
+```
+
+`jobId` 跨 attempt 稳定；`attemptId` 每次尝试唯一。旧 attempt 与证据永不覆盖。
+
+### 分档 merge gate
+
+`riskProfile` 由 Issue 自报，而**自报环节正是不可信处**，所以 Master 按改动路径兜底校验：
+触及 identity、权限、密钥、安全边界、schema/迁移、公共 API、CI 的改动会被强制升档，
+并在 `triggeredRules` 里指名是哪条规则。
+
+| 生效档 | 行为 |
+| --- | --- |
+| `low` / `medium` | 机械门全绿即自动 merge |
+| `high` | 机械门全绿**仍**停在 humanGate 等人工批准 |
+| `critical` | 拒绝直接 merge，只走 PR；waiver 也不能覆盖 |
+
+机械门六项固定顺序：slot → commit → integration → acceptance → review → QA。
+其中 QA 含 `NOT_RUN` 或 `unexecuted` 非空一律判失败。
+
+### 中断恢复
+
+Master 死亡后人工重启，只凭 registry / inbox / receipts + Git 恢复：
+
+```bash
+node "$skillDir/scripts/master.mjs" reconcile
+```
+
+**判定 merge 是否真的发生，问 Git 不问状态位。** merge 前先落 `mergeIntent`，
+reconcile 用 `git merge-base --is-ancestor` 核实 candidate 是否已在 integration 中：
+在则认领既有 merge，不在则退回队列重排。这是「无重复 merge / 无丢失 job / 无假完成」
+的实际依据 —— 进程可能在写状态位之前就死了，Git 不会。
+
+reconcile 输出对每个 job 与每个 slot 都给可解释状态；`unexplainedJobs` /
+`unexplainedSlots` 必须为 0。
+
+### 人工态
+
+`awaiting-human` / `blocked-permission` / `contract-conflict` 三个终点必须携带
+`humanRequest{kind, prompt, requiredEvidence, resumeToken}`。缺 `resumeToken` 的报文
+schema 拒收且**不推进状态**。人工答复必须 `actor: "human"`，Agent 不得代答；
+`WAIVED` 需要结构化 `waiver{reason, loweredCriteria, authorizedBy}`。
+
+### 700×1000 竖屏工作台
+
+产品在 `(max-width: 900px) and (orientation: portrait)` 下切换到竖屏工作台，
+渲染在 shadow root 内，与桌面全屏星图完全隔离（桌面层 id 与样式互不可见）。
+该区段由 `scripts/build-portrait.mjs` 从确认版对照物 `mock.html` 机械生成并记录其
+sha256；`board-ui` 域会核对生成物与真源同步，以及产品与 mock 的**逐像素**一致。
+改视觉走「改 mock → 重跑 build-portrait.mjs」，不要手改 board.html 的生成区段。
+
 ## 自检
 
 ```powershell
 node "$skillDir/scripts/selftest.mjs" orchestration
+node "$skillDir/scripts/selftest.mjs" orchestration --scenario runner-lifecycle
+node "$skillDir/scripts/selftest.mjs" orchestration --scenario recovery
+node "$skillDir/scripts/selftest.mjs" orchestration --scenario trajectory-replay
+node "$skillDir/scripts/selftest.mjs" orchestration --scenario discovered-work
+node "$skillDir/scripts/selftest.mjs" orchestration --scenario delivery-merge
+node "$skillDir/scripts/selftest.mjs" board-ui --baseline 700x1000
 node "$skillDir/scripts/selftest.mjs" orchestration --scenario storage
 node "$skillDir/scripts/selftest.mjs" orchestration --scenario lifecycle
 node "$skillDir/scripts/selftest.mjs" orchestration --scenario governance
@@ -322,7 +414,7 @@ node "$skillDir/scripts/selftest.mjs" orchestration --scenario boundary
 node "$skillDir/scripts/selftest.mjs" orchestration --scenario contract
 ```
 
-默认 `run-tests.mjs` 的 `collect / fixture / dispatch / server / repo-root / layout / windows-hide / orchestration` 全部使用本机或离线 fixture，必须稳定全绿。真实 GitHub 巡检另跑 `node "$skillDir/scripts/selftest.mjs" collect-live`；它是受授权、网络和实时 Issue 变化影响的 live smoke，不进入默认门禁。所有新增 child_process 启动点仍使用 `HEADLESS_CHILD_OPTIONS`。页面视觉与交互必须用真实浏览器逐处对照锁定 mock；自动自检不能替代人工 UI AC。
+默认 `run-tests.mjs` 的 `collect / fixture / dispatch / server / repo-root / layout / windows-hide / orchestration / identity / board-ui` 全部使用本机或离线 fixture，必须稳定全绿。真实 GitHub 巡检另跑 `node "$skillDir/scripts/selftest.mjs" collect-live`；它是受授权、网络和实时 Issue 变化影响的 live smoke，不进入默认门禁。所有新增 child_process 启动点仍使用 `HEADLESS_CHILD_OPTIONS`。页面视觉与交互必须用真实浏览器逐处对照锁定 mock；自动自检不能替代人工 UI AC。
 
 发布或升级前运行技能根的标准回归入口：
 

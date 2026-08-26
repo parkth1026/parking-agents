@@ -1,0 +1,93 @@
+{
+  "schemaVersion": "aes.worktree-board.board-ui-receipt/v1",
+  "acceptance": "AC-006",
+  "baseline": "700x1000",
+  "commit": "dbb265f0a9bd8647b6350f566662fce40a15af46",
+  "mockSha256": "1A94A5291A37D3969E71E245AFD8399425CA80E13839260A451FC7CD7D736CF4",
+  "desktopTruthSha256": "2703B1A632292A1AD4927D2BFD6E57384E234248B5E6EF59C9AA11128435B98A",
+  "environment": {
+    "browser": "HeadlessChrome/148.0.7778.96",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/148.0.7778.96 Safari/537.36",
+    "deviceScaleFactor": 1,
+    "prefersReducedMotion": "reduce",
+    "fonts": [
+      {
+        "family": "Segoe UI",
+        "available": true
+      },
+      {
+        "family": "Microsoft YaHei",
+        "available": true
+      },
+      {
+        "family": "Cascadia Mono",
+        "available": true
+      },
+      {
+        "family": "Georgia",
+        "available": true
+      }
+    ],
+    "platform": "win32"
+  },
+  "screenshotDiff": {
+    "comparable": true,
+    "width": 700,
+    "height": 1000,
+    "totalPixels": 700000,
+    "differentPixels": 0,
+    "ratio": 0,
+    "maxDelta": 0
+  },
+  "screenshotSha256": {
+    "mock": "8615E29A0A98BB38A71321DBB443884373F2BE084B33894953E3496E13B86FBE",
+    "product": "8615E29A0A98BB38A71321DBB443884373F2BE084B33894953E3496E13B86FBE"
+  },
+  "adjacentSmoke": [
+    {
+      "width": 640,
+      "height": 960,
+      "viewBox": "0 0 640 644",
+      "graphResizes": true,
+      "transform": "translate(0 0) scale(1)",
+      "graphRect": [
+        640,
+        644
+      ],
+      "scrollWidth": 640,
+      "scrollHeight": 960,
+      "nodes": 10,
+      "listCards": 10
+    },
+    {
+      "width": 768,
+      "height": 1024,
+      "viewBox": "0 0 700 684",
+      "graphResizes": false,
+      "transform": "translate(-70 -68.39999999999998) scale(1.2)",
+      "graphRect": [
+        700,
+        684
+      ],
+      "scrollWidth": 768,
+      "scrollHeight": 1024,
+      "nodes": 10,
+      "listCards": 10
+    }
+  ],
+  "desktopNonRegression": {
+    "portraitActive": false,
+    "portraitHidden": true,
+    "portraitBooted": false,
+    "starmap": true,
+    "workers": true,
+    "details": true,
+    "viewToggle": [
+      "graph",
+      "map"
+    ],
+    "zoom": true,
+    "appVisible": true
+  },
+  "recordedAt": "2026-08-26T09:59:58.214Z"
+}

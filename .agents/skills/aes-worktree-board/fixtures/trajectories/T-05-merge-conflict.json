@@ -1,0 +1,108 @@
+{
+  "schemaVersion": "aes.worktree-board.trajectory-replay/v1",
+  "trajectoryId": "T-05-merge-conflict",
+  "provenance": {
+    "desensitized": true,
+    "sourceKind": "historical-orchestration-session",
+    "note": "integration 与 candidate 在同一文件分叉，merge 冲突后留下半合并现场，slot 被提前释放，job 一度失联。仓库与分支名已脱敏。"
+  },
+  "historicalFailure": {
+    "classes": ["merge-conflict"],
+    "whatWentWrong": "冲突处置靠主控自然语言：有时留下半合并工作区，有时提前释放 slot 并让 job 掉出队列，失败证据也没有落盘可审计的位置。"
+  },
+  "setup": {
+    "workers": [{ "id": "worker-1" }, { "id": "worker-2" }]
+  },
+  "steps": [
+    { "action": "start" },
+    { "action": "claim", "issue": 641, "slot": "worker-1", "as": "job-a" },
+    { "action": "claim", "issue": 642, "slot": "worker-2", "as": "job-b" },
+
+    { "action": "candidate", "job": "job-a", "conflict": true, "as": "conflicting" },
+    { "action": "review", "job": "job-a", "outcome": "PASS" },
+    { "action": "qa", "job": "job-a", "outcome": "PASS" },
+    { "action": "terminal", "job": "job-a", "outcome": "READY_TO_MERGE" },
+    { "action": "merge", "job": "job-a", "as": "conflict-merge" },
+    { "action": "reconcile", "as": "restart-after-conflict" },
+
+    { "action": "candidate", "job": "job-b", "file": "unrelated.txt" },
+    { "action": "review", "job": "job-b", "outcome": "PASS" },
+    { "action": "qa", "job": "job-b", "outcome": "PASS" },
+    { "action": "terminal", "job": "job-b", "outcome": "READY_TO_MERGE" },
+    { "action": "merge", "job": "job-b", "as": "unblocked-merge" },
+    { "action": "verify", "job": "job-b", "exit": 0 },
+    { "action": "close", "job": "job-b" }
+  ],
+  "expectations": [
+    {
+      "id": "E-1",
+      "check": "step-field",
+      "step": "conflict-merge",
+      "path": "code",
+      "equals": "MERGE_CONFLICT",
+      "why": "冲突必须是 typed disposition，不是自然语言判断"
+    },
+    {
+      "id": "E-2",
+      "check": "step-field",
+      "step": "conflict-merge",
+      "path": "disposition",
+      "equals": "AWAITING_FIX",
+      "why": "冲突后的去向必须明确写在报文里"
+    },
+    {
+      "id": "E-3",
+      "check": "worktree-clean",
+      "why": "冲突后必须 abort，绝不留下半合并现场"
+    },
+    {
+      "id": "E-4",
+      "check": "job-state",
+      "job": "job-a",
+      "equals": "ready-to-merge",
+      "why": "冲突的 job 退回可重试状态，而不是丢失"
+    },
+    {
+      "id": "E-5",
+      "check": "slot-lease-held",
+      "slot": "worker-1",
+      "equals": true,
+      "why": "冲突不得提前释放 slot —— 现场还要用来修复"
+    },
+    {
+      "id": "E-6",
+      "check": "receipt-kinds",
+      "present": ["merge-intent", "merge-failed"],
+      "why": "merge 意图与失败证据都必须落盘可审计"
+    },
+    {
+      "id": "E-7",
+      "check": "step-field",
+      "step": "restart-after-conflict",
+      "path": "duplicateMergeRisk",
+      "equals": false,
+      "why": "冲突后重启不得让同一 job 在队列里出现两次"
+    },
+    {
+      "id": "E-8",
+      "check": "step-field",
+      "step": "unblocked-merge",
+      "path": "ok",
+      "equals": true,
+      "why": "一个 job 的冲突不得阻塞其他 job 的串行 merge"
+    },
+    {
+      "id": "E-9",
+      "check": "merge-commit-count",
+      "equals": 1,
+      "why": "冲突那次不得留下 merge commit，只有成功的那次留下"
+    },
+    {
+      "id": "E-10",
+      "check": "job-state",
+      "job": "job-b",
+      "equals": "closed",
+      "why": "不相关的 job 正常交付"
+    }
+  ]
+}

@@ -1,0 +1,138 @@
+{
+  "schemaVersion": "aes.worktree-board.trajectory-replay/v1",
+  "trajectoryId": "T-04-timeout-env-pollution",
+  "provenance": {
+    "desensitized": true,
+    "sourceKind": "historical-orchestration-session",
+    "note": "测试命令因环境变量污染与超时反复失败，被当作实现缺陷计入 BLOCK 预算；主机路径与账号已脱敏。"
+  },
+  "historicalFailure": {
+    "classes": ["timeout-env-pollution"],
+    "whatWentWrong": "环境问题与真实缺陷共用同一本预算，两次环境失败就吃掉了修复实现的机会；且 NOT_RUN 的检查被当成通过，让不完整的 QA 证据放行。"
+  },
+  "setup": {
+    "workers": [{ "id": "worker-1" }]
+  },
+  "steps": [
+    { "action": "start" },
+    { "action": "claim", "issue": 631, "slot": "worker-1", "as": "job-a" },
+    { "action": "candidate", "job": "job-a", "file": "env.txt" },
+
+    {
+      "action": "qa", "job": "job-a", "outcome": "FAIL", "failureClass": "environment",
+      "as": "env-fail-1", "environmentKind": "local-live",
+      "checks": [{ "id": "QA-1", "kind": "automated", "outcome": "FAIL", "summary": "PYTHONUTF8 未设置导致编码错误" }]
+    },
+    {
+      "action": "qa", "job": "job-a", "outcome": "FAIL", "failureClass": "environment",
+      "as": "env-fail-2",
+      "checks": [{ "id": "QA-1", "kind": "automated", "outcome": "FAIL", "summary": "命令超时" }]
+    },
+    { "action": "budget", "job": "job-a", "as": "budget-after-env" },
+
+    {
+      "action": "qa", "job": "job-a", "outcome": "FAIL", "failureClass": "must-fix",
+      "as": "real-defect",
+      "checks": [{ "id": "QA-2", "kind": "automated", "outcome": "FAIL", "summary": "断言不成立" }]
+    },
+    { "action": "budget", "job": "job-a", "as": "budget-after-defect" },
+
+    {
+      "action": "qa", "job": "job-a", "outcome": "FAIL", "failureClass": "typo-class",
+      "as": "unclassified-failure"
+    },
+
+    {
+      "action": "qa", "job": "job-a", "outcome": "PASS", "as": "qa-with-not-run",
+      "checks": [
+        { "id": "QA-1", "kind": "automated", "outcome": "PASS" },
+        { "id": "QA-3", "kind": "live", "outcome": "NOT_RUN" }
+      ]
+    },
+    { "action": "review", "job": "job-a", "outcome": "PASS" },
+    { "action": "terminal", "job": "job-a", "outcome": "READY_TO_MERGE" },
+    { "action": "merge", "job": "job-a", "as": "merge-with-not-run" },
+
+    {
+      "action": "qa", "job": "job-a", "outcome": "PASS", "as": "qa-complete",
+      "checks": [
+        { "id": "QA-1", "kind": "automated", "outcome": "PASS" },
+        { "id": "QA-3", "kind": "live", "outcome": "PASS" }
+      ]
+    },
+    { "action": "merge", "job": "job-a", "as": "merge-after-complete" },
+    { "action": "verify", "job": "job-a", "exit": 0 },
+    { "action": "close", "job": "job-a" }
+  ],
+  "expectations": [
+    {
+      "id": "E-1",
+      "check": "budget-usage",
+      "job": "job-a",
+      "key": "environmentRetries",
+      "equals": 2,
+      "why": "两次环境失败只烧 environmentRetries"
+    },
+    {
+      "id": "E-2",
+      "check": "step-field",
+      "step": "budget-after-env",
+      "path": "usage.qaLoops",
+      "equals": 0,
+      "why": "环境污染绝不能吃掉修复实现的预算 —— 这正是历史误判的根因"
+    },
+    {
+      "id": "E-3",
+      "check": "step-field",
+      "step": "real-defect",
+      "path": "failureClass",
+      "equals": "must-fix",
+      "why": "真实缺陷与环境问题必须走不同分类"
+    },
+    {
+      "id": "E-4",
+      "check": "step-field",
+      "step": "budget-after-defect",
+      "path": "usage.qaLoops",
+      "equals": 1,
+      "why": "只有真实缺陷计入 QA 修复预算"
+    },
+    {
+      "id": "E-5",
+      "check": "step-field",
+      "step": "unclassified-failure",
+      "path": "code",
+      "equals": "UNCLASSIFIED_STAGE_FAILURE",
+      "why": "闭集外的失败分类必须 fail closed，不得从自然语言补猜"
+    },
+    {
+      "id": "E-6",
+      "check": "step-field",
+      "step": "merge-with-not-run",
+      "path": "decision",
+      "equals": "BLOCKED_MECHANICAL",
+      "why": "含 NOT_RUN 检查的 QA 不得伪装成 PASS 放行"
+    },
+    {
+      "id": "E-7",
+      "check": "step-field",
+      "step": "merge-after-complete",
+      "path": "ok",
+      "equals": true,
+      "why": "所有检查真正执行后才允许合并"
+    },
+    {
+      "id": "E-8",
+      "check": "merge-commit-count",
+      "equals": 1,
+      "why": "被机械门挡下的那次不得留下 merge commit"
+    },
+    {
+      "id": "E-9",
+      "check": "job-state",
+      "job": "job-a",
+      "equals": "closed",
+      "why": "环境问题被正确分类后，job 最终仍能自动走完"
+    }
+  ]
+}

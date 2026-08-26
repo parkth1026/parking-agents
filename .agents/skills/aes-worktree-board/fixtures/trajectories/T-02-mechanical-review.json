@@ -1,0 +1,118 @@
+{
+  "schemaVersion": "aes.worktree-board.trajectory-replay/v1",
+  "trajectoryId": "T-02-mechanical-review",
+  "provenance": {
+    "desensitized": true,
+    "sourceKind": "historical-orchestration-session",
+    "note": "reviewer 连续三次 BLOCK 后被机械 handoff 给人类；三次 BLOCK 中有一次其实是同一条 finding 的重复表述。Issue 编号与仓库已脱敏。"
+  },
+  "historicalFailure": {
+    "classes": ["mechanical-review"],
+    "whatWentWrong": "每次 BLOCK 都进全局 ledger，满三次就机械转人工；Master 用自然语言判断 finding，无法审计，也无法区分「同一问题反复」与「三个独立问题」。修复循环还会打断用户。"
+  },
+  "setup": {
+    "workers": [{ "id": "worker-1" }]
+  },
+  "steps": [
+    { "action": "start" },
+    { "action": "claim", "issue": 611, "slot": "worker-1", "as": "job-a" },
+
+    { "action": "candidate", "job": "job-a", "file": "impl.txt", "content": "v1" },
+    {
+      "action": "review", "job": "job-a", "outcome": "MUST_FIX", "failureClass": "must-fix",
+      "as": "review-1",
+      "findings": [{ "id": "F-1", "axis": "Spec", "priority": "P1", "summary": "error path 未绑定 repo", "recoveryCondition": "所有路径先绑定 account+repo" }]
+    },
+    { "action": "budget", "job": "job-a", "as": "budget-after-1" },
+
+    { "action": "candidate", "job": "job-a", "file": "impl.txt", "content": "v2" },
+    {
+      "action": "review", "job": "job-a", "outcome": "MUST_FIX", "failureClass": "must-fix",
+      "as": "review-2",
+      "findings": [{ "id": "F-2", "axis": "Spec", "priority": "P1", "summary": "同一条 error path 仍未绑定", "recoveryCondition": "所有路径先绑定 account+repo" }]
+    },
+
+    { "action": "candidate", "job": "job-a", "file": "impl.txt", "content": "v3" },
+    {
+      "action": "review", "job": "job-a", "outcome": "MUST_FIX", "failureClass": "must-fix",
+      "as": "review-3",
+      "findings": [{ "id": "F-3", "axis": "Standards", "priority": "P2", "summary": "命名不一致" }]
+    },
+    { "action": "budget", "job": "job-a", "as": "budget-after-3" },
+
+    { "action": "terminal", "job": "job-a", "outcome": "BUDGET_EXHAUSTED", "as": "exhausted",
+      "budget": { "kind": "reviewLoops", "limit": 3, "used": 3 },
+      "remainingBlockers": ["F-3"],
+      "recommendedMasterActions": ["NEW_ATTEMPT_FRONTIER_MODEL", "AWAITING_HUMAN"] },
+    { "action": "reconcile", "as": "restart" }
+  ],
+  "expectations": [
+    {
+      "id": "E-1",
+      "check": "step-field",
+      "step": "review-1",
+      "path": "failureClass",
+      "equals": "must-fix",
+      "why": "review 失败必须被分类，而不是笼统的 BLOCK"
+    },
+    {
+      "id": "E-2",
+      "check": "step-field",
+      "step": "budget-after-1",
+      "path": "exhausted",
+      "equals": false,
+      "why": "一次 must-fix 不得触发人工移交"
+    },
+    {
+      "id": "E-3",
+      "check": "budget-usage",
+      "job": "job-a",
+      "key": "reviewLoops",
+      "equals": 3,
+      "why": "三次 must-fix 精确记账在 reviewLoops 上，可审计"
+    },
+    {
+      "id": "E-4",
+      "check": "step-field",
+      "step": "budget-after-3",
+      "path": "kind",
+      "equals": "reviewLoops",
+      "why": "耗尽时必须指名是哪一本预算，而不是一个不可解释的三次计数"
+    },
+    {
+      "id": "E-5",
+      "check": "human-requests-open",
+      "equals": 0,
+      "why": "普通 review finding 与预算耗尽都不得打断用户；BUDGET_EXHAUSTED 是给 Master 的 typed 结果，不是人工态"
+    },
+    {
+      "id": "E-6",
+      "check": "job-state",
+      "job": "job-a",
+      "equals": "budget-exhausted",
+      "why": "预算耗尽是显式 typed 状态，而不是静默 handoff"
+    },
+    {
+      "id": "E-7",
+      "check": "step-field",
+      "step": "exhausted",
+      "path": "recommendedMasterActions",
+      "equals": ["NEW_ATTEMPT_FRONTIER_MODEL", "AWAITING_HUMAN"],
+      "why": "Master 拿到的是可选动作集合，而不是「已经替你决定转人工」"
+    },
+    {
+      "id": "E-8",
+      "check": "step-field",
+      "step": "restart",
+      "path": "unexplainedJobs",
+      "equals": 0,
+      "why": "预算耗尽的 job 在重启后仍可解释"
+    },
+    {
+      "id": "E-9",
+      "check": "merge-commit-count",
+      "equals": 0,
+      "why": "未通过 review 的 candidate 绝不得进入 integration"
+    }
+  ]
+}

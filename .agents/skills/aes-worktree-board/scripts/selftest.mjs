@@ -21,6 +21,11 @@ import {
   TASK_STATES, transitionTask,
 } from './orchestrate.mjs';
 import { readJson, readJsonLines, readRegistry, writeJsonAtomic } from './runtime-store.mjs';
+import {
+  deliveryMergeScenario, discoveredWorkScenario, recoveryScenario, runnerLifecycleScenario,
+} from './selftest-v4.mjs';
+import { trajectoryReplayScenario } from './selftest-trajectory.mjs';
+import { boardUiDomain } from './selftest-board-ui.mjs';
 
 const SCRIPT_DIR = resolve(SKILL_DIR, 'scripts');
 const SELF = fileURLToPath(import.meta.url);
@@ -111,6 +116,45 @@ function repositoryFixture(label, mainBranch = 'main') {
   gitSync(main, ['commit', '-m', 'fixture']);
   gitSync(main, ['worktree', 'add', '-b', 'fixture-dev', sibling]);
   return { root, main, sibling, mainBranch };
+}
+
+// 全局停止协议需要四条真实 lane。历史上它直接借用本机同级 worktree，于是测试结果
+// 取决于开发机目录布局（worker worktree 被移进子目录后就再也凑不满四条）。
+// 这里改为自建临时多 worktree 仓：验的仍是停止协议，不再是机器摆放方式。
+function multiWorktreeFixture(label, names, { mainBranch = 'main', issueRepo = 'fixture-owner/fixture-repo' } = {}) {
+  const root = tempDirectory(label);
+  const main = join(root, 'fixture-main');
+  mkdirSync(main, { recursive: true });
+  gitSync(main, ['init', '-b', mainBranch]);
+  gitSync(main, ['config', 'user.email', 'selftest@example.invalid']);
+  gitSync(main, ['config', 'user.name', 'AES Worktree Board Selftest']);
+  mkdirSync(join(main, '.aes-worktree-board'), { recursive: true });
+  // identity 必须与调用方 loadConfig() 一致，否则 runtime 会被 repo mismatch 正确挡下。
+  writeFileSync(join(main, '.aes-worktree-board', 'board.config.json'),
+    `${JSON.stringify({ mainBranch, issueRepo }, null, 2)}\n`);
+  writeFileSync(join(main, 'fixture.txt'), 'fixture\n');
+  gitSync(main, ['add', '.']);
+  gitSync(main, ['commit', '-m', 'fixture']);
+  const siblings = names.map((name) => {
+    const path = join(root, name);
+    gitSync(main, ['worktree', 'add', '-b', name, path, mainBranch]);
+    return path;
+  });
+  return {
+    root,
+    main,
+    siblings,
+    names,
+    env: { AES_WORKTREE_BOARD_REPO_ROOT: main.replaceAll('\\', '/') },
+    async cleanup() {
+      for (const path of siblings) {
+        spawnSync('git', ['-C', main, 'worktree', 'remove', '--force', path], {
+          ...HEADLESS_CHILD_OPTIONS, encoding: 'utf8',
+        });
+      }
+      await cleanTemp(root);
+    },
+  };
 }
 
 function boardEnv(runtimeDir, extraEnv = {}) {
@@ -251,7 +295,7 @@ function taskCreateViaCli(runtimeDir, options) {
     if (value !== undefined && value !== null) args.push(`--${key}`, String(value));
   }
   if (options.requiresRuntime || options['requires-runtime']) args.push('--requires-runtime');
-  const result = orchestrateSync(args, runtimeDir);
+  const result = orchestrateSync(args, runtimeDir, options.env || {});
   assert.equal(result.status, 0, result.stderr || result.stdout);
   return parseJsonLine(result.stdout).task;
 }
@@ -280,10 +324,10 @@ function blockRecordViaCli(runtimeDir, taskId, options, expectedStatus = 0) {
   return parseJsonLine(expectedStatus === 0 ? result.stdout : result.stderr);
 }
 
-function stopEvalViaCli(runtimeDir, write, expectedStatus = 0) {
+function stopEvalViaCli(runtimeDir, write, expectedStatus = 0, extraEnv = {}) {
   const args = ['stop', 'eval'];
   if (write) args.push('--write');
-  const result = orchestrateSync(args, runtimeDir);
+  const result = orchestrateSync(args, runtimeDir, extraEnv);
   assert.equal(result.status, expectedStatus, result.stderr || result.stdout);
   const output = result.stdout || result.stderr;
   assert.ok(output.trim(), `stop eval CLI 无 JSON 输出: status=${result.status}, stdout=${result.stdout}, stderr=${result.stderr}`);
@@ -296,7 +340,7 @@ function transitionViaCli(taskId, to, runtimeDir, options = {}) {
   if (options.mergeCommit) args.push('--merge-commit', options.mergeCommit);
   if (options.reviewTaskId) args.push('--review-task', options.reviewTaskId);
   if (options.reason) args.push('--reason', options.reason);
-  const result = orchestrateSync(args, runtimeDir);
+  const result = orchestrateSync(args, runtimeDir, options.env || {});
   assert.equal(result.status, options.expectedStatus ?? 0, result.stderr || result.stdout);
   return result.status === 0 ? parseJsonLine(result.stdout) : parseJsonLine(result.stderr);
 }
@@ -3336,48 +3380,53 @@ async function orchestrationOctopusMergeRejected() {
 }
 
 async function orchestrationGlobalStop() {
-  const availableWorkers = (await listWorktrees()).siblings.map((entry) => basename(entry.path));
-  assert.ok(availableWorkers.length >= 4, `stop fixture 至少需要四个真实 sibling，实际只有 ${availableWorkers.length}`);
+  const config = loadConfig();
+  const repoFixture = multiWorktreeFixture('orchestration-governance-stop-repo',
+    ['fixture-dev1', 'fixture-dev2', 'fixture-dev3', 'fixture-test'],
+    { mainBranch: config.mainBranch, issueRepo: config.issueRepo });
+  const availableWorkers = repoFixture.names;
+  assert.equal(availableWorkers.length, 4, 'stop fixture 需要四条 lane');
+  const laneEnv = repoFixture.env;
   const [firstWorker, secondWorker, idleWorker, testWorker] = availableWorkers;
   const workerId = (worker) => worker.match(/(?:^|-)(dev\d+|test)$/i)?.[1].toLowerCase() || worker.toLowerCase();
   const runtimeDir = tempDirectory('orchestration-governance-stop');
   try {
-    const config = loadConfig();
     const first = taskCreateViaCli(runtimeDir, {
       issue: 14, worktree: firstWorker, role: 'executor', 'thread-id': 'T-stop-a',
-      model: 'luna-max', 'routing-reason': 'stop fixture',
+      model: 'luna-max', 'routing-reason': 'stop fixture', env: laneEnv,
     });
-    let evaluated = stopEvalViaCli(runtimeDir, true, 1);
+    let evaluated = stopEvalViaCli(runtimeDir, true, 1, laneEnv);
     assert.equal(evaluated.result, 'advanceable');
     assert.equal(readRegistry(runtimeDir).orchestration.state, 'running', '--write 在有可推进线路时不得生效');
-    transitionViaCli(first.taskId, 'parked', runtimeDir, { reason: 'waiting for user' });
+    transitionViaCli(first.taskId, 'parked', runtimeDir, { reason: 'waiting for user', env: laneEnv });
     const second = taskCreateViaCli(runtimeDir, {
       issue: 56, worktree: secondWorker, role: 'executor', 'thread-id': 'T-stop-b',
-      model: 'sol-high', 'routing-reason': 'stop fixture',
+      model: 'sol-high', 'routing-reason': 'stop fixture', env: laneEnv,
     });
-    transitionViaCli(second.taskId, 'handoff-required', runtimeDir, { reason: 'manual handoff probe' });
+    transitionViaCli(second.taskId, 'handoff-required', runtimeDir, { reason: 'manual handoff probe', env: laneEnv });
     taskCreateViaCli(runtimeDir, {
-      issue: 0, worktree: testWorker, role: 'executor', agent: 'test', model: 'luna-max', 'routing-reason': 'excluded test lane',
+      issue: 0, worktree: testWorker, role: 'executor', agent: 'test', model: 'luna-max',
+      'routing-reason': 'excluded test lane', env: laneEnv,
     });
     writeJsonAtomic(join(runtimeDir, 'status.json'), {
       schemaVersion: 3,
       repo: {
-        root: ROOT.replace(/\\/g, '/'),
+        root: repoFixture.main.replaceAll('\\', '/'),
         issueRepo: config.issueRepo,
         mainBranch: config.mainBranch,
       },
       worktrees: [{ name: firstWorker }, { name: secondWorker }, { name: idleWorker }, { name: testWorker }],
     });
-    evaluated = stopEvalViaCli(runtimeDir, true, 1);
+    evaluated = stopEvalViaCli(runtimeDir, true, 1, laneEnv);
     assert.equal(evaluated.result, 'advanceable');
     assert.ok(evaluated.advanceable.some((action) => action.type === 'WAIT_THREADS'
       && action.targets.some((lane) => lane.worktree === workerId(idleWorker) && lane.state === 'unregistered')));
     const idle = taskCreateViaCli(runtimeDir, {
       issue: 99, worktree: idleWorker, role: 'executor', 'thread-id': 'T-stop-idle',
-      model: 'luna-max', 'routing-reason': 'register every real lane before stop',
+      model: 'luna-max', 'routing-reason': 'register every real lane before stop', env: laneEnv,
     });
-    transitionViaCli(idle.taskId, 'parked', runtimeDir, { reason: 'explicitly classified idle lane' });
-    evaluated = stopEvalViaCli(runtimeDir, true);
+    transitionViaCli(idle.taskId, 'parked', runtimeDir, { reason: 'explicitly classified idle lane', env: laneEnv });
+    evaluated = stopEvalViaCli(runtimeDir, true, 0, laneEnv);
     assert.equal(evaluated.result, 'stopped');
     assert.equal(evaluated.lanes[workerId(testWorker)], 'excluded');
     const stoppedRegistry = readRegistry(runtimeDir);
@@ -3389,7 +3438,18 @@ async function orchestrationGlobalStop() {
     assert.equal(stoppedRegistry.orchestration.goalState, 'not-created');
     assert.equal(evaluateStop({ write: true }, runtimeDir).alreadyStopped, true, 'stop --write 重放必须幂等');
     assert.equal(nextActions(runtimeDir).actions.length, 0, 'stopped orchestration 不得重新物化 STOP 或其他 action');
-    const collected = await collectStatus({ runtimeDir, issuesFixture: ISSUE_FIXTURE });
+    // collect 必须在 fixture 仓的 identity 下运行：runtime 已绑定该仓，跨仓复用会被
+    // repo mismatch 正确挡下（这条 fail-closed 本身就是不变量之一）。
+    const collectRun = spawnSync(process.execPath, [
+      join(SCRIPT_DIR, 'collect.mjs'), '--no-gh', '--json', '--issues-fixture', ISSUE_FIXTURE,
+    ], {
+      ...HEADLESS_CHILD_OPTIONS,
+      cwd: repoFixture.main,
+      encoding: 'utf8',
+      env: boardEnv(runtimeDir, laneEnv),
+    });
+    assert.equal(collectRun.status, 0, collectRun.stderr || collectRun.stdout);
+    const collected = JSON.parse(collectRun.stdout);
     assert.equal(collected.orchestration.state, 'stopped');
     assert.equal(readRegistry(runtimeDir).orchestration.state, 'stopped', 'collect 不得改写 stop');
   } finally {
@@ -3402,20 +3462,20 @@ async function orchestrationGlobalStop() {
     try {
       const parked = taskCreateViaCli(raceRuntime, {
         issue: 1, worktree: firstWorker, role: 'executor', 'thread-id': `T-old-${attempt}`,
-        model: 'luna-max', 'routing-reason': 'stop race parked lane',
+        model: 'luna-max', 'routing-reason': 'stop race parked lane', env: laneEnv,
       });
-      transitionViaCli(parked.taskId, 'parked', raceRuntime, { reason: 'stop race seed' });
+      transitionViaCli(parked.taskId, 'parked', raceRuntime, { reason: 'stop race seed', env: laneEnv });
       const lock = join(raceRuntime, '.control.lock');
       mkdirSync(lock);
       writeFileSync(join(lock, 'owner.json'), '{}\n');
       const createRun = runNode([
         join(SCRIPT_DIR, 'orchestrate.mjs'), 'task', 'create', '--issue', '2', '--worktree', secondWorker,
         '--role', 'executor', '--thread-id', 'T-new', '--model', 'luna-max', '--routing-reason', 'stop race active lane',
-      ], { env: boardEnv(raceRuntime) });
+      ], { env: boardEnv(raceRuntime, laneEnv) });
       await waitMilliseconds(10);
       const stopRun = runNode([
         join(SCRIPT_DIR, 'orchestrate.mjs'), 'stop', 'eval', '--write',
-      ], { env: boardEnv(raceRuntime) });
+      ], { env: boardEnv(raceRuntime, laneEnv) });
       await waitMilliseconds(185);
       rmSync(lock, { recursive: true, force: true });
       const [createdResult, stoppedResult] = await Promise.all([createRun, stopRun]);
@@ -3431,6 +3491,7 @@ async function orchestrationGlobalStop() {
       await cleanTemp(raceRuntime);
     }
   }
+  await repoFixture.cleanup();
   assert.equal(inconsistent, null, `stop 与 task create 不得产生 stopped+active: ${JSON.stringify(inconsistent)}`);
 }
 
@@ -3761,6 +3822,12 @@ async function orchestrationDomain() {
     { group: 'boundary', name: 'server-origin-token', run: orchestrationServerBoundary },
     { group: 'boundary', name: 'config-preflight', run: orchestrationConfigPreflight },
     { group: 'contract', name: 'skill-board-contract', run: orchestrationContractMarkers },
+    // v4 无人值守控制面（契约 AC-001~005）。每个 scenario 名与契约 Verify 命令一一对应。
+    { group: 'runner-lifecycle', name: 'runner-slot-lifecycle', run: runnerLifecycleScenario },
+    { group: 'recovery', name: 'job-attempt-master-recovery', run: recoveryScenario },
+    { group: 'trajectory-replay', name: 'historical-trajectory-replay', run: trajectoryReplayScenario },
+    { group: 'discovered-work', name: 'discovery-reflow', run: discoveredWorkScenario },
+    { group: 'delivery-merge', name: 'delivery-and-tiered-merge-gate', run: deliveryMergeScenario },
   ];
   const p2p3Ids = cases.filter((testCase) => testCase.id).map((testCase) => testCase.id).sort();
   assert.deepEqual(
@@ -3768,8 +3835,9 @@ async function orchestrationDomain() {
     Array.from({ length: 10 }, (_, index) => `P2.3-${String(index + 1).padStart(2, '0')}`),
     'P2.3 必须恰好保留十个逐项映射 scenario',
   );
+  const groups = [...new Set(cases.map((testCase) => testCase.group))];
   const selected = requested ? cases.filter((testCase) => testCase.group === requested) : cases;
-  assert.ok(selected.length, `未知 orchestration scenario: ${requested}; 可用 storage|lifecycle|governance|continuous|boundary|contract`);
+  assert.ok(selected.length, `未知 orchestration scenario: ${requested}; 可用 ${groups.join('|')}`);
   let passed = 0;
   for (const testCase of selected) {
     try {
@@ -3794,6 +3862,16 @@ async function layoutDomain() {
     'scripts/collect.mjs', 'scripts/capture-issues-fixture.mjs', 'scripts/assess.mjs', 'scripts/check-issue-graph.mjs', 'scripts/command.mjs', 'scripts/dispatch.mjs',
     'scripts/headless.mjs', 'scripts/orchestrate.mjs', 'scripts/runtime-store.mjs',
     'scripts/server.mjs', 'scripts/selftest.mjs', 'scripts/github-identity.mjs', 'scripts/github-issue.mjs',
+    // v4 无人值守控制面
+    'scripts/job-store.mjs', 'scripts/runner-slots.mjs', 'scripts/issue-contract.mjs',
+    'scripts/human-request.mjs', 'scripts/merge-policy.mjs', 'scripts/discovery.mjs', 'scripts/master.mjs',
+    'scripts/selftest-fixture.mjs', 'scripts/selftest-v4.mjs', 'scripts/selftest-trajectory.mjs',
+    'scripts/selftest-board-ui.mjs', 'scripts/cdp.mjs', 'scripts/build-portrait.mjs', 'scripts/live-gate.mjs',
+    'fixtures/trajectories/T-01-premature-complete-idle-lane.json',
+    'fixtures/trajectories/T-02-mechanical-review.json',
+    'fixtures/trajectories/T-03-wrong-parent-orphan-reviewer.json',
+    'fixtures/trajectories/T-04-timeout-env-pollution.json',
+    'fixtures/trajectories/T-05-merge-conflict.json',
   ];
   for (const path of required) assert.ok(existsSync(join(SKILL_DIR, path)), `缺少 ${path}`);
   assert.equal(existsSync(join(ROOT, 'worktree-board')), false, '顶级 worktree-board/ 必须不存在');
@@ -3815,7 +3893,10 @@ async function layoutDomain() {
   const repoConfig = JSON.parse(readFileSync(repoConfigPath, 'utf8'));
   assert.equal(repoConfig.mainBranch, 'dev', 'parking-agents integration branch 必须为 dev');
   assert.equal(repoConfig.issueRepo, 'parkth1026/parking-agents');
-  const scripts = ['collect.mjs', 'assess.mjs', 'check-issue-graph.mjs', 'command.mjs', 'dispatch.mjs', 'headless.mjs', 'orchestrate.mjs', 'runtime-store.mjs', 'server.mjs', 'selftest.mjs', 'github-identity.mjs', 'github-issue.mjs'];
+  const scripts = ['collect.mjs', 'assess.mjs', 'check-issue-graph.mjs', 'command.mjs', 'dispatch.mjs', 'headless.mjs', 'orchestrate.mjs', 'runtime-store.mjs', 'server.mjs', 'selftest.mjs', 'github-identity.mjs', 'github-issue.mjs',
+    'job-store.mjs', 'runner-slots.mjs', 'issue-contract.mjs', 'human-request.mjs', 'merge-policy.mjs',
+    'discovery.mjs', 'master.mjs', 'selftest-fixture.mjs', 'selftest-v4.mjs', 'selftest-trajectory.mjs',
+    'selftest-board-ui.mjs', 'cdp.mjs', 'build-portrait.mjs', 'live-gate.mjs'];
   for (const script of scripts) {
     const source = readFileSync(join(SCRIPT_DIR, script), 'utf8');
     for (const match of source.matchAll(/from ['"]([^'"]+)['"]/g)) {
@@ -3868,6 +3949,7 @@ async function layoutDomain() {
 }
 
 const domains = {
+  'board-ui': boardUiDomain,
   collect: collectDomain,
   'collect-live': collectLiveDomain,
   fixture: fixtureDomain,

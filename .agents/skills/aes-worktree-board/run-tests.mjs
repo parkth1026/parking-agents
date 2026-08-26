@@ -8,11 +8,14 @@ const skillDir = dirname(fileURLToPath(import.meta.url));
 const selftest = join(skillDir, 'scripts', 'selftest.mjs');
 const domains = [
   'collect', 'fixture', 'dispatch', 'server', 'repo-root', 'layout', 'windows-hide', 'orchestration', 'identity',
+  'board-ui',
 ];
+// board-ui 需要 --baseline 参数（AC-006 锁定 700x1000）；其余域无额外参数。
+const domainArgs = { 'board-ui': ['--baseline', '700x1000'] };
 
 let passed = 0;
 for (const domain of domains) {
-  const result = spawnSync(process.execPath, [selftest, domain], {
+  const result = spawnSync(process.execPath, [selftest, domain, ...(domainArgs[domain] || [])], {
     ...HEADLESS_CHILD_OPTIONS,
     cwd: process.cwd(),
     encoding: 'utf8',

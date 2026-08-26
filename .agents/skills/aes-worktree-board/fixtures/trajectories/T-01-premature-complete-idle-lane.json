@@ -1,0 +1,84 @@
+{
+  "schemaVersion": "aes.worktree-board.trajectory-replay/v1",
+  "trajectoryId": "T-01-premature-complete-idle-lane",
+  "provenance": {
+    "desensitized": true,
+    "sourceKind": "historical-orchestration-session",
+    "note": "主控在 frontier 仍有活 job、且部分 lane 无法解释时把 Goal 标为 complete；仓库名与路径已脱敏为占位符。"
+  },
+  "historicalFailure": {
+    "classes": ["premature-complete", "idle-lane"],
+    "whatWentWrong": "静态 frontier 快照 + 未登记 lane 让 Master 认为没有活可干，于是提前 STOP；空闲 slot 没有任何可解释状态，用户无法判断它为什么不干活。"
+  },
+  "setup": {
+    "workers": [
+      { "id": "worker-1" },
+      { "id": "worker-2" },
+      { "id": "worker-3", "foreignRepo": true }
+    ]
+  },
+  "steps": [
+    { "action": "start", "as": "boot" },
+    { "action": "claim", "issue": 601, "slot": "worker-1", "as": "job-a" },
+    { "action": "dirty-slot", "slot": "worker-2", "as": "pollute" },
+    { "action": "stop-eval", "frontier": 0, "as": "stop-with-live-job" },
+    { "action": "reconcile", "as": "restart" },
+    { "action": "candidate", "job": "job-a", "file": "a.txt" },
+    { "action": "review", "job": "job-a", "outcome": "PASS" },
+    { "action": "qa", "job": "job-a", "outcome": "PASS" },
+    { "action": "terminal", "job": "job-a", "outcome": "READY_TO_MERGE" },
+    { "action": "stop-eval", "frontier": 0, "as": "stop-with-queued-merge" },
+    { "action": "merge", "job": "job-a" },
+    { "action": "verify", "job": "job-a", "exit": 0 },
+    { "action": "close", "job": "job-a" },
+    { "action": "release", "job": "job-a", "slot": "worker-1" },
+    { "action": "stop-eval", "frontier": 2, "as": "stop-with-frontier" },
+    { "action": "stop-eval", "frontier": 0, "as": "stop-when-truly-empty" }
+  ],
+  "expectations": [
+    {
+      "id": "E-1",
+      "check": "step-field",
+      "step": "stop-with-live-job",
+      "path": "mayStop",
+      "equals": false,
+      "why": "还有活 job 与被占用的 slot 时不得 STOP —— 这正是历史上的过早 complete"
+    },
+    {
+      "id": "E-2",
+      "check": "step-field",
+      "step": "stop-with-queued-merge",
+      "path": "mayStop",
+      "equals": false,
+      "why": "merge 队列非空时不得 STOP"
+    },
+    {
+      "id": "E-3",
+      "check": "step-field",
+      "step": "stop-with-frontier",
+      "path": "mayStop",
+      "equals": false,
+      "why": "frontier 仍有可领取 Issue 时不得 STOP"
+    },
+    {
+      "id": "E-4",
+      "check": "step-field",
+      "step": "stop-when-truly-empty",
+      "path": "mayStop",
+      "equals": true,
+      "why": "registry / merge 队列 / frontier 同时为空时才允许 STOP"
+    },
+    {
+      "id": "E-5",
+      "check": "all-slots-explained",
+      "step": "restart",
+      "why": "每个空闲 slot 都必须有可解释状态与恢复命令，不再出现无法解释的 idle lane"
+    },
+    {
+      "id": "E-6",
+      "check": "merge-commit-count",
+      "equals": 1,
+      "why": "整条轨迹只应产生一个 merge commit"
+    }
+  ]
+}
