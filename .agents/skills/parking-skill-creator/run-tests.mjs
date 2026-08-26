@@ -499,6 +499,84 @@ try {
   rmSync(root54, { recursive: true, force: true });
 }
 
+// ---- frontmatter 键分诊（issue #63：未知键降警告，拼错的已知键仍判错） ----
+console.log("frontmatter·键分诊：");
+const root63 = mkdtempSync(join(tmpdir(), "keys63-"));
+try {
+  const mkKey = (name, extraLine) => {
+    const d = join(root63, name);
+    mkdirSync(d, { recursive: true });
+    writeFileSync(join(d, "SKILL.md"),
+      "---\nname: probe-skill\ndescription: a valid description here\n" + extraLine + "\n---\n\nbody\n");
+    return d;
+  };
+
+  const rTypo = runFile("quick-validate.mjs", [mkKey("typo-desc", "descrption: 拼错")]);
+  check("拼错的已知键判 FAIL 并给出建议",
+    rTypo.code === 1 && out(rTypo).includes("疑似拼错") && out(rTypo).includes("description"));
+
+  const rTypo2 = runFile("quick-validate.mjs", [mkKey("typo-tools", "allowed_tool: Read")]);
+  check("下划线+缺字母的 allowed_tool 判 FAIL", rTypo2.code === 1 && out(rTypo2).includes("疑似拼错"));
+
+  // 宿主对部分键接受 kebab/snake/camel 三种写法，归一后不得误判成拼写错
+  const rSnake = runFile("quick-validate.mjs", [mkKey("snake-ok", "display_name: Demo")]);
+  check("已知键的 snake_case 变体 PASS 且不报拼写错",
+    rSnake.code === 0 && !out(rSnake).includes("疑似拼错"));
+  const rCamel = runFile("quick-validate.mjs", [mkKey("camel-ok", "defaultEnabled: true")]);
+  check("已知键的 camelCase 变体 PASS", rCamel.code === 0);
+
+  // changelog 求证过的宿主键必须在已知集内（否则每次宿主加键都要改 psc）
+  for (const k of ["disable-model-invocation: true", "argument-hint: [x]", "user-invocable: false", "effort: high"]) {
+    const key = k.split(":")[0];
+    const r = runFile("quick-validate.mjs", [mkKey("known-" + key, k)]);
+    check(`已知宿主键 ${key} 不再被拒`, r.code === 0 && !out(r).includes("未知键"));
+  }
+
+  // 宿主新增而 changelog 无 skill 侧记载的键：只警告，不挡退出码
+  const rNew = runFile("quick-validate.mjs", [mkKey("host-new", "version: 1.2.0")]);
+  check("未知键只警告不挡退出码", rNew.code === 0 && out(rNew).includes("未知键"));
+} finally {
+  rmSync(root63, { recursive: true, force: true });
+}
+
+// ---- 全仓复扫防腐化（issue #63：单技能 fixture 看不见门禁腐化） ----
+// 门禁规则腐化只有在真实语料上才暴露——本条正是这么发现的（曾拒掉 58 个技能里的 24 个）。
+// 本仓之外的宿主没有这个目录结构，此时跳过而不是失败，保持技能可移植。
+console.log("全仓复扫·门禁腐化：");
+{
+  const SKILL_DIR_63 = dirname(SCRIPTS);
+  const { pathToFileURL } = await import("node:url");
+  const repoRoot = join(SKILL_DIR_63, "..", "..", "..");
+  // 注意：本文件的 exists() 用 readFileSync 实现，对目录会抛 EISDIR，不能用来判目录。
+  const isDir63 = (p) => { try { return statSync(p).isDirectory(); } catch { return false; } };
+  const roots = ["skills", join(".agents", "skills")]
+    .map((r) => join(repoRoot, r))
+    .filter(isDir63);
+  if (roots.length === 0) {
+    check("全仓复扫：非本仓布局，按设计跳过", true);
+  } else {
+    const { validateSkill } = await import(pathToFileURL(join(SKILL_DIR_63, "scripts", "quick-validate.mjs")).href);
+    const dirs = [];
+    const walk = (d) => {
+      for (const e of readdirSync(d, { withFileTypes: true })) {
+        if (!e.isDirectory()) continue;
+        const p = join(d, e.name);
+        if (exists(join(p, "SKILL.md"))) dirs.push(p);
+        else walk(p);
+      }
+    };
+    for (const r of roots) walk(r);
+    const bad = [];
+    for (const d of dirs) {
+      const r = validateSkill(d);
+      if (r.undecidable && r.undecidable.length) bad.push(`${d} → 无法判定`);
+      else if (!r.valid) bad.push(`${d} → ${r.errors[0]}`);
+    }
+    check(`全仓 ${dirs.length} 个技能全部过门禁${bad.length ? "：" + bad.slice(0, 3).join(" / ") : ""}`,
+      dirs.length > 0 && bad.length === 0);
+  }
+}
+
 // ---- 打包·设计文档与成绩随包分发（2026-08-17 设计自包含升级） ----
 console.log("打包·设计与成绩随包：");
 const root5 = mkdtempSync(join(tmpdir(), "pkgtest-"));
