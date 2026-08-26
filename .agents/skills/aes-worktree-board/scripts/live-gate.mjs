@@ -19,7 +19,8 @@ import { classifySlot, probeSlot } from './runner-slots.mjs';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const SKILL_DIR = dirname(SCRIPT_DIR);
-const RECEIPT_DIR = join(SKILL_DIR, 'receipts');
+// 同 selftest-board-ui：receipt 是运行产物，落 Git 忽略的 runtime 目录。
+const RECEIPT_DIR = join(resolve(join(SKILL_DIR, '..', '..', '..')), '.aes-worktree-board', 'receipts');
 const DESKTOP_TRUTH = join(resolve(join(SKILL_DIR, '..', '..', '..')),
   'docs', 'design', 'design_handoff_issue_starmap', '需求星图 7a.dc.html');
 const LOCKED_DESKTOP_SHA = '2703B1A632292A1AD4927D2BFD6E57384E234248B5E6EF59C9AA11128435B98A';

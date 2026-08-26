@@ -127,6 +127,9 @@ export async function runnerLifecycleScenario() {
 
     // --- 嵌套 worker 目录的自动发现（#52）---
     await nestedWorktreeDiscovery();
+    // --- runner init / update CLI（#51）---
+    // 库函数早就有，但操作者只能从命令行进来；没有 CLI 入口等于这条能力对人不存在。
+    await runnerCliContract();
 
     // --- 四类 slot 状态 ---
     const config = loadSlotsConfig(fixture.slotsPath);
@@ -265,6 +268,67 @@ async function nestedWorktreeDiscovery() {
       { ...HEADLESS_CHILD_OPTIONS, encoding: 'utf8' });
     for (const id of ['w1', 'w2', 'w3']) remove(join(nested, id));
     rmSync(root, { recursive: true, force: true, maxRetries: 5 });
+  }
+}
+
+// #51: runner init / update 的 CLI 契约。全程走真实子进程，不调库函数 ——
+// 这条 AC 要证明的恰恰是「命令行进得来」。
+async function runnerCliContract() {
+  const fixture = makeFixture('runner-cli', { workers: [{ id: 'worker-1' }, { id: 'worker-2' }] });
+  try {
+    const paths = ['worker-1', 'worker-2'].map((id) => fixture.worktreeOf(id)).join(',');
+    const runnerCli = (action, extra = []) => {
+      const result = spawnSync(process.execPath, [
+        MASTER_CLI, 'runner', action,
+        '--repo', fixture.repoRoot,
+        '--branch', fixture.integrationBranch,
+        '--issue-repo', fixture.issueRepo,
+        '--paths', paths,
+        '--slots', fixture.slotsPath,
+        ...extra,
+      ], { ...HEADLESS_CHILD_OPTIONS, encoding: 'utf8', cwd: fixture.repoRoot });
+      return { status: result.status, payload: JSON.parse(String(result.stdout || result.stderr).trim().split(/\r?\n/).pop()) };
+    };
+
+    // AC-1: 生成合法 allowlist，重复运行是幂等 NOOP。
+    const created = runnerCli('init');
+    assert.equal(created.status, 0, `runner init 应成功: ${JSON.stringify(created.payload)}`);
+    assert.equal(created.payload.outcome, 'CREATED');
+    assert.equal(created.payload.slots, 2);
+    const config = loadSlotsConfig(fixture.slotsPath);
+    assert.equal(config.schemaVersion, 'aes.worktree-board.runner-slots/v1');
+    assert.equal(config.repoIdentity.integrationBranch, fixture.integrationBranch);
+    assert.equal(config.slots.length, 2);
+
+    const again = runnerCli('init');
+    assert.equal(again.status, 0);
+    assert.equal(again.payload.outcome, 'NOOP', '重复 runner init 必须是幂等 NOOP');
+
+    // AC-2: 内容不同时 init 拒绝，update 放行。
+    const conflicting = ['--paths', fixture.worktreeOf('worker-1')];
+    const rejected = spawnSync(process.execPath, [
+      MASTER_CLI, 'runner', 'init', '--repo', fixture.repoRoot, '--branch', fixture.integrationBranch,
+      '--issue-repo', fixture.issueRepo, '--slots', fixture.slotsPath, ...conflicting,
+    ], { ...HEADLESS_CHILD_OPTIONS, encoding: 'utf8', cwd: fixture.repoRoot });
+    assert.notEqual(rejected.status, 0, 'runner init 遇到不同配置必须非零退出');
+    assert.equal(JSON.parse(String(rejected.stderr).trim()).code, 'RUNNER_SLOTS_CONFLICT');
+    assert.equal(loadSlotsConfig(fixture.slotsPath).slots.length, 2, '被拒绝的 init 不得改写既有配置');
+
+    const updated = spawnSync(process.execPath, [
+      MASTER_CLI, 'runner', 'update', '--repo', fixture.repoRoot, '--branch', fixture.integrationBranch,
+      '--issue-repo', fixture.issueRepo, '--slots', fixture.slotsPath, ...conflicting,
+    ], { ...HEADLESS_CHILD_OPTIONS, encoding: 'utf8', cwd: fixture.repoRoot });
+    assert.equal(updated.status, 0, `runner update 应成功: ${updated.stderr}`);
+    assert.equal(JSON.parse(String(updated.stdout).trim()).outcome, 'UPDATED');
+    assert.equal(loadSlotsConfig(fixture.slotsPath).slots.length, 1, 'update 必须真的生效');
+
+    // 缺必需参数时 fail closed，不从环境猜。
+    const missing = spawnSync(process.execPath, [
+      MASTER_CLI, 'runner', 'init', '--repo', fixture.repoRoot, '--slots', fixture.slotsPath,
+    ], { ...HEADLESS_CHILD_OPTIONS, encoding: 'utf8', cwd: fixture.repoRoot });
+    assert.notEqual(missing.status, 0, '缺 --issue-repo / --paths 时必须拒绝');
+  } finally {
+    fixture.cleanup();
   }
 }
 
