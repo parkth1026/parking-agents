@@ -120,7 +120,7 @@ frontmatter 只允许 name/description（必需）+ license/allowed-tools/metada
 node scripts/quick-validate.mjs <技能目录>
 ```
 
-官方规则集：name kebab-case ≤64；description ≤1024 且无尖括号；键白名单；compatibility ≤500。合法 → `PASS`（退出码 0）；违规逐条列规则名（退出码 1）；参数缺失出用法（退出码 2）。CRLF 与 LF 同判定。PASS 但缺 `run-tests.mjs` 或 `references/design.md` 时给警告、SKILL.md 仍含待办占位时给提示（都不挡退出码——存量老技能照常工作，升级时补上；新技能必须齐）。修完再跑直到 PASS。PASS 后跑 `node <技能目录>/run-tests.mjs`，自带测试全过才算过本步（主观无测试的技能除外）；此后每次升级改动，先跑它做回归。
+官方规则集：name kebab-case ≤64；description ≤1024 且无尖括号；键白名单；compatibility ≤500。合法 → `PASS`（退出码 0）；违规逐条列规则名（退出码 1）；参数缺失出用法（退出码 2）；frontmatter 含解析器支持子集外的构造时报 `UNDECIDABLE`（退出码 3）——**既不判 PASS 也不判 FAIL**，因为读不到宿主会读到的值，猜一个比没有门禁更危险。支持子集（与宿主 YAML 语义对齐）：单行/多行 plain 标量（含行尾注释剥离与续行折叠）、双引号标量（含 `\"` `\n` `\uNNNN` 等转义）、单引号标量、块标量 `|` 与 `>`（含 strip/clip）、嵌套块父键；越界即失败关闭：flow 集合 `[...]`/`{...}`、跨行引号标量、单引号双写 `''`、块标量 keep chomping `+`。越界只有落在被校验的键（name/description/compatibility）上才阻塞判定——`allowed-tools: [Read, Glob]` 这类合法 flow 序列不影响 PASS。打包门同样拒绝无法判定的技能。CRLF 与 LF 同判定。PASS 但缺 `run-tests.mjs` 或 `references/design.md` 时给警告、SKILL.md 仍含待办占位时给提示（都不挡退出码——存量老技能照常工作，升级时补上；新技能必须齐）。修完再跑直到 PASS。PASS 后跑 `node <技能目录>/run-tests.mjs`，自带测试全过才算过本步（主观无测试的技能除外）；此后每次升级改动，先跑它做回归。
 
 ## 第 6 步：输出评测循环
 

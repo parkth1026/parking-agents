@@ -429,6 +429,76 @@ try {
   rmSync(root4, { recursive: true, force: true });
 }
 
+// ---- frontmatter 支持子集边界（issue #54：与宿主 YAML 语义对齐 / 越界失败关闭） ----
+console.log("frontmatter·支持子集与失败关闭：");
+const root54 = mkdtempSync(join(tmpdir(), "fm54-"));
+try {
+  const BS = String.fromCharCode(92);
+  const Q = String.fromCharCode(34);
+  const SQ = String.fromCharCode(39);
+  const mk = (name, fmBody) => {
+    const d = join(root54, name);
+    mkdirSync(d, { recursive: true });
+    writeFileSync(join(d, "SKILL.md"), "---" + "\n" + fmBody + "\n---\n\nbody\n");
+    return d;
+  };
+
+  // 修复类：解析结果必须与宿主一致，判定不能相反
+  const longPlain = mk("long-plain",
+    "name: probe-skill\ndescription: " + "A".repeat(600) + "\n  " + "B".repeat(600));
+  const rLong = runFile("quick-validate.mjs", [longPlain]);
+  check("多行 plain 标量：折叠后按 1201 判超长(旧实现读 600 假 PASS)",
+    rLong.code === 1 && out(rLong).includes("1201"));
+
+  const escQ = mk("esc-quote",
+    "name: probe-skill\ndescription: " + Q + "say " + BS + Q + "hi" + BS + Q + " now" + Q);
+  const rEsc = runFile("quick-validate.mjs", [escQ]);
+  check("双引号转义：解出真引号，长度 12 与宿主一致",
+    rEsc.code === 0 && out(rEsc).includes("12/1024"));
+
+  const uEsc = mk("u-escape",
+    "name: probe-skill\ndescription: " + Q + "tag " + BS + "u003ca" + BS + "u003e end" + Q);
+  const rU = runFile("quick-validate.mjs", [uEsc]);
+  check("\u003c 转义：解出真尖括号并被尖括号规则拦下(旧实现可绕过)",
+    rU.code === 1 && out(rU).includes("尖括号"));
+
+  const cmt = mk("trailing-comment", "name: probe-skill # 这是注释\ndescription: hello world # note");
+  const rCmt = runFile("quick-validate.mjs", [cmt]);
+  check("行尾注释：剥离后 name 不被误判非 kebab-case(旧实现假 FAIL)",
+    rCmt.code === 0 && out(rCmt).includes("11/1024"));
+
+  // 失败关闭类：不猜，退出码 3
+  const flowDesc = mk("flow-desc", "name: probe-skill\ndescription: [a, b, c]");
+  const rFlow = runFile("quick-validate.mjs", [flowDesc]);
+  check("description 是 flow 集合 → 无法判定退出 3",
+    rFlow.code === 3 && out(rFlow).includes("UNDECIDABLE"));
+
+  const crossQ = mk("cross-quote",
+    "name: probe-skill\ndescription: " + Q + "line1\n  line2" + Q);
+  check("跨行引号标量 → 无法判定退出 3", runFile("quick-validate.mjs", [crossQ]).code === 3);
+
+  const sqEsc = mk("sq-escape",
+    "name: probe-skill\ndescription: " + SQ + "it" + SQ + SQ + "s fine" + SQ);
+  check("单引号双写转义 → 无法判定退出 3", runFile("quick-validate.mjs", [sqEsc]).code === 3);
+
+  const keepChomp = mk("keep-chomp", "name: probe-skill\ndescription: |+\n  line1\n  line2");
+  check("块标量 keep chomping(+) → 无法判定退出 3", runFile("quick-validate.mjs", [keepChomp]).code === 3);
+
+  // 越界落在不被校验的键上时不得阻塞（野外 3 处命中全在这类键）
+  const flowTools = mk("flow-tools",
+    "name: probe-skill\ndescription: a normal description\nallowed-tools: [Read, Glob, Grep]");
+  check("allowed-tools 是 flow 集合 → 不阻塞判定(仍 PASS)",
+    runFile("quick-validate.mjs", [flowTools]).code === 0);
+
+  // 打包门禁必须同样守住「无法判定」
+  writeFileSync(join(flowDesc, "run-tests.mjs"), "process.exit(0);\n");
+  const rPkg = runFile("package-skill.mjs", [flowDesc, join(root54, "dist")]);
+  check("无法判定的技能拒绝打包且不产出包",
+    rPkg.code === 1 && !exists(join(root54, "dist", "flow-desc.skill")));
+} finally {
+  rmSync(root54, { recursive: true, force: true });
+}
+
 // ---- 打包·设计文档与成绩随包分发（2026-08-17 设计自包含升级） ----
 console.log("打包·设计与成绩随包：");
 const root5 = mkdtempSync(join(tmpdir(), "pkgtest-"));

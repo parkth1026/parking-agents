@@ -33,6 +33,7 @@
 | AC-9 | `SKILL.md`、writing guide 和 UI default prompt 明确 Chinese-first；English 只用于 machine contract 或通过四道 gate 的少量核心 term | manual/script |
 | AC-10 | `--history` 沉淀通道同轮整写 `output-evals.json`（题面+断言含 ac），clone 接收方不依赖 workspace 即可重建评测用例；无旗标时不写、写入失败干净拒绝 | script |
 | AC-11 | 评测 subagent 分批受限并发：输出评测同一 eval 的各 gate 同批、默认每批 2 eval；触发探针按整条 query 分批、默认每批 3 条；grader 同口径；并发受限宿主可降级串行 | manual |
+| AC-13 | frontmatter 解析器有显式支持子集：子集内构造与宿主 YAML 语义逐字一致（多行 plain 折叠、双引号转义含 `\uNNNN`、行尾注释剥离、块标量 `|`/`>`）；越界构造（flow 集合、跨行引号标量、单引号双写、keep chomping）不猜值，落在 name/description/compatibility 上时以退出码 3 报「无法判定」，落在不被校验的键上不阻塞；打包门同样拒绝无法判定 | script |
 | AC-12 | 无嵌套 Agent 工具时，headless 触发探针固定逐字 prompt 和单轮调用；只从进程环境接收凭据，不读写共享 CLI 配置、不输出或落盘 key；失败不自答；清理私有 Temp 后对授权扫描根的内容、文件名和路径做前缀残留检查，命中路径输出不得泄漏前缀 | script/manual |
 
 ## 迭代记录
@@ -52,3 +53,4 @@
 | 2026-08-25 | 修复私有 Temp 命中后过早退出：私有清理后始终完成外部扫描并记录摘要，再统一报告 Provider、协议和全部残留失败；增加私有与外部双位置同时泄漏回归 | 136 项自测通过；双位置假凭据均被检出，私有 Temp 清零且外部路径进入审计 | 未命中；保持单一流水线技能 |
 | 2026-08-25 | 修复 secret-derived filename/path 输出泄漏：扫描文件内容时同步检查文件名和父路径，命中路径含 key 前缀时整条脱敏；保留双位置扫描顺序与统一失败审计 | 137 项自测通过；12 字符假前缀文件名被检出，stdout/stderr 不含完整 key、前缀或原路径 | 未命中；保持单一流水线技能 |
 | 2026-08-25 | 移除 headless fallback 的本机 zcode 绝对路径，Windows + Git Bash 示例改用 `command -v zcode` 发现入口；回归扫描随包 Markdown，拒绝硬编码用户主目录 | 139 项自测通过；quick-validate、Node 语法和 diff-check 通过；真实 Provider 仍为 runtime debt | 未命中；保持单一流水线技能 |
+| 2026-08-26 | issue #54：修 frontmatter 解析器与宿主的 9/11 类分歧。实测建 11 类构造对照，补齐多行 plain 折叠、双引号转义（含 `\uNNNN`）、行尾注释剥离、块标量 `|` 换行连接四类（此前假 PASS：1201 字符 description 被读成 600 而放行；假 FAIL：带注释的合法 name 被判非 kebab-case；尖括号检查可被 `\u003c` 绕过）；其余四类失败关闭为退出码 3「无法判定」，只在被校验键上阻塞。init 模板的 `description: [TODO…]` 是裸 flow 序列（宿主也读不成字符串），改为带引号标量 | 160 项自测通过（+10）；11 类对照 8 一致 3 无法判定 0 分歧；全仓 58 技能 0 新增无法判定，`code-review` 由 419/字面反斜杠 → 417 与宿主逐字一致 | 未命中；保持单一流水线技能 |
