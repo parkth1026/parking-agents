@@ -54,8 +54,14 @@ check("parking-skill-creator 自身 description 保持中文优先", creatorDesc
 // ---- 无嵌套 Agent·headless 触发探针 fallback ----
 console.log("headless 触发探针 fallback：");
 const fallbackDoc = readFileSync(join(CREATOR_DIR, "references", "headless-trigger-fallback.md"), "utf8");
-check("SKILL.md 把无嵌套 Agent 路由到 fallback 或主会话", creatorDoc.includes("references/headless-trigger-fallback.md")
+// 触发评测全流程已下沉到 references/trigger-eval.md（issue #57）。路由契约拆两层校验：
+// SKILL.md 保证「这条降级路径可被发现」，trigger-eval.md 保证「细则完整」。
+const triggerEvalDoc = readFileSync(join(CREATOR_DIR, "references", "trigger-eval.md"), "utf8");
+check("SKILL.md 指针提到无嵌套 Agent 的降级路径", creatorDoc.includes("references/headless-trigger-fallback.md")
   && creatorDoc.includes("交回主会话直跑"));
+check("trigger-eval.md 把无嵌套 Agent 路由到 fallback 或主会话",
+  triggerEvalDoc.includes("references/headless-trigger-fallback.md")
+  && triggerEvalDoc.includes("交回主会话直跑"));
 check("fallback 文档固化三禁、单轮与扫描边界", [
   "不得读取、备份、修改或恢复 `~/.zcode/cli/config.json`",
   "凭据只进进程环境",

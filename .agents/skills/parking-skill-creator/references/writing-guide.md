@@ -101,7 +101,13 @@ cloud-deploy/
 分歧核心（crux）
 ```
 
-只有 nucleus 单独不足以表达概念时，才扩展为完整 English phrase。`name`、enum、CLI flag、schema field、API、identifier、path、URL、版本号和命令必须原样保留；它们属于 machine contract，不属于术语润色。
+只有 nucleus 单独不足以表达概念时，才扩展为完整 English phrase。`name`、enum、CLI flag、schema field、API、identifier、provider name、path、URL、版本号和命令必须原样保留；它们属于 machine contract，不属于术语润色。
+
+反过来说，中文的自然句子、动作、判断和普通领域词一律保留原样——**不要逐句 bilingualize**。把每个中文词都配一个英文，读者要付双份阅读成本，却一个歧义都没消掉。
+
+### 拿不准的词怎么办
+
+术语候选不等于行业标准。某个 English mapping 是否真的通用、在当前上下文是否指同一件事，拿不准时标成 `context-dependent` 或 `unverified`，**不要用英文替换制造确定感**——一个看起来很专业的错译，比保留中文更难被下一个人发现。
 
 ### 输出纪律
 
