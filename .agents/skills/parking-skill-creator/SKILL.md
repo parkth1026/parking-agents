@@ -379,12 +379,11 @@ node scripts/package-skill.mjs <技能目录> [输出目录]
 
 - `references/writing-guide.md` — 技能写作方法论（渐进披露、自由度分级、description 写法、防泄漏纪律）
 - `references/headless-trigger-fallback.md` — 无嵌套 Agent 工具时的单轮 headless 探针、安全凭据与残留扫描契约
-- `references/schemas.md` — 全部 JSON 契约（eval_metadata 含 ac 字段/grading/timing/benchmark/feedback/history.json/structure-review/触发评测三契约/comparison/analysis）
+- `references/schemas.md` — 全部 JSON 契约（eval_metadata 含 ac 字段/grading/timing/benchmark/feedback/history.json/structure-review/触发评测三契约）
 - `references/design.md` — 本技能的意图、设计取舍和 AC-1…AC-12 验收依据
 - `agents/openai.yaml` — 技能列表 UI 元数据，字段值不含宿主路径
 - `agents/grader.md` — grader subagent 指令（评分哲学与 grading.json 契约）
-- `agents/comparator.md` — 盲比较指令（A/B 不知情评审）
-- `agents/analyzer.md` — 基准分析指令（找聚合看不见的模式）
+- `agents/analyzer.md` — 基准分析指令（analyst pass：找聚合看不见的模式）
 - `scripts/` — init-skill / snapshot-skill / check-shadow-skills / quick-validate / aggregate-benchmark / aggregate-trigger / package-skill + lib/
 - `eval-viewer/` — generate-review.mjs（服务器与 --static 模式）+ viewer.html
 
