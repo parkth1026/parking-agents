@@ -4,12 +4,16 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { basename, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { HEADLESS_CHILD_OPTIONS } from './headless.mjs';
 import { readV4Registry, readReceipts, readTransitions } from './job-store.mjs';
-import { initSlots, loadSlotsConfig, projectRunners } from './runner-slots.mjs';
+import {
+  defaultSlotsFromWorktrees, discoverWorktrees, initSlots, loadSlotsConfig, normalizePath,
+  projectRunners, validateSlotsConfig,
+} from './runner-slots.mjs';
 import { HUMAN_REQUEST_SCHEMA } from './human-request.mjs';
 import { resolveMergePolicy } from './merge-policy.mjs';
 import * as master from './master.mjs';
@@ -121,6 +125,9 @@ export async function runnerLifecycleScenario() {
       slots: fixture.slots.slice(0, 1),
     }), (error) => error.code === 'RUNNER_SLOTS_CONFLICT');
 
+    // --- 嵌套 worker 目录的自动发现（#52）---
+    await nestedWorktreeDiscovery();
+
     // --- 四类 slot 状态 ---
     const config = loadSlotsConfig(fixture.slotsPath);
     const runners = projectRunners(config, { runners: {} });
@@ -195,6 +202,69 @@ export async function runnerLifecycleScenario() {
     }
   } finally {
     fixture.cleanup();
+  }
+}
+
+// #52: worker worktree 放在子目录里时也必须被发现。
+// 历史口径只认与主仓同级的目录，于是本机把 worker 收进 <repo>-worker/ 之后
+// 自动发现结果为空 —— 目录摆放方式不该决定一个 worktree 是不是本仓的 worktree。
+async function nestedWorktreeDiscovery() {
+  const root = mkdtempSync(join(tmpdir(), 'aes-nested-'));
+  const repo = join(root, 'main');
+  const nested = join(root, 'main-worker');
+  const foreign = join(root, 'main-worker', 'other-repo');
+  try {
+    mkdirSync(repo, { recursive: true });
+    mkdirSync(nested, { recursive: true });
+    const git = (cwd, args) => {
+      const result = spawnSync('git', args, { ...HEADLESS_CHILD_OPTIONS, cwd, encoding: 'utf8' });
+      assert.equal(result.status, 0, `git ${args.join(' ')}: ${result.stderr || result.stdout}`);
+      return String(result.stdout || '').trim();
+    };
+    git(repo, ['init', '-b', 'dev']);
+    git(repo, ['config', 'user.email', 'selftest@aes.local']);
+    git(repo, ['config', 'user.name', 'aes-selftest']);
+    writeFileSync(join(repo, 'README.md'), 'nested fixture\n');
+    git(repo, ['add', '.']);
+    git(repo, ['commit', '-m', 'baseline']);
+    // 三个 worker 全部放在子目录里，与主仓不同级。
+    for (const id of ['w1', 'w2', 'w3']) git(repo, ['worktree', 'add', '-b', id, join(nested, id), 'dev']);
+    // 同一子目录下再放一个「别的仓」，它必须被排除。
+    mkdirSync(foreign, { recursive: true });
+    git(foreign, ['init', '-b', 'dev']);
+    git(foreign, ['config', 'user.email', 'selftest@aes.local']);
+    git(foreign, ['config', 'user.name', 'aes-selftest']);
+    writeFileSync(join(foreign, 'README.md'), 'foreign\n');
+    git(foreign, ['add', '.']);
+    git(foreign, ['commit', '-m', 'foreign baseline']);
+
+    // AC-1: 嵌套布局下全部 worker 都被发现。
+    const discovered = discoverWorktrees(repo);
+    const slots = defaultSlotsFromWorktrees(discovered, { repoRoot: repo });
+    const names = slots.map((slot) => basename(slot.worktreePath)).sort();
+    assert.deepEqual(names, ['w1', 'w2', 'w3'], `嵌套 worker 必须全部被发现，实际 ${JSON.stringify(names)}`);
+    assert.equal(new Set(slots.map((slot) => slot.slotId)).size, 3, 'slotId 必须唯一');
+    assert.ok(slots.every((slot) => slot.enabled && slot.concurrency === 1), 'slot 默认值必须完整');
+    assert.equal(validateSlotsConfig({
+      schemaVersion: 'aes.worktree-board.runner-slots/v1',
+      repoIdentity: { root: repo, integrationBranch: 'dev', issueRepo: 'owner/repo' },
+      slots,
+    }, { path: join(root, 'slots.json') }).slots.length, 3, '推导出的 slot 必须通过 schema 校验');
+
+    // AC-2: 排除主仓自身与不属于本仓的路径。
+    assert.equal(slots.some((slot) => normalizePath(slot.worktreePath) === normalizePath(repo)), false,
+      '主仓自身不得成为 worker slot');
+    const withForeign = defaultSlotsFromWorktrees([...discovered, foreign], { repoRoot: repo });
+    assert.equal(withForeign.length, 3, '别的仓的 worktree 必须被排除');
+    assert.equal(withForeign.some((slot) => normalizePath(slot.worktreePath) === normalizePath(foreign)), false);
+    // 重复路径不得产生重复 slot。
+    assert.equal(defaultSlotsFromWorktrees([...discovered, ...discovered], { repoRoot: repo }).length, 3,
+      '重复输入不得产生重复 slot');
+  } finally {
+    const remove = (path) => spawnSync('git', ['-C', repo, 'worktree', 'remove', '--force', path],
+      { ...HEADLESS_CHILD_OPTIONS, encoding: 'utf8' });
+    for (const id of ['w1', 'w2', 'w3']) remove(join(nested, id));
+    rmSync(root, { recursive: true, force: true, maxRetries: 5 });
   }
 }
 
