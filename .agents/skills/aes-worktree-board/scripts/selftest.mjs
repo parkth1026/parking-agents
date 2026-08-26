@@ -11,7 +11,7 @@ import { basename, join, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   BOARD_API, collectStatus, DEFAULT_RUNTIME_DIR, listWorktrees, loadIssueFixture, loadConfig,
-  selectOwnedWorktrees, SKILL_DIR,
+  resolveWorktreeTarget, selectOwnedWorktrees, SKILL_DIR,
 } from './collect.mjs';
 import { resolveCommand } from './command.mjs';
 import { HEADLESS_CHILD_OPTIONS } from './headless.mjs';
@@ -507,8 +507,197 @@ async function nestedWorktreeLayoutScenario() {
   }
 }
 
+// #67 AC-2 覆盖补齐：resolveWorktreeTarget 的多义拒绝分支（AMBIGUOUS_WORKTREE）。
+//
+// 上一轮只钉了「短名唯一命中」与「不存在则拒绝」，多义那一支只有代码没有断言。
+// 这里造真实布局：不同父目录下 basename 同后缀（-w1）、同后缀且另有精确同名（w2）、
+// 以及两个 basename 完全同名（fixture-dup），一次盖住三段判定的全部出口。
+function ambiguousLayoutFixture(label) {
+  const root = tempDirectory(label);
+  const main = join(root, 'fixture-main');
+  // 键是分支名，值是路径；同名的两个 worktree 用 dupA/dupB 区分键，basename 仍相同。
+  const workers = {
+    // 短名 w1：两个不同父目录下的 -w1 后缀候选，没有精确同名 → 多义。
+    'fixture-w1': join(root, 'fixture-main-worker', 'fixture-w1'),
+    'team-w1': join(root, 'fixture-main-alt', 'team-w1'),
+    // 短名 w2：两个后缀候选之外还有一个精确 basename「w2」→ 精确必须压过后缀多义。
+    'fixture-w2': join(root, 'fixture-main-worker', 'fixture-w2'),
+    'team-w2': join(root, 'fixture-main-alt', 'team-w2'),
+    w2: join(root, 'fixture-main-worker', 'group', 'w2'),
+    // basename 完全同名：精确匹配自身就是多义（exact.length > 1）。
+    dupA: join(root, 'fixture-main-worker', 'left', 'fixture-dup'),
+    dupB: join(root, 'fixture-main-alt', 'right', 'fixture-dup'),
+  };
+  mkdirSync(main, { recursive: true });
+  gitSync(main, ['init', '-b', 'main']);
+  gitSync(main, ['config', 'user.email', 'selftest@example.invalid']);
+  gitSync(main, ['config', 'user.name', 'AES Worktree Board Selftest']);
+  writeFileSync(join(main, 'fixture.txt'), 'ambiguous layout fixture\n');
+  gitSync(main, ['add', 'fixture.txt']);
+  gitSync(main, ['commit', '-m', 'fixture']);
+  for (const [branch, path] of Object.entries(workers)) {
+    gitSync(main, ['worktree', 'add', '-b', `fixture-${branch}`, path, 'main']);
+  }
+  return {
+    root,
+    main,
+    workers,
+    entries: Object.values(workers).map((path) => ({ path: path.replaceAll('\\', '/') })),
+    async cleanup() {
+      for (const path of Object.values(workers)) {
+        spawnSync('git', ['-C', main, 'worktree', 'remove', '--force', path], {
+          ...HEADLESS_CHILD_OPTIONS, encoding: 'utf8',
+        });
+      }
+      await cleanTemp(root);
+    },
+  };
+}
+
+// 纯函数层：同一份真实布局的 entries 直接喂 resolveWorktreeTarget，钉住 code/matches/available
+// 三个字段 —— CLI 的报错文案只透出 matches 的 basename，拿不到候选路径与空请求这条出口。
+function assertAmbiguousResolution(fixture) {
+  const { entries } = fixture;
+  const comparable = (path) => resolve(path).replaceAll('\\', '/');
+
+  const ambiguous = resolveWorktreeTarget(entries, 'w1');
+  assert.equal(ambiguous.target, null, '短名 w1 有两个后缀候选时不得猜一个');
+  assert.equal(ambiguous.code, 'AMBIGUOUS_WORKTREE');
+  assert.deepEqual(
+    ambiguous.matches.map((entry) => comparable(entry.path)).sort(),
+    [fixture.workers['fixture-w1'], fixture.workers['team-w1']].map(comparable).sort(),
+    '多义拒绝必须点名两个候选的完整路径',
+  );
+
+  // 精确 basename 优先：短名 w2 精确命中 w2，完整 basename 命中各自的那一个。
+  // 没有这条优先级，w2 会退化成 fixture-w2 / team-w2 两个后缀候选的多义。
+  const exactShort = resolveWorktreeTarget(entries, 'w2');
+  assert.equal(exactShort.code, null, '精确 basename 存在时不得报多义');
+  assert.equal(comparable(exactShort.target.path), comparable(fixture.workers.w2));
+  for (const name of ['fixture-w2', 'team-w2']) {
+    const exactFull = resolveWorktreeTarget(entries, name);
+    assert.equal(exactFull.code, null, `完整 basename ${name} 必须唯一命中`);
+    assert.equal(comparable(exactFull.target.path), comparable(fixture.workers[name]));
+  }
+  // 大小写不参与判定。
+  assert.equal(
+    comparable(resolveWorktreeTarget(entries, 'FIXTURE-W2').target.path),
+    comparable(fixture.workers['fixture-w2']),
+    'basename 匹配必须大小写无关',
+  );
+
+  // exact.length > 1：两个 worktree 的 basename 完全同名，精确匹配自身就是多义。
+  const duplicated = resolveWorktreeTarget(entries, 'fixture-dup');
+  assert.equal(duplicated.target, null, 'basename 同名时不得挑一个');
+  assert.equal(duplicated.code, 'AMBIGUOUS_WORKTREE');
+  assert.deepEqual(
+    duplicated.matches.map((entry) => comparable(entry.path)).sort(),
+    [fixture.workers.dupA, fixture.workers.dupB].map(comparable).sort(),
+    '同名多义必须点名两条不同路径',
+  );
+
+  // 空请求与零候选走 BAD_REQUEST，不得被误报成多义。
+  for (const empty of ['', '   ', null, undefined]) {
+    const bad = resolveWorktreeTarget(entries, empty);
+    assert.equal(bad.code, 'BAD_REQUEST', `空请求 ${JSON.stringify(empty)} 必须是 BAD_REQUEST`);
+    assert.deepEqual(bad.matches, []);
+  }
+  const missing = resolveWorktreeTarget(entries, 'w9');
+  assert.equal(missing.code, 'BAD_REQUEST', '零候选是 BAD_REQUEST 而不是多义');
+  assert.deepEqual(
+    missing.available.slice().sort(),
+    entries.map((entry) => basename(entry.path)).sort(),
+    'available 必须列出全部 basename',
+  );
+}
+
+async function ambiguousWorktreeTargetScenario() {
+  const fixture = ambiguousLayoutFixture('ambiguous-layout');
+  const runtimeDir = join(fixture.root, 'runtime');
+  let server = null;
+  try {
+    assertAmbiguousResolution(fixture);
+    const unique = `${process.pid}-${Date.now()}`;
+
+    // dispatch 层：多义短名被拒，退出码 1、code=AMBIGUOUS_WORKTREE，文案点名候选集合。
+    for (const [name, expected] of [
+      ['w1', ['fixture-w1', 'team-w1']],
+      ['fixture-dup', ['fixture-dup', 'fixture-dup']],
+    ]) {
+      const rejected = dispatchSync(
+        [name, '--agent', 'test', '--task-id', `ambiguous-${unique}-${name}`, '多义拒绝'],
+        runtimeDir,
+        fixture.main,
+        ROOT,
+      );
+      assert.equal(rejected.status, 1, `多义 worktree "${name}" 必须被拒绝: ${rejected.stdout}`);
+      const rejectedJson = parseJsonLine(rejected.stderr);
+      assert.equal(
+        rejectedJson.code,
+        'AMBIGUOUS_WORKTREE',
+        `多义必须报 AMBIGUOUS_WORKTREE 而不是 ${rejectedJson.code}: ${rejectedJson.error}`,
+      );
+      for (const candidate of new Set(expected)) {
+        assert.match(rejectedJson.error, new RegExp(candidate), `多义报错必须点名候选 ${candidate}`);
+      }
+      assert.match(rejectedJson.error, /完整 basename/, '多义报错必须给出可行的下一步');
+      // 候选逐条列出：同名的两条不得被折叠成一条，否则用户看不出到底撞了几个。
+      // git worktree list 的顺序不保证，只比集合。
+      const listed = rejectedJson.error.match(/同时匹配 (.+)，请用完整 basename/)?.[1];
+      assert.ok(listed, `多义报错缺少候选集合: ${rejectedJson.error}`);
+      assert.deepEqual(listed.split(', ').sort(), expected.slice().sort(),
+        `候选集合必须逐条列出: ${rejectedJson.error}`);
+    }
+
+    // 精确优先的关键分支：多义候选仍在时，精确 basename 依然唯一命中并真的派发成功。
+    const dispatched = [];
+    for (const [index, spelling] of ['w2', 'team-w2'].entries()) {
+      // 两次成功派发落在不同 worktree，同一 registry 下会被 ISSUE_ALREADY_ACTIVE 挡住
+      // （Issue #0 只允许一条 lane），因此各用各的 runtime。
+      const result = dispatchSync(
+        [spelling, '--agent', 'test', '--task-id', `ambiguous-${unique}-ok-${index}`, '精确命中'],
+        join(fixture.root, `runtime-exact-${index}`),
+        fixture.main,
+        ROOT,
+      );
+      assert.equal(result.status, 0, `精确 basename "${spelling}" 必须命中: ${result.stderr}`);
+      const lines = result.stdout.trim().split(/\r?\n/).map(JSON.parse);
+      assert.equal(lines[0].ok, true);
+      assert.equal(lines.at(-1).exitCode, 0);
+      dispatched.push(lines[0].worktree);
+    }
+    assert.deepEqual(dispatched, ['w2', 'team-w2'],
+      '精确 basename 必须命中自身，不得被后缀候选劫持');
+
+    // server 层与 dispatch 同一口径：多义走 400，精确 basename 照常受理。
+    server = await startServer(join(fixture.root, 'runtime-server'), {
+      AES_WORKTREE_BOARD_REPO_ROOT: fixture.main,
+    });
+    const rejectedResponse = await authorizedDispatch(server, {
+      worktree: 'w1', prompt: '多义拒绝', agent: 'test',
+    });
+    assert.equal(rejectedResponse.status, 400, 'server 对多义 worktree 必须 400');
+    const rejectedBody = await rejectedResponse.json();
+    assert.equal(rejectedBody.ok, false);
+    assert.match(rejectedBody.error, /同时匹配多个 worktree/, `server 多义文案不符: ${rejectedBody.error}`);
+    const accepted = await authorizedDispatch(server, {
+      worktree: 'w2', prompt: '精确命中', agent: 'test',
+    });
+    assert.equal(accepted.status, 202, 'server 侧精确 basename 必须照常受理');
+    await waitTask(server.origin, (await accepted.json()).taskId);
+  } finally {
+    if (server?.child && server.child.exitCode === null) {
+      const stopped = waitForExit(server.child);
+      server.child.kill();
+      await stopped;
+    }
+    await fixture.cleanup();
+  }
+}
+
 async function collectDomain() {
   await nestedWorktreeLayoutScenario();
+  await ambiguousWorktreeTargetScenario();
   const runtimeDir = tempDirectory('collect');
   try {
     const fixtureIssues = loadIssueFixture(ISSUE_FIXTURE);
