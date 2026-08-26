@@ -14,7 +14,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { HEADLESS_CHILD_OPTIONS } from './headless.mjs';
 import { launchChrome } from './cdp.mjs';
-import { sha256Of } from './build-portrait.mjs';
+import { matchesLockedTextSha } from './build-portrait.mjs';
 import { classifySlot, probeSlot } from './runner-slots.mjs';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
@@ -47,8 +47,9 @@ function worktreeFingerprint(path) {
 // ---------------------------------------------------------------- (b) desktop 非回归
 
 export async function desktopNonRegressionGate({ repoRoot = process.cwd() } = {}) {
-  assert.equal(sha256Of(readFileSync(DESKTOP_TRUTH)), LOCKED_DESKTOP_SHA,
-    'desktop 视觉真源已被修改，非回归基准失效');
+  const desktopTruth = matchesLockedTextSha(DESKTOP_TRUTH, LOCKED_DESKTOP_SHA);
+  assert.ok(desktopTruth.matched,
+    `desktop 视觉真源已被修改，非回归基准失效: ${JSON.stringify(desktopTruth.variants)}`);
 
   const workDir = mkdtempSync(join(tmpdir(), 'aes-live-desktop-'));
   const page = await launchChrome({ ...DESKTOP_VIEWPORT, deviceScaleFactor: 1 });

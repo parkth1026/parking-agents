@@ -13,7 +13,9 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { HEADLESS_CHILD_OPTIONS } from './headless.mjs';
 import { diffPng, launchChrome } from './cdp.mjs';
-import { DEFAULT_MOCK_PATH, generatePortraitBlock, normalizeEol, sha256Of } from './build-portrait.mjs';
+import {
+  DEFAULT_MOCK_PATH, generatePortraitBlock, matchesLockedTextSha, normalizeEol, sha256OfText,
+} from './build-portrait.mjs';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const SKILL_DIR = dirname(SCRIPT_DIR);
@@ -55,14 +57,17 @@ function stageBoard(workDir) {
 
 function assertGeneratedBlockFresh() {
   const board = readFileSync(join(SKILL_DIR, 'board.html'), 'utf8');
-  const mockSha = sha256Of(readFileSync(DEFAULT_MOCK_PATH));
-  assert.equal(mockSha, LOCKED_MOCK_SHA, 'mock.html 已偏离契约锁定的 SHA，视觉真源失效');
-  assert.equal(sha256Of(readFileSync(DESKTOP_TRUTH)), LOCKED_DESKTOP_SHA, 'desktop 视觉真源不得被修改');
+  const mock = matchesLockedTextSha(DEFAULT_MOCK_PATH, LOCKED_MOCK_SHA);
+  assert.ok(mock.matched,
+    `mock.html 已偏离契约锁定的 SHA，视觉真源失效: ${JSON.stringify(mock.variants)}`);
+  const desktop = matchesLockedTextSha(DESKTOP_TRUTH, LOCKED_DESKTOP_SHA);
+  assert.ok(desktop.matched,
+    `desktop 视觉真源不得被修改: ${JSON.stringify(desktop.variants)}`);
   // 生成物必须与当前 mock 完全一致：否则产品在悄悄偏离真源。换行风格不参与比较。
   const expected = normalizeEol(generatePortraitBlock(DEFAULT_MOCK_PATH));
   assert.ok(normalizeEol(board).includes(expected),
     'board.html 中的竖屏工作台区段与 mock.html 不同步；重跑 build-portrait.mjs');
-  assert.ok(board.includes(`mockSha256=${LOCKED_MOCK_SHA}`), '生成区段必须记录 mock SHA 溯源');
+  assert.ok(board.includes(`mockSha256=${sha256OfText(DEFAULT_MOCK_PATH)}`), '生成区段必须记录 mock SHA 溯源');
   // 桌面层不得被竖屏改动侵入。
   assert.ok(board.includes('id="graph"') && board.includes('class="map-view" id="map-view"'), '桌面全屏星图结构必须保留');
 }

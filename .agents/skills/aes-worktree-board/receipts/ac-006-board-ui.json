@@ -2,7 +2,7 @@
   "schemaVersion": "aes.worktree-board.board-ui-receipt/v1",
   "acceptance": "AC-006",
   "baseline": "700x1000",
-  "commit": "dbb265f0a9bd8647b6350f566662fce40a15af46",
+  "commit": "2cb1f29b207392d9dcbe1a667b1fadff9d924563",
   "mockSha256": "1A94A5291A37D3969E71E245AFD8399425CA80E13839260A451FC7CD7D736CF4",
   "desktopTruthSha256": "2703B1A632292A1AD4927D2BFD6E57384E234248B5E6EF59C9AA11128435B98A",
   "environment": {
@@ -89,5 +89,5 @@
     "zoom": true,
     "appVisible": true
   },
-  "recordedAt": "2026-08-26T09:59:58.214Z"
+  "recordedAt": "2026-08-26T10:29:15.231Z"
 }

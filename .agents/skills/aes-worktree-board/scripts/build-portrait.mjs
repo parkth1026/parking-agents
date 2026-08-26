@@ -27,6 +27,35 @@ export function sha256Of(buffer) {
   return createHash('sha256').update(buffer).digest('hex').toUpperCase();
 }
 
+// 文本真源的 SHA 必须对换行形态不敏感。
+//
+// 契约里两个锁定 SHA 取自作者当时的工作区字节，而这两份文件的存储形态本就不同
+// （mock.html 是 LF，desktop 真源是 CRLF）；再加上开了 autocrlf 的检出会把同一个 blob
+// 变成另一种字节序列。任何单一形态的比较都会在某个合法检出上误报「真源被修改」——
+// 而那与内容是否真的变了毫无关系。
+//
+// 所以判定口径是：内容在 LF / CRLF / 原样三种解释中的任一种下与锁定值相符。
+// 这仍然锁死了内容，只是不再顺带锁死这台机器的 Git 换行设置。
+export function textShaVariants(path) {
+  const raw = readFileSync(path);
+  const lf = raw.toString('utf8').replaceAll('\r\n', '\n');
+  return {
+    raw: sha256Of(raw),
+    lf: sha256Of(Buffer.from(lf, 'utf8')),
+    crlf: sha256Of(Buffer.from(lf.replaceAll('\n', '\r\n'), 'utf8')),
+  };
+}
+
+export function matchesLockedTextSha(path, locked) {
+  const variants = textShaVariants(path);
+  return { matched: Object.values(variants).includes(locked), variants };
+}
+
+// 生成物里记录的 SHA 取 LF 形态：它要在任何检出上都是同一个值，才能当溯源锚点。
+export function sha256OfText(path) {
+  return textShaVariants(path).lf;
+}
+
 function section(source, open, close, label) {
   const start = source.indexOf(open);
   const end = source.indexOf(close, start);
@@ -69,9 +98,8 @@ function adaptScript(script) {
 }
 
 export function generatePortraitBlock(mockPath = DEFAULT_MOCK_PATH) {
-  const raw = readFileSync(mockPath);
-  const mockSha = sha256Of(raw);
-  const source = raw.toString('utf8');
+  const mockSha = sha256OfText(mockPath);
+  const source = readFileSync(mockPath, 'utf8');
   const css = adaptCss(section(source, '<style>', '</style>', '<style>'));
   const markup = section(source, '<main class="app booting" id="app">', '</main>', '<main class="app">');
   const script = adaptScript(section(source, '<script>', '</script>', '<script>'));
@@ -108,7 +136,7 @@ export function writePortraitBlock({ mockPath = DEFAULT_MOCK_PATH, boardPath = B
   const next = `${board.slice(0, start)}${shaped}${board.slice(end + END_MARKER.length)}`;
   const changed = next !== board;
   if (changed) writeFileSync(boardPath, next);
-  return { changed, mockSha: sha256Of(readFileSync(mockPath)), bytes: shaped.length };
+  return { changed, mockSha: sha256OfText(mockPath), bytes: shaped.length };
 }
 
 if (resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url))) {

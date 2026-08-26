@@ -32,10 +32,85 @@ export function isAutonomousCandidate(issue) {
   return { eligible: true, reason: null };
 }
 
+// 真实 GitHub Issue 的正文是 markdown，不是结构化对象。这里把约定的六个小节抽出来，
+// 抽不到就留空让上面的校验判 missing —— 解析器绝不"尽力理解"，宁可判合同不完整。
+const SECTION_PATTERNS = Object.freeze({
+  goal: /^##\s*目标\s*$/m,
+  workflowRole: /^##\s*workflow\s*role\s*$/im,
+  acceptanceCriteria: /^##\s*验收条件\s*$/m,
+  dependencies: /^##\s*依赖\s*$/m,
+  risk: /^##\s*风险\s*$/m,
+  allowedSideEffects: /^##\s*允许的副作用\s*$/m,
+  humanGates: /^##\s*人工门\s*$/m,
+});
+
+function sectionBody(body, pattern) {
+  const match = pattern.exec(body);
+  if (!match) return null;
+  const start = match.index + match[0].length;
+  const rest = body.slice(start);
+  const next = /^##\s+/m.exec(rest);
+  return (next ? rest.slice(0, next.index) : rest).trim();
+}
+
+export function parseIssueBody(body) {
+  const text = String(body || '');
+  const goal = sectionBody(text, SECTION_PATTERNS.goal);
+  const roleText = sectionBody(text, SECTION_PATTERNS.workflowRole);
+  const acText = sectionBody(text, SECTION_PATTERNS.acceptanceCriteria);
+  const depsText = sectionBody(text, SECTION_PATTERNS.dependencies);
+  const riskText = sectionBody(text, SECTION_PATTERNS.risk);
+  const effectsText = sectionBody(text, SECTION_PATTERNS.allowedSideEffects);
+  const gatesText = sectionBody(text, SECTION_PATTERNS.humanGates);
+
+  const contract = {};
+  if (goal) contract.goal = goal;
+  if (roleText) {
+    const role = roleText.split(/\s+/)[0]?.trim().toLowerCase();
+    if (role) contract.workflowRole = role;
+  }
+  if (acText !== null) {
+    // 形如 `- **AC-1**（automated）：文本`
+    const criteria = [];
+    for (const line of acText.split(/\r?\n/)) {
+      const match = /^[-*]\s*\*{0,2}(AC-[\w.]+)\*{0,2}\s*[（(]\s*(\w+)\s*[)）]\s*[:：]\s*(.+)$/.exec(line.trim());
+      if (match) criteria.push({ id: match[1], evidenceClass: match[2].toLowerCase(), text: match[3].trim() });
+    }
+    if (criteria.length) contract.acceptanceCriteria = criteria;
+  }
+  if (depsText !== null) {
+    // 「无。」是显式的空依赖声明；未写这一节才算 missing。
+    contract.dependencies = /^无[。.]?$/.test(depsText)
+      ? []
+      : [...depsText.matchAll(/#(\d+)/g)].map((match) => Number(match[1]));
+  }
+  if (riskText) {
+    const match = /riskProfile\s*[:：]\s*\*{0,2}(low|medium|high|critical)\*{0,2}/i.exec(riskText);
+    if (match) contract.riskProfile = match[1].toLowerCase();
+  }
+  if (effectsText !== null) {
+    const effects = effectsText.split(/\r?\n/)
+      .map((line) => /^[-*]\s*([a-z-]+)\s*$/.exec(line.trim())?.[1])
+      .filter(Boolean);
+    if (effects.length) contract.allowedSideEffects = effects;
+  }
+  // 人工门只认列表项。散文（「无。全部 AC 可自动验证。」）不是门，
+  // 否则一句说明性文字就会平白多出一个人工触点。
+  contract.humanGates = gatesText
+    ? gatesText.split(/\r?\n/)
+      .map((line) => /^[-*]\s+(.+)$/.exec(line.trim())?.[1]?.trim())
+      .filter(Boolean)
+    : [];
+  return contract;
+}
+
 // 解析 Issue body 中的结构化契约块。缺失的域一律进 missing，绝不从自然语言猜测补全
 // （已锁定约定：未知 schema、缺字段、非闭集值必须 fail closed）。
 export function parseIssueContract(issue) {
-  const contract = issue?.contract && typeof issue.contract === 'object' ? issue.contract : {};
+  // 已经是结构化对象就直接用；否则从真实 GitHub Issue 的 markdown 正文里抽。
+  const contract = issue?.contract && typeof issue.contract === 'object'
+    ? issue.contract
+    : parseIssueBody(issue?.body);
   const missing = [];
   const invalid = [];
 
