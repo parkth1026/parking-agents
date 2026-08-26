@@ -99,7 +99,10 @@ function adaptScript(script) {
 
 export function generatePortraitBlock(mockPath = DEFAULT_MOCK_PATH) {
   const mockSha = sha256OfText(mockPath);
-  const source = readFileSync(mockPath, 'utf8');
+  // 先归一化再处理：adaptCss 的模式里有 `\n?` 这类锚点，在 CRLF 源上会少吃一个换行，
+  // 于是同一个 mock 在两种检出下生成出结构相同、空行不同的产物。生成器必须与
+  // 检出的换行设置无关，否则「产品是否跟着真源」这条断言会在别的机器上假红。
+  const source = normalizeEol(readFileSync(mockPath, 'utf8'));
   const css = adaptCss(section(source, '<style>', '</style>', '<style>'));
   const markup = section(source, '<main class="app booting" id="app">', '</main>', '<main class="app">');
   const script = adaptScript(section(source, '<script>', '</script>', '<script>'));

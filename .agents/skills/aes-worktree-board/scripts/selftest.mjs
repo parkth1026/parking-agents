@@ -3873,6 +3873,9 @@ async function layoutDomain() {
     'fixtures/trajectories/T-04-timeout-env-pollution.json',
     'fixtures/trajectories/T-05-merge-conflict.json',
   ];
+  // receipt 是运行产物：必须落在 Git 忽略的 runtime 目录，不得进技能目录，
+  // 否则每次跑回归都会把 worktree 弄脏并触发 slot 隔离。
+  assert.equal(existsSync(join(SKILL_DIR, 'receipts')), false, '技能目录不得承载 receipt 产物');
   for (const path of required) assert.ok(existsSync(join(SKILL_DIR, path)), `缺少 ${path}`);
   assert.equal(existsSync(join(ROOT, 'worktree-board')), false, '顶级 worktree-board/ 必须不存在');
   const diff = spawnSync('git', ['diff', '--quiet', '--', 'run.toml', '.gitignore'], {

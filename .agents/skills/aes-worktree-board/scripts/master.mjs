@@ -16,7 +16,8 @@ import {
   setJobState, storeError, updateV4Registry, V4_DIR,
 } from './job-store.mjs';
 import {
-  assertStartable, loadSlotsConfig, projectRunners, slotById, SLOTS_PATH, syncSlotBaseline,
+  assertStartable, defaultSlotsFromWorktrees, initSlots, loadSlotsConfig, projectRunners,
+  slotById, SLOTS_PATH, syncSlotBaseline, updateSlots,
 } from './runner-slots.mjs';
 import { assertContractComplete, buildWorkOrder, contractDigestOf } from './issue-contract.mjs';
 import { buildHumanRequest, validateHumanRequest, validateHumanResponse } from './human-request.mjs';
@@ -1114,11 +1115,46 @@ function payloadFrom(options, key = 'payload') {
   throw storeError('BAD_REQUEST', `需要 --${key} 或 --${key}-file`);
 }
 
+// runner init/update 必须在 ctx() 之前处理：ctx() 会 loadSlotsConfig，
+// 而这两条命令的存在意义恰恰是「配置还不存在时把它造出来」。
+function runnerCommand(action, options) {
+  const paths = String(requireValue(options, 'paths')).split(',').map((value) => value.trim()).filter(Boolean);
+  const slots = defaultSlotsFromWorktrees(paths, {
+    repoRoot: options.repo || process.cwd(),
+    prefix: options.prefix || 'worker',
+  });
+  if (!slots.length) {
+    throw storeError('RUNNER_SLOTS_EMPTY', '--paths 未给出任何有效 worker worktree', {
+      repo: options.repo || process.cwd(),
+    });
+  }
+  const shape = {
+    path: options.slots,
+    hostWorktree: options.host || null,
+    repoIdentity: {
+      root: options.repo || process.cwd(),
+      integrationBranch: options.branch || 'dev',
+      issueRepo: requireValue(options, 'issue-repo'),
+    },
+    slots,
+  };
+  return action === 'update' ? updateSlots(shape) : initSlots(shape);
+}
+
+function requireValue(options, key) {
+  const value = options[key];
+  if (!value) throw storeError('BAD_REQUEST', `缺少必需参数 --${key}`, { key });
+  return value;
+}
+
 async function main(argv = process.argv.slice(2)) {
   const { options, positional } = parseArguments(argv);
   const [command, action] = positional;
   const shared = { dir: options.dir, slotsPath: options.slots };
 
+  if (command === 'runner' && (action === 'init' || action === 'update')) {
+    return runnerCommand(action, options);
+  }
   if (command === 'start') return masterStart({ ...shared, legacyRuntimeDir: options['legacy-runtime'] });
   if (command === 'status') return masterStatus(shared);
   if (command === 'reconcile') return masterReconcile(shared);
@@ -1166,7 +1202,7 @@ async function main(argv = process.argv.slice(2)) {
   if (command === 'human' && action === 'respond') {
     return respondHumanRequest({ ...shared, resumeToken: options['resume-token'], response: payloadFrom(options, 'response') });
   }
-  throw storeError('BAD_REQUEST', '用法: master.mjs start|status|reconcile|next-step|stop eval|claim|candidate|stage review|stage qa|terminal|gate|merge|verify|close|release|discovery|attempt interrupt|attempt resume|attempt new|human open|human respond');
+  throw storeError('BAD_REQUEST', '用法: master.mjs runner init|runner update|start|status|reconcile|next-step|stop eval|claim|candidate|stage review|stage qa|terminal|gate|merge|verify|close|release|discovery|attempt interrupt|attempt resume|attempt new|human open|human respond');
 }
 
 if (resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url))) {
