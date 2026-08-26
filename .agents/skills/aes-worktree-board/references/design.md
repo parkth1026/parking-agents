@@ -23,6 +23,29 @@
 - dead-letter 只处理已被较晚合法 replacement 取代的 reviewer commit 字符串绑定错误；原/replacement 必须解析到同一 Git object，并保存 authorization 与独立 append-only receipt。
 - Goal 只能由显式 `goal start` 创建。Goal 是 root 的持久完成条件，不代替 Desktop `create_thread` / `wait_threads`，也不扩大 merge、dirty 或人工决策权限。
 
+## v4 无人值守控制面的两个核心取舍
+
+### 恢复判据：问 Git，不问状态位
+
+Master 可能在写状态位之前就死掉，所以「merge 到底发生了没有」不能由 registry 回答。
+merge 前先落 `mergeIntent`，重启后 reconcile 用 `git merge-base --is-ancestor` 去问 Git：
+在则认领既有 merge，不在则退回队列。registry 记意图，Git 记事实 —— 这是「无重复 merge /
+无丢失 job / 无假完成」的实际依据，不是一句口号。
+
+备选方案是「写状态位 + 两阶段提交」，但它把正确性寄托在「崩溃不会发生在这两行之间」上，
+而崩溃恰恰只发生在这种地方。
+
+### 竖屏工作台：生成而不是手抄，隔离靠 Shadow DOM
+
+AC-006 要求以确认版 `mock.html` 为真源。手抄的副本会随时间漂移且无人察觉，所以竖屏
+工作台由 `build-portrait.mjs` 从 mock 机械生成，并把 mock 的 sha256 写进产物；
+`board-ui` 域核对生成物与真源同步，以及产品与 mock 的逐像素一致。
+
+隔离不能靠改名：mock 的 id 与 class 大量与桌面星图重名，两者的 `:root` 变量与字体栈
+也不同。Shadow DOM 让 mock 的 CSS 逐字保留（只把 `:root` 换成 `:host`）而不污染桌面层，
+也不产生重复 id。桌面全屏星图因此零改动 —— 「desktop 不得降级」由结构保证，
+不是靠事后回归发现。
+
 ## Continuous orchestration loop
 
 宿主在 Goal 活跃期间必须执行不可提前退出的循环：
@@ -111,3 +134,5 @@ merge gate，Task create 从 fresh Issue labels 自动推导该 interaction clas
 | 2026-08-25 | BLOCK 1/3 follow-up：目标仓 integration 配置落为 `dev`，collect 增加锁内 identity 复核，端口探测增加专属 board marker/schema。 | 双仓 barrier 并发回归、repo-shaped 伪服务回归、无 env 目标主仓 live API/Playwright。 | marker 是 additive v3 字段与响应头；页面仍可降级读取旧 v2/v3 快照。 |
 | 2026-08-25 | Issue #24：固定环境覆盖 > 目标仓 `board.config.json` > 技能默认，并让完整 Issue labels 穿过 live、fixture 与缓存 collect 输入链。 | 完整 labels fixture、跨仓 `main`/`trunk` 配置回归、环境覆盖回归、八域回归与显式 `collect-live`。 | 保留现有 label 对象形状，不新增多仓聚合或 label 业务推导。 |
 | 2026-08-25 | Issue #45：增加显式 GitHub host/account 绑定、viewer/repository permission preflight、进程级 `GH_TOKEN` 继承和 Issue 读写 wrapper；多账号与 remote URL 用户名均 fail closed。 | fake `gh` 隔离回归覆盖单/多账号、身份不匹配、权限/404/网络错误、capture/collect/Issue wrapper 与 fallback 子进程无密钥继承；默认离线域保持不触网。 | `GH_TOKEN` 只存在父/子进程环境；真实账号 token 不写入任何仓库或 runtime 产物。 |
+| 2026-08-26 | 目标 A 无人值守控制面：runner/job/attempt 分层模型、Master 重启 reconcile、humanRequest 统一人工态载荷、riskProfile 四档 merge gate、DISCOVERED_WORK 四类回流、5 条历史 trajectory replay、700×1000 竖屏工作台（shadow root + 由 mock 机械生成）与零依赖 CDP 截图 diff。 | 5 个新 orchestration scenario + `board-ui --baseline 700x1000`（逐像素 0 差异）+ 十域 `run-tests.mjs`；AC-007(b) desktop 非回归与本机 worktree 只读校验各留 receipt。 | v3 runtime 只读封存，不推导 job/attempt；v4 走独立 registry。竖屏层与桌面星图靠 shadow DOM 完全隔离，桌面代码零改动。 |
+| 2026-08-26 | AC-007 真实宿主门暴露并修掉三类离线门结构上看不到的缺陷：真源 SHA 绑定工作区字节、生成器锚点吃不掉 CRLF、receipt 写进版本控制目录导致 slot 自我隔离。 | 在真实第二份检出（CRLF worktree）上跑通十域回归；`live-gate.mjs` 三个子命令留证。 | 前两类只在多检出下存在，后一类只在复用真实 slot 时才走到 —— 离线 fixture 每次用全新临时仓，三者都碰不到。这是 live 门不可替代的具体理由。 |

@@ -396,6 +396,26 @@ schema 拒收且**不推进状态**。人工答复必须 `actor: "human"`，Agen
 sha256；`board-ui` 域会核对生成物与真源同步，以及产品与 mock 的**逐像素**一致。
 改视觉走「改 mock → 重跑 build-portrait.mjs」，不要手改 board.html 的生成区段。
 
+### 真实宿主门（离线门代替不了的证据）
+
+```powershell
+node "$skillDir/scripts/live-gate.mjs" desktop --repo <目标仓根>
+node "$skillDir/scripts/live-gate.mjs" worktrees --repo <目标仓根> --branch <integration> --paths <p1,p2,...>
+node "$skillDir/scripts/live-gate.mjs" live-receipt --repo <目标仓根> --host <host worktree> --branch <integration> --issue-repo <owner/name>
+```
+
+`worktrees` 是**纯只读**校验：它比对每个 worktree 前后的完整指纹（HEAD / branch /
+status / stash / reflog），前后不一致即判定「只读校验产生了写副作用」。只读如果不被
+机械证明，就只是一句承诺。
+
+receipt 一律落在 Git 忽略的 `<目标仓根>/.aes-worktree-board/receipts/`，不进版本库：
+写进受版本控制的目录会让每次跑门禁都把 worktree 弄脏，slot 随即被 `QUARANTINED_DIRTY`，
+交付循环在释放 slot 那一步就死锁了。
+
+真实宿主门证明的是离线门结构上看不到的东西。已经抓到的两类：只在**第二份检出**上
+存在的换行耦合（真源 SHA 绑定工作区字节、生成器锚点吃不掉 CRLF），以及只在**复用真实
+slot** 时才走到的自我污染路径。离线 fixture 每次用全新临时仓，这两类永远碰不到。
+
 ## 自检
 
 ```powershell

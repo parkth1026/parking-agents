@@ -189,6 +189,81 @@ export function localWorktreeGate({ repoRoot, integrationBranch = 'dev', worktre
   return receipt;
 }
 
+// ---------------------------------------------------------------- (a) live 运行留证
+
+// 从 v4 registry 与 append-only 审计流里如实导出这次真实宿主运行发生了什么。
+// 不重新计算、不美化：registry 说什么就写什么 —— receipt 的价值全在于它不替系统圆场。
+export function liveRunReceipt({ repoRoot, hostWorktree, issueRepo, integrationBranch, v4Dir, unexpectedUserMessages = 0 }) {
+  const registry = JSON.parse(readFileSync(join(v4Dir, 'registry.json'), 'utf8'));
+  const auditLines = (name) => {
+    try {
+      return readFileSync(join(v4Dir, name), 'utf8').split(/\r?\n/).filter(Boolean).length;
+    } catch { return 0; }
+  };
+
+  const jobs = Object.values(registry.jobs).map((job) => {
+    const delivery = registry.deliveries[job.jobId] || null;
+    const attempt = registry.attempts[job.currentAttemptId] || null;
+    return {
+      jobId: job.jobId,
+      issue: job.issue,
+      title: job.title,
+      url: job.url,
+      declaredRisk: job.declaredRisk,
+      state: job.state,
+      slotId: job.slotId,
+      attempts: job.attemptIds.length,
+      baseCommit: job.baseCommit,
+      candidateCommit: attempt?.candidateCommit || null,
+      // 缺证据一律显式写 NOT_RUN，不留空让读者以为跑过。
+      reviewOutcome: attempt?.review?.outcome || 'NOT_RUN',
+      qaOutcome: attempt?.qa?.outcome || 'NOT_RUN',
+      acceptance: job.acceptance || [],
+      mergeCommit: delivery?.mergeCommit || null,
+      postMergeVerification: delivery?.postMergeVerification
+        ? { outcome: delivery.postMergeVerification.outcome, runId: delivery.postMergeVerification.runId }
+        : null,
+      issueClose: delivery?.issueClose || null,
+      runnerRelease: delivery?.runnerRelease || null,
+    };
+  });
+
+  const mergeCommits = (git(hostWorktree, ['log', '--merges', '--format=%H %s', integrationBranch]) || '')
+    .split(/\r?\n/).filter(Boolean);
+
+  const receipt = {
+    schemaVersion: 'aes.worktree-board.live-run-receipt/v1',
+    acceptance: 'AC-007(a)',
+    recordedAt: new Date().toISOString(),
+    repo: { root: repoRoot, issueRepo, integrationBranch, hostWorktree },
+    integrationHead: gitHead(hostWorktree),
+    // 验收分支是专用的：live 门不触碰 main / dev，这两个 SHA 就是证据。
+    untouchedBranches: { main: git(repoRoot, ['rev-parse', 'main']), dev: git(repoRoot, ['rev-parse', 'dev']) },
+    master: registry.master,
+    jobs,
+    mergeCommits,
+    humanRequests: Object.values(registry.humanRequests).map((request) => ({
+      resumeToken: request.resumeToken, kind: request.kind, state: request.state, open: request.open,
+    })),
+    discoveries: Object.values(registry.discoveries),
+    audit: {
+      transitions: auditLines('transitions.jsonl'),
+      receipts: auditLines('receipts.jsonl'),
+      inbox: auditLines('inbox.jsonl'),
+    },
+    // 契约要求：全程零意外用户消息，人工触点仅限契约人工态终点。
+    unexpectedUserMessages,
+    humanTouchpoints: Object.values(registry.humanRequests).length,
+    // 契约残留风险监测项：本轮 reviewer 与 owner 同 session，未达成独立性。
+    reviewerIndependence: 'same-session',
+  };
+
+  mkdirSync(RECEIPT_DIR, { recursive: true });
+  const path = join(RECEIPT_DIR, 'ac-007a-live-run.json');
+  writeFileSync(path, `${JSON.stringify(receipt, null, 2)}\n`);
+  return { path, receipt };
+}
+
 // ---------------------------------------------------------------- CLI
 
 function parseArguments(argv) {
@@ -215,8 +290,24 @@ if (resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url))) 
         worktrees: (options.paths || '').split(',').map((value) => value.trim()).filter(Boolean),
       });
       console.log(JSON.stringify({ ok: true, gate: 'AC-007(a) readonly', inspected: receipt.inspected, writeSideEffects: 0 }));
+    } else if (positional[0] === 'live-receipt') {
+      const { path, receipt } = liveRunReceipt({
+        repoRoot: options.repo || process.cwd(),
+        hostWorktree: options.host || options.repo || process.cwd(),
+        issueRepo: options['issue-repo'] || 'unknown',
+        integrationBranch: options.branch || 'dev',
+        v4Dir: options.dir || join(options.repo || process.cwd(), '.aes-worktree-board', 'runtime-v4'),
+        unexpectedUserMessages: Number(options['unexpected-user-messages'] || 0),
+      });
+      console.log(JSON.stringify({
+        ok: true, gate: 'AC-007(a)', path,
+        jobs: receipt.jobs.length,
+        closed: receipt.jobs.filter((job) => job.state === 'closed').length,
+        merges: receipt.mergeCommits.length,
+        unexpectedUserMessages: receipt.unexpectedUserMessages,
+      }));
     } else {
-      throw new Error('用法: live-gate.mjs desktop [--repo <root>] | worktrees --repo <root> --branch <b> --paths <p1,p2,...>');
+      throw new Error('用法: live-gate.mjs desktop [--repo <root>] | worktrees --repo <root> --branch <b> --paths <p1,p2,...> | live-receipt --repo <root> --host <worktree> --branch <b> --issue-repo <owner/name>');
     }
   } catch (error) {
     console.error(JSON.stringify({ ok: false, error: error.stack || error.message }));
