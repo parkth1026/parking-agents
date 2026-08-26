@@ -4,12 +4,16 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { basename, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { HEADLESS_CHILD_OPTIONS } from './headless.mjs';
 import { readV4Registry, readReceipts, readTransitions } from './job-store.mjs';
-import { initSlots, loadSlotsConfig, projectRunners } from './runner-slots.mjs';
+import {
+  defaultSlotsFromWorktrees, discoverWorktrees, initSlots, loadSlotsConfig, normalizePath,
+  projectRunners, validateSlotsConfig,
+} from './runner-slots.mjs';
 import { HUMAN_REQUEST_SCHEMA } from './human-request.mjs';
 import { resolveMergePolicy } from './merge-policy.mjs';
 import * as master from './master.mjs';
@@ -28,9 +32,9 @@ function base(fixture) {
 }
 
 // 「重启 Master」在这里是字面意义的：另一个 Node 进程，只能看见落盘状态。
-function freshProcess(fixture, args, { expectStatus = 0 } = {}) {
+function freshProcess(fixture, args, { expectStatus = 0, env = {} } = {}) {
   const result = spawnSync(process.execPath, [MASTER_CLI, ...args, '--dir', fixture.v4Dir, '--slots', fixture.slotsPath], {
-    ...HEADLESS_CHILD_OPTIONS, encoding: 'utf8', cwd: fixture.repoRoot,
+    ...HEADLESS_CHILD_OPTIONS, encoding: 'utf8', cwd: fixture.repoRoot, env: { ...process.env, ...env },
   });
   if (expectStatus === 'nonzero') {
     assert.notEqual(result.status, 0,
@@ -121,6 +125,12 @@ export async function runnerLifecycleScenario() {
       slots: fixture.slots.slice(0, 1),
     }), (error) => error.code === 'RUNNER_SLOTS_CONFLICT');
 
+    // --- 嵌套 worker 目录的自动发现（#52）---
+    await nestedWorktreeDiscovery();
+    // --- runner init / update CLI（#51）---
+    // 库函数早就有，但操作者只能从命令行进来；没有 CLI 入口等于这条能力对人不存在。
+    await runnerCliContract();
+
     // --- 四类 slot 状态 ---
     const config = loadSlotsConfig(fixture.slotsPath);
     const runners = projectRunners(config, { runners: {} });
@@ -193,6 +203,130 @@ export async function runnerLifecycleScenario() {
     } finally {
       blockedFixture.cleanup();
     }
+  } finally {
+    fixture.cleanup();
+  }
+}
+
+// #52: worker worktree 放在子目录里时也必须被发现。
+// 历史口径只认与主仓同级的目录，于是本机把 worker 收进 <repo>-worker/ 之后
+// 自动发现结果为空 —— 目录摆放方式不该决定一个 worktree 是不是本仓的 worktree。
+async function nestedWorktreeDiscovery() {
+  const root = mkdtempSync(join(tmpdir(), 'aes-nested-'));
+  const repo = join(root, 'main');
+  const nested = join(root, 'main-worker');
+  const foreign = join(root, 'main-worker', 'other-repo');
+  try {
+    mkdirSync(repo, { recursive: true });
+    mkdirSync(nested, { recursive: true });
+    const git = (cwd, args) => {
+      const result = spawnSync('git', args, { ...HEADLESS_CHILD_OPTIONS, cwd, encoding: 'utf8' });
+      assert.equal(result.status, 0, `git ${args.join(' ')}: ${result.stderr || result.stdout}`);
+      return String(result.stdout || '').trim();
+    };
+    git(repo, ['init', '-b', 'dev']);
+    git(repo, ['config', 'user.email', 'selftest@aes.local']);
+    git(repo, ['config', 'user.name', 'aes-selftest']);
+    writeFileSync(join(repo, 'README.md'), 'nested fixture\n');
+    git(repo, ['add', '.']);
+    git(repo, ['commit', '-m', 'baseline']);
+    // 三个 worker 全部放在子目录里，与主仓不同级。
+    for (const id of ['w1', 'w2', 'w3']) git(repo, ['worktree', 'add', '-b', id, join(nested, id), 'dev']);
+    // 同一子目录下再放一个「别的仓」，它必须被排除。
+    mkdirSync(foreign, { recursive: true });
+    git(foreign, ['init', '-b', 'dev']);
+    git(foreign, ['config', 'user.email', 'selftest@aes.local']);
+    git(foreign, ['config', 'user.name', 'aes-selftest']);
+    writeFileSync(join(foreign, 'README.md'), 'foreign\n');
+    git(foreign, ['add', '.']);
+    git(foreign, ['commit', '-m', 'foreign baseline']);
+
+    // AC-1: 嵌套布局下全部 worker 都被发现。
+    const discovered = discoverWorktrees(repo);
+    const slots = defaultSlotsFromWorktrees(discovered, { repoRoot: repo });
+    const names = slots.map((slot) => basename(slot.worktreePath)).sort();
+    assert.deepEqual(names, ['w1', 'w2', 'w3'], `嵌套 worker 必须全部被发现，实际 ${JSON.stringify(names)}`);
+    assert.equal(new Set(slots.map((slot) => slot.slotId)).size, 3, 'slotId 必须唯一');
+    assert.ok(slots.every((slot) => slot.enabled && slot.concurrency === 1), 'slot 默认值必须完整');
+    assert.equal(validateSlotsConfig({
+      schemaVersion: 'aes.worktree-board.runner-slots/v1',
+      repoIdentity: { root: repo, integrationBranch: 'dev', issueRepo: 'owner/repo' },
+      slots,
+    }, { path: join(root, 'slots.json') }).slots.length, 3, '推导出的 slot 必须通过 schema 校验');
+
+    // AC-2: 排除主仓自身与不属于本仓的路径。
+    assert.equal(slots.some((slot) => normalizePath(slot.worktreePath) === normalizePath(repo)), false,
+      '主仓自身不得成为 worker slot');
+    const withForeign = defaultSlotsFromWorktrees([...discovered, foreign], { repoRoot: repo });
+    assert.equal(withForeign.length, 3, '别的仓的 worktree 必须被排除');
+    assert.equal(withForeign.some((slot) => normalizePath(slot.worktreePath) === normalizePath(foreign)), false);
+    // 重复路径不得产生重复 slot。
+    assert.equal(defaultSlotsFromWorktrees([...discovered, ...discovered], { repoRoot: repo }).length, 3,
+      '重复输入不得产生重复 slot');
+  } finally {
+    const remove = (path) => spawnSync('git', ['-C', repo, 'worktree', 'remove', '--force', path],
+      { ...HEADLESS_CHILD_OPTIONS, encoding: 'utf8' });
+    for (const id of ['w1', 'w2', 'w3']) remove(join(nested, id));
+    rmSync(root, { recursive: true, force: true, maxRetries: 5 });
+  }
+}
+
+// #51: runner init / update 的 CLI 契约。全程走真实子进程，不调库函数 ——
+// 这条 AC 要证明的恰恰是「命令行进得来」。
+async function runnerCliContract() {
+  const fixture = makeFixture('runner-cli', { workers: [{ id: 'worker-1' }, { id: 'worker-2' }] });
+  try {
+    const paths = ['worker-1', 'worker-2'].map((id) => fixture.worktreeOf(id)).join(',');
+    const runnerCli = (action, extra = []) => {
+      const result = spawnSync(process.execPath, [
+        MASTER_CLI, 'runner', action,
+        '--repo', fixture.repoRoot,
+        '--branch', fixture.integrationBranch,
+        '--issue-repo', fixture.issueRepo,
+        '--paths', paths,
+        '--slots', fixture.slotsPath,
+        ...extra,
+      ], { ...HEADLESS_CHILD_OPTIONS, encoding: 'utf8', cwd: fixture.repoRoot });
+      return { status: result.status, payload: JSON.parse(String(result.stdout || result.stderr).trim().split(/\r?\n/).pop()) };
+    };
+
+    // AC-1: 生成合法 allowlist，重复运行是幂等 NOOP。
+    const created = runnerCli('init');
+    assert.equal(created.status, 0, `runner init 应成功: ${JSON.stringify(created.payload)}`);
+    assert.equal(created.payload.outcome, 'CREATED');
+    assert.equal(created.payload.slots, 2);
+    const config = loadSlotsConfig(fixture.slotsPath);
+    assert.equal(config.schemaVersion, 'aes.worktree-board.runner-slots/v1');
+    assert.equal(config.repoIdentity.integrationBranch, fixture.integrationBranch);
+    assert.equal(config.slots.length, 2);
+
+    const again = runnerCli('init');
+    assert.equal(again.status, 0);
+    assert.equal(again.payload.outcome, 'NOOP', '重复 runner init 必须是幂等 NOOP');
+
+    // AC-2: 内容不同时 init 拒绝，update 放行。
+    const conflicting = ['--paths', fixture.worktreeOf('worker-1')];
+    const rejected = spawnSync(process.execPath, [
+      MASTER_CLI, 'runner', 'init', '--repo', fixture.repoRoot, '--branch', fixture.integrationBranch,
+      '--issue-repo', fixture.issueRepo, '--slots', fixture.slotsPath, ...conflicting,
+    ], { ...HEADLESS_CHILD_OPTIONS, encoding: 'utf8', cwd: fixture.repoRoot });
+    assert.notEqual(rejected.status, 0, 'runner init 遇到不同配置必须非零退出');
+    assert.equal(JSON.parse(String(rejected.stderr).trim()).code, 'RUNNER_SLOTS_CONFLICT');
+    assert.equal(loadSlotsConfig(fixture.slotsPath).slots.length, 2, '被拒绝的 init 不得改写既有配置');
+
+    const updated = spawnSync(process.execPath, [
+      MASTER_CLI, 'runner', 'update', '--repo', fixture.repoRoot, '--branch', fixture.integrationBranch,
+      '--issue-repo', fixture.issueRepo, '--slots', fixture.slotsPath, ...conflicting,
+    ], { ...HEADLESS_CHILD_OPTIONS, encoding: 'utf8', cwd: fixture.repoRoot });
+    assert.equal(updated.status, 0, `runner update 应成功: ${updated.stderr}`);
+    assert.equal(JSON.parse(String(updated.stdout).trim()).outcome, 'UPDATED');
+    assert.equal(loadSlotsConfig(fixture.slotsPath).slots.length, 1, 'update 必须真的生效');
+
+    // 缺必需参数时 fail closed，不从环境猜。
+    const missing = spawnSync(process.execPath, [
+      MASTER_CLI, 'runner', 'init', '--repo', fixture.repoRoot, '--slots', fixture.slotsPath,
+    ], { ...HEADLESS_CHILD_OPTIONS, encoding: 'utf8', cwd: fixture.repoRoot });
+    assert.notEqual(missing.status, 0, '缺 --issue-repo / --paths 时必须拒绝');
   } finally {
     fixture.cleanup();
   }
@@ -605,12 +739,92 @@ export async function discoveredWorkScenario() {
 // ============================================================ AC-005 delivery-merge
 
 export async function deliveryMergeScenario() {
+  await nextStepDriver();
   await mergePolicyTiers();
   await deliveryHappyPath();
   await postMergeVerificationFailure();
   await mergeConflictDisposition();
   await serialMergeEnforcement();
   await legacyArchiveStable();
+}
+
+// #53: next-step 把 reconcile 已经算出的动作直接执行掉一步。
+// 全程走真实 CLI 子进程 —— 这条能力的价值就在于「无人值守循环不必自己拼装命令」，
+// 用库函数测等于绕过了要证明的东西。
+async function nextStepDriver() {
+  const fixture = makeFixture('next-step', { workers: [{ id: 'worker-1' }, { id: 'worker-2' }] });
+  const commandsFile = join(fixture.root, 'verify-commands.json');
+  writeFileSync(commandsFile, JSON.stringify([{ command: process.execPath, args: ['-e', 'process.exit(0)'] }]));
+  // close 会调用 gh。离线 scenario 绝不允许触达真实 GitHub，所以从既有注入点接管，
+  // 并把每次调用记到 trace 里，好断言「确实只发生了 comment + close」。
+  const ghTrace = join(fixture.root, 'gh-trace.jsonl');
+  const ghScript = join(fixture.root, 'fake-gh.mjs');
+  writeFileSync(ghScript, [
+    "import { appendFileSync } from 'node:fs';",
+    `appendFileSync(${JSON.stringify(ghTrace)}, JSON.stringify(process.argv.slice(2)) + '\\n');`,
+    "console.log('ok');",
+  ].join('\n'));
+  const ghEnv = { AES_WORKTREE_BOARD_GH_COMMAND: JSON.stringify([process.execPath, ghScript]) };
+  try {
+    writeSlots(fixture);
+    freshProcess(fixture, ['start']);
+
+    // 空 registry：没有任何可推进项。
+    const idle = freshProcess(fixture, ['next-step'], { env: ghEnv });
+    assert.equal(idle.outcome, 'NOOP', '无 job 时必须是 NOOP');
+
+    const job = driveToReadyToMerge(fixture, issuePayload({ number: 561 }), { slotId: 'worker-1' });
+    const headBefore = gitOut(fixture.repoRoot, ['rev-parse', 'dev']);
+
+    // AC-1: 推进恰好一个 job，返回 typed 结果。
+    const merged = freshProcess(fixture, ['next-step'], { env: ghEnv });
+    assert.equal(merged.outcome, 'ADVANCED');
+    assert.equal(merged.jobId, job.jobId);
+    assert.equal(merged.kind, 'merge');
+    assert.notEqual(gitOut(fixture.repoRoot, ['rev-parse', 'dev']), headBefore, 'merge 必须真的发生');
+    assert.equal(readV4Registry(fixture.v4Dir).jobs[job.jobId].state, 'merged');
+
+    // 缺 verification 命令时不猜：如实跳过并说明原因。
+    const withoutCommands = freshProcess(fixture, ['next-step'], { env: ghEnv });
+    assert.equal(withoutCommands.outcome, 'NOOP');
+    assert.ok(withoutCommands.skipped.some((entry) => /verification 命令/.test(entry.reason)),
+      'next-step 必须说明为什么没推进，而不是沉默 NOOP');
+
+    const verified = freshProcess(fixture, ['next-step', '--commands-file', commandsFile], { env: ghEnv });
+    assert.equal(verified.kind, 'verify');
+    const closed = freshProcess(fixture, ['next-step', '--commands-file', commandsFile], { env: ghEnv });
+    assert.equal(closed.kind, 'close');
+    assert.equal(readV4Registry(fixture.v4Dir).jobs[job.jobId].state, 'closed');
+    const ghCalls = readFileSync(ghTrace, 'utf8').split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line));
+    assert.deepEqual(ghCalls.map((call) => `${call[0]} ${call[1]}`), ['issue comment', 'issue close'],
+      'close 只允许 comment + close 两次写入');
+
+    // AC-2: 全部终态后回到 NOOP，退出码 0，且不再改动 integration。
+    const headAfter = gitOut(fixture.repoRoot, ['rev-parse', 'dev']);
+    const done = freshProcess(fixture, ['next-step', '--commands-file', commandsFile], { env: ghEnv });
+    assert.equal(done.outcome, 'NOOP');
+    assert.equal(gitOut(fixture.repoRoot, ['rev-parse', 'dev']), headAfter, 'NOOP 不得产生任何 Git 副作用');
+
+    // AC-3: 人工态永不被 next-step 推进。
+    // 前一个 job 合并后 integration 已前移，worker-2 必须先同步 baseline 才可领取（B3）。
+    master.releaseAndSync({ ...base(fixture), slotId: 'worker-2' });
+    const humanJob = driveToReadyToMerge(fixture, issuePayload({ number: 562 }), { slotId: 'worker-2' });
+    master.openHumanRequest({
+      ...base(fixture), jobId: humanJob.jobId, state: 'awaiting-human', kind: 'manual_validation',
+      prompt: '需要人工确认', requiredEvidence: ['截图'],
+    });
+    const headBeforeHuman = gitOut(fixture.repoRoot, ['rev-parse', 'dev']);
+    for (let index = 0; index < 3; index += 1) {
+      const blocked = freshProcess(fixture, ['next-step', '--commands-file', commandsFile], { env: ghEnv });
+      assert.equal(blocked.outcome, 'NOOP', '人工态不得被 next-step 推进');
+      assert.ok(blocked.skipped.some((entry) => entry.jobId === humanJob.jobId && /人工态/.test(entry.reason)),
+        '跳过人工态必须给出可解释原因');
+    }
+    assert.equal(gitOut(fixture.repoRoot, ['rev-parse', 'dev']), headBeforeHuman, '人工态期间不得 merge');
+    assert.equal(readV4Registry(fixture.v4Dir).jobs[humanJob.jobId].state, 'awaiting-human');
+  } finally {
+    fixture.cleanup();
+  }
 }
 
 // 四档 mergePolicy + riskProfile 自报按路径兜底。
