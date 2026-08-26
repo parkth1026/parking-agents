@@ -577,6 +577,27 @@ console.log("全仓复扫·门禁腐化：");
   }
 }
 
+// ---- 孤儿资源检测（issue #56：comparator.md 曾在参考清单里挂了 202 行却无调用路径） ----
+// 病根是「文件存在、被索引、但正文没有任何一处说何时用它」。文件存在性测不出这一点，
+// 但「SKILL.md 里根本没提到它」是可测的，也是孤儿的第一道征兆。
+console.log("孤儿资源检测：");
+{
+  const SKILL_DIR_56 = dirname(SCRIPTS);
+  const skillMd = readFileSync(join(SKILL_DIR_56, "SKILL.md"), "utf8");
+  const orphans = [];
+  for (const sub of ["agents", "references"]) {
+    const dir = join(SKILL_DIR_56, sub);
+    let entries = [];
+    try { entries = readdirSync(dir, { withFileTypes: true }); } catch { continue; }
+    for (const e of entries) {
+      if (!e.isFile()) continue;
+      if (!skillMd.includes(`${sub}/${e.name}`)) orphans.push(`${sub}/${e.name}`);
+    }
+  }
+  check(`agents/ 与 references/ 下无孤儿资源${orphans.length ? "：" + orphans.join(", ") : ""}`,
+    orphans.length === 0);
+}
+
 // ---- 打包·设计文档与成绩随包分发（2026-08-17 设计自包含升级） ----
 console.log("打包·设计与成绩随包：");
 const root5 = mkdtempSync(join(tmpdir(), "pkgtest-"));
