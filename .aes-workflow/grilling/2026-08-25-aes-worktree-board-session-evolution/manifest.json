@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "slug": "2026-08-25-aes-worktree-board-session-evolution",
+  "created_at": "2026-08-25T07:51:30Z",
+  "updated_at": "2026-08-26T08:26:20Z",
+  "original_request": "[$parking-skills:workflow-interview](G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\.agents\\skills\\workflow-interview\\SKILL.md) 结合你的调查，帮我完整整理一下需要修复的问题是什么？",
+  "goal_oneline": "把 aes-worktree-board 定义为 Wayfinder Issue 的 GitHub Actions 式消化控制面，并在既有高保真需求星图界面内增量呈现确定性 runner、job/attempt、双层 Goal、review/QA、discovery 与 delivery。",
+  "target": null,
+  "stage": "3-contract",
+  "next_action": "执行 Agent 按 contract.md 实现；AC-007 为人工门，live 半需用户提供 3 个 fresh Issue",
+  "stage_gates": {
+    "1-interview": {
+      "status": "done",
+      "closed_at": "2026-08-25T10:29:14Z",
+      "self_assessment": {
+        "意图": "已定",
+        "结果": "已定",
+        "边界": "已定",
+        "约束": "已定",
+        "现状": "已定"
+      }
+    },
+    "2-prototype": {
+      "status": "done",
+      "reason": "用户纠正视觉目标为 700x1000 竖屏工作台；v4 已实现并完成本地 QA，等待独立复审与用户确认",
+      "closed_at": "2026-08-26T08:22:11Z",
+      "artifacts_confirmed": [
+        "behavior",
+        "api-mock",
+        "example-run",
+        "mock",
+        "diagram"
+      ]
+    },
+    "3-contract": {
+      "status": "done",
+      "closed_at": "2026-08-26T08:26:20Z"
+    }
+  },
+  "validation": {
+    "status": "valid",
+    "ac_count": 7,
+    "warnings": [],
+    "ran_at": "2026-08-26T08:26:14Z",
+    "verify_tiers": {
+      "A": 6,
+      "B": 0,
+      "C": 1,
+      "D": 0
+    }
+  },
+  "blocked": [],
+  "residual_risk": null,
+  "status": "ready"
+}

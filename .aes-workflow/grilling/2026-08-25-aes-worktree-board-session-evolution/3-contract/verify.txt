@@ -1,0 +1,18 @@
+# verify @ 2026-08-26T08:26:14Z
+# cwd: G:\GIT\AI_WorkFlow\parking-agents-manual
+
+[FAIL] AC-001  exit=1  $ node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration --scenario runner-lifecycle
+         {"ok":false,"domain":"orchestration","error":"AssertionError [ERR_ASSERTION]: 未知 orchestration scenario: runner-lifecycle; 可用 storage|lifecycle|governance|continuous|boundary|contract\n    at Object.orchestrationDomain [as orchestration] (file:///G:/GIT/AI_WorkFlow/parking-agents-manual/.agents/skills/aes-worktree-board/scripts/selftest.mjs:3772:10)\n    at file:///G:/GIT/AI_WorkFlow/parking-agents-manual/.agents/skills/aes-worktree-board/scripts/selftest.mjs:3888:39"}
+[FAIL] AC-002  exit=1  $ node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration --scenario recovery
+         {"ok":false,"domain":"orchestration","error":"AssertionError [ERR_ASSERTION]: 未知 orchestration scenario: recovery; 可用 storage|lifecycle|governance|continuous|boundary|contract\n    at Object.orchestrationDomain [as orchestration] (file:///G:/GIT/AI_WorkFlow/parking-agents-manual/.agents/skills/aes-worktree-board/scripts/selftest.mjs:3772:10)\n    at file:///G:/GIT/AI_WorkFlow/parking-agents-manual/.agents/skills/aes-worktree-board/scripts/selftest.mjs:3888:39"}
+[FAIL] AC-003  exit=1  $ node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration --scenario trajectory-replay
+         {"ok":false,"domain":"orchestration","error":"AssertionError [ERR_ASSERTION]: 未知 orchestration scenario: trajectory-replay; 可用 storage|lifecycle|governance|continuous|boundary|contract\n    at Object.orchestrationDomain [as orchestration] (file:///G:/GIT/AI_WorkFlow/parking-agents-manual/.agents/skills/aes-worktree-board/scripts/selftest.mjs:3772:10)\n    at file:///G:/GIT/AI_WorkFlow/parking-agents-manual/.agents/skills/aes-worktree-board/scripts/selftest.mjs:3888:39"}
+[FAIL] AC-004  exit=1  $ node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration --scenario discovered-work
+         {"ok":false,"domain":"orchestration","error":"AssertionError [ERR_ASSERTION]: 未知 orchestration scenario: discovered-work; 可用 storage|lifecycle|governance|continuous|boundary|contract\n    at Object.orchestrationDomain [as orchestration] (file:///G:/GIT/AI_WorkFlow/parking-agents-manual/.agents/skills/aes-worktree-board/scripts/selftest.mjs:3772:10)\n    at file:///G:/GIT/AI_WorkFlow/parking-agents-manual/.agents/skills/aes-worktree-board/scripts/selftest.mjs:3888:39"}
+[FAIL] AC-005  exit=1  $ node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration --scenario delivery-merge
+         {"ok":false,"domain":"orchestration","error":"AssertionError [ERR_ASSERTION]: 未知 orchestration scenario: delivery-merge; 可用 storage|lifecycle|governance|continuous|boundary|contract\n    at Object.orchestrationDomain [as orchestration] (file:///G:/GIT/AI_WorkFlow/parking-agents-manual/.agents/skills/aes-worktree-board/scripts/selftest.mjs:3772:10)\n    at file:///G:/GIT/AI_WorkFlow/parking-agents-manual/.agents/skills/aes-worktree-board/scripts/selftest.mjs:3888:39"}
+[FAIL] AC-006  exit=2  $ node .agents/skills/aes-worktree-board/scripts/selftest.mjs board-ui --baseline 700x1000
+         用法: node selftest.mjs <collect|collect-live|fixture|dispatch|server|identity|repo-root|layout|windows-hide|orchestration>
+
+绿 0 / 红 6 / 跑不起来 0
+另有 1 条非 [A] 档没跑：AC-007 [C]

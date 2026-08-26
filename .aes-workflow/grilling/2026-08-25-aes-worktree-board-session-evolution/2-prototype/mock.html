@@ -1,0 +1,278 @@
+<!-- 竖屏工作台修订候选 v4 | revised 2026-08-26
+     设计基线：700×1000 竖屏工作台；390×844 仅保留为历史证据，不再是当前验收基线。
+     数据模式：DEMO SNAPSHOT。执行 Agent 改的是产品，不是这份确认版对照物。 -->
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>AES 需求星图 · Portrait Runner Workbench</title>
+  <link rel="icon" href="data:,">
+  <style>
+    :root {
+      --paper:#FAF9F5; --line:#E0DACB; --ink:#1F1E1B; --text:#625E54;
+      --muted:#777168; --faint:#9B9487; --orange:#C15F3C; --orange-text:#A94F2F;
+      --purple:#7C6BAE; --purple-text:#66569A; --blocked:#6F685D; --resolved:#AAA293;
+      --human:#B18432; --danger:#A7483A; --card:#FFF; --green:#56724E;
+      --safe-top:env(safe-area-inset-top,0px);
+      --serif:Georgia,"Songti SC","STSong",serif;
+      --ui:"Segoe UI","Microsoft YaHei","PingFang SC",sans-serif;
+      --mono:"Cascadia Mono","SFMono-Regular",Consolas,monospace;
+    }
+    * { box-sizing:border-box; }
+    html,body { width:100%; height:100%; margin:0; overflow:hidden; color:var(--ink); font-family:var(--ui); }
+    body { display:grid; place-items:center; background:#ECE9E0; }
+    button,input { font:inherit; }
+    button { color:inherit; }
+    .preview-label { position:fixed; left:24px; top:22px; max-width:300px; color:#6E685D; font:12px/1.55 var(--mono); }
+    .preview-label strong { display:block; margin-bottom:5px; color:var(--ink); font-size:13px; }
+    .app { position:relative; width:min(700px,100vw); height:min(1000px,100dvh); overflow:hidden; container-type:size; background:var(--paper); box-shadow:0 18px 60px rgba(31,30,27,.16); }
+    .brand { position:absolute; z-index:30; left:14px; right:14px; top:calc(10px + var(--safe-top)); }
+    .brand-line { display:flex; align-items:center; gap:9px; }
+    .brand-mark { width:9px; height:9px; background:var(--orange); transform:rotate(45deg); }
+    h1 { margin:0; font:600 17px/1.2 var(--serif); }
+    .brand-sub { margin:4px 0 0 18px; color:var(--muted); font:10px/1.35 var(--mono); }
+    .status-strip { position:absolute; z-index:31; left:14px; right:14px; top:calc(52px + var(--safe-top)); height:26px; display:flex; align-items:center; gap:6px; overflow:hidden; }
+    .status-pill { min-height:24px; display:inline-flex; align-items:center; gap:6px; padding:0 9px; border:1px solid var(--line); border-radius:999px; background:#FFF; color:var(--muted); font:600 9px var(--mono); white-space:nowrap; }
+    .status-pill.demo { color:#7A6328; border-color:#D9C48F; background:#FBF6E9; }
+    .status-pill.goal { color:var(--purple-text); }
+    .status-pill.goal::before { content:""; width:7px; height:7px; border-radius:50%; background:var(--purple); }
+    .nav-row { position:absolute; z-index:32; left:14px; right:14px; top:calc(82px + var(--safe-top)); height:44px; display:flex; align-items:center; gap:8px; }
+    .view-toggle { height:44px; display:flex; padding:0; border:0; border-radius:999px; background:#FFF; box-shadow:0 0 0 1px var(--line); overflow:hidden; }
+    .view-toggle button { min-width:60px; height:44px; border:0; border-radius:999px; background:transparent; color:var(--muted); font-size:12px; cursor:pointer; }
+    .view-toggle button.active { color:#FFF; background:var(--ink); }
+    .runner-toggle { margin-left:auto; min-width:118px; height:44px; border:1px solid #D9C48F; border-radius:999px; background:#FBF6E9; color:#7A6328; font:600 10px var(--mono); cursor:pointer; }
+    .search-wrap { position:absolute; z-index:35; left:14px; right:14px; top:calc(132px + var(--safe-top)); }
+    .search { width:100%; height:44px; border:1px solid var(--line); border-radius:10px; background:#FFF; padding:0 13px; color:var(--ink); font-size:13px; outline:none; box-shadow:0 2px 8px rgba(31,30,27,.025); }
+    .search:focus { border-color:#C8BFAE; box-shadow:0 0 0 3px rgba(193,95,60,.10); }
+    .search-results { display:none; position:absolute; left:0; right:0; top:48px; max-height:230px; overflow:auto; border:1px solid var(--line); border-radius:10px; background:#FFF; box-shadow:0 8px 24px rgba(31,30,27,.12); }
+    .search-results.open { display:block; }
+    .search-result { width:100%; min-height:44px; display:flex; align-items:center; justify-content:space-between; border:0; border-top:1px solid #F0ECE2; padding:7px 11px; background:#FFF; text-align:left; cursor:pointer; }
+    .search-result:first-child { border-top:0; }
+    .search-result b { font:600 11px var(--mono); color:var(--orange-text); }
+    .search-result span { margin-left:8px; color:var(--text); font-size:12px; }
+    .search-result small { color:var(--muted); font:9px var(--mono); }
+    .progress { position:absolute; z-index:29; left:14px; right:14px; top:calc(182px + var(--safe-top)); height:23px; }
+    .progress-meta { display:flex; justify-content:space-between; color:var(--muted); font:10px var(--mono); }
+    .progress-track { height:3px; margin-top:5px; border-radius:999px; overflow:hidden; background:#E7E1D2; }
+    .progress-fill { width:20%; height:100%; background:var(--orange); }
+    .legend { position:absolute; z-index:28; left:10px; right:10px; top:calc(210px + var(--safe-top)); height:44px; display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); align-items:center; gap:4px; overflow:visible; }
+    .legend::-webkit-scrollbar { display:none; }
+    .legend-row { width:100%; min-width:0; min-height:44px; display:flex; align-items:center; justify-content:center; gap:3px; padding:0 3px; border:1px solid #E8E2D2; border-radius:999px; background:rgba(255,255,255,.94); color:var(--text); font-size:9px; white-space:nowrap; cursor:pointer; }
+    .legend-row.active { border-color:#C7BBA5; background:#F2EEE4; color:var(--ink); }
+    .legend-row b { color:var(--muted); font:600 9px var(--mono); }
+    .legend-dot { width:9px; height:9px; border-radius:50%; }
+    .legend-dot.frontier { background:var(--orange); box-shadow:0 0 0 3px rgba(193,95,60,.12); }
+    .legend-dot.running { background:var(--purple); box-shadow:0 0 0 3px rgba(124,107,174,.12); }
+    .legend-dot.blocked { background:var(--paper); border:1.4px dashed var(--blocked); }
+    .legend-dot.human { background:var(--human); }
+    .legend-dot.resolved { width:7px; height:7px; background:var(--resolved); }
+    .canvas { position:absolute; z-index:5; left:0; right:0; top:calc(258px + var(--safe-top)); width:100%; height:calc(100% - 316px - var(--safe-top)); touch-action:none; cursor:grab; outline:none; }
+    .canvas.panning { cursor:grabbing; }
+    #viewport { transform-origin:0 0; transition:transform .34s ease-out; }
+    .edge { fill:none; stroke:#918877; stroke-width:1.25; transition:opacity .22s,stroke .22s,stroke-width .22s; }
+    .edge.blocking { stroke:#B35B39; stroke-dasharray:5 4; }
+    .edge.focused { stroke:#71695B; stroke-width:1.9; }
+    .edge.blocking.focused { stroke:var(--orange); }
+    .node { cursor:pointer; outline:none; transition:opacity .22s,transform .38s ease-out; transform-box:view-box; }
+    .node .hit { fill:transparent; pointer-events:all; }
+    .node text { pointer-events:none; text-anchor:middle; }
+    .node-id { font:600 12px var(--mono); }
+    .node-title { fill:var(--text); font:12px var(--ui); }
+    .node.frontier .node-id { fill:var(--orange-text); }
+    .node.running .node-id { fill:var(--purple-text); }
+    .node.blocked .node-id { fill:var(--blocked); }
+    .node.human .node-id { fill:#8A681F; }
+    .node.resolved .node-id { fill:#6F685D; font-size:11px; }
+    .node[aria-selected="true"] .select-ring { stroke:var(--ink); stroke-width:2; }
+    .node:focus-visible .hit { stroke:var(--ink); stroke-width:2; stroke-dasharray:3 3; }
+    .node.pointer-focus:focus-visible .hit { stroke:none; }
+    .beacon { pointer-events:none; transition:transform .38s ease-out,opacity .18s; }
+    .app.booting .node,.app.booting .beacon { transition:none; }
+    .beacon line { stroke-width:1.2; }
+    .beacon rect { filter:drop-shadow(0 2px 4px rgba(31,30,27,.13)); }
+    .beacon text { text-anchor:middle; dominant-baseline:middle; font:600 9px var(--mono); }
+    .pulse { animation:beacon 2s ease-in-out infinite; }
+    @keyframes beacon { 0%,100%{opacity:.22} 50%{opacity:.56} }
+    .collapsed-note { position:absolute; z-index:7; left:50%; bottom:66px; transform:translateX(-50%); color:var(--muted); font:10px var(--mono); pointer-events:none; white-space:nowrap; }
+    .map-tools { position:absolute; z-index:24; right:10px; bottom:calc(8px + env(safe-area-inset-bottom)); display:flex; height:44px; overflow:hidden; border:1px solid var(--line); border-radius:999px; background:#FFF; box-shadow:0 2px 8px rgba(31,30,27,.06); }
+    .map-tools button { min-width:48px; height:44px; border:0; border-left:1px solid #EEE9DE; background:transparent; font-size:11px; cursor:pointer; }
+    .map-tools button:first-child { border-left:0; }
+    .zoom-value { min-width:52px; display:flex; align-items:center; justify-content:center; color:var(--muted); font:10px var(--mono); }
+    .list-view { display:none; position:absolute; z-index:12; left:8px; right:8px; top:calc(210px + var(--safe-top)); bottom:calc(8px + env(safe-area-inset-bottom)); overflow:auto; padding:0 0 18px; }
+    .list-view.active { display:block; }
+    .list-section { margin-bottom:10px; border:1px solid #E5DFD0; border-radius:12px; overflow:hidden; background:rgba(255,255,255,.64); }
+    .list-section h2 { position:sticky; top:0; z-index:2; margin:0; padding:10px 12px; background:#F6F3EB; color:var(--text); font:600 11px var(--mono); }
+    .list-card { width:100%; min-height:58px; display:grid; grid-template-columns:1fr auto; gap:8px; border:0; border-top:1px solid #ECE7DA; padding:9px 12px; background:#FFF; text-align:left; cursor:pointer; }
+    .list-card b { color:var(--orange-text); font:600 11px var(--mono); }
+    .list-card span { display:block; margin-top:3px; color:var(--text); font-size:12px; }
+    .list-card small { align-self:center; color:var(--muted); font:9px var(--mono); }
+    .scrim { display:none; position:absolute; z-index:60; inset:0; border:0; background:rgba(31,30,27,.18); }
+    .scrim.open { display:block; }
+    .sheet { visibility:hidden; opacity:0; pointer-events:none; position:absolute; z-index:70; left:8px; right:8px; bottom:calc(8px + env(safe-area-inset-bottom)); height:174px; overflow:hidden; border:1px solid rgba(224,218,203,.95); border-radius:18px; background:#FFF; box-shadow:0 10px 32px rgba(31,30,27,.15); transform:translateY(calc(100% + 22px)); transition:transform .28s ease,height .28s ease,opacity .18s ease; }
+    .sheet.open { visibility:visible; opacity:1; pointer-events:auto; transform:translateY(0); }
+    .sheet.expanded { height:min(68vh,570px); overflow:auto; }
+    .sheet-handle { position:absolute; z-index:2; left:50%; top:0; width:80px; height:44px; transform:translateX(-50%); border:0; background:transparent; cursor:pointer; }
+    .sheet-handle::after { content:""; position:absolute; left:17px; top:9px; width:46px; height:5px; border-radius:999px; background:#D8D1C1; }
+    .sheet-head { display:grid; grid-template-columns:1fr auto; gap:8px; padding:34px 12px 9px; }
+    .issue-kicker { display:flex; align-items:center; gap:7px; color:var(--muted); font:600 10px var(--mono); }
+    .state-badge { padding:3px 7px; border-radius:999px; background:#EFECF7; color:var(--purple-text); font-size:9px; }
+    .state-badge.frontier { background:#F9E9E2; color:var(--orange-text); }
+    .state-badge.running { background:#EFECF7; color:var(--purple-text); }
+    .state-badge.blocked { border:1px dashed #B5AC9D; background:#F7F4ED; color:var(--blocked); }
+    .state-badge.human { background:#F6EDD8; color:#7A6328; }
+    .state-badge.resolved { background:#EEEAE1; color:#777168; }
+    .sheet h2 { margin:5px 0 0; font:600 18px/1.2 var(--serif); }
+    .close-button { min-width:44px; height:44px; border:1px solid var(--line); border-radius:999px; background:#FFF; font-size:11px; cursor:pointer; }
+    .peek-row { display:grid; grid-template-columns:1fr 1fr; gap:6px 8px; align-items:center; padding:0 12px 12px; }
+    .peek-meta { grid-column:1/-1; color:var(--text); font:11px/1.45 var(--mono); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .reset-button,.expand-button { width:100%; height:44px; border-radius:10px; font-size:12px; cursor:pointer; }
+    .reset-button { border:1px solid var(--line); background:#FFF; color:var(--text); }
+    .expand-button { border:0; background:var(--orange); color:#FFF; }
+    .sheet-body { display:none; padding:0 12px 18px; }
+    .sheet.expanded .sheet-body { display:block; }
+    .kv { display:grid; grid-template-columns:88px 1fr; gap:8px; margin:8px 0; font-size:12px; line-height:1.4; }
+    .kv span:first-child { color:var(--muted); }
+    .section { margin-top:13px; padding:11px; border:1px dashed #D7B09F; border-radius:10px; background:#FFFCF8; }
+    .section h3 { margin:0 0 8px; color:var(--ink); font:700 11px var(--ui); }
+    .stage-line { display:grid; grid-template-columns:72px 1fr; gap:8px; padding:6px 0; border-top:1px solid #EEE9DE; font:10px/1.4 var(--mono); }
+    .stage-line:first-of-type { border-top:0; }
+    .stage-line span:first-child { color:var(--muted); }
+    .demo-actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:13px; }
+    .demo-actions button { min-height:44px; border:1px solid var(--line); border-radius:9px; background:#F4F1E9; color:var(--muted); font-size:11px; }
+    .drawer { visibility:hidden; opacity:0; pointer-events:none; position:absolute; z-index:75; left:8px; right:8px; bottom:calc(8px + env(safe-area-inset-bottom)); max-height:min(72vh,610px); overflow:auto; border:1px solid var(--line); border-radius:18px; background:#FFF; box-shadow:0 10px 32px rgba(31,30,27,.16); transform:translateY(calc(100% + 22px)); transition:transform .28s ease,opacity .18s ease; }
+    .drawer.open { visibility:visible; opacity:1; pointer-events:auto; transform:translateY(0); }
+    .drawer-head { position:sticky; top:0; z-index:2; display:flex; align-items:center; justify-content:space-between; padding:8px 12px; background:#FFF; border-bottom:1px solid #EEE9DE; }
+    .drawer-head h2 { margin:0; font:700 12px var(--mono); }
+    .config-ok { margin:10px 12px 4px; padding:8px 9px; border-radius:8px; background:#F6FAF4; color:var(--green); font:10px var(--mono); }
+    .worker-row { display:grid; grid-template-columns:10px 1fr auto; gap:9px; align-items:center; min-height:66px; margin:0 12px; border-top:1px solid #F0ECE2; }
+    .worker-state { width:8px; height:8px; border-radius:50%; background:var(--resolved); }
+    .worker-state.running { background:var(--purple); box-shadow:0 0 0 3px rgba(124,107,174,.13); }
+    .worker-state.quarantine { border-radius:2px; background:var(--danger); transform:rotate(45deg); }
+    .worker-name { font:600 11px var(--mono); }
+    .worker-position { margin-top:3px; color:var(--muted); font-size:11px; }
+    .locate { min-width:56px; height:44px; border:1px solid var(--line); border-radius:999px; background:#FFF; font-size:11px; cursor:pointer; }
+    .locate:disabled { color:#AAA; background:#F6F3EB; }
+    .archive { margin:10px 12px 16px; padding:11px; border:1px dashed #CFC7B7; border-radius:10px; background:#F8F6F0; }
+    .archive h3 { margin:0 0 6px; font:700 10px var(--mono); }
+    .archive p { margin:0; color:var(--muted); font:10px/1.5 var(--mono); }
+    .visually-hidden { position:absolute!important; width:1px!important; height:1px!important; padding:0!important; margin:-1px!important; overflow:hidden!important; clip:rect(0,0,0,0)!important; white-space:nowrap!important; border:0!important; }
+    @container (max-height:700px) {
+      .brand-sub,.progress { display:none; }
+      .status-strip { top:calc(40px + var(--safe-top)); }
+      .nav-row { top:calc(69px + var(--safe-top)); }
+      .search-wrap { top:calc(119px + var(--safe-top)); }
+      .legend { top:calc(169px + var(--safe-top)); }
+      .canvas { top:calc(217px + var(--safe-top)); height:calc(100% - 275px - var(--safe-top)); }
+      .list-view { top:calc(169px + var(--safe-top)); }
+    }
+    @container (max-width:340px) {
+      .node-title { font-size:11px; }
+      .node-id { font-size:11px; }
+      .node.resolved .node-id { font-size:10px; }
+      .beacon text { font-size:8px; }
+    }
+    @container (min-width:600px) {
+      .brand { left:20px; right:20px; }
+      h1 { font-size:19px; }
+      .brand-sub { font-size:11px; }
+      .status-strip,.nav-row,.search-wrap,.progress { left:20px; right:20px; }
+      .legend { left:16px; right:16px; gap:7px; }
+      .legend-row { font-size:10px; }
+      .node-title { font-size:13px; }
+      .node-id { font-size:13px; }
+      .node.resolved .node-id { font-size:12px; }
+      .beacon text { font-size:10px; }
+      .sheet,.drawer { left:12px; right:12px; }
+    }
+    @media (max-width:900px) { .preview-label { display:none; } }
+    @media (max-width:700px) { .app { box-shadow:none; } }
+    @media (prefers-reduced-motion:reduce) { *,*::before,*::after { scroll-behavior:auto!important; animation:none!important; transition:none!important; } }
+  </style>
+</head>
+<body>
+  <aside class="preview-label" aria-hidden="true"><strong>700×1000 PORTRAIT WORKBENCH</strong>当前对照物锁定中尺寸竖屏工作台，不是 390 宽手机稿，也不替代产品既有桌面全屏星图。</aside>
+  <main class="app booting" id="app">
+    <header class="brand"><div class="brand-line"><span class="brand-mark" aria-hidden="true"></span><h1>AES 需求星图</h1></div><p class="brand-sub">10 Issues · 2 已探明 · 5 managed runners</p></header>
+    <div class="status-strip" aria-label="运行模式"><span class="status-pill demo">DEMO SNAPSHOT</span><span class="status-pill goal">MASTER GOAL · 示例运行中</span></div>
+    <nav class="nav-row" aria-label="看板视图"><div class="view-toggle" role="group" aria-label="切换视图"><button class="active" data-view="map" aria-pressed="true">Map</button><button data-view="list" aria-pressed="false">List</button></div><button class="runner-toggle" id="runner-toggle" aria-expanded="false" aria-controls="runner-drawer">RUNNERS · 4/5</button></nav>
+    <div class="search-wrap"><label class="visually-hidden" for="search">搜索 Issue、worker 或 job</label><input class="search" id="search" autocomplete="off" placeholder="搜索 Issue / worker / job…" aria-controls="search-results" aria-expanded="false"><div class="search-results" id="search-results" role="listbox" aria-label="搜索结果"></div></div>
+    <div class="progress" aria-label="Issue 消化进度：2 / 10"><div class="progress-meta"><span>已完成 Issue</span><b>2 / 10</b></div><div class="progress-track"><div class="progress-fill"></div></div></div>
+    <div class="legend" id="legend" aria-label="按状态过滤"></div>
+    <svg class="canvas" id="graph" viewBox="0 0 700 684" preserveAspectRatio="xMidYMid meet" aria-label="Issue 依赖星图"><g id="viewport"><g id="stars" aria-hidden="true"></g><g id="edge-layer" aria-hidden="true"></g><g id="node-layer"></g><g id="beacon-layer" aria-hidden="true"></g></g></svg>
+    <div class="collapsed-note" id="collapsed-note">选择节点，展开一跳依赖</div>
+    <div class="map-tools" id="map-tools" aria-label="星图缩放"><button data-zoom="out" aria-label="缩小星图">缩小</button><span class="zoom-value" id="zoom-value">100%</span><button data-zoom="in" aria-label="放大星图">放大</button><button id="fit" aria-label="复位并适配全部节点">复位</button></div>
+    <div class="list-view" id="list-view" aria-label="Issue 列表"></div>
+    <button class="scrim" id="scrim" aria-label="关闭当前面板"></button>
+    <section class="sheet" id="details" role="region" aria-hidden="true" aria-labelledby="detail-title" aria-live="polite"><button class="sheet-handle" id="sheet-handle" aria-label="展开或收起详情"></button><div class="sheet-head"><div><div class="issue-kicker"><span id="detail-id">#58</span><span class="state-badge" id="detail-state">进行中</span></div><h2 id="detail-title">Worker Goal contract</h2></div><button class="close-button" id="detail-close" aria-label="关闭 Issue 详情">关闭</button></div><div class="peek-row"><div class="peek-meta" id="peek-meta">job-58 · attempt-1 · worker-1 · fixing</div><button class="reset-button" id="detail-reset">复位概览</button><button class="expand-button" id="detail-expand" aria-expanded="false">完整证据</button></div><div class="sheet-body" id="detail-body"></div></section>
+    <aside class="drawer" id="runner-drawer" role="dialog" aria-hidden="true" aria-modal="true" aria-labelledby="runner-title"><div class="drawer-head"><h2 id="runner-title">RUNNER SLOTS · DEMO</h2><button class="close-button" id="runner-close">关闭</button></div><div class="config-ok">runner-slots.local.json · identity verified · snapshot fixture</div><div id="runner-list"></div><section class="archive"><h3>LEGACY V3 ARCHIVE · READ ONLY</h3><p>旧 runtime 不迁移、不推导 job/attempt。证据仅通过 session ref 与 sha256 hash 进入 exporter/eval。</p></section></aside>
+  </main>
+  <script>
+    const issues = [
+      {id:12,title:'Registry identity baseline',status:'resolved',stage:'closed',job:null,attempt:null,runner:null,model:null,candidate:'81afa92',review:'PASS',qa:'PASS',discovery:'无',delivery:'receipt archived',extra:'legacy ref: v3/session-12 · hash only'},
+      {id:34,title:'Legacy evidence exporter',status:'resolved',stage:'closed',job:'job-34',attempt:'attempt-2',runner:null,model:'standard',candidate:'92363a8',review:'PASS',qa:'PASS',discovery:'无',delivery:'merged · issue closed',extra:'legacy archive immutable · sha256 verified'},
+      {id:45,title:'GitHub identity 绑定',status:'frontier',stage:'ready',job:null,attempt:null,runner:null,model:'standard',candidate:null,review:'NOT_RUN',qa:'NOT_RUN',discovery:'IN_CURRENT_SCOPE · no child issue',delivery:'NOT_RUN',extra:'ready-for-agent · contract complete'},
+      {id:47,title:'Session evidence exporter',status:'running',stage:'implement',job:'job-47',attempt:'attempt-2',runner:'worker-2',beacon:'w2 · impl',model:'economy',candidate:'worktree dirty=false',review:'NOT_RUN',qa:'NOT_RUN',discovery:'NON_BLOCKING · dedupe receipt dw-47',delivery:'NOT_RUN',extra:'owner thread recovered from handoff bundle'},
+      {id:49,title:'等待 #53 runner config',status:'blocked',stage:'dependency',job:'job-49',attempt:'attempt-1',runner:null,model:'standard',candidate:'frozen pending dependency',review:'STALE',qa:'NOT_RUN',discovery:'BLOCKING_DEPENDENCY → #53',delivery:'NOT_RUN',extra:'owner Goal blocked; Master retains job identity'},
+      {id:53,title:'Runner config drift',status:'running',stage:'qa',job:'job-53',attempt:'attempt-1',runner:'worker-4',beacon:'w4 · QA',model:'frontier',candidate:'c53a9d1',review:'PASS · exact commit',qa:'RUNNING',discovery:'CONTRACT_CONFLICT resolved by Master',delivery:'QUEUED',extra:'slot identity revalidated after locked read'},
+      {id:58,title:'Worker Goal contract',status:'running',stage:'fixing',job:'job-58',attempt:'attempt-1',runner:'worker-1',beacon:'w1 · fix',model:'standard',candidate:'6c59e3a',review:'MUST_FIX · F-1',qa:'QUEUED',discovery:'BLOCKING_DEPENDENCY → #53 · deduped',delivery:'WAITING_REVIEW_BINDING',extra:'same owner session · commit change will invalidate evidence'},
+      {id:60,title:'Delivery receipt',status:'blocked',stage:'delivery',job:'job-60',attempt:'attempt-1',runner:null,model:'standard',candidate:'review binding stale',review:'STALE',qa:'STALE',discovery:'无',delivery:'NOT_RUN · exact merge gate blocked',extra:'post-merge verify/comment/close not started'},
+      {id:61,title:'Autonomy trajectory eval',status:'frontier',stage:'ready',job:null,attempt:null,runner:null,model:'frontier',candidate:null,review:'NOT_RUN',qa:'NOT_RUN',discovery:'NON_BLOCKING · replay fixture ready',delivery:'NOT_RUN',extra:'5 replay + 3 fresh live acceptance pending'},
+      {id:7,title:'Board interaction 验收',status:'human',stage:'awaiting-human',job:'job-ui-7',attempt:'attempt-1',runner:null,beacon:'human · wait',model:'standard',candidate:'immutable candidate ui7c201',review:'PASS',qa:'PASS · environment receipt qa-ui-7',discovery:'无',delivery:'WAITING_HUMAN_VERDICT',extra:'writer lease released · environment lease none · PASS resumes delivery'}
+    ];
+    const links = [{a:12,b:45},{a:45,b:47},{a:47,b:49,blocking:true},{a:47,b:58},{a:53,b:49,blocking:true},{a:53,b:58},{a:58,b:60},{a:58,b:61},{a:45,b:60},{a:53,b:34},{a:53,b:7},{a:61,b:7}];
+    const runners = [{name:'worker-1',state:'running',position:'#58 · job-58 · attempt-1 · fixing',issue:58},{name:'worker-2',state:'running',position:'#47 · job-47 · attempt-2 · implement',issue:47},{name:'worker-3',state:'quarantine',position:'DIRTY_WORKTREE · no job lease',issue:null},{name:'worker-4',state:'running',position:'#53 · job-53 · attempt-1 · QA',issue:53},{name:'worker-5',state:'idle',position:'baseline 81afa92 · lease free',issue:null}];
+    const overviewVisible=new Set([45,47,49,53,58,61,7]);
+    const statusOrder=['frontier','running','blocked','human','resolved'];
+    const statusText={frontier:'可开工',running:'进行中',blocked:'被阻塞',human:'待人工',resolved:'已探明'};
+    const issueById=new Map(issues.map(issue=>[issue.id,issue]));
+    const app=document.getElementById('app'),graph=document.getElementById('graph'),viewport=document.getElementById('viewport'),edgeLayer=document.getElementById('edge-layer'),nodeLayer=document.getElementById('node-layer'),beaconLayer=document.getElementById('beacon-layer'),details=document.getElementById('details'),drawer=document.getElementById('runner-drawer'),scrim=document.getElementById('scrim'),search=document.getElementById('search'),searchResults=document.getElementById('search-results');
+    const state={view:'map',selected:null,expanded:false,filter:null,query:'',transform:{x:0,y:0,k:1},frameWidth:700,frameHeight:684,lastTrigger:null};
+    let pointers=new Map(),gesture=null,dragMoved=false;
+    function escapeHtml(value){return String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));}
+    function focusStable(element){element?.focus?.({preventScroll:true});}
+    function neighbors(id){const set=new Set([Number(id)]);links.forEach(link=>{if(link.a===Number(id))set.add(link.b);if(link.b===Number(id))set.add(link.a)});return set;}
+    function graphX(ratio){return Math.round(state.frameWidth*ratio);}
+    function overviewPositions(height){const compact=state.frameWidth<450||height<450,y=value=>Math.round(value*height);return compact?{45:[graphX(.174),y(.52)],47:[graphX(.264),y(.18)],49:[graphX(.5),y(.04)],53:[graphX(.736),y(.18)],58:[graphX(.5),y(.36)],61:[graphX(.769),y(.54)],7:[graphX(.5),y(.68)],12:[graphX(.062),y(.08)],34:[graphX(.908),y(.08)],60:[graphX(.231),y(.61)]}:{45:[graphX(.16),y(.462)],47:[graphX(.28),y(.232)],49:[graphX(.5),y(.105)],53:[graphX(.72),y(.232)],58:[graphX(.5),y(.498)],61:[graphX(.78),y(.706)],7:[graphX(.5),y(.761)],12:[graphX(.08),y(.134)],34:[graphX(.92),y(.141)],60:[graphX(.22),y(.743)]};}
+    function currentLayout(){const base=overviewPositions(state.frameHeight);if(!state.expanded||state.selected===null)return base;const relatedSet=neighbors(state.selected),related=[...relatedSet].filter(id=>id!==state.selected),h=state.frameHeight,compact=state.frameWidth<450||h<450,center=graphX(.5);const slots=compact?[[graphX(.23),Math.round(h*.14)],[graphX(.77),Math.round(h*.14)],[graphX(.23),Math.round(h*.42)],[graphX(.77),Math.round(h*.42)],[center,Math.round(h*.62)],[center,Math.round(h*.05)]]:[[graphX(.18),Math.round(h*.18)],[graphX(.82),Math.round(h*.18)],[graphX(.16),Math.round(h*.56)],[graphX(.84),Math.round(h*.56)],[center,Math.round(h*.78)],[center,Math.round(h*.08)]];const layout={...base,[state.selected]:[center,Math.round(h*(compact?.30:.35))]};related.forEach((id,index)=>{layout[id]=slots[index]||[center,Math.round(h*(.12+index*.12))]});if(compact&&!relatedSet.has(7))layout[7]=[center,Math.round(h*.58)];return layout;}
+    function nodeVisual(issue){if(issue.status==='frontier')return '<circle r="25" fill="rgba(193,95,60,.08)"/><circle class="select-ring" r="18" fill="none" stroke="rgba(193,95,60,.36)"/><circle r="13" fill="#C15F3C"/>';if(issue.status==='running')return '<circle class="pulse" r="31" fill="rgba(124,107,174,.13)"/><circle r="22" fill="none" stroke="rgba(124,107,174,.22)"/><circle class="select-ring" r="17" fill="none" stroke="rgba(124,107,174,.48)"/><circle r="12" fill="#7C6BAE"/>';if(issue.status==='blocked')return '<circle class="select-ring" r="11" fill="#FAF9F5" stroke="#8F887A" stroke-width="1.5" stroke-dasharray="3 3"/>';if(issue.status==='human')return '<circle r="29" fill="rgba(177,132,50,.10)"/><circle class="select-ring" r="17" fill="none" stroke="rgba(177,132,50,.5)"/><circle r="12" fill="#B18432"/>';return '<circle class="select-ring" r="7" fill="#AAA293" stroke="#AAA293"/>';}
+    function renderStars(){document.getElementById('stars').innerHTML=[[.07,.06,2],[.31,.14,2],[.5,.03,2],[.69,.11,2],[.93,.07,2],[.11,.60,2],[.46,.85,2],[.88,.65,2]].map(([x,y,r])=>`<circle cx="${graphX(x)}" cy="${Math.round(state.frameHeight*y)}" r="${r}" fill="#DAD4C5"/>`).join('');}
+    function buildGraph(){edgeLayer.innerHTML=links.map((link,index)=>`<path class="edge${link.blocking?' blocking':''}" data-edge="${index}"/>`).join('');nodeLayer.innerHTML=issues.map(issue=>`<g class="node ${issue.status}" data-id="${issue.id}" role="button" tabindex="0" aria-label="Issue #${issue.id}，${escapeHtml(issue.title)}，${statusText[issue.status]}" aria-selected="false" aria-expanded="false"><circle class="hit" r="27"/>${nodeVisual(issue)}<text class="node-id" y="33">#${issue.id}</text><text class="node-title" y="50">${escapeHtml(issue.title)}</text></g>`).join('');beaconLayer.innerHTML=issues.filter(issue=>issue.beacon).map(issue=>`<g class="beacon" data-beacon="${issue.id}"><line y1="-17" y2="-27" stroke="${issue.status==='human'?'#B18432':'#66569A'}"/><rect x="-48" y="-51" width="96" height="24" rx="7" fill="${issue.status==='human'?'#F6EDD8':'#7C6BAE'}" stroke="${issue.status==='human'?'#D9C48F':'#66569A'}"/><text y="-39" fill="${issue.status==='human'?'#7A6328':'#FFF'}">${escapeHtml(issue.beacon)}</text></g>`).join('');nodeLayer.querySelectorAll('.node').forEach(node=>{node.addEventListener('pointerdown',event=>{event.preventDefault();node.classList.add('pointer-focus');focusStable(node)});node.addEventListener('blur',()=>node.classList.remove('pointer-focus'));node.addEventListener('click',event=>{event.stopPropagation();selectIssue(Number(node.dataset.id),node)});node.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();selectIssue(Number(node.dataset.id),node)}})});}
+    function edgePath(a,b,index){const dx=b[0]-a[0],dy=b[1]-a[1],length=Math.max(1,Math.hypot(dx,dy)),bend=(index%2?1:-1)*Math.min(22,length*.09),mx=(a[0]+b[0])/2-dy/length*bend,my=(a[1]+b[1])/2+dx/length*bend;return `M${a[0]} ${a[1]} Q${mx.toFixed(1)} ${my.toFixed(1)} ${b[0]} ${b[1]}`;}
+    function matches(issue){const query=state.query.trim().toLowerCase(),filterMatch=!state.filter||issue.status===state.filter,haystack=[issue.id,issue.title,issue.job,issue.runner,issue.stage].filter(Boolean).join(' ').toLowerCase();return filterMatch&&(!query||haystack.includes(query));}
+    function applyGraphState(){const layout=currentLayout(),related=state.expanded&&state.selected!==null?neighbors(state.selected):null,renderSet=related?new Set([...overviewVisible,...related]):new Set(overviewVisible);if(!related&&(state.filter||state.query.trim()))issues.filter(matches).forEach(issue=>renderSet.add(issue.id));issues.forEach(issue=>{const node=nodeLayer.querySelector(`[data-id="${issue.id}"]`),beacon=beaconLayer.querySelector(`[data-beacon="${issue.id}"]`),[x,y]=layout[issue.id],present=renderSet.has(issue.id),relationOpacity=related?(related.has(issue.id)?1:.08):1,opacity=present?(matches(issue)?relationOpacity:.08):0,interactive=present&&opacity>.1;node.style.transform=`translate(${x}px,${y}px)`;node.style.opacity=String(opacity);node.style.pointerEvents=interactive?'auto':'none';node.tabIndex=interactive?0:-1;node.setAttribute('aria-hidden',interactive?'false':'true');node.setAttribute('aria-selected',state.selected===issue.id?'true':'false');node.setAttribute('aria-expanded',state.selected===issue.id&&state.expanded?'true':'false');if(beacon){beacon.style.transform=`translate(${x}px,${y}px)`;beacon.style.opacity=present?'1':'0';}});links.forEach((link,index)=>{const edge=edgeLayer.querySelector(`[data-edge="${index}"]`),visible=renderSet.has(link.a)&&renderSet.has(link.b),focused=related&&(link.a===state.selected||link.b===state.selected),endpointMatches=matches(issueById.get(link.a))&&matches(issueById.get(link.b));edge.setAttribute('d',edgePath(layout[link.a],layout[link.b],index));edge.style.opacity=visible?(focused?1:(related?.1:(endpointMatches?1:.08))):0;edge.classList.toggle('focused',Boolean(focused));});document.getElementById('collapsed-note').textContent=state.expanded?`#${state.selected} 已展开一跳；再次选择可收起`:'选择节点，展开一跳依赖';renderList();}
+    function renderLegend(){const legend=document.getElementById('legend');legend.innerHTML=statusOrder.map(status=>{const count=issues.filter(issue=>issue.status===status).length;return `<button class="legend-row${state.filter===status?' active':''}" data-filter="${status}" aria-pressed="${state.filter===status}"><span class="legend-dot ${status}" aria-hidden="true"></span><span>${statusText[status]}</span><b>${count}</b></button>`}).join('');legend.querySelectorAll('[data-filter]').forEach(button=>button.addEventListener('click',()=>{state.filter=state.filter===button.dataset.filter?null:button.dataset.filter;renderLegend();applyGraphState()}));}
+    function renderList(){const root=document.getElementById('list-view');root.innerHTML=statusOrder.map(status=>{const group=issues.filter(issue=>issue.status===status&&matches(issue));if(!group.length)return '';return `<section class="list-section"><h2>${statusText[status]} · ${group.length}</h2>${group.map(issue=>`<button class="list-card" data-list-id="${issue.id}"><span><b>#${issue.id}</b><span>${escapeHtml(issue.title)}</span></span><small>${escapeHtml(issue.job||issue.stage)}</small></button>`).join('')}</section>`}).join('')||'<section class="list-section"><h2>没有匹配项</h2></section>';root.querySelectorAll('[data-list-id]').forEach(button=>button.addEventListener('click',()=>{const id=Number(button.dataset.listId);setView('map');const target=nodeLayer.querySelector(`[data-id="${id}"]`);selectIssue(id,target,false);focusStable(target)}));}
+    function renderRunners(){document.getElementById('runner-list').innerHTML=runners.map(runner=>`<div class="worker-row"><span class="worker-state ${runner.state}" aria-hidden="true"></span><div><div class="worker-name">${escapeHtml(runner.name)}</div><div class="worker-position">${escapeHtml(runner.position)}</div></div><button class="locate" ${runner.issue?'data-locate="'+runner.issue+'"':'disabled'} aria-label="${runner.issue?'定位 '+runner.name+' 的 Issue #'+runner.issue:runner.name+' 当前不可定位'}">${runner.issue?'定位':'无任务'}</button></div>`).join('');document.querySelectorAll('[data-locate]').forEach(button=>button.addEventListener('click',()=>{const id=Number(button.dataset.locate);closeRunner(false);setView('map');const target=nodeLayer.querySelector(`[data-id="${id}"]`);selectIssue(id,target,false);focusStable(target)}));}
+    function detailValue(value){return value||'未产生 / NOT_RUN';}
+    function renderDetails(issue){document.getElementById('detail-id').textContent='#'+issue.id;document.getElementById('detail-title').textContent=issue.title;const badge=document.getElementById('detail-state');badge.textContent=statusText[issue.status];badge.className=`state-badge ${issue.status}`;document.getElementById('peek-meta').textContent=[issue.job,issue.attempt,issue.runner,issue.stage].filter(Boolean).join(' · ')||`${issue.stage} · 尚未领取 Job`;document.getElementById('detail-body').innerHTML=`<div class="kv"><span>Job / Attempt</span><span>${escapeHtml(detailValue([issue.job,issue.attempt].filter(Boolean).join(' · ')))}</span></div><div class="kv"><span>Runner / Model</span><span>${escapeHtml(detailValue([issue.runner,issue.model].filter(Boolean).join(' · ')))}</span></div><div class="kv"><span>Candidate</span><span>${escapeHtml(detailValue(issue.candidate))}</span></div><section class="section"><h3>OWNER WORKFLOW</h3><div class="stage-line"><span>stage</span><span>${escapeHtml(issue.stage)}</span></div><div class="stage-line"><span>review</span><span>${escapeHtml(issue.review)}</span></div><div class="stage-line"><span>QA</span><span>${escapeHtml(issue.qa)}</span></div></section><section class="section"><h3>DISCOVERY / DELIVERY</h3><div class="stage-line"><span>discovery</span><span>${escapeHtml(issue.discovery)}</span></div><div class="stage-line"><span>delivery</span><span>${escapeHtml(issue.delivery)}</span></div><div class="stage-line"><span>receipt / lease</span><span>${escapeHtml(issue.extra)}</span></div></section><div class="demo-actions"><button disabled title="DEMO SNAPSHOT 不连接 owner 日志">Owner 日志 · 仅示意</button><button disabled title="DEMO SNAPSHOT 不连接 GitHub">Issue 链接 · 仅示意</button></div>`;}
+    function selectIssue(id,trigger,allowToggle=true){if(allowToggle&&state.selected===id&&state.expanded){collapseSelection();return}const issue=issueById.get(id);state.selected=id;state.expanded=true;state.lastTrigger=trigger||document.activeElement;state.query='';search.value='';if(state.filter&&issue.status!==state.filter){state.filter=null;renderLegend()}closeSearch();resetTransform(false);renderDetails(issue);details.classList.add('open');details.classList.remove('expanded');details.setAttribute('aria-hidden','false');document.getElementById('detail-expand').setAttribute('aria-expanded','false');applyGraphState();}
+    function collapseSelection(){const previous=state.selected,trigger=state.lastTrigger,triggerNode=trigger?.closest?.('.node'),triggerWillHide=triggerNode&&!overviewVisible.has(Number(triggerNode.dataset.id)),fallbackId=overviewVisible.has(previous)?previous:[...neighbors(previous||58)].find(id=>overviewVisible.has(id))||58,fallback=nodeLayer.querySelector(`[data-id="${fallbackId}"]`);state.selected=null;state.expanded=false;closeDetails(false);applyGraphState();if(trigger?.isConnected&&!triggerWillHide)focusStable(trigger);else focusStable(fallback);}
+    function expandDetails(){const expanded=details.classList.toggle('expanded');document.getElementById('detail-expand').setAttribute('aria-expanded',String(expanded));document.getElementById('detail-expand').textContent=expanded?'收起详情':'完整证据';details.setAttribute('role',expanded?'dialog':'region');if(expanded){details.setAttribute('aria-modal','true');scrim.classList.add('open');focusStable(document.getElementById('detail-close'));}else{details.removeAttribute('aria-modal');scrim.classList.remove('open');focusStable(document.getElementById('detail-expand'));}}
+    function closeDetails(restore=true){details.classList.remove('open','expanded');details.setAttribute('role','region');details.setAttribute('aria-hidden','true');details.removeAttribute('aria-modal');if(!drawer.classList.contains('open'))scrim.classList.remove('open');document.getElementById('detail-expand').setAttribute('aria-expanded','false');document.getElementById('detail-expand').textContent='完整证据';if(restore&&state.lastTrigger?.isConnected)focusStable(state.lastTrigger);}
+    function openRunner(trigger){state.lastTrigger=trigger||document.activeElement;state.selected=null;state.expanded=false;closeDetails(false);applyGraphState();drawer.classList.add('open');drawer.setAttribute('aria-hidden','false');scrim.classList.add('open');document.getElementById('runner-toggle').setAttribute('aria-expanded','true');requestAnimationFrame(()=>focusStable(document.getElementById('runner-close')));}
+    function closeRunner(restore=true){drawer.classList.remove('open');drawer.setAttribute('aria-hidden','true');scrim.classList.remove('open');document.getElementById('runner-toggle').setAttribute('aria-expanded','false');if(restore&&state.lastTrigger?.isConnected)focusStable(state.lastTrigger);}
+    function closeSearch(){searchResults.classList.remove('open');search.setAttribute('aria-expanded','false');searchResults.innerHTML='';}
+    function renderSearch(){const query=state.query.trim().toLowerCase();if(!query){closeSearch();return}const results=issues.filter(matches).slice(0,8);searchResults.innerHTML=results.length?results.map(issue=>`<button class="search-result" role="option" data-search-id="${issue.id}"><span><b>#${issue.id}</b><span>${escapeHtml(issue.title)}</span></span><small>${escapeHtml(issue.job||issue.stage)}</small></button>`).join(''):'<div class="search-result"><span>没有匹配项</span></div>';searchResults.classList.add('open');search.setAttribute('aria-expanded','true');searchResults.querySelectorAll('[data-search-id]').forEach(button=>button.addEventListener('click',()=>{selectIssue(Number(button.dataset.searchId),search,false);closeSearch()}));}
+    function setView(view){state.view=view;state.selected=null;state.expanded=false;closeDetails(false);closeRunner(false);closeSearch();resetTransform(false);document.querySelectorAll('[data-view]').forEach(button=>{const active=button.dataset.view===view;button.classList.toggle('active',active);button.setAttribute('aria-pressed',String(active))});graph.style.display=view==='map'?'block':'none';document.getElementById('legend').style.display=view==='map'?'grid':'none';document.getElementById('map-tools').style.display=view==='map'?'flex':'none';document.getElementById('collapsed-note').style.display=view==='map'?'block':'none';document.getElementById('list-view').classList.toggle('active',view==='list');applyGraphState();renderList();}
+    function applyTransform(animate=true){viewport.style.transition=animate?'transform .34s ease-out':'none';viewport.setAttribute('transform',`translate(${state.transform.x} ${state.transform.y}) scale(${state.transform.k})`);document.getElementById('zoom-value').textContent=Math.round(state.transform.k*100)+'%';}
+    function resetTransform(animate=true){state.transform={x:0,y:0,k:1};applyTransform(animate);}
+    function zoomAt(next,cx=state.frameWidth/2,cy=state.frameHeight/2){next=Math.max(.55,Math.min(2.5,next));const ratio=next/state.transform.k;state.transform.x=cx-(cx-state.transform.x)*ratio;state.transform.y=cy-(cy-state.transform.y)*ratio;state.transform.k=next;applyTransform(false);}
+    function syncFrame(){const rect=graph.getBoundingClientRect();if(!rect.width||!rect.height)return;const nextWidth=Math.round(rect.width),nextHeight=Math.round(rect.height),changed=nextWidth!==state.frameWidth||nextHeight!==state.frameHeight;state.frameWidth=nextWidth;state.frameHeight=nextHeight;if(changed&&(state.transform.x!==0||state.transform.y!==0||state.transform.k!==1))resetTransform(false);graph.setAttribute('viewBox',`0 0 ${state.frameWidth} ${state.frameHeight}`);renderStars();applyGraphState();}
+    document.querySelectorAll('[data-view]').forEach(button=>button.addEventListener('click',()=>setView(button.dataset.view)));
+    document.getElementById('runner-toggle').addEventListener('click',event=>openRunner(event.currentTarget));document.getElementById('runner-close').addEventListener('click',()=>closeRunner());document.getElementById('detail-close').addEventListener('click',collapseSelection);document.getElementById('detail-reset').addEventListener('click',collapseSelection);document.getElementById('detail-expand').addEventListener('click',expandDetails);document.getElementById('sheet-handle').addEventListener('click',expandDetails);scrim.addEventListener('click',()=>{if(drawer.classList.contains('open'))closeRunner();else if(details.classList.contains('expanded'))expandDetails();});
+    search.addEventListener('input',event=>{state.query=event.target.value;state.selected=null;state.expanded=false;closeDetails(false);renderSearch();applyGraphState()});search.addEventListener('keydown',event=>{if(event.key==='Escape'){search.value='';state.query='';closeSearch();applyGraphState()}if(event.key==='Enter'){const first=searchResults.querySelector('[data-search-id]');if(first)first.click()}});
+    document.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>zoomAt(state.transform.k*(button.dataset.zoom==='in'?1.2:.83))));document.getElementById('fit').addEventListener('click',()=>{resetTransform();if(state.expanded)collapseSelection()});
+    function trapFocus(container,event){if(event.key!=='Tab')return;const focusable=[...container.querySelectorAll('button:not(:disabled),[tabindex]:not([tabindex="-1"])')].filter(element=>element.offsetParent!==null);if(!focusable.length)return;const first=focusable[0],last=focusable[focusable.length-1];if(event.shiftKey&&document.activeElement===first){event.preventDefault();focusStable(last);}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();focusStable(first);}}
+    document.addEventListener('keydown',event=>{if(drawer.classList.contains('open'))trapFocus(drawer,event);else if(details.classList.contains('expanded'))trapFocus(details,event);if(event.key!=='Escape')return;if(drawer.classList.contains('open'))closeRunner();else if(details.classList.contains('open'))collapseSelection();});
+    graph.addEventListener('click',event=>{if(event.target.closest('.node')||dragMoved)return;if(state.expanded)collapseSelection();});
+    function graphPoint(clientX,clientY){const rect=graph.getBoundingClientRect();return {x:(clientX-rect.left)*state.frameWidth/rect.width,y:(clientY-rect.top)*state.frameHeight/rect.height};}
+    function startPinch(){const[a,b]=[...pointers.values()],midX=(a.x+b.x)/2,midY=(a.y+b.y)/2,mid=graphPoint(midX,midY);gesture={type:'pinch',distance:Math.max(1,Math.hypot(b.x-a.x,b.y-a.y)),k:state.transform.k,anchorX:(mid.x-state.transform.x)/state.transform.k,anchorY:(mid.y-state.transform.y)/state.transform.k};}
+    graph.addEventListener('pointerdown',event=>{if(event.target.closest('.node'))return;graph.setPointerCapture(event.pointerId);pointers.set(event.pointerId,{x:event.clientX,y:event.clientY});dragMoved=false;if(pointers.size===1)gesture={type:'pan',x:event.clientX,y:event.clientY,tx:state.transform.x,ty:state.transform.y};if(pointers.size===2)startPinch();graph.classList.add('panning')});
+    graph.addEventListener('pointermove',event=>{if(!pointers.has(event.pointerId))return;pointers.set(event.pointerId,{x:event.clientX,y:event.clientY});if(!gesture)return;if(pointers.size===1&&gesture.type==='pan'){dragMoved=dragMoved||Math.hypot(event.clientX-gesture.x,event.clientY-gesture.y)>5;const rect=graph.getBoundingClientRect(),scaleX=state.frameWidth/rect.width,scaleY=state.frameHeight/rect.height;state.transform.x=gesture.tx+(event.clientX-gesture.x)*scaleX;state.transform.y=gesture.ty+(event.clientY-gesture.y)*scaleY;applyTransform(false)}else if(pointers.size===2&&gesture.type==='pinch'){const[a,b]=[...pointers.values()],distance=Math.hypot(b.x-a.x,b.y-a.y),mid=graphPoint((a.x+b.x)/2,(a.y+b.y)/2),nextK=Math.max(.55,Math.min(2.5,gesture.k*(distance/gesture.distance)));state.transform.x=mid.x-gesture.anchorX*nextK;state.transform.y=mid.y-gesture.anchorY*nextK;state.transform.k=nextK;applyTransform(false);dragMoved=true}});
+    function endPointer(event){pointers.delete(event.pointerId);if(graph.hasPointerCapture?.(event.pointerId))graph.releasePointerCapture(event.pointerId);if(pointers.size===1){const remaining=[...pointers.values()][0];gesture={type:'pan',x:remaining.x,y:remaining.y,tx:state.transform.x,ty:state.transform.y};}else if(!pointers.size){gesture=null;graph.classList.remove('panning');setTimeout(()=>{dragMoved=false},0)}}
+    graph.addEventListener('pointerup',endPointer);graph.addEventListener('pointercancel',endPointer);graph.addEventListener('lostpointercapture',event=>{pointers.delete(event.pointerId);if(!pointers.size){gesture=null;graph.classList.remove('panning')}});graph.addEventListener('wheel',event=>{event.preventDefault();const rect=graph.getBoundingClientRect(),cx=(event.clientX-rect.left)*state.frameWidth/rect.width,cy=(event.clientY-rect.top)*state.frameHeight/rect.height;zoomAt(state.transform.k*(event.deltaY<0?1.12:.89),cx,cy)},{passive:false});
+    buildGraph();renderLegend();renderRunners();renderList();syncFrame();new ResizeObserver(syncFrame).observe(graph);requestAnimationFrame(()=>app.classList.remove('booting'));
+  </script>
+</body>
+</html>

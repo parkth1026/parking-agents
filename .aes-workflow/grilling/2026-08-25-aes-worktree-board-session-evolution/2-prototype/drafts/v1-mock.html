@@ -1,0 +1,81 @@
+<!-- draft v1 | published 2026-08-25T10:06:56Z
+     用户意见：待逐项确认
+     状态：superseded by v2-mock.html（未遵循既有需求星图高保真基线） -->
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>aes-worktree-board v2 mock</title>
+  <style>
+    :root{--bg:#0c111b;--panel:#151c29;--panel2:#1a2332;--line:#2b374a;--text:#eef3fb;--muted:#8fa0b7;--accent:#ff7a45;--green:#43d39e;--yellow:#f5c451;--red:#ff6b7a;--blue:#64a8ff;--purple:#b58cff}
+    *{box-sizing:border-box} body{margin:0;background:radial-gradient(circle at 25% 0,#17243a 0,#0c111b 42%);color:var(--text);font:14px/1.45 system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+    button{font:inherit}.shell{max-width:1480px;margin:auto;padding:24px}.top{display:flex;gap:20px;justify-content:space-between;align-items:flex-start;margin-bottom:20px}.eyebrow{color:var(--accent);font:700 11px/1.2 ui-monospace,Consolas,monospace;letter-spacing:.14em;text-transform:uppercase}.top h1{margin:5px 0 4px;font-size:26px}.sub{color:var(--muted)}.identity{background:#101722;border:1px solid var(--line);border-radius:10px;padding:12px 14px;min-width:380px;font:12px/1.7 ui-monospace,Consolas,monospace}.ok{color:var(--green)}
+    .metrics{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:18px}.metric,.panel{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:12px}.metric{padding:14px}.metric b{display:block;font-size:23px}.metric span{color:var(--muted);font-size:12px}.grid{display:grid;grid-template-columns:1.15fr .85fr;gap:16px}.panel{padding:16px;margin-bottom:16px}.panel h2{font-size:15px;margin:0 0 12px}.panel-head{display:flex;justify-content:space-between;align-items:center}.pill{display:inline-flex;align-items:center;gap:6px;padding:3px 8px;border:1px solid var(--line);border-radius:999px;color:var(--muted);font-size:11px}.dot{width:7px;height:7px;border-radius:50%;background:currentColor}.runner-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}.runner{padding:12px;border:1px solid var(--line);border-radius:10px;background:#101722;min-height:128px}.runner.active{border-color:#476d9f;box-shadow:inset 0 3px var(--blue)}.runner.quarantine{border-color:#79404a;box-shadow:inset 0 3px var(--red)}.runner.idle{box-shadow:inset 0 3px #43516a}.runner-name{display:flex;justify-content:space-between;font-weight:700}.runner small{display:block;color:var(--muted);margin:7px 0}.mono{font-family:ui-monospace,"Cascadia Mono",Consolas,monospace}.bar{height:5px;background:#273247;border-radius:3px;overflow:hidden;margin:9px 0}.bar i{display:block;height:100%;background:var(--blue)}
+    table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--line);vertical-align:top}th{color:var(--muted);font-size:11px;font-weight:600}.job{font-weight:700}.state{font:700 10px ui-monospace,Consolas,monospace;padding:4px 7px;border-radius:5px;background:#243044}.state.run{color:#9bc8ff}.state.fix{color:#ffd87e}.state.ready{color:#75e4bb}.state.human{color:#d7bbff}.stage{display:flex;gap:4px;margin-top:7px}.stage i{height:4px;flex:1;border-radius:3px;background:#2b374a}.stage .done{background:var(--green)}.stage .now{background:var(--yellow)}
+    .timeline{display:grid;gap:10px}.event{display:grid;grid-template-columns:70px 10px 1fr;gap:10px}.event time{color:var(--muted);font:11px ui-monospace,Consolas,monospace}.event .mark{width:8px;height:8px;margin-top:5px;border-radius:50%;background:var(--blue);box-shadow:0 0 0 4px rgba(100,168,255,.12)}.event strong{display:block;font-size:12px}.event p{margin:2px 0;color:var(--muted);font-size:12px}
+    .queue{display:grid;gap:9px}.card{padding:11px;border:1px solid var(--line);border-radius:9px;background:#101722}.card-head{display:flex;justify-content:space-between;gap:10px}.tag{font:700 10px ui-monospace,Consolas,monospace;color:var(--accent)}.card p{margin:5px 0 0;color:var(--muted);font-size:12px}.actions{display:flex;gap:7px;margin-top:9px}.actions button{background:#1e2a3d;color:#c8d4e6;border:1px solid #35455f;border-radius:6px;padding:5px 8px;font-size:11px}.actions button.primary{border-color:#8d4e34;color:#ffc0a5;background:#322018}
+    .legend{display:flex;gap:16px;color:var(--muted);font-size:11px;margin-top:10px}.changed{outline:2px solid rgba(255,122,69,.7);outline-offset:2px}.footer{color:var(--muted);font-size:11px;padding:6px 2px 30px}@media(max-width:1050px){.metrics{grid-template-columns:repeat(3,1fr)}.grid{grid-template-columns:1fr}.runner-grid{grid-template-columns:repeat(2,1fr)}}
+  </style>
+</head>
+<body>
+<main class="shell">
+  <header class="top">
+    <div><div class="eyebrow">Issue Consumption Control Plane · Draft v1</div><h1>parking-agents / runner board</h1><div class="sub">Master Goal 持续运行 · integration branch <span class="mono">dev</span> · 只显示受配置管理的 runner slots</div></div>
+    <div class="identity changed"><span class="ok">● IDENTITY VERIFIED</span><br>root=G:/GIT/AI_WorkFlow/parking-agents<br>issueRepo=parkth1026/parking-agents<br>slotConfig=runner-slots.local.json · sha256:a17c</div>
+  </header>
+
+  <section class="metrics">
+    <div class="metric"><b>5</b><span>managed runners</span></div><div class="metric"><b>3</b><span>active jobs</span></div><div class="metric"><b>1</b><span>awaiting human</span></div><div class="metric"><b>1</b><span>quarantined</span></div><div class="metric"><b>0</b><span>merge queue</span></div><div class="metric"><b class="ok">RUNNING</b><span>Master Goal</span></div>
+  </section>
+
+  <section class="panel changed">
+    <div class="panel-head"><h2>Runner slots</h2><span class="pill"><i class="dot ok"></i>deterministic allowlist</span></div>
+    <div class="runner-grid">
+      <article class="runner active"><div class="runner-name">worker-1 <span class="ok">BUSY</span></div><small>job-45 · attempt-1</small><div class="mono">review → fixing</div><div class="bar"><i style="width:58%"></i></div><small>gpt tier: standard</small></article>
+      <article class="runner active"><div class="runner-name">worker-2 <span class="ok">BUSY</span></div><small>job-47 · attempt-2</small><div class="mono">implement</div><div class="bar"><i style="width:34%"></i></div><small>resumed from handoff</small></article>
+      <article class="runner quarantine"><div class="runner-name">worker-3 <span style="color:var(--red)">QUARANTINE</span></div><small>DIRTY_WORKTREE</small><div class="mono">tracked=2 · untracked=1</div><div class="bar"><i style="width:0"></i></div><small>never auto-clean</small></article>
+      <article class="runner active"><div class="runner-name">worker-4 <span class="ok">BUSY</span></div><small>job-53 · attempt-1</small><div class="mono">QA live</div><div class="bar"><i style="width:76%"></i></div><small>dependency of #49</small></article>
+      <article class="runner idle"><div class="runner-name">worker-5 <span style="color:var(--muted)">IDLE</span></div><small>no contract-complete issue</small><div class="mono">head=81afa92</div><div class="bar"><i style="width:0"></i></div><small>baseline ready</small></article>
+    </div>
+  </section>
+
+  <div class="grid">
+    <div>
+      <section class="panel changed">
+        <div class="panel-head"><h2>Issue jobs / owner workflows</h2><span class="pill">one job · one owner Goal</span></div>
+        <table><thead><tr><th>JOB</th><th>ISSUE / OWNER</th><th>STAGE</th><th>GOAL RESULT</th></tr></thead><tbody>
+          <tr><td class="job mono">job-45</td><td><b>#45 GitHub identity</b><br><span class="sub">worker-1 · attempt-1</span></td><td><span class="state fix">FIXING</span><div class="stage"><i class="done"></i><i class="done"></i><i class="now"></i><i></i><i></i></div></td><td>review F-1 returned to owner<br><span class="sub">no Master intervention</span></td></tr>
+          <tr><td class="job mono">job-47</td><td><b>#47 session exporter</b><br><span class="sub">worker-2 · attempt-2</span></td><td><span class="state run">IMPLEMENT</span><div class="stage"><i class="done"></i><i class="now"></i><i></i><i></i><i></i></div></td><td>Goal active<br><span class="sub">handoff restored</span></td></tr>
+          <tr><td class="job mono">job-53</td><td><b>#53 runner config drift</b><br><span class="sub">worker-4 · attempt-1</span></td><td><span class="state run">QA LIVE</span><div class="stage"><i class="done"></i><i class="done"></i><i class="done"></i><i class="now"></i><i></i></div></td><td>Goal active<br><span class="sub">unblocks #49</span></td></tr>
+          <tr><td class="job mono">job-ui-7</td><td><b>#7 board interaction</b><br><span class="sub">lease released</span></td><td><span class="state human">AWAITING HUMAN</span></td><td>3 manual checks<br><span class="sub">never auto-pass</span></td></tr>
+        </tbody></table>
+        <div class="legend"><span>阶段：contract</span><span>implement</span><span>review</span><span>QA</span><span>delivery</span></div>
+      </section>
+
+      <section class="panel"><div class="panel-head"><h2>Master event timeline</h2><span class="pill">append-only</span></div><div class="timeline">
+        <div class="event"><time>10:01:04</time><i class="mark"></i><div><strong>Review MUST_FIX stayed inside owner Goal</strong><p>job-45 · commit 6c59e3a · finding F-1 · returned to same owner session</p></div></div>
+        <div class="event"><time>10:02:19</time><i class="mark" style="background:var(--purple)"></i><div><strong>DISCOVERED_WORK routed to Wayfinder</strong><p>dw-9001 → Issue #53 · BLOCKING_DEPENDENCY of #49</p></div></div>
+        <div class="event"><time>10:03:55</time><i class="mark" style="background:var(--yellow)"></i><div><strong>Runner quarantined</strong><p>worker-3 dirty; other lanes continued without asking user</p></div></div>
+        <div class="event"><time>10:05:08</time><i class="mark" style="background:var(--green)"></i><div><strong>QA receipt accepted</strong><p>job-53 · commit c01db33 · automated 9 / live 2</p></div></div>
+      </div></section>
+    </div>
+
+    <aside>
+      <section class="panel changed"><div class="panel-head"><h2>Discovered work</h2><span class="pill">Master → Wayfinder</span></div><div class="queue">
+        <article class="card"><div class="card-head"><b>Stale runner identity config</b><span class="tag">BLOCKING</span></div><p>Source job #49 · dedupe matched none · proposed workflow: diagnose</p><div class="actions"><button class="primary">Opened #53</button><button>View evidence</button></div></article>
+        <article class="card"><div class="card-head"><b>Usage report hardcodes date</b><span class="tag">NON-BLOCKING</span></div><p>Source job #47 · current job continues · proposed workflow: implement</p><div class="actions"><button>Wayfinder pending</button><button>Dismiss duplicate</button></div></article>
+      </div></section>
+
+      <section class="panel"><div class="panel-head"><h2>Attention queue</h2><span class="pill">only job-level terminal</span></div><div class="queue">
+        <article class="card"><div class="card-head"><b>Manual board acceptance</b><span class="tag" style="color:var(--purple)">HUMAN</span></div><p>job-ui-7 · URL ready · 3 checks · writer lease released</p><div class="actions"><button class="primary">Open checklist</button><button>Park</button></div></article>
+        <article class="card"><div class="card-head"><b>worker-3 quarantine</b><span class="tag" style="color:var(--red)">CAPACITY</span></div><p>Not blocking while 4 slots remain available. No auto reset/clean.</p><div class="actions"><button>Inspect diff</button><button>Runner update</button></div></article>
+      </div></section>
+
+      <section class="panel"><h2>Merge gate</h2><div class="sub">Queue empty. A job appears here only after:</div><ul><li>AC evidence complete</li><li>Standards + Spec pass</li><li>required QA receipt pass</li><li>candidate equals live runner HEAD</li></ul><div class="pill"><i class="dot ok"></i>host-only serial merge</div></section>
+    </aside>
+  </div>
+  <footer class="footer">新增/变更：runner pool、Issue owner workflows、discovered-work 与 attention queue。保持：host-only merge、append-only evidence、dirty fail-closed。此 mock 锁信息结构与状态，不锁像素。</footer>
+</main>
+</body>
+</html>
