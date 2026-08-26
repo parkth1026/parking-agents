@@ -28,9 +28,9 @@ function base(fixture) {
 }
 
 // 「重启 Master」在这里是字面意义的：另一个 Node 进程，只能看见落盘状态。
-function freshProcess(fixture, args, { expectStatus = 0 } = {}) {
+function freshProcess(fixture, args, { expectStatus = 0, env = {} } = {}) {
   const result = spawnSync(process.execPath, [MASTER_CLI, ...args, '--dir', fixture.v4Dir, '--slots', fixture.slotsPath], {
-    ...HEADLESS_CHILD_OPTIONS, encoding: 'utf8', cwd: fixture.repoRoot,
+    ...HEADLESS_CHILD_OPTIONS, encoding: 'utf8', cwd: fixture.repoRoot, env: { ...process.env, ...env },
   });
   if (expectStatus === 'nonzero') {
     assert.notEqual(result.status, 0,
@@ -605,12 +605,92 @@ export async function discoveredWorkScenario() {
 // ============================================================ AC-005 delivery-merge
 
 export async function deliveryMergeScenario() {
+  await nextStepDriver();
   await mergePolicyTiers();
   await deliveryHappyPath();
   await postMergeVerificationFailure();
   await mergeConflictDisposition();
   await serialMergeEnforcement();
   await legacyArchiveStable();
+}
+
+// #53: next-step 把 reconcile 已经算出的动作直接执行掉一步。
+// 全程走真实 CLI 子进程 —— 这条能力的价值就在于「无人值守循环不必自己拼装命令」，
+// 用库函数测等于绕过了要证明的东西。
+async function nextStepDriver() {
+  const fixture = makeFixture('next-step', { workers: [{ id: 'worker-1' }, { id: 'worker-2' }] });
+  const commandsFile = join(fixture.root, 'verify-commands.json');
+  writeFileSync(commandsFile, JSON.stringify([{ command: process.execPath, args: ['-e', 'process.exit(0)'] }]));
+  // close 会调用 gh。离线 scenario 绝不允许触达真实 GitHub，所以从既有注入点接管，
+  // 并把每次调用记到 trace 里，好断言「确实只发生了 comment + close」。
+  const ghTrace = join(fixture.root, 'gh-trace.jsonl');
+  const ghScript = join(fixture.root, 'fake-gh.mjs');
+  writeFileSync(ghScript, [
+    "import { appendFileSync } from 'node:fs';",
+    `appendFileSync(${JSON.stringify(ghTrace)}, JSON.stringify(process.argv.slice(2)) + '\\n');`,
+    "console.log('ok');",
+  ].join('\n'));
+  const ghEnv = { AES_WORKTREE_BOARD_GH_COMMAND: JSON.stringify([process.execPath, ghScript]) };
+  try {
+    writeSlots(fixture);
+    freshProcess(fixture, ['start']);
+
+    // 空 registry：没有任何可推进项。
+    const idle = freshProcess(fixture, ['next-step'], { env: ghEnv });
+    assert.equal(idle.outcome, 'NOOP', '无 job 时必须是 NOOP');
+
+    const job = driveToReadyToMerge(fixture, issuePayload({ number: 561 }), { slotId: 'worker-1' });
+    const headBefore = gitOut(fixture.repoRoot, ['rev-parse', 'dev']);
+
+    // AC-1: 推进恰好一个 job，返回 typed 结果。
+    const merged = freshProcess(fixture, ['next-step'], { env: ghEnv });
+    assert.equal(merged.outcome, 'ADVANCED');
+    assert.equal(merged.jobId, job.jobId);
+    assert.equal(merged.kind, 'merge');
+    assert.notEqual(gitOut(fixture.repoRoot, ['rev-parse', 'dev']), headBefore, 'merge 必须真的发生');
+    assert.equal(readV4Registry(fixture.v4Dir).jobs[job.jobId].state, 'merged');
+
+    // 缺 verification 命令时不猜：如实跳过并说明原因。
+    const withoutCommands = freshProcess(fixture, ['next-step'], { env: ghEnv });
+    assert.equal(withoutCommands.outcome, 'NOOP');
+    assert.ok(withoutCommands.skipped.some((entry) => /verification 命令/.test(entry.reason)),
+      'next-step 必须说明为什么没推进，而不是沉默 NOOP');
+
+    const verified = freshProcess(fixture, ['next-step', '--commands-file', commandsFile], { env: ghEnv });
+    assert.equal(verified.kind, 'verify');
+    const closed = freshProcess(fixture, ['next-step', '--commands-file', commandsFile], { env: ghEnv });
+    assert.equal(closed.kind, 'close');
+    assert.equal(readV4Registry(fixture.v4Dir).jobs[job.jobId].state, 'closed');
+    const ghCalls = readFileSync(ghTrace, 'utf8').split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line));
+    assert.deepEqual(ghCalls.map((call) => `${call[0]} ${call[1]}`), ['issue comment', 'issue close'],
+      'close 只允许 comment + close 两次写入');
+
+    // AC-2: 全部终态后回到 NOOP，退出码 0，且不再改动 integration。
+    const headAfter = gitOut(fixture.repoRoot, ['rev-parse', 'dev']);
+    const done = freshProcess(fixture, ['next-step', '--commands-file', commandsFile], { env: ghEnv });
+    assert.equal(done.outcome, 'NOOP');
+    assert.equal(gitOut(fixture.repoRoot, ['rev-parse', 'dev']), headAfter, 'NOOP 不得产生任何 Git 副作用');
+
+    // AC-3: 人工态永不被 next-step 推进。
+    // 前一个 job 合并后 integration 已前移，worker-2 必须先同步 baseline 才可领取（B3）。
+    master.releaseAndSync({ ...base(fixture), slotId: 'worker-2' });
+    const humanJob = driveToReadyToMerge(fixture, issuePayload({ number: 562 }), { slotId: 'worker-2' });
+    master.openHumanRequest({
+      ...base(fixture), jobId: humanJob.jobId, state: 'awaiting-human', kind: 'manual_validation',
+      prompt: '需要人工确认', requiredEvidence: ['截图'],
+    });
+    const headBeforeHuman = gitOut(fixture.repoRoot, ['rev-parse', 'dev']);
+    for (let index = 0; index < 3; index += 1) {
+      const blocked = freshProcess(fixture, ['next-step', '--commands-file', commandsFile], { env: ghEnv });
+      assert.equal(blocked.outcome, 'NOOP', '人工态不得被 next-step 推进');
+      assert.ok(blocked.skipped.some((entry) => entry.jobId === humanJob.jobId && /人工态/.test(entry.reason)),
+        '跳过人工态必须给出可解释原因');
+    }
+    assert.equal(gitOut(fixture.repoRoot, ['rev-parse', 'dev']), headBeforeHuman, '人工态期间不得 merge');
+    assert.equal(readV4Registry(fixture.v4Dir).jobs[humanJob.jobId].state, 'awaiting-human');
+  } finally {
+    fixture.cleanup();
+  }
 }
 
 // 四档 mergePolicy + riskProfile 自报按路径兜底。

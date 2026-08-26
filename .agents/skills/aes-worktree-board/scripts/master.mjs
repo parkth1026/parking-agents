@@ -917,9 +917,13 @@ export function masterReconcile(options = {}) {
           setJobState(registry, job.jobId, 'merged', { reason: 'reconcile: candidate 已在 integration 中', dir });
           registry.mergeQueue = registry.mergeQueue.filter((id) => id !== job.jobId);
           actions.push({ jobId: job.jobId, action: 'ADOPT_EXISTING_MERGE' });
-        } else if (!registry.mergeQueue.includes(job.jobId)) {
-          registry.mergeQueue.push(job.jobId);
-          actions.push({ jobId: job.jobId, action: 'REQUEUE_FOR_MERGE' });
+        } else {
+          // 已经正确排好队的 job 同样要出现在动作列表里。
+          // 只报「纠正性」动作会让 reconcile 的输出无法回答「下一步做什么」——
+          // 一个就绪且排好队的 job 会安静地不产生任何动作，驱动方于是看不到它。
+          const requeued = !registry.mergeQueue.includes(job.jobId);
+          if (requeued) registry.mergeQueue.push(job.jobId);
+          actions.push({ jobId: job.jobId, action: 'REQUEUE_FOR_MERGE', requeued });
         }
       } else if (job.state === 'merged' || job.state === 'closing') {
         // 中断点 4：merge 成功但 close 前中断。close 幂等，直接续跑，不重复 merge。
@@ -1003,6 +1007,68 @@ export function masterReconcile(options = {}) {
   });
 }
 
+// reconcile 算出的动作里，哪些是 Master 能自己执行完的。
+// 其余（探测 owner thread、等 slot 恢复、等人工、等策略）都需要本进程之外的输入，
+// next-step 只能跳过它们并如实说明 —— 沉默跳过会让「无可推进」这个结论不可解释。
+const MACHINE_ACTIONABLE = Object.freeze({
+  REQUEUE_FOR_MERGE: 'merge',
+  RESUME_POST_MERGE_VERIFY: 'verify',
+  RESUME_CLOSE: 'close',
+});
+
+// 把 reconcile 的结论直接执行掉一步。无人值守循环因此不需要调用方自己解析
+// reconcile 输出再拼装命令 —— 那层拼装既没有测试覆盖，也是重启后行为漂移的来源。
+export async function masterNextStep(options = {}) {
+  const { dir } = ctx(options);
+  const reconciled = masterReconcile(options);
+  const registry = readV4Registry(dir);
+
+  const skipped = [];
+  let target = null;
+  for (const action of reconciled.actions) {
+    const job = registry.jobs[action.jobId];
+    // 人工态永远不由 next-step 推进：等人就是等人，不是「暂时没轮到」。
+    if (job && HUMAN_STATES.includes(job.state)) {
+      skipped.push({ jobId: action.jobId, action: action.action, reason: `人工态 ${job.state}，只能由人工答复推进` });
+      continue;
+    }
+    const kind = MACHINE_ACTIONABLE[action.action];
+    if (!kind) {
+      skipped.push({ jobId: action.jobId, action: action.action, reason: '需要本进程之外的输入' });
+      continue;
+    }
+    if (kind === 'verify' && !options.commands) {
+      skipped.push({ jobId: action.jobId, action: action.action, reason: '缺少 post-merge verification 命令' });
+      continue;
+    }
+    target = { ...action, kind, job };
+    break;
+  }
+
+  if (!target) {
+    return {
+      ok: true, outcome: 'NOOP', reason: '没有可由 Master 自行推进的 job',
+      skipped, jobs: reconciled.jobs.length,
+    };
+  }
+
+  const shared = { ...options, jobId: target.jobId };
+  let result;
+  if (target.kind === 'merge') result = masterMerge(shared);
+  else if (target.kind === 'verify') result = postMergeVerify({ ...shared, commands: options.commands });
+  else result = await masterClose(shared);
+
+  return {
+    ok: result.ok !== false,
+    outcome: 'ADVANCED',
+    jobId: target.jobId,
+    action: target.action,
+    kind: target.kind,
+    result,
+    skipped,
+  };
+}
+
 // B21: fresh runner registry + job queue + inbox + Issue graph 同时为空/terminal 才 STOP。
 export function evaluateStop(options = {}) {
   const { dir, config } = ctx(options);
@@ -1056,6 +1122,12 @@ async function main(argv = process.argv.slice(2)) {
   if (command === 'start') return masterStart({ ...shared, legacyRuntimeDir: options['legacy-runtime'] });
   if (command === 'status') return masterStatus(shared);
   if (command === 'reconcile') return masterReconcile(shared);
+  if (command === 'next-step') {
+    return masterNextStep({
+      ...shared,
+      commands: options['commands-file'] ? JSON.parse(readFileSync(resolve(options['commands-file']), 'utf8')) : null,
+    });
+  }
   if (command === 'stop' && action === 'eval') {
     return evaluateStop({ ...shared, frontierCount: Number(options.frontier || 0) });
   }
@@ -1094,7 +1166,7 @@ async function main(argv = process.argv.slice(2)) {
   if (command === 'human' && action === 'respond') {
     return respondHumanRequest({ ...shared, resumeToken: options['resume-token'], response: payloadFrom(options, 'response') });
   }
-  throw storeError('BAD_REQUEST', '用法: master.mjs start|status|reconcile|stop eval|claim|candidate|stage review|stage qa|terminal|gate|merge|verify|close|release|discovery|attempt interrupt|attempt resume|attempt new|human open|human respond');
+  throw storeError('BAD_REQUEST', '用法: master.mjs start|status|reconcile|next-step|stop eval|claim|candidate|stage review|stage qa|terminal|gate|merge|verify|close|release|discovery|attempt interrupt|attempt resume|attempt new|human open|human respond');
 }
 
 if (resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url))) {
