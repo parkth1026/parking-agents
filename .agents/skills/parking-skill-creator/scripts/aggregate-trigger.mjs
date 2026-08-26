@@ -8,7 +8,7 @@
 //   - best_description 按 test 分数选出（防过拟合）：correct ↑ → 应触发率 ↑ → 误触发率 ↓，全平取先出现有效轮
 // --persist <技能目录>: 题库（trigger-evals.json）读取与成绩（trigger-benchmark.json）写出缺省指向技能目录；
 //   显式 --eval-set/--output 可覆盖；probe-results.jsonl 始终住 workspace（原始探针是 scratch）。
-// 用法: node aggregate-trigger.mjs <workspace目录> [--persist <技能目录>] [--eval-set <路径>] [--probes <路径>] [--output <路径>]
+// 用法: node aggregate-trigger.mjs <workspace目录> [--persist <技能目录>] [--eval-set <路径>] [--probes <路径>] [--output <路径>] [--min-test-queries <N>]
 // 退出码: 0 成功 / 1 数据缺失、无有效结果或 --persist 目标不可写 / 2 用法错
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -18,7 +18,7 @@ const SPLIT_SEED = 42;
 const HOLDOUT = 0.4;
 
 function usage() {
-  console.log("用法: node aggregate-trigger.mjs <workspace目录> [--persist <技能目录>] [--eval-set <路径>] [--probes <路径>] [--output <路径>]");
+  console.log("用法: node aggregate-trigger.mjs <workspace目录> [--persist <技能目录>] [--eval-set <路径>] [--probes <路径>] [--output <路径>] [--min-test-queries <N>]");
   console.log("示例: node aggregate-trigger.mjs ../my-skill-workspace --persist ../../skills/log-classifier");
   process.exit(2);
 }
@@ -143,7 +143,14 @@ function readJsonl(path) {
  * 聚合。返回 trigger-benchmark 对象（写入 json）。
  * jsonl 行: { query_id, probe, first_line, description? }；description 用于多轮迭代分组（缺省归入 null 轮）。
  */
-export function aggregateTrigger(evalSet, probeRows) {
+// test 样本下限：低于它就不宣告 best_description。理由与「全无效探针退出 1、不写假报告」
+// 同源——test 只有 2 条时，一轮赢另一轮往往只差一条 query，那不是证据是噪声。
+// 判定基数是 test 里**真正拿到有效探针**的 query 数，不是切分声明的条数：
+// 8 条里 6 条没探针，实际证据仍然只有 2 条。
+export const MIN_TEST_QUERIES = 6;
+
+export function aggregateTrigger(evalSet, probeRows, opts = {}) {
+  const minTestQueries = Number.isInteger(opts.minTestQueries) ? opts.minTestQueries : MIN_TEST_QUERIES;
   const skill = evalSet.skill;
   const byId = new Map(evalSet.queries.map((q) => [q.id, q]));
   const split = splitEvalSet(evalSet.queries);
@@ -212,6 +219,7 @@ export function aggregateTrigger(evalSet, probeRows) {
       }
       return {
         queries: ids.length,
+        evaluated: ids.length - invalidQueries,
         trigger_rate_on_should: should > 0 ? round4(shouldTriggered / should) : 0,
         false_trigger_rate_on_should_not: shouldNot > 0 ? round4(falseTriggered / shouldNot) : 0,
         correct,
@@ -240,10 +248,16 @@ export function aggregateTrigger(evalSet, probeRows) {
       return challenger.test.false_trigger_rate_on_should_not < champ.test.false_trigger_rate_on_should_not;
     return false; // 全平：保守保留先出现轮
   }
+  // 样本下限（issue #55）：证据不足的轮次没有资格当冠军——宁可不宣告，也不拿噪声当结论。
   let best = null;
-  for (const r of roundStats) {
-    if (r.valid_probes === 0) continue;
+  let bestReason = null;
+  const eligible = roundStats.filter((r) => r.valid_probes > 0 && r.test.evaluated >= minTestQueries);
+  for (const r of eligible) {
     if (best === null || beats(r, best)) best = r;
+  }
+  if (best === null && roundStats.length > 0) {
+    const maxEvaluated = Math.max(0, ...roundStats.map((r) => r.test.evaluated));
+    bestReason = `样本不足：test 有效 query 数 ${maxEvaluated} < 下限 ${minTestQueries}（扩充题库或显式放宽 --min-test-queries 后重跑）`;
   }
 
   return {
@@ -251,6 +265,8 @@ export function aggregateTrigger(evalSet, probeRows) {
     split: { train: split.train, test: split.test, seed: SPLIT_SEED, holdout: HOLDOUT },
     rounds: roundStats,
     best_description: best ? best.description : null,
+    best_description_reason: bestReason,
+    min_test_queries: minTestQueries,
     valid_probes: validProbes,
     invalid_probes: invalidProbes,
   };
@@ -271,6 +287,19 @@ const flag = (name) => {
 };
 
 const ws = resolve(wsArg);
+
+// --min-test-queries N：覆盖 test 样本下限（默认 MIN_TEST_QUERIES）。放宽是显式动作，
+// 免得小题库悄悄拿到一个看起来权威的 best_description。
+const minArg = flag("--min-test-queries");
+let minTestQueries = MIN_TEST_QUERIES;
+if (minArg !== undefined) {
+  const n = Number(minArg);
+  if (!Number.isInteger(n) || n < 1) {
+    console.log(`用法错: --min-test-queries 需为 ≥1 的整数，收到: ${minArg}`);
+    process.exit(2);
+  }
+  minTestQueries = n;
+}
 
 // --persist <技能目录>：题库读取与成绩写出的缺省从 workspace 切到技能目录（持久依据随技能走）。
 // 题库未沉淀时拒绝，绝不静默回退读 workspace 旧副本——那是跨轮漂移的源头。
@@ -309,7 +338,7 @@ if (bad.length > 0) {
   console.log(`警告: ${probesPath} 有 ${bad.length} 行不可解析，已跳过`);
 }
 
-const result = aggregateTrigger(evalSet, rows);
+const result = aggregateTrigger(evalSet, rows, { minTestQueries });
 result.invalid_probes += bad.length;
 if (result.rounds.length === 0 || result.valid_probes === 0) {
   console.log("无有效探针结果");
@@ -328,8 +357,12 @@ result.rounds.forEach((r, i) => {
   console.log("  " + label(r).train);
   console.log("  " + label(r).test);
 });
-const bestRound = result.rounds.find((r) => r.description === result.best_description);
-console.log(`best_description: 按 test 分数选出（correct=${bestRound?.test.correct ?? "?"}/${bestRound?.test.queries ?? "?"}, 触发率=${bestRound?.test.trigger_rate_on_should.toFixed(2) ?? "?"}，平局比率细分，防过拟合）`);
+if (result.best_description === null && result.best_description_reason) {
+  console.log(`best_description: 未宣告 —— ${result.best_description_reason}`);
+} else {
+  const bestRound = result.rounds.find((r) => r.description === result.best_description);
+  console.log(`best_description: 按 test 分数选出（correct=${bestRound?.test.correct ?? "?"}/${bestRound?.test.evaluated ?? "?"} 有效, 触发率=${bestRound?.test.trigger_rate_on_should.toFixed(2) ?? "?"}，平局比率细分，防过拟合；下限 ${result.min_test_queries}）`);
+}
 console.log(`valid 探针: ${result.valid_probes}`);
 console.log(`invalid 探针: ${result.invalid_probes}`);
 console.log(`→ ${outPath}`);

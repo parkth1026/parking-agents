@@ -969,11 +969,54 @@ try {
     { query_id: "unknown", first_line: "SKILL: trigger-demo", description: "新描述" },
     [],
   ].map((row) => JSON.stringify(row)).join("\n") + "\nnot-json\n", "utf8");
-  const good = runFile("aggregate-trigger.mjs", [root9]);
+  // 本用例考的是选优逻辑，题库刻意小（test=2）；下限另有专门用例，这里显式放宽。
+  const good = runFile("aggregate-trigger.mjs", [root9, "--min-test-queries", "2"]);
   const triggerBenchmark = JSON.parse(readFileSync(join(root9, "trigger-benchmark.json"), "utf8"));
   check("触发聚合: 有效探针产出多轮 benchmark", good.code === 0 && triggerBenchmark.rounds.length === 2
     && triggerBenchmark.valid_probes === 8 && triggerBenchmark.invalid_probes === 4);
   check("触发聚合: best_description 只从有效轮选择", triggerBenchmark.best_description === "新描述");
+
+  // 样本下限（issue #55）：test 证据不足时不宣告 best_description，而不是硬选一个。
+  const floored = runFile("aggregate-trigger.mjs", [root9, "--output", join(root9, "floored.json")]);
+  const flooredJson = JSON.parse(readFileSync(join(root9, "floored.json"), "utf8"));
+  check("样本下限: 默认下限下小题库不宣告 best_description",
+    floored.code === 0 && flooredJson.best_description === null);
+  check("样本下限: 未宣告时给出可读原因并记录下限值",
+    typeof flooredJson.best_description_reason === "string"
+      && flooredJson.best_description_reason.includes("样本不足")
+      && flooredJson.min_test_queries === 6);
+  check("样本下限: 终端显式说明未宣告", out(floored).includes("best_description: 未宣告"));
+  check("样本下限: 仍产出其余指标(不是整体失败)",
+    flooredJson.rounds.length === 2 && flooredJson.valid_probes > 0);
+  check("样本下限: test 计入有效 query 数而非切分声明条数",
+    flooredJson.rounds.every((r) => typeof r.test.evaluated === "number" && r.test.evaluated <= r.test.queries));
+  const badFloor = runFile("aggregate-trigger.mjs", [root9, "--min-test-queries", "0"]);
+  check("样本下限: 非法下限按用法错退出 2", badFloor.code === 2);
+  const nanFloor = runFile("aggregate-trigger.mjs", [root9, "--min-test-queries", "abc"]);
+  check("样本下限: 非整数下限退出 2", nanFloor.code === 2);
+
+  // 反向验证：下限必须不误拦。20 条题库(正10/负10) 在 holdout=0.4 下 test=8 ≥ 6，应正常宣告。
+  const bigWs = join(root9, "big");
+  mkdirSync(bigWs);
+  const bigQueries = [];
+  for (let i = 1; i <= 10; i++) bigQueries.push({ id: `p${i}`, text: `应触发场景 ${i}`, should_trigger: true });
+  for (let i = 1; i <= 10; i++) bigQueries.push({ id: `n${i}`, text: `near-miss 场景 ${i}`, should_trigger: false });
+  writeFileSync(join(bigWs, "trigger-evals.json"),
+    JSON.stringify({ skill: "trigger-demo", queries: bigQueries }), "utf8");
+  const bigRows = [];
+  for (const q of bigQueries) {
+    // 旧描述：应触发的一半漏触发；新描述：全对
+    const oldTrig = q.should_trigger ? Number(q.id.slice(1)) % 2 === 1 : false;
+    bigRows.push({ query_id: q.id, first_line: oldTrig ? "SKILL: trigger-demo" : "SKILL: none", description: "旧描述" });
+    bigRows.push({ query_id: q.id, first_line: q.should_trigger ? "SKILL: trigger-demo" : "SKILL: none", description: "新描述" });
+  }
+  writeFileSync(join(bigWs, "probe-results.jsonl"), bigRows.map((r) => JSON.stringify(r)).join("\n"), "utf8");
+  const bigRun = runFile("aggregate-trigger.mjs", [bigWs]);
+  const bigJson = JSON.parse(readFileSync(join(bigWs, "trigger-benchmark.json"), "utf8"));
+  check("样本下限: 20 条题库(test=8) 正常宣告 best_description",
+    bigRun.code === 0 && bigJson.best_description === "新描述" && bigJson.best_description_reason === null);
+  check("样本下限: 足量时 test.evaluated 达到下限",
+    bigJson.rounds.every((r) => r.test.evaluated >= bigJson.min_test_queries));
 
   const bad = join(root9, "all-invalid");
   mkdirSync(bad);

@@ -374,11 +374,14 @@ Output from `scripts/aggregate-trigger.mjs <workspace> --persist <skill-dir>`. D
 - `split`: train/test 60/40 stratified by should_trigger (official run_loop caliber; deterministic shuffle with the recorded seed), test gets at least one query per stratum
 - `rounds[]`: One entry per description tested; within each split:
   - `valid_probes`: Number of protocol-valid, known-query probe rows in this round; rounds with zero valid probes cannot become `best_description`
+  - `train.evaluated` / `test.evaluated`: Queries in that split that actually received at least one valid probe (`queries - invalid_queries`). This — not `queries` — is the evidence base the sample floor is checked against
   - `trigger_rate_on_should`: Fraction of should-trigger queries where the majority of valid probes triggered (strict majority, default 3 probes per query)
   - `false_trigger_rate_on_should_not`: Fraction of should-not-trigger queries that (wrongly) triggered
   - `correct`: test/train correctness count (should→triggered + should-not→quiet)
   - `invalid_queries`: Queries with zero valid probes (excluded from rate denominators)
-- `best_description`: Picked by test `correct` count, then trigger/false-trigger rates (anti-overfitting); a complete tie keeps the earlier valid round
+- `best_description`: Picked by test `correct` count, then trigger/false-trigger rates (anti-overfitting); a complete tie keeps the earlier valid round. `null` when no round clears the sample floor — see `min_test_queries`
+- `best_description_reason`: `null` when a winner was declared; otherwise a human-readable reason (currently: sample below the floor)
+- `min_test_queries`: The test-sample floor in effect for this run (default 6, overridable with `--min-test-queries <N>`). A round is eligible to win only when its `test.evaluated` reaches this floor
 - `valid_probes`: Total protocol-valid, known-query probe rows across all rounds
 - `invalid_probes`: Total malformed JSON lines, non-object/unknown-query rows, or probe lines whose first line did not match the protocol
 

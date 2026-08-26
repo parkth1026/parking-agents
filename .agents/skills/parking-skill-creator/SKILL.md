@@ -321,6 +321,8 @@ node scripts/aggregate-trigger.mjs <workspace> --persist <技能目录>
 
 输出 `trigger-benchmark.json`：train/test 60/40 按 should_trigger 分层切分（官方 run_loop 口径），每 query 3 探针取严格多数，各层触发率/误触发率/invalid 计数；多轮（改写 description 后再跑探针，jsonl 行带 `description` 字段）时按 **test 正确数**选 best_description，防过拟合。结果同时记录 `valid_probes`，每轮记录有效探针数，便于审计证据是否充足。
 
+**样本下限**：test 里**真正拿到有效探针**的 query 数（`test.evaluated`，不是切分声明的条数——8 条里 6 条没探针，实际证据仍只有 2 条）低于下限时**不宣告** best_description，置 `null` 并在 `best_description_reason` 写明原因。默认下限 6；20 条题库在 holdout=0.4 下 test=8，正常通过。这与「全无效探针退出 1、不写假报告」同源——test 只有 2 条时，一轮赢另一轮往往只差一条 query，那不是证据是噪声。需要放宽用 `--min-test-queries <N>`（显式动作，免得小题库悄悄拿到一个看起来权威的结论）；其余指标照常产出，不是整体失败。
+
 `--persist <技能目录>` 把题库读取与成绩写出缺省切到技能目录（`trigger-evals.json`/`trigger-benchmark.json` 沉淀进技能根，显式 `--eval-set`/`--output` 仍可覆盖）；技能目录缺题库或目标不是目录时拒绝（退出 1），**绝不静默回退**读 workspace 旧副本——那是跨轮漂移的源头。probe-results.jsonl 始终留 workspace。成绩为原子整写（非追加），跨轮内容史由 git 记录。不带 `--persist` 时与旧行为完全一致，外部技能一次性评测照旧。
 
 ### 迭代 description
