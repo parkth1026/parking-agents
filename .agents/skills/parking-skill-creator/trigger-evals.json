@@ -1,9 +1,25 @@
 {
   "skill": "parking-skill-creator",
   "queries": [
-    { "id": "q1", "text": "帮我从零创建一个带脚本和自测的 agent skill，并打成 skill 包", "should_trigger": true },
-    { "id": "q2", "text": "我有一个技能草稿，想跑 with/without 评测并看 benchmark", "should_trigger": true },
-    { "id": "q3", "text": "帮我把这段日志翻译成中文", "should_trigger": false },
-    { "id": "q4", "text": "帮我修复一个 React 页面布局问题", "should_trigger": false }
+    { "id": "q1", "text": "我想从零做一个 agent skill，帮我搭好脚手架、把测试写了、校验跑过，最后打包成 .skill 文件", "should_trigger": true },
+    { "id": "q2", "text": "我有个技能草稿想验证下效果，跑一轮 with/without 对照评测，看看 benchmark 数据再决定留不留", "should_trigger": true },
+    { "id": "q3", "text": "我这个技能老是不触发，有时候还被别的技能抢走，帮我查查 description 是不是要改", "should_trigger": true },
+    { "id": "q4", "text": "把 SKILL.md 按上一轮评测的反馈改一版，改完把成绩追加到技能的 history 里", "should_trigger": true },
+    { "id": "q5", "text": "技能写完了，帮我生成一个能直接发给同事安装的 .skill 分发包", "should_trigger": true },
+    { "id": "q6", "text": "我平时整理 Jenkins 日志有自己一套手法，想把它固化成技能，从哪儿开始搞？", "should_trigger": true },
+    { "id": "q7", "text": "技能又迭代了一版，起个浏览器评审页，我要逐条对比这轮和上轮的输出差别", "should_trigger": true },
+    { "id": "q8", "text": "帮我检查一下这个技能的 frontmatter 合不合规，顺便把它自带的回归测试跑一遍", "should_trigger": true },
+    { "id": "q9", "text": "怎么知道我的技能触发准不准？给我跑一轮真实探针，看看误触发率高不高", "should_trigger": true },
+    { "id": "q10", "text": "我们仓库要批量建自己的 agent skill，需要一条从创建、校验、评测到打包的完整流水线", "should_trigger": true },
+    { "id": "q11", "text": "用 karpathy-llm-wiki 把这篇 GLM 论文整理成可以检索的笔记", "should_trigger": false },
+    { "id": "q12", "text": "写个一次性的 Node 脚本，把 D:/logs 按月份归档压缩，跑完就删的那种", "should_trigger": false },
+    { "id": "q13", "text": "把这个 React 项目打包成生产构建，然后丢到测试环境跑一遍", "should_trigger": false },
+    { "id": "q14", "text": "压测脚本跑完了，帮我评测一下这个接口的 p99 延迟和错误率", "should_trigger": false },
+    { "id": "q15", "text": "Jenkins 上一看到测试失败就自动触发回滚，帮我把这条流水线配起来", "should_trigger": false },
+    { "id": "q16", "text": "把这段 SKILL.md 里的英文 description 翻译成中文给我看看什么意思", "should_trigger": false },
+    { "id": "q17", "text": "agent skill、MCP 和 subagent 到底有啥区别？给我讲讲各自适合什么场景", "should_trigger": false },
+    { "id": "q18", "text": "帮我做一个飞书机器人，能在群里每天自动发销售日报", "should_trigger": false },
+    { "id": "q19", "text": "ps1-creator 能不能帮我生成一个监控 GPU 温度的 PowerShell 脚本？", "should_trigger": false },
+    { "id": "q20", "text": "帮我给团队写一份《如何写好技能文档》的内部分享大纲，下周要用", "should_trigger": false }
   ]
 }

@@ -1,0 +1,26 @@
+{
+  "skill": "parking-skill-creator",
+  "source_iteration": "iteration-3",
+  "evals": [
+    {
+      "name": "eval-1-create-skill-with-tests",
+      "prompt": "创建一个名为 text-stats 的 agent skill：功能是给定一个文本文件路径，统计字符数（不含换行符）、行数、词数（按空白字符切分），以 JSON 格式输出到 stdout，键为 chars/lines/words。技能必须包含：(1) SKILL.md，frontmatter 含合法的 name（text-stats）与 description；(2) 可统计文本的核心实现（形态自定，本机 Node 可运行即可）；(3) run-tests.mjs，至少 2 个断言，用固定样例文本验证统计正确性，node run-tests.mjs 退出码 0。把完整的 text-stats 技能目录保存到指定位置，并把执行过程纪要写入 transcript.md（关键步骤、关键决策、验证结果）。",
+      "assertions": [
+        {
+          "name": "SKILL.md frontmatter 合法（name=text-stats、description 非空）",
+          "type": "script",
+          "ac": "AC-1"
+        },
+        {
+          "name": "run-tests.mjs 存在且 node 执行退出码 0",
+          "type": "script",
+          "ac": "AC-2"
+        },
+        {
+          "name": "统计口径正确（chars 不含换行、lines、words 按空白切分，JSON 三键齐全）",
+          "type": "manual"
+        }
+      ]
+    }
+  ]
+}
