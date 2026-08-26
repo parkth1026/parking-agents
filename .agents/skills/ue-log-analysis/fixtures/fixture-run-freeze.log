@@ -1,0 +1,22 @@
+[2026.08.25-08.51.18:295][  0]LogInit: Display: Starting Game.
+[2026.08.25-08.51.18:296][  0]LogLoad: LoadMap: /Game/Proj/Maps/Main?Name=Player
+[2026.08.25-08.51.19:400][  6]LogAesEarth: Display: [EarthReady] Timer: 0.000000, bIsEarthReady: False
+[2026.08.25-08.51.20:400][ 46]LogAesEarth: Display: [EarthReady] Timer: 1.000000, bIsEarthReady: False
+[2026.08.25-08.51.21:400][ 86]LogAesEarth: Display: [EarthReady] Timer: 2.000000, bIsEarthReady: False
+[2026.08.25-08.51.22:400][126]LogAesEarth: Display: [EarthReady] Timer: 3.000000, bIsEarthReady: False
+[2026.08.25-08.51.23:400][166]LogAesEarth: Display: [EarthReady] Timer: 4.000000, bIsEarthReady: False
+[2026.08.25-08.51.24:400][206]LogAesEarth: Display: [EarthReady] Timer: 5.000000, bIsEarthReady: False
+[2026.08.25-08.51.25:400][246]LogAesEarth: Display: [EarthReady] Timer: 6.000000, bIsEarthReady: False
+[2026.08.25-08.51.26:400][286]LogAesEarth: Display: [EarthReady] Timer: 7.000000, bIsEarthReady: False
+[2026.08.25-08.51.27:400][326]LogAesEarth: Display: [EarthReady] Timer: 8.000000, bIsEarthReady: False
+[2026.08.25-08.51.28:400][366]LogAesEarth: Display: [EarthReady] Timer: 9.000000, bIsEarthReady: False
+[2026.08.25-08.51.29:400][406]LogAesEarth: Display: [EarthReady] Timer: 10.000000, bIsEarthReady: False
+[2026.08.25-08.51.30:400][446]LogAesEarth: Display: [EarthReady] Timer: 11.000000, bIsEarthReady: False
+[2026.08.25-08.51.31:400][486]LogAesEarth: Display: [EarthReady] Timer: 12.000000, bIsEarthReady: False
+[2026.08.25-08.51.32:400][526]LogAesEarth: Display: [EarthReady] Timer: 13.000000, bIsEarthReady: True
+[2026.08.25-08.51.33:400][566]LogWDPLog: SendEventToWeb: {"type":1,"event_name":"OnWdpSceneIsReady","args":{"progress":94}}
+[2026.08.25-08.51.59:879][830]LogPixelStreamingAgent: -> Agent: KeepAlive:
+Type: ping
+Data: 1787619119
+[2026.08.25-08.51.59:890][831]LogPixelStreamingSS: OnMessage: <- SS: pong
+EventType: pong

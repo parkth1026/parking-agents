@@ -1,0 +1,6 @@
+[2026.08.25-09.00.01:000][  0]LogInit: Display: Starting Game.
+[2026.08.25-09.00.02:000][130]LogPhysics: Warning: TConvex Element [0] has no Geometry
+[2026.08.25-09.00.03:000][180]LogD3D12RHI: Waited for PSO creation for 100.000000ms
+[2026.08.25-09.00.05:000][220]LogWindows: Error: === Critical error ===
+[2026.08.25-09.00.05:001][220]Unhandled Exception: ACCESS_VIOLATION reading address 0x00000000
+[2026.08.25-09.00.05:002][220]LogWindows: Error: [Callstack] 0x0000000000000000 Proj.exe!FBar() []

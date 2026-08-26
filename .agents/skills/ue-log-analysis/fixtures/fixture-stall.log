@@ -1,0 +1,59 @@
+[2026.08.25-08.50.49:100][  0]LogInit: Display: Starting Game.
+[2026.08.25-08.50.50:200][  0]LogLoad: LoadMap: /Game/Proj/Maps/Main?Name=Player
+[2026.08.25-08.50.51:100][  0]LogStreaming: Error: Couldn't find file for package /ProjectCustomAPI/BP_Actor requested by async loading code. NameToLoad: D:\pkg\Plugins\X\BP_Actor
+[2026.08.25-08.50.51:101][  0]LogStreaming: Error: This will hitch streaming because it ends up searching the disk instead of finding the file in the pak file.
+[2026.08.25-08.50.51:102][  0]LogOutputDevice: Error: Ensure condition failed: IsInGameThread()  [File:CoreUObject\CoreRedirects.cpp] [Line: 1374]
+[2026.08.25-08.50.51:103][  0]LogOutputDevice: Error: [Callstack] 0x00007ff65c2a71bc Proj.exe!FCoreRedirects::Initialize() []
+[2026.08.25-08.51.00:000][  0]LogStreaming: Display: ULevelStreaming::RequestLevel(/Game/Proj/Maps/L_Sub_01) is flushing async loading
+[2026.08.25-08.51.02:000][  0]LogStreaming: Display: ULevelStreaming::RequestLevel(/Game/Proj/Maps/L_Sub_02) is flushing async loading
+[2026.08.25-08.51.13:249][  0]LogAesEarth: FEarthUFSProj::open 'proj.ini' -> [Open] cpp(45)
+[2026.08.25-08.51.13:250][  0]LogAesEarth: FEarthUFSProj::close 'proj.ini' -> [Close] cpp(99)
+[2026.08.25-08.51.13:251][  0]LogAesEarth: FEarthUFSProj::open 'proj.db' -> [Open] cpp(45)
+[2026.08.25-08.51.13:252][  0]LogAesEarth: FEarthUFSProj::close 'proj.db' -> [Close] cpp(99)
+[2026.08.25-08.51.21:249][  0]LogAesEarth: FEarthUFSProj::open 'proj.ini' -> [Open] cpp(45)
+[2026.08.25-08.51.21:250][  0]LogAesEarth: FEarthUFSProj::close 'proj.ini' -> [Close] cpp(99)
+[2026.08.25-08.51.21:251][  0]LogAesEarth: FEarthUFSProj::open 'proj.db' -> [Open] cpp(45)
+[2026.08.25-08.51.21:252][  0]LogAesEarth: FEarthUFSProj::close 'proj.db' -> [Close] cpp(99)
+[2026.08.25-08.51.29:249][  0]LogAesEarth: FEarthUFSProj::open 'proj.ini' -> [Open] cpp(45)
+[2026.08.25-08.51.29:250][  0]LogAesEarth: FEarthUFSProj::close 'proj.ini' -> [Close] cpp(99)
+[2026.08.25-08.51.29:251][  0]LogAesEarth: FEarthUFSProj::open 'proj.db' -> [Open] cpp(45)
+[2026.08.25-08.51.29:252][  0]LogAesEarth: FEarthUFSProj::close 'proj.db' -> [Close] cpp(99)
+[2026.08.25-08.51.37:249][  0]LogAesEarth: FEarthUFSProj::open 'proj.ini' -> [Open] cpp(45)
+[2026.08.25-08.51.37:250][  0]LogAesEarth: FEarthUFSProj::close 'proj.ini' -> [Close] cpp(99)
+[2026.08.25-08.51.37:251][  0]LogAesEarth: FEarthUFSProj::open 'proj.db' -> [Open] cpp(45)
+[2026.08.25-08.51.37:252][  0]LogAesEarth: FEarthUFSProj::close 'proj.db' -> [Close] cpp(99)
+[2026.08.25-08.51.45:249][  0]LogAesEarth: FEarthUFSProj::open 'proj.ini' -> [Open] cpp(45)
+[2026.08.25-08.51.45:250][  0]LogAesEarth: FEarthUFSProj::close 'proj.ini' -> [Close] cpp(99)
+[2026.08.25-08.51.45:251][  0]LogAesEarth: FEarthUFSProj::open 'proj.db' -> [Open] cpp(45)
+[2026.08.25-08.51.45:252][  0]LogAesEarth: FEarthUFSProj::close 'proj.db' -> [Close] cpp(99)
+[2026.08.25-08.51.53:249][  0]LogAesEarth: FEarthUFSProj::open 'proj.ini' -> [Open] cpp(45)
+[2026.08.25-08.51.53:250][  0]LogAesEarth: FEarthUFSProj::close 'proj.ini' -> [Close] cpp(99)
+[2026.08.25-08.51.53:251][  0]LogAesEarth: FEarthUFSProj::open 'proj.db' -> [Open] cpp(45)
+[2026.08.25-08.51.53:252][  0]LogAesEarth: FEarthUFSProj::close 'proj.db' -> [Close] cpp(99)
+[2026.08.25-08.52.01:249][  0]LogAesEarth: FEarthUFSProj::open 'proj.ini' -> [Open] cpp(45)
+[2026.08.25-08.52.01:250][  0]LogAesEarth: FEarthUFSProj::close 'proj.ini' -> [Close] cpp(99)
+[2026.08.25-08.52.01:251][  0]LogAesEarth: FEarthUFSProj::open 'proj.db' -> [Open] cpp(45)
+[2026.08.25-08.52.01:252][  0]LogAesEarth: FEarthUFSProj::close 'proj.db' -> [Close] cpp(99)
+[2026.08.25-08.52.09:249][  0]LogAesEarth: FEarthUFSProj::open 'proj.ini' -> [Open] cpp(45)
+[2026.08.25-08.52.09:250][  0]LogAesEarth: FEarthUFSProj::close 'proj.ini' -> [Close] cpp(99)
+[2026.08.25-08.52.09:251][  0]LogAesEarth: FEarthUFSProj::open 'proj.db' -> [Open] cpp(45)
+[2026.08.25-08.52.09:252][  0]LogAesEarth: FEarthUFSProj::close 'proj.db' -> [Close] cpp(99)
+[2026.08.25-08.52.17:249][  0]LogAesEarth: FEarthUFSProj::open 'proj.ini' -> [Open] cpp(45)
+[2026.08.25-08.52.17:250][  0]LogAesEarth: FEarthUFSProj::close 'proj.ini' -> [Close] cpp(99)
+[2026.08.25-08.52.17:251][  0]LogAesEarth: FEarthUFSProj::open 'proj.db' -> [Open] cpp(45)
+[2026.08.25-08.52.17:252][  0]LogAesEarth: FEarthUFSProj::close 'proj.db' -> [Close] cpp(99)
+[2026.08.25-08.52.25:249][  0]LogAesEarth: FEarthUFSProj::open 'proj.ini' -> [Open] cpp(45)
+[2026.08.25-08.52.25:250][  0]LogAesEarth: FEarthUFSProj::close 'proj.ini' -> [Close] cpp(99)
+[2026.08.25-08.52.25:251][  0]LogAesEarth: FEarthUFSProj::open 'proj.db' -> [Open] cpp(45)
+[2026.08.25-08.52.25:252][  0]LogAesEarth: FEarthUFSProj::close 'proj.db' -> [Close] cpp(99)
+[2026.08.25-08.52.33:249][  0]LogAesEarth: FEarthUFSProj::open 'proj.ini' -> [Open] cpp(45)
+[2026.08.25-08.52.33:250][  0]LogAesEarth: FEarthUFSProj::close 'proj.ini' -> [Close] cpp(99)
+[2026.08.25-08.52.33:251][  0]LogAesEarth: FEarthUFSProj::open 'proj.db' -> [Open] cpp(45)
+[2026.08.25-08.52.33:252][  0]LogAesEarth: FEarthUFSProj::close 'proj.db' -> [Close] cpp(99)
+[2026.08.25-08.52.41:249][  0]LogAesEarth: FEarthUFSProj::open 'proj.ini' -> [Open] cpp(45)
+[2026.08.25-08.52.41:250][  0]LogAesEarth: FEarthUFSProj::close 'proj.ini' -> [Close] cpp(99)
+[2026.08.25-08.52.41:251][  0]LogAesEarth: FEarthUFSProj::open 'proj.db' -> [Open] cpp(45)
+[2026.08.25-08.52.41:252][  0]LogAesEarth: FEarthUFSProj::close 'proj.db' -> [Close] cpp(99)
+[2026.08.25-08.52.49:910][  0]LogPixelStreamingAgent: -> Agent: KeepAlive:
+Type: ping
+Data: 100

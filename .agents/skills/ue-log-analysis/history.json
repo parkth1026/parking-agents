@@ -1,0 +1,121 @@
+{
+  "skill": "ue-log-analysis",
+  "runs": [
+    {
+      "date": "2026-08-25T18:56:34+08:00",
+      "iteration_ref": "G:\\GIT\\AI_WorkFlow\\parking-agents\\evals\\ue-log-analysis-workspace\\iteration-1",
+      "gates": {
+        "with_skill": {
+          "pass_rate": 1,
+          "mean_ms": 618793,
+          "mean_tokens": 730565.5
+        },
+        "without_skill": {
+          "pass_rate": 1,
+          "mean_ms": 671659,
+          "mean_tokens": 1447346
+        }
+      },
+      "vs_previous": null,
+      "bank_epoch": 1,
+      "current_best": true
+    },
+    {
+      "date": "2026-08-25T22:09:14+08:00",
+      "iteration_ref": "G:\\GIT\\AI_WorkFlow\\parking-agents\\evals\\ue-log-analysis-workspace\\iteration-1",
+      "gates": {
+        "with_skill": {
+          "pass_rate": 1,
+          "mean_ms": 618793,
+          "mean_tokens": 730565.5
+        },
+        "without_skill": {
+          "pass_rate": 1,
+          "mean_ms": 822370.6667,
+          "mean_tokens": 1664335.3333
+        }
+      },
+      "vs_previous": null,
+      "bank_epoch": 1,
+      "supersedes": "runs[0]",
+      "current_best": true
+    },
+    {
+      "date": "2026-08-25T22:44:37+08:00",
+      "iteration_ref": "G:\\GIT\\AI_WorkFlow\\parking-agents\\evals\\ue-log-analysis-workspace\\iteration-2",
+      "gates": {
+        "old_skill": {
+          "pass_rate": 0.875,
+          "mean_ms": 796949.5,
+          "mean_tokens": 1005089.5
+        },
+        "with_skill": {
+          "pass_rate": 0.875,
+          "mean_ms": 673595.5,
+          "mean_tokens": 1021917.5
+        },
+        "without_skill": {
+          "pass_rate": 0.7639,
+          "mean_ms": 468485,
+          "mean_tokens": 1840476.5
+        }
+      },
+      "vs_previous": {
+        "evals_total": 2,
+        "won": 0,
+        "lost": 1,
+        "tie": 1,
+        "detail": [
+          {
+            "eval": "eval-单份卡死日志判活与卡点",
+            "result": "lost"
+          },
+          {
+            "eval": "eval-打包版三日志同因诊断",
+            "result": "tie"
+          }
+        ]
+      },
+      "bank_epoch": 1
+    },
+    {
+      "date": "2026-08-26T07:31:37+08:00",
+      "iteration_ref": "G:\\GIT\\AI_WorkFlow\\parking-agents\\evals\\ue-log-analysis-workspace\\iteration-3",
+      "gates": {
+        "old_skill": {
+          "pass_rate": 1,
+          "mean_ms": 479259,
+          "mean_tokens": 1065991
+        },
+        "with_skill": {
+          "pass_rate": 1,
+          "mean_ms": 420813.5,
+          "mean_tokens": 758010
+        },
+        "without_skill": {
+          "pass_rate": 0.8,
+          "mean_ms": 422017,
+          "mean_tokens": 1342285.5
+        }
+      },
+      "vs_previous": {
+        "evals_total": 2,
+        "won": 1,
+        "lost": 0,
+        "tie": 1,
+        "detail": [
+          {
+            "eval": "eval-单份卡死日志判活与卡点",
+            "result": "won"
+          },
+          {
+            "eval": "eval-打包版三日志同因诊断",
+            "result": "tie"
+          }
+        ]
+      },
+      "bank_epoch": 1
+    }
+  ],
+  "current_best": "runs[1]"
+}

@@ -1,0 +1,7 @@
+interface:
+  display_name: "ue-log-analysis"
+  short_description: "UE 运行日志结构化体检：帧号判活、空窗定位卡点、错误分组、噪声聚类"
+  default_prompt: "Use $ue-log-analysis to analyze this UE runtime log."
+
+policy:
+  allow_implicit_invocation: true
