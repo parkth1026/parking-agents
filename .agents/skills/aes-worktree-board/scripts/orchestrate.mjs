@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { listWorktrees, RUNTIME_DIR } from './collect.mjs';
+import { listWorktrees, resolveWorktreeTarget, RUNTIME_DIR } from './collect.mjs';
 import { HEADLESS_CHILD_OPTIONS } from './headless.mjs';
 import {
   appendJsonLineAtomic, canonicalWorktreeKey, readJson, readJsonLines, readRegistry, updateRegistry,
@@ -1792,12 +1792,17 @@ async function resolveExistingWorktree(value) {
   const requested = canonicalWorktreeId(value);
   const { siblings } = await listWorktrees();
   const matches = siblings.filter((entry) => canonicalWorktreeId(basename(entry.path)) === requested);
-  if (matches.length !== 1) {
-    throw controlError('UNKNOWN_WORKTREE', `worktree "${value}" 不在同级既有列表中`, {
-      requested, available: siblings.map((entry) => basename(entry.path)),
-    });
+  if (matches.length === 1) return canonicalWorktreeId(basename(matches[0].path));
+  // #67: canonical 短名只覆盖 devN/test。嵌套 worker 的 basename（parking-agents-worker-1）
+  // 不在该闭集内，因此再走一次与 dispatch/server 同一口径的 basename 解析，
+  // 让短名与完整 basename 收敛到同一个 worker identity。
+  if (!matches.length) {
+    const resolved = resolveWorktreeTarget(siblings, value);
+    if (resolved.target) return canonicalWorktreeId(basename(resolved.target.path));
   }
-  return canonicalWorktreeId(basename(matches[0].path));
+  throw controlError('UNKNOWN_WORKTREE', `worktree "${value}" 不在本仓既有 worktree 列表中`, {
+    requested, available: siblings.map((entry) => basename(entry.path)),
+  });
 }
 
 async function main(argv = process.argv.slice(2), runtimeDir = RUNTIME_DIR) {

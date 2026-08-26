@@ -10,7 +10,8 @@ import { tmpdir } from 'node:os';
 import { basename, join, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
-  BOARD_API, collectStatus, DEFAULT_RUNTIME_DIR, listWorktrees, loadIssueFixture, loadConfig, SKILL_DIR,
+  BOARD_API, collectStatus, DEFAULT_RUNTIME_DIR, listWorktrees, loadIssueFixture, loadConfig,
+  selectOwnedWorktrees, SKILL_DIR,
 } from './collect.mjs';
 import { resolveCommand } from './command.mjs';
 import { HEADLESS_CHILD_OPTIONS } from './headless.mjs';
@@ -20,6 +21,7 @@ import {
   EXECUTOR_FINAL_SCHEMA, nextActions, receiveActionReceipt, recordBlock, runPostMergeVerification, setVerdict, startGoal,
   TASK_STATES, transitionTask,
 } from './orchestrate.mjs';
+import { defaultSlotsFromWorktrees, discoverWorktrees } from './runner-slots.mjs';
 import { readJson, readJsonLines, readRegistry, writeJsonAtomic } from './runtime-store.mjs';
 import {
   deliveryMergeScenario, discoveredWorkScenario, recoveryScenario, runnerLifecycleScenario,
@@ -349,7 +351,164 @@ async function ghJson(args, auth) {
   return runGithubJson(args, { auth, cwd: ROOT, timeout: 60_000, maxBuffer: 32 * 1024 * 1024 });
 }
 
+// #67: worker worktree 位于子目录（嵌套一层或多层）时的发现口径回归。
+//
+// 历史 bug：v3 的 listWorktrees 只认「与主仓同级」的 worktree，于是把 worker 收进
+// <repo>-worker/ 之后 dispatch 报「不在同级列表中」、看板 WORKERS 只剩同级的两个；
+// 而 v4 的 runner slot 早已用 git-common-dir 判归属。这里同时钉住三件事：
+// 嵌套布局下 collect 能采到、dispatch 两种写法都能派发、v3 与 v4 返回同一集合。
+function nestedLayoutFixture(label) {
+  const root = tempDirectory(label);
+  const main = join(root, 'fixture-main');
+  // 三种嵌套形态：主仓父目录下的子目录、主仓自身的子目录、以及更深一层。
+  const workers = {
+    'fixture-w1': join(root, 'fixture-main-worker', 'fixture-w1'),
+    'fixture-w2': join(main, 'nested', 'fixture-w2'),
+    'fixture-w3': join(root, 'fixture-main-worker', 'group', 'fixture-w3'),
+  };
+  mkdirSync(main, { recursive: true });
+  gitSync(main, ['init', '-b', 'main']);
+  gitSync(main, ['config', 'user.email', 'selftest@example.invalid']);
+  gitSync(main, ['config', 'user.name', 'AES Worktree Board Selftest']);
+  writeFileSync(join(main, 'fixture.txt'), 'nested layout fixture\n');
+  gitSync(main, ['add', 'fixture.txt']);
+  gitSync(main, ['commit', '-m', 'fixture']);
+  for (const [name, path] of Object.entries(workers)) {
+    gitSync(main, ['worktree', 'add', '-b', name, path, 'main']);
+  }
+  return {
+    root,
+    main,
+    workers,
+    names: Object.keys(workers).sort(),
+    async cleanup() {
+      for (const path of Object.values(workers)) {
+        spawnSync('git', ['-C', main, 'worktree', 'remove', '--force', path], {
+          ...HEADLESS_CHILD_OPTIONS, encoding: 'utf8',
+        });
+      }
+      await cleanTemp(root);
+    },
+  };
+}
+
+function comparablePaths(paths) {
+  return paths
+    .map((path) => resolve(path).replaceAll('\\', '/'))
+    .map((path) => (process.platform === 'win32' ? path.toLowerCase() : path))
+    .sort();
+}
+
+// 排除边界用合成路径直接验纯函数：不必为「主仓不在 Temp 里」真去 Temp 之外建仓。
+function assertOwnershipExclusions() {
+  const tempRoot = resolve(tmpdir()).replaceAll('\\', '/');
+  const outsideMain = `${resolve(ROOT).replaceAll('\\', '/')}/fixture-nested-main`;
+  const expectedCommonRoot = outsideMain;
+  const entries = [
+    { path: outsideMain },
+    { path: `${outsideMain}/deep/level-2/worker-9` },
+    { path: `${outsideMain}-worker/worker-8` },
+    { path: `${tempRoot}/aes-worktree-board-fake-worker` },
+    { path: `${outsideMain}-worker/foreign` },
+  ];
+  const commonRootOf = (path) => (path.endsWith('/foreign') ? `${outsideMain}-other` : expectedCommonRoot);
+  const kept = selectOwnedWorktrees({
+    entries,
+    main: entries[0],
+    expectedCommonRoot,
+    commonRootOf,
+    tempRoot,
+    exists: () => true,
+  }).map((entry) => entry.path);
+  assert.deepEqual(kept, [entries[1].path, entries[2].path],
+    `嵌套 worker 必须保留，主仓自身 / Temp / 非同仓必须排除，实际 ${JSON.stringify(kept)}`);
+
+  // 主仓本身就在 Temp 里时（离线 fixture），Temp 排除不适用，否则一个都发现不了。
+  const tempMain = { path: `${tempRoot}/aes-worktree-board-fake-main` };
+  const tempEntries = [tempMain, { path: `${tempRoot}/aes-worktree-board-fake-main-worker/w1` }];
+  const tempKept = selectOwnedWorktrees({
+    entries: tempEntries,
+    main: tempMain,
+    expectedCommonRoot: tempMain.path,
+    commonRootOf: () => tempMain.path,
+    tempRoot,
+    exists: () => true,
+  }).map((entry) => entry.path);
+  assert.deepEqual(tempKept, [tempEntries[1].path], 'fixture 仓自身在 Temp 里时不得套用 Temp 排除');
+}
+
+async function nestedWorktreeLayoutScenario() {
+  assertOwnershipExclusions();
+  const fixture = nestedLayoutFixture('nested-layout');
+  const runtimeDir = join(fixture.root, 'runtime');
+  try {
+    // AC-1: 嵌套一层与多层的 worker 都被 collect 采集。
+    const collected = spawnSync(process.execPath, [join(SCRIPT_DIR, 'collect.mjs'), '--no-gh'], {
+      ...HEADLESS_CHILD_OPTIONS,
+      cwd: ROOT,
+      encoding: 'utf8',
+      env: boardEnv(runtimeDir, { AES_WORKTREE_BOARD_REPO_ROOT: fixture.main }),
+    });
+    assert.equal(collected.status, 0, collected.stderr);
+    const status = JSON.parse(readFileSync(join(runtimeDir, 'status.json'), 'utf8'));
+    assert.deepEqual(status.worktrees.map((worker) => worker.name).sort(), fixture.names,
+      `嵌套 worker 必须全部被采集，实际 ${JSON.stringify(status.worktrees.map((worker) => worker.name))}`);
+
+    // AC-4: v4 的 runner slot 口径与 v3 的发现口径返回同一集合。
+    const slotPaths = defaultSlotsFromWorktrees(discoverWorktrees(fixture.main), { repoRoot: fixture.main })
+      .map((slot) => slot.worktreePath);
+    assert.deepEqual(
+      comparablePaths(status.worktrees.map((worker) => worker.path)),
+      comparablePaths(slotPaths),
+      'v3 发现与 v4 slot 必须返回同一 worktree 集合',
+    );
+
+    // AC-2: 短名与完整 basename 两种写法都能 target 嵌套 worker，且规范化到同一 identity。
+    const unique = `${process.pid}-${Date.now()}`;
+    const dispatched = [];
+    for (const [index, spelling] of ['w1', 'fixture-w1'].entries()) {
+      const result = dispatchSync(
+        [spelling, '--agent', 'test', '--task-id', `nested-${unique}-${index}`, '嵌套派发'],
+        runtimeDir,
+        fixture.main,
+        ROOT,
+      );
+      assert.equal(result.status, 0, `以 "${spelling}" 派发嵌套 worker 失败: ${result.stderr}`);
+      const lines = result.stdout.trim().split(/\r?\n/).map(JSON.parse);
+      assert.equal(lines[0].ok, true);
+      assert.equal(lines.at(-1).exitCode, 0);
+      dispatched.push(lines[0].worktree);
+    }
+    assert.deepEqual(dispatched, ['fixture-w1', 'fixture-w1'],
+      '短名与完整 basename 必须规范化为同一 worker identity');
+
+    // AC-3: 不存在的 worktree 仍被拒绝，且提示列出真实可用集合。
+    const rejected = dispatchSync(
+      ['not-a-worker', '--agent', 'test', '--task-id', `nested-${unique}-x`, '拒绝'],
+      runtimeDir,
+      fixture.main,
+      ROOT,
+    );
+    assert.equal(rejected.status, 1);
+    const rejectedJson = parseJsonLine(rejected.stderr);
+    assert.equal(rejectedJson.code, 'BAD_REQUEST');
+    for (const name of fixture.names) assert.match(rejectedJson.error, new RegExp(name));
+    // 主仓自身不是 worker，不得被 target。
+    const host = dispatchSync(
+      ['fixture-main', '--agent', 'test', '--task-id', `nested-${unique}-h`, '主仓'],
+      runtimeDir,
+      fixture.main,
+      ROOT,
+    );
+    assert.equal(host.status, 1, '主仓自身不得成为派发目标');
+    assert.equal(parseJsonLine(host.stderr).code, 'BAD_REQUEST');
+  } finally {
+    await fixture.cleanup();
+  }
+}
+
 async function collectDomain() {
+  await nestedWorktreeLayoutScenario();
   const runtimeDir = tempDirectory('collect');
   try {
     const fixtureIssues = loadIssueFixture(ISSUE_FIXTURE);
