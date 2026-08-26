@@ -228,8 +228,19 @@ export function liveRunReceipt({ repoRoot, hostWorktree, issueRepo, integrationB
     };
   });
 
-  const mergeCommits = (git(hostWorktree, ['log', '--merges', '--format=%H %s', integrationBranch]) || '')
-    .split(/\r?\n/).filter(Boolean);
+  // 只数本轮产生的 merge：按 job 的 mergeCommit 反查，而不是数整条分支历史。
+  // 数 `git log --merges <branch>` 会把验收基线之前的祖先 merge 一并算进来，
+  // 把 3 说成 23 —— receipt 的价值全在于不替系统圆场，这种失真必须避免。
+  const runMergeCommits = jobs
+    .filter((job) => job.mergeCommit)
+    .map((job) => ({
+      jobId: job.jobId,
+      issue: job.issue,
+      mergeCommit: job.mergeCommit,
+      subject: git(hostWorktree, ['log', '-1', '--format=%s', job.mergeCommit]) || null,
+    }));
+  const branchMergeTotal = ((git(hostWorktree, ['log', '--merges', '--format=%H', integrationBranch]) || '')
+    .split(/\r?\n/).filter(Boolean)).length;
 
   const receipt = {
     schemaVersion: 'aes.worktree-board.live-run-receipt/v1',
@@ -241,7 +252,9 @@ export function liveRunReceipt({ repoRoot, hostWorktree, issueRepo, integrationB
     untouchedBranches: { main: git(repoRoot, ['rev-parse', 'main']), dev: git(repoRoot, ['rev-parse', 'dev']) },
     master: registry.master,
     jobs,
-    mergeCommits,
+    // 本轮产生的 merge；branchMergeTotal 只作对照，说明分支上还有多少历史祖先 merge。
+    runMergeCommits,
+    branchMergeTotal,
     humanRequests: Object.values(registry.humanRequests).map((request) => ({
       resumeToken: request.resumeToken, kind: request.kind, state: request.state, open: request.open,
     })),
@@ -303,7 +316,7 @@ if (resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url))) 
         ok: true, gate: 'AC-007(a)', path,
         jobs: receipt.jobs.length,
         closed: receipt.jobs.filter((job) => job.state === 'closed').length,
-        merges: receipt.mergeCommits.length,
+        merges: receipt.runMergeCommits.length,
         unexpectedUserMessages: receipt.unexpectedUserMessages,
       }));
     } else {
