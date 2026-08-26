@@ -10,7 +10,7 @@ import {
 import { join } from 'node:path';
 import {
   assertRuntimeIdentity, BOARD_API, collectStatus, listWorktrees, loadConfig, repoIdentity, repoIdentityMatches,
-  RUNTIME_DIR, SKILL_DIR, TASKS_DIR,
+  resolveWorktreeTarget, RUNTIME_DIR, SKILL_DIR, TASKS_DIR,
 } from './collect.mjs';
 import { HEADLESS_CHILD_OPTIONS } from './headless.mjs';
 import { githubIdentityPrompt, prepareGithubAccess } from './github-identity.mjs';
@@ -187,11 +187,15 @@ async function handleDispatch(request, response) {
   if (!config.agents[agent]) return badRequest(response, `未知 agent "${agent}"`);
 
   const { main, siblings } = await listWorktrees();
-  const target = siblings.find((entry) => {
-    const name = entry.path.split('/').pop();
-    return name === worktree || name.endsWith(`-${worktree}`);
-  });
-  if (!target) return badRequest(response, `worktree "${worktree}" 不在同级列表中`);
+  // #67: 与 dispatch.mjs 同一口径 —— 归属由 git common dir 判定，短名与完整 basename
+  // 规范化到同一个 worktree；多义时拒绝而不猜。
+  const resolvedTarget = resolveWorktreeTarget(siblings, worktree);
+  const target = resolvedTarget.target;
+  if (!target) {
+    return badRequest(response, resolvedTarget.code === 'AMBIGUOUS_WORKTREE'
+      ? `worktree "${worktree}" 同时匹配多个 worktree，请用完整 basename`
+      : `worktree "${worktree}" 不在本仓 worktree 列表中`);
+  }
   const targetName = target.path.split('/').pop();
   const worktreeId = canonicalWorktreeId(targetName);
 

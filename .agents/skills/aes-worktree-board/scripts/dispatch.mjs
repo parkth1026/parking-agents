@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 在指定同级 worktree 启动 headless agent；prompt 只经 stdin 进入 agent。
+// 在指定的本仓既有 worktree 启动 headless agent；prompt 只经 stdin 进入 agent。
 // PID 锁、任务三件套与干净 worktree 的成功输出保持 v1 兼容。
 import { execFileSync, spawn } from 'node:child_process';
 import {
@@ -7,7 +7,7 @@ import {
 } from 'node:fs';
 import { join, resolve, sep } from 'node:path';
 import {
-  collectStatus, listWorktrees, loadConfig, REPO_ROOT, RUNTIME_DIR, TASKS_DIR,
+  collectStatus, listWorktrees, loadConfig, REPO_ROOT, resolveWorktreeTarget, RUNTIME_DIR, TASKS_DIR,
 } from './collect.mjs';
 import { resolveCommand } from './command.mjs';
 import { HEADLESS_CHILD_OPTIONS } from './headless.mjs';
@@ -115,18 +115,17 @@ if (requiresGithub) {
 }
 const prompt = `${rawPrompt}${githubIdentityPrompt(githubAuth)}`;
 
+// #67: 归属由 git common dir 判定，嵌套 worker 同样可 target；短名与完整 basename
+// 都规范化到同一个 worktree identity（target.path 的 basename）。
 const { siblings } = await listWorktrees();
-const target = siblings.find((entry) => {
-  const name = entry.path.split('/').pop();
-  return name === worktreeArg || name.endsWith(`-${worktreeArg}`);
-});
-if (!target) {
-  fail(
-    `worktree "${worktreeArg}" 不在同级列表中，可用: ${siblings.map((entry) => entry.path.split('/').pop()).join(', ')}`,
-    1,
-    { code: 'BAD_REQUEST' },
-  );
+const resolved = resolveWorktreeTarget(siblings, worktreeArg);
+if (!resolved.target) {
+  const reason = resolved.code === 'AMBIGUOUS_WORKTREE'
+    ? `worktree "${worktreeArg}" 同时匹配 ${resolved.matches.map((entry) => entry.path.split('/').pop()).join(', ')}，请用完整 basename`
+    : `worktree "${worktreeArg}" 不在本仓 worktree 列表中，可用: ${resolved.available.join(', ')}`;
+  fail(reason, 1, { code: resolved.code || 'BAD_REQUEST' });
 }
+const target = resolved.target;
 const targetName = target.path.split('/').pop();
 
 const statusOutput = execFileSync('git', ['-C', target.path, 'status', '--porcelain'], {
