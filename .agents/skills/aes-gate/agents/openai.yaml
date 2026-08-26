@@ -1,0 +1,7 @@
+interface:
+  display_name: "aes-gate"
+  short_description: "盘点项目门禁基建，产出缺口清单与六维评分"
+  default_prompt: "Use $aes-gate to run a gate audit on this repository and produce a gap list."
+
+policy:
+  allow_implicit_invocation: false

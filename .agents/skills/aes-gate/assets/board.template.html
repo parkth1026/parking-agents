@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<!-- aes-gate 看板投影模板：零 JS、零外链、断网可开。collect.mjs 渲染后部署为 <repo>/.aes-gate/board.html。
+     页面不推导状态——gate-registry.json 是唯一数据真源（api.md 一），本模板只做占位替换。 -->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>gate 看板 · <!--PROJECT--></title>
+<style>
+  :root {
+    --ink:#2B2B2B; --muted:#6A6A6A; --line:#E6E6E2; --bg:#FAFAF8;
+    --green:#1D7A3E; --green-bg:#EAF5EC; --miss:#A35A00; --miss-bg:#FDF0E3;
+    --red:#B3261E; --red-bg:#FBEAE9; --stale:#5A5AA8; --stale-bg:#EDEDF8;
+    --p0:#B3261E; --p1:#A35A00; --p2:#5A6A7A;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, "Segoe UI", "Microsoft YaHei", sans-serif; color: var(--ink); margin: 0; background: var(--bg); }
+  header { padding: 20px 28px 14px; border-bottom: 1px solid var(--line); background: #fff; }
+  h1 { font-size: 19px; margin: 0 0 4px; }
+  .meta { font-size: 12.5px; color: var(--muted); display: flex; gap: 18px; flex-wrap: wrap; align-items: center; }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+  .badge.paper { background: var(--miss-bg); color: var(--miss); }
+  .badge.partial { background: var(--stale-bg); color: var(--stale); }
+  .badge.hard { background: var(--green-bg); color: var(--green); }
+  .badge.score { background: var(--bg); color: var(--ink); border: 1px solid var(--line); }
+  main { padding: 20px 28px 32px; display: grid; gap: 20px; }
+  section h2 { font-size: 15px; margin: 0 0 10px; }
+  .note { font-size: 12px; color: var(--muted); margin: 0 0 12px; }
+
+  .dims { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 10px 28px; }
+  .dim { display: grid; grid-template-columns: 96px 1fr 64px; align-items: center; gap: 10px; font-size: 13px; }
+  .dim .name { color: var(--muted); }
+  .bar { height: 10px; background: #EFEFEA; border-radius: 5px; overflow: hidden; }
+  .bar > i { display: block; height: 100%; background: var(--miss); border-radius: 5px; }
+  .dim .val { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+
+  table { border-collapse: collapse; width: 100%; background: #fff; border: 1px solid var(--line); font-size: 13px; }
+  th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; color: var(--muted); background: var(--bg); font-weight: 600; }
+  td .id { font-weight: 600; }
+  td .ev { color: var(--muted); font-size: 12px; }
+  .st { display: inline-block; padding: 1px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .st.green { background: var(--green-bg); color: var(--green); }
+  .st.miss { background: var(--miss-bg); color: var(--miss); }
+  .st.red { background: var(--red-bg); color: var(--red); }
+  .st.stale { background: var(--stale-bg); color: var(--stale); }
+  .prot { font-size: 12px; }
+  .prot.paper { color: var(--miss); font-weight: 600; }
+
+  .gaps { display: grid; gap: 10px; }
+  .gap { background: #fff; border: 1px solid var(--line); border-left: 4px solid var(--p2); border-radius: 6px; padding: 10px 14px; display: grid; grid-template-columns: 40px 1fr auto; gap: 4px 12px; align-items: baseline; }
+  .gap.p0 { border-left-color: var(--p0); } .gap.p1 { border-left-color: var(--p1); }
+  .gap .tag { font-size: 12px; font-weight: 700; color: var(--muted); }
+  .gap.p0 .tag { color: var(--p0); } .gap.p1 .tag { color: var(--p1); }
+  .gap .what { font-size: 13.5px; }
+  .gap .owner { font-size: 12px; color: var(--muted); text-align: right; }
+  .asm { display: inline-block; margin-left: 8px; font-size: 11.5px; padding: 1px 8px; border-radius: 999px; background: var(--green-bg); color: var(--green); }
+
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); margin-top: 6px; }
+  footer { padding: 14px 28px 28px; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--muted); line-height: 1.8; }
+  code { background: #F0F0EC; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>gate 看板 · <!--PROJECT--> <span class="badge paper">档位：<!--TIER--></span> <span class="badge score">总分 <!--SCORE--></span></h1>
+  <div class="meta">
+    <span>项目：<!--PROJECT--></span>
+    <span>数据真源：<code>gate-registry.json</code>（采集脚本刷新，页面不推导状态）</span>
+    <span>最近采集：<!--COLLECTED-AT-->（实跑退出码显式读取）</span>
+    <span>刷新：跑采集脚本 <code>node .agents/skills/aes-gate/scripts/collect.mjs</code></span>
+    <span>轻路径：开发中踩坑 →「把这个问题记成 gate」→ 注册 run.toml + 本看板即时刷新</span>
+  </div>
+</header>
+
+<main>
+
+  <section>
+    <h2>六维评分</h2>
+    <div class="dims">
+      <!--DIMS-->
+    </div>
+    <p class="note">档位规则：硬门禁（CI 阻断+branch protection）／部分（有 CI 无保护）／纸面（仅本地或约定）。档位由保护结构决定，不看总分——低分≠有风险（防 Goodhart）。</p>
+  </section>
+
+  <section>
+    <h2>门清单</h2>
+    <table>
+      <tr><th>门 id</th><th>类型</th><th>命令 / 位置</th><th>状态</th><th>保护级别</th><th>最近运行 / 证据</th></tr>
+      <!--GATES-->
+    </table>
+    <div class="legend">
+      <span>状态词汇：<span class="st green">绿</span> <span class="st red">红</span> <span class="st miss">缺失</span> <span class="st stale">疑似过时</span>（与运行态矛盾时标，人审归位；红着的门=没有门）</span>
+    </div>
+  </section>
+
+  <section>
+    <h2>缺口清单（=给 aes-qa 的移交单）</h2>
+    <div class="gaps">
+      <!--GAPS-->
+    </div>
+  </section>
+
+  <section>
+    <h2>约定级检查（无机器断言，靠约定）</h2>
+    <p class="note">
+      <!--CONVENTIONS-->
+      ——看板列出但不计入评分，升级为机器断言后移入门清单。
+    </p>
+  </section>
+
+  <section>
+    <h2>历史序列（自我基线，追加式）</h2>
+    <table>
+      <tr><th>时间</th><th>总分</th><th>档位</th><th>门数</th><th>缺口数</th></tr>
+      <!--HISTORY-->
+    </table>
+    <p class="note">无生态基线，历史序列即自我基线；分数是体检参考不是 KPI。</p>
+  </section>
+
+</main>
+
+<footer>
+  本页由 <code>scripts/collect.mjs</code> 从 <code>assets/board.template.html</code> 渲染，零 JS、零外链、断网可开。<br>
+  注册真源=run.toml（门 id 引用 action id）；registry 只存运行时事实。缺口处置：可组装项走「组装」（显式会话+确认门），出界项归通用 gate-builder。
+</footer>
+
+</body>
+</html>

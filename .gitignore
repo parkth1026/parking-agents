@@ -18,3 +18,6 @@ node_modules/
 /.aes-worktree-board/runtime/
 /.agents/skills/aes-worktree-board/runtime/
 /.aes-worktree-board
+
+# aes-gate runtime (运行产物不入库；验收证据副本入 references/bootstrap-report.md)
+/.aes-gate/

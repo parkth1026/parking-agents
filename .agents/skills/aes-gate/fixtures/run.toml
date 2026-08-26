@@ -1,0 +1,16 @@
+# fixtures/run.toml — collect.mjs 的黄金正例（run/v1 标准，见 aes-standardize-repo/references/run-standard.md）
+# self-test 的 S1 用它验证解析；S2 用内联反例验证拒绝面。命令故意用 node -e 保持零依赖可实跑。
+[project]
+id = "selftest/fixture"
+
+[[actions]]
+id = "test.fixture"
+name = "Fixture ok"
+kind = "test"
+run = ["node", "-e", "process.exit(0)"]
+
+[[actions]]
+id = "gate.fixture"
+name = "Fixture gate"
+kind = "gate"
+run = ["node", "-e", "process.exit(0)"]
