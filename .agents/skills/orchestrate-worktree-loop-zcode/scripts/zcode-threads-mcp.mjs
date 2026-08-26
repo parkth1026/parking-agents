@@ -8,17 +8,23 @@
 //
 // Internally this server owns a headless ZCode app-server (same NDJSON protocol as the
 // bundled zcode-session-driver.mjs daemon). Child sessions are ordinary top-level
-// interactive sessions: persisted in the shared session store, visible and openable
-// in the ZCode UI. Permission requests from child sessions are surfaced through the
+// interactive sessions from the backend's perspective, but the desktop UI only indexes
+// sessions its own process creates. To keep bridge sessions visible we mirror them
+// into the UI's session index (~/.zcode/v2/tasks-index.sqlite, table `tasks`) —
+// best-effort, failure never breaks orchestration (#79).
+//
+// Permission requests from child sessions are surfaced through the
 // status/wait tools and answered via the approve tool (escalation policy).
 //
-// Zero dependencies (Node >= 20). Wire: MCP stdio = NDJSON JSON-RPC 2.0.
+// Zero dependencies (Node >= 20; tasks-index mirroring needs node:sqlite, feature-detected).
+// Wire: MCP stdio = NDJSON JSON-RPC 2.0.
 
 import { spawn } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir, platform } from "node:os";
 import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { titleFromPrompt, uiStatusFor, registerBridgeTask, syncBridgeTask } from "./tasks-index.mjs";
 
 const STATE_DIR = join(homedir(), ".zcode", "bridge");
 const REGISTRY_FILE = join(STATE_DIR, "sessions.json");
@@ -143,7 +149,9 @@ async function ensureSession(sessionId) {
 async function readProjection(sessionId) {
   const r = await callAppServer("session/read", { sessionId });
   if (r.error) throw new Error("session/read: " + JSON.stringify(r.error).slice(0, 300));
-  return r.result.projection ?? r.result.session ?? r.result;
+  const pr = r.result.projection ?? r.result.session ?? r.result;
+  syncBridgeTask(sessionId, uiStatusFor(pr.status));
+  return pr;
 }
 
 function escalatedFor(sessionId) {
@@ -167,6 +175,18 @@ const ops = {
       send = s.error ? { error: s.error } : { accepted: true };
     }
     writeRegistry(registry);
+    const rm = appServer.runtimeModel || {};
+    const model = rm.model && rm.model.providerId ? rm.model.providerId + "/" + rm.model.modelId : undefined;
+    const title = p.tag ? p.tag + " · " + titleFromPrompt(p.prompt) : titleFromPrompt(p.prompt);
+    registerBridgeTask({
+      sessionId,
+      workspace: p.workspace,
+      title,
+      status: send && send.accepted ? "running" : "completed",
+      mode: p.mode,
+      model,
+      createdAt: registry[sessionId].createdAt,
+    });
     return { sessionId, send };
   },
   send: async (p) => {
@@ -226,6 +246,9 @@ const ops = {
   stop: async (p) => {
     if (!p.sessionId) throw new Error("sessionId required");
     const r = await callAppServer("session/stop", { sessionId: p.sessionId });
+    if (!r.error) {
+      try { await readProjection(p.sessionId); } catch {}
+    }
     return r.error ? { stopped: false, error: r.error } : { stopped: true };
   },
   close: async (p) => {
@@ -256,7 +279,7 @@ async function resultText(sessionId, all) {
 
 // ---------- MCP tool descriptors ----------
 const TOOLS = [
-  { name: "create_session", description: "Create a REAL top-level ZCode session for a workspace (typically a git worktree). Returns sessionId. The session is visible and openable in the ZCode UI session list. Optionally sends the first prompt immediately.", inputSchema: { type: "object", properties: { workspace: { type: "string", description: "Absolute path to the workspace/worktree" }, mode: { type: "string", enum: ["yolo", "build", "plan", "edit"], description: "Permission mode; yolo = no permission prompts (recommended for autonomous delivery)" }, tag: { type: "string", description: "Label for the coordinator map, e.g. wt1" }, prompt: { type: "string", description: "Optional fully self-contained first task prompt" } }, required: ["workspace"] } },
+  { name: "create_session", description: "Create a REAL top-level ZCode session for a workspace (typically a git worktree). Returns sessionId. The session is mirrored into the ZCode UI session index (tasks-index.sqlite) so it appears in the sidebar session list — the app may need a reload/restart to pick up externally inserted rows. Optionally sends the first prompt immediately.", inputSchema: { type: "object", properties: { workspace: { type: "string", description: "Absolute path to the workspace/worktree" }, mode: { type: "string", enum: ["yolo", "build", "plan", "edit"], description: "Permission mode; yolo = no permission prompts (recommended for autonomous delivery)" }, tag: { type: "string", description: "Label for the coordinator map and UI title prefix, e.g. worker-1" }, prompt: { type: "string", description: "Optional fully self-contained first task prompt" } }, required: ["workspace"] } },
   { name: "send", description: "Send a follow-up prompt to an existing session. Keeps full context. Fails with -32010 while a turn is still running (use wait first).", inputSchema: { type: "object", properties: { sessionId: { type: "string" }, text: { type: "string" } }, required: ["sessionId", "text"] } },
   { name: "wait", description: "Wait for the session's current turn to settle (idle/waiting/error) and return the final status plus the last assistant message. Guards against the stale-snapshot race right after send.", inputSchema: { type: "object", properties: { sessionId: { type: "string" }, timeoutSeconds: { type: "number", description: "Default 600, max 1800" }, includeResult: { type: "boolean", description: "Include last assistant text (default true)" } }, required: ["sessionId"] } },
   { name: "status", description: "Point-in-time session state: idle/running/waiting/paused/completed/error, active tool calls, and permission requests escalated to the coordinator.", inputSchema: { type: "object", properties: { sessionId: { type: "string" } }, required: ["sessionId"] } },
@@ -267,16 +290,20 @@ const TOOLS = [
   { name: "approve", description: "Answer a permission request escalated from a child session (allow, or deny with deny=true). Request ids come from status/wait escalatedPermissions.", inputSchema: { type: "object", properties: { sessionId: { type: "string" }, requestId: { type: "string" }, deny: { type: "boolean" } }, required: ["sessionId", "requestId"] } },
 ];
 
-// ---------- MCP stdio server ----------
-let buf = "";
-process.stdin.setEncoding("utf8");
-process.stdin.on("data", (d) => {
-  buf += d;
-  let i;
-  while ((i = buf.indexOf("\n")) >= 0) { const line = buf.slice(0, i); buf = buf.slice(i + 1); if (line.trim()) handleMcp(line); }
-});
-process.stdin.on("end", () => process.exit(0));
+// ---------- MCP stdio server (main entry only; importable for tests) ----------
+const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 process.on("exit", () => { try { appServer.child.kill(); } catch {} });
+
+if (isMain) {
+  let buf = "";
+  process.stdin.setEncoding("utf8");
+  process.stdin.on("data", (d) => {
+    buf += d;
+    let i;
+    while ((i = buf.indexOf("\n")) >= 0) { const line = buf.slice(0, i); buf = buf.slice(i + 1); if (line.trim()) handleMcp(line); }
+  });
+  process.stdin.on("end", () => process.exit(0));
+}
 
 function send(obj) { process.stdout.write(JSON.stringify(obj) + "\n"); }
 
