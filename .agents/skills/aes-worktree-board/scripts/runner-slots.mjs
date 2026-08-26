@@ -302,17 +302,44 @@ export function slotById(config, slotId) {
   return slot;
 }
 
-export function defaultSlotsFromWorktrees(siblings, { repoRoot, prefix = 'worker' }) {
-  return siblings
-    .map((entry) => normalizePath(entry.path || entry))
-    .filter((path) => path !== normalizePath(repoRoot))
-    .map((path, index) => ({
-      slotId: `${prefix}-${index + 1}`,
-      worktreePath: path,
-      projectId: `project-${prefix}-${index + 1}`,
-      branch: basename(path),
-      enabled: true,
-      concurrency: 1,
-      capabilities: ['code', 'test'],
-    }));
+// 枚举同一个仓的全部 worktree，不限于与主仓同级。
+//
+// 历史口径把「候选 worker」定义成主仓的同级目录，于是把 worker 放进
+// <parent>/<repo>-worker/ 这类子目录后，自动发现结果为空。目录摆放方式不该决定
+// 一个 worktree 是不是本仓的 worktree —— `git worktree list` 才是权威。
+export function discoverWorktrees(repoRoot) {
+  const porcelain = gitOut(resolve(repoRoot), ['worktree', 'list', '--porcelain']);
+  if (!porcelain) return [];
+  return porcelain.split(/\r?\n/)
+    .filter((line) => line.startsWith('worktree '))
+    .map((line) => normalizePath(line.slice('worktree '.length).trim()))
+    .filter((path) => existsSync(path));
+}
+
+// 从 worktree 列表推导 slot allowlist。
+// 排除两类：主仓自身（它是 host，不是 worker），以及不属于本仓的路径 —— 后者用
+// git-common-dir 判定，与 classifySlot 的漂移判定同一口径，不靠路径前缀猜。
+export function defaultSlotsFromWorktrees(entries, { repoRoot, prefix = 'worker' }) {
+  const expected = normalizePath(repoRoot);
+  const seen = new Set();
+  const candidates = [];
+  for (const entry of entries) {
+    const path = normalizePath(entry.path || entry);
+    if (path === expected || seen.has(path)) continue;
+    seen.add(path);
+    if (!existsSync(path)) continue;
+    const commonDir = gitOut(path, ['rev-parse', '--git-common-dir']);
+    const commonRoot = commonDir ? normalizePath(resolve(path, commonDir, '..')) : null;
+    if (commonRoot !== expected) continue;
+    candidates.push(path);
+  }
+  return candidates.map((path, index) => ({
+    slotId: `${prefix}-${index + 1}`,
+    worktreePath: path,
+    projectId: `project-${prefix}-${index + 1}`,
+    branch: basename(path),
+    enabled: true,
+    concurrency: 1,
+    capabilities: ['code', 'test'],
+  }));
 }
