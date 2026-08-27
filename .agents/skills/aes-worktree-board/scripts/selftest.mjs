@@ -24,7 +24,7 @@ import {
 import { defaultSlotsFromWorktrees, discoverWorktrees } from './runner-slots.mjs';
 import { readJson, readJsonLines, readRegistry, writeJsonAtomic } from './runtime-store.mjs';
 import {
-  deliveryMergeScenario, discoveredWorkScenario, recoveryScenario, runnerLifecycleScenario,
+  deliveryMergeScenario, discoveredWorkScenario, integrationBaseAdvanceStaleEvidence, recoveryScenario, runnerLifecycleScenario,
 } from './selftest-v4.mjs';
 import { trajectoryReplayScenario } from './selftest-trajectory.mjs';
 import { boardUiDomain } from './selftest-board-ui.mjs';

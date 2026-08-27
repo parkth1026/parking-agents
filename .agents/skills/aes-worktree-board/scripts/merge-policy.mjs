@@ -94,7 +94,7 @@ export function applyWaiver(resolution, waiver) {
 // 顺序固定，便于把「卡在第几关」写进 typed disposition。
 export function evaluateMechanicalGate({
   slotOk, slotReason, commitFresh, commitReason, integrationOk, integrationReason,
-  acceptance = [], review = null, qa = null,
+  acceptance = [], review = null, qa = null, baseCommit = null, integrationHead = null,
 }) {
   const checks = [];
   const push = (id, ok, detail) => checks.push({ id, outcome: ok ? 'PASS' : 'FAIL', detail });
@@ -113,6 +113,13 @@ export function evaluateMechanicalGate({
     ? `review outcome=${review.outcome} commit=${review.commitSha || 'NOT_BOUND'}`
     : 'review 证据缺失');
 
+  // review 必须在当前 integration base 上取证；base 前进使旧证据失效（AC-007/AC-2）。
+  const reviewBaseOk = review && review.baseCommit && review.baseCommit === baseCommit;
+  const reviewBaseReason = review
+    ? `review baseCommit=${review.baseCommit || 'NOT_SET'} job baseCommit=${baseCommit || 'UNRESOLVED'}`
+    : 'review 证据缺失';
+  push('GATE-review-base', Boolean(reviewBaseOk), reviewBaseReason);
+
   // runtime=NOT_RUN 不得伪装 PASS（不变清单）。
   const qaOk = qa && qa.outcome === 'PASS' && qa.commitSha
     && !(qa.checks || []).some((check) => check.outcome === 'NOT_RUN')
@@ -120,6 +127,13 @@ export function evaluateMechanicalGate({
   push('GATE-qa', Boolean(qaOk), qa
     ? `qa outcome=${qa.outcome} unexecuted=${(qa.unexecuted || []).length}`
     : 'QA 证据缺失');
+
+  // QA 必须在当前 integration base 上取证；base 前进使旧证据失效（AC-007/AC-2）。
+  const qaBaseOk = qa && qa.baseCommit && qa.baseCommit === baseCommit;
+  const qaBaseReason = qa
+    ? `qa baseCommit=${qa.baseCommit || 'NOT_SET'} job baseCommit=${baseCommit || 'UNRESOLVED'}`
+    : 'QA 证据缺失';
+  push('GATE-qa-base', Boolean(qaBaseOk), qaBaseReason);
 
   const failed = checks.filter((check) => check.outcome === 'FAIL');
   return { checks, allGreen: !failed.length, failed };

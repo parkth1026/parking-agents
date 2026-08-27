@@ -389,6 +389,13 @@ export function recordStageResult(options = {}) {
         expectedCommit: attempt.candidateCommit, actualCommit: payload.commitSha || null, pending: true,
       };
     }
+    // 证据必须记录取证时的 base commit（AC-1）。缺失则 fail closed。
+    if (!payload.baseCommit) {
+      return {
+        ok: false, code: 'MISSING_BASE_COMMIT', stage: options.stage,
+        jobId: options.jobId, consumed: false, pending: true,
+      };
+    }
 
     attempt.budgetUsage ||= emptyBudgetUsage();
     let failureClass = null;
@@ -606,6 +613,8 @@ export function evaluateGate(options = {}) {
     acceptance: job.acceptance || [],
     review: attempt?.review || null,
     qa: attempt?.qa || null,
+    baseCommit: job.baseCommit || null,
+    integrationHead,
   });
 
   const decision = decideMerge({ mechanical, policy, humanApproval: job.humanGateApproval || null });
