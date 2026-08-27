@@ -48,6 +48,36 @@ merge 前先落 `mergeIntent`，重启后 reconcile 用 `git merge-base --is-anc
 所以串行 merge 的实际成本不是排队等待，而是**队列越长，重新证明的次数越多**。这也是
 为什么 hermetic 档的速度不是舒适度问题：它直接决定串行队列能有多长。
 
+### stage-result / qa-receipt 加字段必须版本化，否则新门禁反杀历史证据
+
+实现「integration base 新鲜度」检查的第一版直接给 `stage-result` 加了必填的 `baseCommit`，
+没有 bump schemaVersion。结果 5 条历史 trajectory replay 语料（`fixtures/trajectories/`，
+脱敏后的真实历史失败案例，锁定证据、不得改写）全部用的是修复前就存在的 v1 报文——它们
+从未见过 `baseCommit` 这个字段，被新校验当场 fail closed，job 链条断在 merge 之前。
+新门禁把自己的假设错误地施加到了早于这个假设存在的历史证据头上。
+
+**修法**：`aes.issue-worker.stage-result` 与 `aes.qa.receipt` 各自纯加法演进出 v2：
+v1 语义永久保持原样（不承诺 `baseCommit`），v2 新增并强制该字段（缺失 fail closed）。
+产品代码同时接受两版，分派依据只有一个——报文自带的 `schemaVersion`，不看调用方是
+真实 worker 还是 trajectory replay。`GATE-review-base` / `GATE-qa-base` 对 v1 证据
+天然豁免（它没资格被一个自己诞生前就已过时的字段考核），只对 v2 证据强制相等比对。
+
+这不是特例，是所有「给既有报文类型加必填字段」都要走的路——契约变更必须让旧合法
+输入继续合法，新增强度只加在新版本上。回填一条通用检查清单：改报文 schema 前，
+先问「这个报文类型的历史样本（trajectory fixture / 已落盘 receipt）会不会被新规则
+反杀」，答案是会，就必须版本化，不能就地加严。
+
+**遗留的开放风险（有意不用运行时机制堵，留给 code review 把关）**：v1 通道理论上
+可以被新流程故意用来绕开 `GATE-review-base`/`GATE-qa-base`——生产 worker 本可以老实
+用 v2 附上 `baseCommit`（`WorkOrder.runner.baseCommit` 早就在手，v2 只是如实回填，
+零额外成本），却选择发 v1。这个风险**无法在 master 运行时侧堵住**：trajectory replay
+与真实 claim 走的是同一段代码（`masterClaim` → `buildWorkOrder` → `recordStageResult`），
+运行时没有任何不违反「不得探测测试/回放环境」原则的信号能分辨「这是合法历史证据」
+还是「新流程故意降级」。因此防线放在契约层：新 worker 的实现规范里应明确要求
+一律发 v2；v1 只对历史遗留数据保留，不是给新代码的选项。这条约束目前只是文档
+承诺，没有代码强制——如果未来需要强制，需要引入与「job 创建时间」或类似维度绑定
+的 schema 最低版本要求，而不是简单的版本白名单，这不在本次改动范围内。
+
 ### 竖屏工作台：生成而不是手抄，隔离靠 Shadow DOM
 
 AC-006 要求以确认版 `mock.html` 为真源。手抄的副本会随时间漂移且无人察觉，所以竖屏

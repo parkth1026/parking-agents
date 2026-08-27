@@ -94,7 +94,7 @@ export function applyWaiver(resolution, waiver) {
 // 顺序固定，便于把「卡在第几关」写进 typed disposition。
 export function evaluateMechanicalGate({
   slotOk, slotReason, commitFresh, commitReason, integrationOk, integrationReason,
-  acceptance = [], review = null, qa = null, candidateCommit = null,
+  acceptance = [], review = null, qa = null, candidateCommit = null, baseCommit = null, integrationHead = null,
 }) {
   const checks = [];
   const push = (id, ok, detail) => checks.push({ id, outcome: ok ? 'PASS' : 'FAIL', detail });
@@ -116,6 +116,20 @@ export function evaluateMechanicalGate({
     ? `review outcome=${review.outcome} commit=${review.commitSha || 'NOT_BOUND'} candidate=${candidateCommit || 'NOT_RUN'}`
     : 'review 证据缺失');
 
+  // review 必须在当前 integration base 上取证；base 前进使旧证据失效（AC-007/AC-2）。
+  // 只对 v2 证据强制：v1 从未承诺过 baseCommit 字段，语义永久保持原样——这是向下
+  // 兼容的既定豁免，不是漏检；历史 trajectory replay 语料就是真实的 v1 报文（合同
+  // 早于 AC-007 存在），不能因为新门禁而回溯性判它们不合格。判据只看报文自带的
+  // schemaVersion，不做「探测回放/测试环境」的特权判断（见 references/design.md）。
+  const reviewDeclaresBase = Boolean(review?.schemaVersion?.endsWith('/v2'));
+  const reviewBaseOk = !review ? false : (!reviewDeclaresBase || review.baseCommit === baseCommit);
+  const reviewBaseReason = !review
+    ? 'review 证据缺失'
+    : !reviewDeclaresBase
+      ? `review schemaVersion=${review.schemaVersion} 为 v1，不承诺 baseCommit，按向下兼容豁免此检查`
+      : `review baseCommit=${review.baseCommit || 'NOT_SET'} job baseCommit=${baseCommit || 'UNRESOLVED'}`;
+  push('GATE-review-base', Boolean(reviewBaseOk), reviewBaseReason);
+
   // runtime=NOT_RUN 不得伪装 PASS（不变清单）。
   const qaOk = qa && qa.outcome === 'PASS'
     && candidateCommit && qa.commitSha === candidateCommit
@@ -124,6 +138,17 @@ export function evaluateMechanicalGate({
   push('GATE-qa', Boolean(qaOk), qa
     ? `qa outcome=${qa.outcome} commit=${qa.commitSha || 'NOT_BOUND'} candidate=${candidateCommit || 'NOT_RUN'} unexecuted=${(qa.unexecuted || []).length}`
     : 'QA 证据缺失');
+
+  // QA 必须在当前 integration base 上取证；base 前进使旧证据失效（AC-007/AC-2）。
+  // 同上：只对 v2 证据强制，v1 豁免（向下兼容，理由见 GATE-review-base 处注释）。
+  const qaDeclaresBase = Boolean(qa?.schemaVersion?.endsWith('/v2'));
+  const qaBaseOk = !qa ? false : (!qaDeclaresBase || qa.baseCommit === baseCommit);
+  const qaBaseReason = !qa
+    ? 'QA 证据缺失'
+    : !qaDeclaresBase
+      ? `qa schemaVersion=${qa.schemaVersion} 为 v1，不承诺 baseCommit，按向下兼容豁免此检查`
+      : `qa baseCommit=${qa.baseCommit || 'NOT_SET'} job baseCommit=${baseCommit || 'UNRESOLVED'}`;
+  push('GATE-qa-base', Boolean(qaBaseOk), qaBaseReason);
 
   const failed = checks.filter((check) => check.outcome === 'FAIL');
   return { checks, allGreen: !failed.length, failed };

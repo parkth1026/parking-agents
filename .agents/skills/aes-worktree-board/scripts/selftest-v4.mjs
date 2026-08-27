@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { HEADLESS_CHILD_OPTIONS } from './headless.mjs';
-import { readV4Registry, readReceipts, readTransitions } from './job-store.mjs';
+import { readV4Registry, readReceipts, readTransitions, updateV4Registry } from './job-store.mjs';
 import {
   defaultSlotsFromWorktrees, discoverWorktrees, initSlots, loadSlotsConfig, normalizePath,
   projectRunners, validateSlotsConfig,
@@ -47,18 +47,43 @@ function freshProcess(fixture, args, { expectStatus = 0, env = {} } = {}) {
   return JSON.parse(String(text).trim().split(/\r?\n/).pop());
 }
 
-function passingReview(jobId, commitSha) {
+// v2：#65 + AC-007 合流后的默认现行格式——review 类同时携带 baseCommit（AC-007，
+// GATE-review-base 对它生效）与 reviewerSessionId（#65，缺失 fail closed）。
+function passingReview(jobId, commitSha, baseCommit, reviewerSessionId = 'reviewer-default') {
   return {
-    schemaVersion: 'aes.issue-worker.stage-result/v1',
+    schemaVersion: master.STAGE_RESULT_SCHEMA_V2,
+    jobId, stage: 'code-review', commitSha, baseCommit, outcome: 'PASS', findings: [],
+    evidence: [{ kind: 'standards', result: 'PASS' }, { kind: 'spec', result: 'PASS' }],
+    mayAdvance: true,
+    reviewerSessionId,
+  };
+}
+
+// qa 类 v2 只强制 baseCommit——reviewerSessionId 不适用于 qa。
+function passingQa(jobId, commitSha, baseCommit) {
+  return {
+    schemaVersion: master.QA_RECEIPT_SCHEMA_V2,
+    jobId, commitSha, baseCommit, outcome: 'PASS',
+    environment: { kind: 'local-live', identityDigest: 'sha256:env-test' },
+    checks: [{ id: 'QA-1', kind: 'automated', outcome: 'PASS', command: 'node run-tests.mjs' }],
+    unexecuted: [], manualDebt: [],
+  };
+}
+
+// v1：历史轨迹夹具锁定证据的原始语义，不带 baseCommit / reviewerSessionId，永远合法——
+// GATE-review-base/qa-base 与 MISSING_REVIEWER_SESSION_ID 对它都豁免（向下兼容）。
+function passingReviewV1(jobId, commitSha) {
+  return {
+    schemaVersion: master.STAGE_RESULT_SCHEMA_V1,
     jobId, stage: 'code-review', commitSha, outcome: 'PASS', findings: [],
     evidence: [{ kind: 'standards', result: 'PASS' }, { kind: 'spec', result: 'PASS' }],
     mayAdvance: true,
   };
 }
 
-function passingQa(jobId, commitSha) {
+function passingQaV1(jobId, commitSha) {
   return {
-    schemaVersion: 'aes.qa.receipt/v1',
+    schemaVersion: master.QA_RECEIPT_SCHEMA_V1,
     jobId, commitSha, outcome: 'PASS',
     environment: { kind: 'local-live', identityDigest: 'sha256:env-test' },
     checks: [{ id: 'QA-1', kind: 'automated', outcome: 'PASS', command: 'node run-tests.mjs' }],
@@ -78,22 +103,30 @@ function readyTerminal(job, commitSha, contractDigest) {
 }
 
 // 把一个 job 从 claim 推到 READY_TO_MERGE。返回 jobId 与 candidate。
-function driveToReadyToMerge(fixture, issue, { slotId } = {}) {
+function driveToReadyToMerge(fixture, issue, { slotId, ownerThreadId = 'owner-session-1', reviewerSessionId } = {}) {
   const claim = master.masterClaim({ ...base(fixture), issue, slotId });
   assert.equal(claim.outcome, 'CLAIMED', `claim 失败: ${JSON.stringify(claim)}`);
+  const baseCommit = claim.workOrder.runner.baseCommit;
+
+  // 设置 ownerThreadId 用于独立性测试（直接修改 registry）
+  master.setAttemptOwnerThreadId({ ...base(fixture), jobId: claim.jobId, ownerThreadId });
+
   const candidate = makeCandidate(fixture, claim.slotId, { file: `feature-${issue.number}.txt` });
   master.recordCandidate({ ...base(fixture), jobId: claim.jobId, commitSha: candidate });
-  master.recordStageResult({ ...base(fixture), jobId: claim.jobId, stage: 'review', payload: passingReview(claim.jobId, candidate) });
-  master.recordStageResult({ ...base(fixture), jobId: claim.jobId, stage: 'qa', payload: passingQa(claim.jobId, candidate) });
+
+  // 使用提供的或默认的 reviewer session id：如果没指定，就用 ownerThreadId 来测试 same-session
+  const actualReviewerSessionId = reviewerSessionId || ownerThreadId;
+  master.recordStageResult({ ...base(fixture), jobId: claim.jobId, stage: 'review', payload: passingReview(claim.jobId, candidate, baseCommit, actualReviewerSessionId) });
+  master.recordStageResult({ ...base(fixture), jobId: claim.jobId, stage: 'qa', payload: passingQa(claim.jobId, candidate, baseCommit) });
   const terminal = master.masterTerminal({
     ...base(fixture),
     payload: readyTerminal(
-      { jobId: claim.jobId, attemptId: claim.attemptId, issue: issue.number, baseCommit: claim.workOrder.runner.baseCommit },
+      { jobId: claim.jobId, attemptId: claim.attemptId, issue: issue.number, baseCommit },
       candidate, claim.workOrder.issue.contractDigest,
     ),
   });
   assert.equal(terminal.state, 'ready-to-merge');
-  return { jobId: claim.jobId, attemptId: claim.attemptId, candidate, slotId: claim.slotId, claim };
+  return { jobId: claim.jobId, attemptId: claim.attemptId, candidate, slotId: claim.slotId, claim, baseCommit };
 }
 
 // ============================================================ AC-001 runner-lifecycle
@@ -344,9 +377,12 @@ export async function recoveryScenario() {
     const claim = master.masterClaim({ ...base(fixture), issue });
     const jobId = claim.jobId;
 
+    const baseCommit = claim.workOrder.runner.baseCommit;
     const first = makeCandidate(fixture, claim.slotId, { file: 'r1.txt' });
     master.recordCandidate({ ...base(fixture), jobId, commitSha: first });
-    master.recordStageResult({ ...base(fixture), jobId, stage: 'review', payload: passingReview(jobId, first) });
+    // 设置 ownerThreadId 以便测试 reviewerIndependence
+    master.setAttemptOwnerThreadId({ ...base(fixture), jobId, ownerThreadId: 'owner-recovery' });
+    master.recordStageResult({ ...base(fixture), jobId, stage: 'review', payload: passingReview(jobId, first, baseCommit, 'owner-recovery') });
 
     // candidate 前进使旧 review/QA 失效（E5）。
     const second = makeCandidate(fixture, claim.slotId, { file: 'r2.txt' });
@@ -356,7 +392,7 @@ export async function recoveryScenario() {
     assert.equal(readV4Registry(fixture.v4Dir).attempts[claim.attemptId].review, null);
 
     // 绑定旧 commit 的证据必须被拒收，不得推进。
-    const stale = master.recordStageResult({ ...base(fixture), jobId, stage: 'review', payload: passingReview(jobId, first) });
+    const stale = master.recordStageResult({ ...base(fixture), jobId, stage: 'review', payload: passingReview(jobId, first, baseCommit) });
     assert.equal(stale.ok, false);
     assert.equal(stale.code, 'STALE_EVIDENCE');
     assert.equal(stale.pending, true);
@@ -368,7 +404,34 @@ export async function recoveryScenario() {
     });
     assert.equal(unknown.code, 'UNCLASSIFIED_STAGE_RESULT');
     assert.equal(unknown.consumed, false);
-    assert.equal(unknown.requiredReplacementSchema, 'aes.issue-worker.stage-result/v1');
+    // v0 从未存在过，两个在役版本都不认——requiredReplacementSchema 指向最新（v2）；
+    // v1 本身仍是被接受的合法历史语义（见下方 reviewer-independence 场景）。
+    assert.equal(unknown.requiredReplacementSchema, master.STAGE_RESULT_SCHEMA_V2);
+    assert.deepEqual(unknown.acceptedSchemas, [master.STAGE_RESULT_SCHEMA_V1, master.STAGE_RESULT_SCHEMA_V2]);
+
+    // v1（历史 schema，无 baseCommit / reviewerSessionId）仍必须被接受——向下兼容不是可选项。
+    const legacyV1 = master.recordStageResult({ ...base(fixture), jobId, stage: 'review', payload: passingReviewV1(jobId, second) });
+    assert.equal(legacyV1.ok, true, 'v1 报文必须仍被接受（向下兼容）');
+    assert.equal(readV4Registry(fixture.v4Dir).attempts[claim.attemptId].review.baseCommit, undefined,
+      'v1 报文不携带 baseCommit，落盘也不应凭空补上');
+
+    // v2 报文缺 baseCommit 必须 fail closed（AC-1），不得推进、不得清空既有证据。
+    const missingBase = master.recordStageResult({
+      ...base(fixture), jobId, stage: 'review',
+      payload: { schemaVersion: master.STAGE_RESULT_SCHEMA_V2, jobId, commitSha: second, outcome: 'PASS', reviewerSessionId: 'owner-recovery' },
+    });
+    assert.equal(missingBase.ok, false);
+    assert.equal(missingBase.code, 'MISSING_BASE_COMMIT');
+    assert.ok(readV4Registry(fixture.v4Dir).attempts[claim.attemptId].review, 'fail closed 不清空既有 v1 证据');
+
+    // v2 报文缺 reviewerSessionId 必须 fail closed（#65 AC-1），不得推进、不得清空既有证据。
+    const missingReviewer = master.recordStageResult({
+      ...base(fixture), jobId, stage: 'review',
+      payload: { schemaVersion: master.STAGE_RESULT_SCHEMA_V2, jobId, commitSha: second, outcome: 'PASS', baseCommit },
+    });
+    assert.equal(missingReviewer.ok, false);
+    assert.equal(missingReviewer.code, 'MISSING_REVIEWER_SESSION_ID');
+    assert.ok(readV4Registry(fixture.v4Dir).attempts[claim.attemptId].review, 'fail closed 不清空既有 v1 证据');
 
     // owner thread 中断：优先恢复原 thread。
     const interrupted = master.attemptInterrupt({ ...base(fixture), jobId, reason: 'owner thread 无响应' });
@@ -913,10 +976,14 @@ async function deliveryHappyPath() {
     master.masterStart({ ...base(fixture) });
     const job = driveToReadyToMerge(fixture, issuePayload({ number: 511 }));
 
-    // fresh 校验：slot / commit / integration / AC / review / QA 六项都必须在门里。
+    // fresh 校验：slot / commit / integration / AC / review(+base) / QA(+base) 都必须在门里。
+    // review-base / qa-base 是 AC-007 新增的 integration-base 新鲜度检查。
     const gate = master.evaluateGate({ ...base(fixture), jobId: job.jobId });
     const ids = gate.mechanical.checks.map((check) => check.id);
-    assert.deepEqual(ids, ['GATE-slot', 'GATE-commit', 'GATE-integration', 'GATE-acceptance', 'GATE-review', 'GATE-qa']);
+    assert.deepEqual(ids, [
+      'GATE-slot', 'GATE-commit', 'GATE-integration', 'GATE-acceptance',
+      'GATE-review', 'GATE-review-base', 'GATE-qa', 'GATE-qa-base',
+    ]);
     assert.equal(gate.mechanical.allGreen, true);
 
     const merged = master.masterMerge({ ...base(fixture), jobId: job.jobId });
@@ -966,8 +1033,11 @@ async function evidenceBindingBypass() {
     const claim = master.masterClaim({ ...base(fixture), issue });
     const first = makeCandidate(fixture, claim.slotId, { file: 'binding-1.txt' });
     master.recordCandidate({ ...base(fixture), jobId: claim.jobId, commitSha: first });
-    master.recordStageResult({ ...base(fixture), jobId: claim.jobId, stage: 'review', payload: passingReview(claim.jobId, first) });
-    master.recordStageResult({ ...base(fixture), jobId: claim.jobId, stage: 'qa', payload: passingQa(claim.jobId, first) });
+    // 本测试只关心 commit 绑定旁路（#84），与 baseCommit（AC-007）/ reviewerSessionId
+    // （#65）无关，用 v1 证据保持聚焦——v1 在 GATE-review-base/qa-base 与
+    // MISSING_REVIEWER_SESSION_ID 上都天然豁免，不干扰这里的断言。
+    master.recordStageResult({ ...base(fixture), jobId: claim.jobId, stage: 'review', payload: passingReviewV1(claim.jobId, first) });
+    master.recordStageResult({ ...base(fixture), jobId: claim.jobId, stage: 'qa', payload: passingQaV1(claim.jobId, first) });
 
     // worker 又推了新 commit，却不走 recordCandidate 而直接在 terminal 里报新 SHA：
     // 必须拒收，不得让 first 的 review/QA 给 second 背书。
@@ -990,8 +1060,8 @@ async function evidenceBindingBypass() {
     // 正路仍然通：recordCandidate 前进（作废旧证据）→ 重新绑定 second → terminal 接受。
     const advanced = master.recordCandidate({ ...base(fixture), jobId: claim.jobId, commitSha: second });
     assert.equal(advanced.invalidated.length, 2, 'candidate 前进必须作废旧 review+QA');
-    master.recordStageResult({ ...base(fixture), jobId: claim.jobId, stage: 'review', payload: passingReview(claim.jobId, second) });
-    master.recordStageResult({ ...base(fixture), jobId: claim.jobId, stage: 'qa', payload: passingQa(claim.jobId, second) });
+    master.recordStageResult({ ...base(fixture), jobId: claim.jobId, stage: 'review', payload: passingReviewV1(claim.jobId, second) });
+    master.recordStageResult({ ...base(fixture), jobId: claim.jobId, stage: 'qa', payload: passingQaV1(claim.jobId, second) });
     const accepted = master.masterTerminal({ ...base(fixture), payload: terminalPayload });
     assert.equal(accepted.state, 'ready-to-merge');
     const gate = master.evaluateGate({ ...base(fixture), jobId: claim.jobId });
@@ -1002,8 +1072,8 @@ async function evidenceBindingBypass() {
     const mechanical = evaluateMechanicalGate({
       slotOk: true, commitFresh: true, integrationOk: true,
       acceptance: [{ id: 'AC-1', outcome: 'PASS' }],
-      review: passingReview(claim.jobId, first),
-      qa: passingQa(claim.jobId, first),
+      review: passingReviewV1(claim.jobId, first),
+      qa: passingQaV1(claim.jobId, first),
       candidateCommit: second,
     });
     const outcomes = Object.fromEntries(mechanical.checks.map((check) => [check.id, check.outcome]));
@@ -1016,8 +1086,8 @@ async function evidenceBindingBypass() {
     const unbound = evaluateMechanicalGate({
       slotOk: true, commitFresh: true, integrationOk: true,
       acceptance: [{ id: 'AC-1', outcome: 'PASS' }],
-      review: passingReview(claim.jobId, first),
-      qa: passingQa(claim.jobId, first),
+      review: passingReviewV1(claim.jobId, first),
+      qa: passingQaV1(claim.jobId, first),
       candidateCommit: null,
     });
     assert.equal(unbound.allGreen, false, 'candidateCommit 缺失时机械门不得全绿');
@@ -1076,10 +1146,12 @@ async function mergeConflictDisposition() {
     master.masterStart({ ...base(fixture) });
     const issue = issuePayload({ number: 531 });
     const claim = master.masterClaim({ ...base(fixture), issue });
+    const baseCommit = claim.workOrder.runner.baseCommit;
     const candidate = makeConflict(fixture, claim.slotId);
     master.recordCandidate({ ...base(fixture), jobId: claim.jobId, commitSha: candidate });
-    master.recordStageResult({ ...base(fixture), jobId: claim.jobId, stage: 'review', payload: passingReview(claim.jobId, candidate) });
-    master.recordStageResult({ ...base(fixture), jobId: claim.jobId, stage: 'qa', payload: passingQa(claim.jobId, candidate) });
+    master.setAttemptOwnerThreadId({ ...base(fixture), jobId: claim.jobId, ownerThreadId: 'owner-conflict' });
+    master.recordStageResult({ ...base(fixture), jobId: claim.jobId, stage: 'review', payload: passingReview(claim.jobId, candidate, baseCommit, 'owner-conflict') });
+    master.recordStageResult({ ...base(fixture), jobId: claim.jobId, stage: 'qa', payload: passingQa(claim.jobId, candidate, baseCommit) });
     master.masterTerminal({
       ...base(fixture),
       payload: readyTerminal(
@@ -1129,6 +1201,167 @@ async function serialMergeEnforcement() {
   }
 }
 
+// AC-4: integration 前进使旧 base 上取得的 stage 证据失效（AC-007）。
+// 链路：旧 base 取证 → integration 前进 → 门禁判 STALE → 重新取证 → 放行。
+export async function integrationBaseAdvanceStaleEvidence() {
+  const fixture = makeFixture('integration-base-advance', { workers: [{ id: 'worker-1' }] });
+  try {
+    writeSlots(fixture);
+    master.masterStart({ ...base(fixture) });
+
+    const issue = issuePayload({ number: 551 });
+    const claim = master.masterClaim({ ...base(fixture), issue });
+    const jobId = claim.jobId;
+    const oldBaseCommit = claim.workOrder.runner.baseCommit;
+
+    // 第一部分：在旧 base 上取得 review/QA 证据。
+    const candidate = makeCandidate(fixture, claim.slotId, { file: 'ac4.txt' });
+    master.recordCandidate({ ...base(fixture), jobId, commitSha: candidate });
+    const reviewResult = master.recordStageResult({
+      ...base(fixture), jobId, stage: 'review', payload: passingReview(jobId, candidate, oldBaseCommit),
+    });
+    assert.equal(reviewResult.ok, true, 'review 在旧 base 上应该通过');
+
+    const qaResult = master.recordStageResult({
+      ...base(fixture), jobId, stage: 'qa', payload: passingQa(jobId, candidate, oldBaseCommit),
+    });
+    assert.equal(qaResult.ok, true, 'QA 在旧 base 上应该通过');
+
+    // 准备 terminal 来激活 gate 的其他检查。
+    const terminalResult = master.masterTerminal({
+      ...base(fixture),
+      payload: readyTerminal(
+        { jobId, attemptId: claim.attemptId, issue: issue.number, baseCommit: oldBaseCommit },
+        candidate, claim.workOrder.issue.contractDigest,
+      ),
+    });
+    assert.equal(terminalResult.state, 'ready-to-merge', 'terminal 应该将 job 推送到 ready-to-merge');
+
+    // 此时 gate 应该通过（证据绑定当前 base）。
+    const gateBeforeAdvance = master.evaluateGate({ ...base(fixture), jobId });
+    assert.equal(gateBeforeAdvance.mechanical.allGreen, true, '旧 base 证据应该通过 gate');
+
+    // 第二部分：模拟 integration 前进。这里直接更新 registry 中 job 的 baseCommit。
+    // 真实场景中这是因为其他 PR 合入了 integration branch。
+    const newBaseCommit = makeCandidate(fixture, claim.slotId, { file: 'unrelated.txt' });
+    const updated = updateV4Registry(fixture.v4Dir, (registry) => {
+      const job = registry.jobs[jobId];
+      const oldBase = job.baseCommit;
+      job.baseCommit = newBaseCommit;
+      return { oldBase, newBase: newBaseCommit };
+    });
+    assert.equal(updated.oldBase, oldBaseCommit);
+
+    // 第三部分：gate 应该判 review/QA 为 STALE（baseCommit 不匹配）。
+    const gateAfterAdvance = master.evaluateGate({ ...base(fixture), jobId });
+    const failedChecks = gateAfterAdvance.mechanical.failed.map((c) => c.id);
+    assert.ok(failedChecks.includes('GATE-review-base'), 'review baseCommit 不匹配应该拒绝放行');
+    assert.ok(failedChecks.includes('GATE-qa-base'), 'QA baseCommit 不匹配应该拒绝放行');
+    assert.equal(gateAfterAdvance.mechanical.allGreen, false, 'STALE 证据应该拒绝 gate');
+
+    // 验证证据本身未被清空（AC-3）。
+    const registry = readV4Registry(fixture.v4Dir);
+    const attempt = registry.attempts[claim.attemptId];
+    assert.ok(attempt.review, 'STALE 判定不应该清空 review 证据');
+    assert.ok(attempt.qa, 'STALE 判定不应该清空 QA 证据');
+
+    // 第四部分：在新 base 上重新取得证据。
+    const newReviewResult = master.recordStageResult({
+      ...base(fixture), jobId, stage: 'review', payload: passingReview(jobId, candidate, newBaseCommit),
+    });
+    assert.equal(newReviewResult.ok, true, 'review 在新 base 上应该通过');
+
+    const newQaResult = master.recordStageResult({
+      ...base(fixture), jobId, stage: 'qa', payload: passingQa(jobId, candidate, newBaseCommit),
+    });
+    assert.equal(newQaResult.ok, true, 'QA 在新 base 上应该通过');
+
+    // 第五部分：重新 gate，应该全绿放行。
+    const gateFinal = master.evaluateGate({ ...base(fixture), jobId });
+    assert.equal(gateFinal.mechanical.allGreen, true, '新 base 证据应该通过 gate');
+    assert.ok(gateFinal.decision.mayMerge, '新 base 证据应该允许 merge');
+  } finally {
+    fixture.cleanup();
+  }
+}
+
+// stage-result / qa-receipt 的 v1→v2 向下兼容（AC-007 的兼容性缺口，回填）：
+// - v1（历史 schema，无 baseCommit）必须仍能推进全流程直到 merge——这是
+//   历史 trajectory replay 依赖的不变量，不是可选行为。
+// - v2 缺 baseCommit 必须 fail closed（AC-1）。
+// - v2 的 baseCommit 与当前 job base 不一致时必须判 STALE（AC-2），
+//   v1 对同一 mismatch 免疫（它从未声明过这个字段，不能回溯性地判它不合格）。
+export async function stageResultSchemaBackwardCompat() {
+  const fixture = makeFixture('schema-compat', { workers: [{ id: 'worker-1' }, { id: 'worker-2' }] });
+  try {
+    writeSlots(fixture);
+    master.masterStart({ ...base(fixture) });
+
+    // 两个 job 都先 claim：merge job-1 会推进 integration HEAD，
+    // 事后才 claim worker-2 会撞上「未同步 baseline 不可领取」，与本测试意图无关。
+    const issueV1 = issuePayload({ number: 561 });
+    const claimV1 = master.masterClaim({ ...base(fixture), issue: issueV1, slotId: 'worker-1' });
+    const issueV2 = issuePayload({ number: 562 });
+    const claimV2 = master.masterClaim({ ...base(fixture), issue: issueV2, slotId: 'worker-2' });
+    const oldBase = claimV2.workOrder.runner.baseCommit;
+
+    // --- 分支一：纯 v1 证据必须能走完整条链路到 merge。 ---
+    const candidateV1 = makeCandidate(fixture, claimV1.slotId, { file: 'compat-v1.txt' });
+    master.recordCandidate({ ...base(fixture), jobId: claimV1.jobId, commitSha: candidateV1 });
+
+    const reviewV1 = master.recordStageResult({
+      ...base(fixture), jobId: claimV1.jobId, stage: 'review', payload: passingReviewV1(claimV1.jobId, candidateV1),
+    });
+    assert.equal(reviewV1.ok, true, 'v1 review 必须被接受');
+    const qaV1 = master.recordStageResult({
+      ...base(fixture), jobId: claimV1.jobId, stage: 'qa', payload: passingQaV1(claimV1.jobId, candidateV1),
+    });
+    assert.equal(qaV1.ok, true, 'v1 QA 必须被接受');
+
+    const terminalV1 = master.masterTerminal({
+      ...base(fixture),
+      payload: readyTerminal(
+        { jobId: claimV1.jobId, attemptId: claimV1.attemptId, issue: issueV1.number, baseCommit: claimV1.workOrder.runner.baseCommit },
+        candidateV1, claimV1.workOrder.issue.contractDigest,
+      ),
+    });
+    assert.equal(terminalV1.state, 'ready-to-merge');
+
+    const gateV1 = master.evaluateGate({ ...base(fixture), jobId: claimV1.jobId });
+    const v1Checks = Object.fromEntries(gateV1.mechanical.checks.map((c) => [c.id, c.outcome]));
+    assert.equal(v1Checks['GATE-review-base'], 'PASS', 'v1 证据在 GATE-review-base 上应豁免通过');
+    assert.equal(v1Checks['GATE-qa-base'], 'PASS', 'v1 证据在 GATE-qa-base 上应豁免通过');
+    assert.equal(gateV1.mechanical.allGreen, true, 'v1 全套证据应该通过机械门');
+    assert.ok(gateV1.decision.mayMerge, 'v1 全套证据应该允许 merge（向下兼容不变量）');
+
+    const mergedV1 = master.masterMerge({ ...base(fixture), jobId: claimV1.jobId });
+    assert.equal(mergedV1.ok, true, 'v1 证据必须能真实 merge 成功');
+
+    // --- 分支二：v2 证据下，integration 前进后旧 baseCommit 必须判 STALE；
+    //     同样的 mismatch 对 v1 不生效，用以对照两版本语义的差异是设计出来的，不是漏洞。 ---
+    const candidateV2 = makeCandidate(fixture, claimV2.slotId, { file: 'compat-v2.txt' });
+    master.recordCandidate({ ...base(fixture), jobId: claimV2.jobId, commitSha: candidateV2 });
+    master.recordStageResult({
+      ...base(fixture), jobId: claimV2.jobId, stage: 'review', payload: passingReview(claimV2.jobId, candidateV2, oldBase),
+    });
+    master.recordStageResult({
+      ...base(fixture), jobId: claimV2.jobId, stage: 'qa', payload: passingQa(claimV2.jobId, candidateV2, oldBase),
+    });
+
+    // 模拟 integration 前进（同 integrationBaseAdvanceStaleEvidence 的手法）。
+    const newBase = makeCandidate(fixture, claimV2.slotId, { file: 'compat-unrelated.txt' });
+    updateV4Registry(fixture.v4Dir, (registry) => { registry.jobs[claimV2.jobId].baseCommit = newBase; });
+
+    const gateV2Stale = master.evaluateGate({ ...base(fixture), jobId: claimV2.jobId });
+    const v2Checks = Object.fromEntries(gateV2Stale.mechanical.checks.map((c) => [c.id, c.outcome]));
+    assert.equal(v2Checks['GATE-review-base'], 'FAIL', 'v2 证据在 base 前进后必须判 STALE（不豁免）');
+    assert.equal(v2Checks['GATE-qa-base'], 'FAIL', 'v2 QA 证据在 base 前进后必须判 STALE（不豁免）');
+    assert.equal(gateV2Stale.mechanical.allGreen, false, 'v2 STALE 证据必须拒绝放行');
+  } finally {
+    fixture.cleanup();
+  }
+}
+
 // v3 legacy runtime 只读封存：hash 不变，且不推导出任何 job/attempt。
 async function legacyArchiveStable() {
   const fixture = makeFixture('legacy', { workers: [{ id: 'worker-1' }] });
@@ -1170,4 +1403,103 @@ async function legacyArchiveStable() {
 
 function hashFile(path) {
   return createHash('sha256').update(readFileSync(path)).digest('hex');
+}
+
+// AC-1 ~ AC-5: reviewer 独立性机械判据
+export async function reviewerIndependenceScenario() {
+  const fixture = makeFixture('reviewer-independence', {
+    workers: [{ id: 'worker-1' }, { id: 'worker-2' }, { id: 'worker-3' }],
+  });
+  try {
+    writeSlots(fixture);
+    master.masterStart({ ...base(fixture) });
+
+    // 场景 1: same-session review（owner 与 reviewer 同 session）
+    const sameSessionJob = driveToReadyToMerge(
+      fixture, issuePayload({ number: 601 }),
+      { slotId: 'worker-1', ownerThreadId: 'session-A', reviewerSessionId: 'session-A' }
+    );
+    const sameSessionRegistry = readV4Registry(fixture.v4Dir);
+    const sameSessionAttempt = sameSessionRegistry.attempts[sameSessionJob.attemptId];
+    assert.equal(sameSessionAttempt.reviewerIndependence, 'same-session', 'same-session 必须被推导');
+    assert.equal(sameSessionAttempt.reviewerSessionId, 'session-A', 'reviewer session id 必须被记录');
+    const sameSessionReceipts = readReceipts(fixture.v4Dir)
+      .filter((entry) => entry.attemptId === sameSessionJob.attemptId && entry.kind === 'review');
+    assert.ok(sameSessionReceipts.length > 0, 'review receipt 必须被记录');
+
+    // 场景 2: independent review（owner 与 reviewer 不同 session）
+    const independentJob = driveToReadyToMerge(
+      fixture, issuePayload({ number: 602 }),
+      { slotId: 'worker-2', ownerThreadId: 'session-B', reviewerSessionId: 'reviewer-C' }
+    );
+    const independentRegistry = readV4Registry(fixture.v4Dir);
+    const independentAttempt = independentRegistry.attempts[independentJob.attemptId];
+    assert.equal(independentAttempt.reviewerIndependence, 'independent', 'independent 必须被推导');
+    assert.equal(independentAttempt.reviewerSessionId, 'reviewer-C', 'reviewer session id 必须被记录');
+
+    // 场景 3: ownerThreadId 未记录（无法判定）→ 必须如实记 unknown，不得默认 independent。
+    // fail-closed 口径：owner 侧标识缺失时，「无法证明独立」不能偷换成「独立」。
+    const unknownOwnerJob = driveToReadyToMerge(
+      fixture, issuePayload({ number: 603 }),
+      { slotId: 'worker-3', ownerThreadId: null, reviewerSessionId: 'reviewer-D' }
+    );
+    const unknownOwnerRegistry = readV4Registry(fixture.v4Dir);
+    const unknownOwnerAttempt = unknownOwnerRegistry.attempts[unknownOwnerJob.attemptId];
+    assert.equal(unknownOwnerAttempt.reviewerIndependence, 'unknown', 'ownerThreadId 缺失时必须记 unknown，不得默认 independent');
+
+    // AC-3: 三种情况都不阻断 merge gate
+    const sameSessionGate = master.evaluateGate({ ...base(fixture), jobId: sameSessionJob.jobId });
+    assert.equal(sameSessionGate.mechanical.allGreen, true, 'same-session 不得阻断 merge gate');
+    const independentGate = master.evaluateGate({ ...base(fixture), jobId: independentJob.jobId });
+    assert.equal(independentGate.mechanical.allGreen, true, 'independent 不得阻断 merge gate');
+    const unknownOwnerGate = master.evaluateGate({ ...base(fixture), jobId: unknownOwnerJob.jobId });
+    assert.equal(unknownOwnerGate.mechanical.allGreen, true, 'unknown 不得阻断 merge gate');
+
+    // AC-4: same-session 在 receipt 中显式标记
+    const sameSessionReceiptPayload = sameSessionReceipts[0].payload;
+    assert.ok(sameSessionReceiptPayload, 'receipt 必须包含 payload');
+
+  } finally {
+    fixture.cleanup();
+  }
+}
+
+// AC-1: v2 起缺失 reviewerSessionId 时 schema fail closed；v1 legacy 无此要求（向后兼容）。
+export async function missingReviewerSessionIdScenario() {
+  const fixture = makeFixture('missing-reviewer-id', { workers: [{ id: 'worker-1' }] });
+  try {
+    writeSlots(fixture);
+    master.masterStart({ ...base(fixture) });
+    const issue = issuePayload({ number: 610 });
+    const claim = master.masterClaim({ ...base(fixture), issue });
+    master.setAttemptOwnerThreadId({ ...base(fixture), jobId: claim.jobId, ownerThreadId: 'owner-1' });
+
+    const candidate = makeCandidate(fixture, claim.slotId, { file: 'test.txt' });
+    master.recordCandidate({ ...base(fixture), jobId: claim.jobId, commitSha: candidate });
+
+    // v2 报文缺失 reviewerSessionId → fail closed。带上 baseCommit 使其满足 AC-007
+    // 的必填项，本测试才能精确定位到 reviewerSessionId 这一个缺口（否则会先撞上
+    // MISSING_BASE_COMMIT，测不到这里想测的东西）。
+    const badReviewV2 = {
+      schemaVersion: 'aes.issue-worker.stage-result/v2',
+      jobId: claim.jobId, stage: 'code-review', commitSha: candidate, outcome: 'PASS',
+      findings: [], evidence: [], mayAdvance: true,
+      baseCommit: claim.workOrder.runner.baseCommit,
+      // 缺少 reviewerSessionId
+    };
+    const result = master.recordStageResult({ ...base(fixture), jobId: claim.jobId, stage: 'review', payload: badReviewV2 });
+    assert.equal(result.ok, false, 'v2 缺失 reviewerSessionId 必须 fail closed');
+    assert.equal(result.code, 'MISSING_REVIEWER_SESSION_ID', '必须报 MISSING_REVIEWER_SESSION_ID');
+
+    // v1 报文同样缺失 reviewerSessionId → 必须被接受（向后兼容历史证据），
+    // 但 reviewerIndependence 推导为 'unknown'，不得被判定为 same-session 或 independent。
+    const legacyReview = passingReviewV1(claim.jobId, candidate);
+    const accepted = master.recordStageResult({ ...base(fixture), jobId: claim.jobId, stage: 'review', payload: legacyReview });
+    assert.equal(accepted.ok, true, 'v1 legacy 报文缺失 reviewerSessionId 必须被接受（不追溯要求）');
+    assert.equal(accepted.reviewerIndependence, 'unknown', 'v1 无 reviewerSessionId 时必须如实记 unknown，不得默认 independent');
+    const registry = readV4Registry(fixture.v4Dir);
+    assert.equal(registry.attempts[claim.attemptId].reviewerIndependence, 'unknown');
+  } finally {
+    fixture.cleanup();
+  }
 }
