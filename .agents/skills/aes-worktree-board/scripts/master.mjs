@@ -303,10 +303,35 @@ export function attemptNew(options = {}) {
         jobId, attemptId: previous.attemptId, state: previous.state,
       });
     }
+    const previousSlotId = previous?.slotId || job.slotId || null;
+    const slotId = options.slotId || previousSlotId;
+    const migrating = slotId !== previousSlotId;
+
+    // #78 缺陷二：改派到新 slot 时，baseCommit 必须取新 slot 的实时 HEAD，不能继承
+    // claim 那一刻的 job.baseCommit —— 新 slot 可能早已 release 同步到更新的
+    // integration HEAD。继承陈旧 base 会让 reviewer 按 base..candidate 取 diff 时把
+    // 别的 job 已合入的改动算进本 job，QA 的「在什么基线上验证」也随之失真，而
+    // GATE-commit 只比对 candidate、从不校验 base，兜不住这一层。
+    // 同 slot 续跑则不改 base：worktree 就是上一个 attempt 的现场（HEAD 可能已是
+    // candidate 本身），claim 时记录的 base 仍然是事实。
+    let baseCommit = job.baseCommit;
+    let baseCommitAdvancedFrom = null;
+    if (migrating) {
+      // allowlist 外的 slot 直接 fail closed（slotById 抛 UNKNOWN_SLOT）。
+      const slot = slotById(config, slotId);
+      const liveHead = gitOut(resolve(slot.worktreePath), ['rev-parse', 'HEAD']);
+      if (!liveHead) {
+        throw storeError('SLOT_HEAD_UNRESOLVED', `无法解析 slot ${slotId} 的实时 HEAD，拒绝新建 attempt`, {
+          jobId, slotId, worktreePath: slot.worktreePath,
+        });
+      }
+      if (liveHead !== baseCommit) baseCommitAdvancedFrom = baseCommit;
+      baseCommit = liveHead;
+    }
+
     if (previous) previous.state = 'superseded';
     const ordinal = job.attemptIds.length + 1;
     const attemptId = attemptIdFor(jobId, ordinal);
-    const slotId = options.slotId || previous?.slotId || job.slotId;
     const bundle = previous?.handoffBundle || null;
     registry.attempts[attemptId] = {
       attemptId,
@@ -315,7 +340,7 @@ export function attemptNew(options = {}) {
       slotId,
       ownerThreadId: options.ownerThreadId || null,
       state: 'dispatched',
-      baseCommit: job.baseCommit,
+      baseCommit,
       // 从 handoff bundle 续跑：live worktree 上的 candidate commit 保留，证据不保留
       // （candidate 前进后旧 review/QA 已失效，新 attempt 必须重新绑定）。
       candidateCommit: bundle?.candidateCommit || null,
@@ -329,15 +354,31 @@ export function attemptNew(options = {}) {
     job.attemptIds.push(attemptId);
     job.currentAttemptId = attemptId;
     job.slotId = slotId;
+    // registry 记录的 base 必须与 executor 实际工作的基线一致，否则 gate 的
+    // changedPaths / GATE-review-base / GATE-qa-base 全部基于错误前提。
+    job.baseCommit = baseCommit;
     job.updatedAt = nowIso();
+
+    // #78 缺陷一：改派后释放旧 slot 的租约，否则同一 job 同时持有两个 slot lease，
+    // 干净的旧 slot 会被一条早已迁走的 job 永久占住。仅当旧租约确属本 job 才释放 ——
+    // 旧 slot 可能已被别的 job 合法租用（例如本 job 的租约早先被外力清理），不误伤。
+    let releasedSlotId = null;
+    if (migrating && previousSlotId && registry.runners[previousSlotId]?.lease?.jobId === jobId) {
+      releaseSlot(registry, previousSlotId, { reason: `job ${jobId} 改派至 ${slotId}，旧租约释放`, keepJob: true });
+      releasedSlotId = previousSlotId;
+    }
     if (registry.runners[slotId]) {
       registry.runners[slotId].lease = { jobId, attemptId, acquiredAt: nowIso() };
       registry.runners[slotId].state = 'leased';
       registry.runners[slotId].claimable = false;
     }
-    appendTransition(dir, { kind: 'attempt', jobId, attemptId, to: 'dispatched', reason: 'new-attempt-from-handoff' });
+    appendTransition(dir, {
+      kind: 'attempt', jobId, attemptId, to: 'dispatched', reason: 'new-attempt-from-handoff',
+      baseCommit, baseCommitAdvancedFrom, releasedSlotId,
+    });
     return {
       ok: true, outcome: 'NEW_ATTEMPT', jobId, attemptId, ordinal, slotId,
+      baseCommit, baseCommitAdvancedFrom, releasedSlotId,
       resumedFrom: registry.attempts[attemptId].resumedFrom,
       preservedAttempts: job.attemptIds.length,
       integrationBranch: config.repoIdentity.integrationBranch,
@@ -345,10 +386,11 @@ export function attemptNew(options = {}) {
   });
 }
 
-// candidate commit 前进使旧 review/QA 失效（E5 / 不变清单）。
+// candidate commit 前进使旧 review/QA/acceptance 失效（E5 / 不变清单 / #72）。
 export function recordCandidate(options = {}) {
   const { dir } = ctx(options);
   return updateV4Registry(dir, (registry) => {
+    const job = jobOf(registry, options.jobId);
     const attempt = currentAttempt(registry, options.jobId);
     if (!attempt) throw storeError('NO_CURRENT_ATTEMPT', `job ${options.jobId} 无当前 attempt`, { jobId: options.jobId });
     const previous = attempt.candidateCommit;
@@ -356,6 +398,15 @@ export function recordCandidate(options = {}) {
     if (previous && previous !== options.commitSha) {
       if (attempt.review) invalidated.push({ kind: 'review', commitSha: attempt.review.commitSha });
       if (attempt.qa) invalidated.push({ kind: 'qa', commitSha: attempt.qa.commitSha });
+      // #72：job.acceptance 与 review/qa 同构失效 —— AC 结论是在旧 candidate 上取得的，
+      // candidate 前进后不能继续给新 commit 背书。此前只靠 GATE-commit 拦截过期 terminal
+      // 间接兜住，acceptance 这一层自己没有失效语义；任何使 terminal 与 candidate 重新
+      // 对齐的路径都会让旧 AC 结论直接放行。
+      if (Array.isArray(job.acceptance) && job.acceptance.length) {
+        invalidated.push({ kind: 'acceptance', commitSha: job.acceptanceCommit || null });
+        job.acceptance = null;
+        job.acceptanceCommit = null;
+      }
       attempt.review = null;
       attempt.qa = null;
     }
@@ -538,6 +589,9 @@ export function masterTerminal(options = {}) {
       }
       attempt.state = 'ready-to-merge';
       job.acceptance = payload.acceptance || [];
+      // #72：记录 AC 结论的取证 commit（上方已校验 payload.candidateCommit 与当前
+      // candidate 一致）。GATE-acceptance 据此判断新鲜度，不再依赖 GATE-commit 兜底。
+      job.acceptanceCommit = payload.candidateCommit;
       job.terminal = payload;
       setJobState(registry, job.jobId, 'ready-to-merge', { reason: 'worker READY_TO_MERGE', dir });
       // 串行 merge：进队列，且同一 job 只入队一次（重启后 reconcile 也依赖这个不变量）。
@@ -603,6 +657,16 @@ function releaseSlot(registry, slotId, { reason, keepJob = false } = {}) {
 
 export function openHumanRequest(options = {}) {
   const { dir } = ctx(options);
+  // #76：分档 gate 让 high 停下来，就是为了让人看着证据做判断；证据清单为空的请求
+  // 等于让人盲签。humanRequest schema 是 v1、语义冻结（空数组在 schema 层合法，
+  // 收紧 schema 会追溯性判历史报文不合格），所以收紧发生在 Master 主动创建这一侧：
+  // requiredEvidence 为空直接 fail closed，而不是静默开出一个没有证据摘要的人工门。
+  const requiredEvidence = options.requiredEvidence || [];
+  if (!Array.isArray(requiredEvidence) || !requiredEvidence.length) {
+    throw storeError('EMPTY_REQUIRED_EVIDENCE', 'humanRequest.requiredEvidence 为空：人工门请求必须携带证据清单', {
+      jobId: options.jobId, kind: options.kind || null,
+    });
+  }
   return updateV4Registry(dir, (registry) => {
     const job = jobOf(registry, options.jobId);
     const attempt = currentAttempt(registry, options.jobId);
@@ -683,6 +747,7 @@ export function evaluateGate(options = {}) {
     integrationOk: Boolean(integrationHead),
     integrationReason: `integration ${integrationBranch}=${integrationHead || 'UNRESOLVED'}`,
     acceptance: job.acceptance || [],
+    acceptanceCommit: job.acceptanceCommit || null,
     review: attempt?.review || null,
     qa: attempt?.qa || null,
     candidateCommit: attempt?.candidateCommit || null,
@@ -1061,14 +1126,29 @@ export function masterReconcile(options = {}) {
     }
 
     // 每个 slot 都必须有可解释状态（B21）。
-    const slotExplanations = Object.values(registry.runners).map((runner) => ({
-      slotId: runner.slotId,
-      state: runner.state,
-      reason: runner.reason,
-      recovery: runner.recovery || null,
-      lease: runner.lease || null,
-      explained: Boolean(runner.reason),
-    }));
+    // #78：残留租约是不可解释状态 —— lease 指向的 job 当前并不落在这个 slot
+    // （job.slotId 指向别处，即同一 jobId 持有多个 slot 租约的残留侧），或 job 根本
+    // 不存在（孤儿租约）。改派后旧租约残留会把干净 slot 永久占住，且 status 看不出
+    // 这是残留；这里如实报 unexplained，不替系统圆场。
+    const slotExplanations = Object.values(registry.runners).map((runner) => {
+      const lease = runner.lease || null;
+      const leasedJob = lease ? registry.jobs[lease.jobId] || null : null;
+      const staleLease = Boolean(lease && (!leasedJob || leasedJob.slotId !== runner.slotId));
+      const staleDetail = staleLease
+        ? `残留租约：job ${lease.jobId} ${leasedJob ? `当前登记在 ${leasedJob.slotId}` : '不存在于 registry'}`
+        : null;
+      return {
+        slotId: runner.slotId,
+        state: runner.state,
+        reason: staleLease ? [runner.reason, staleDetail].filter(Boolean).join('；') : runner.reason,
+        recovery: staleLease
+          ? '人工确认 job 已迁移/终结后清理该 slot 的残留租约（编排不自动清理，避免误伤在途 job）'
+          : (runner.recovery || null),
+        lease,
+        staleLease,
+        explained: Boolean(runner.reason) && !staleLease,
+      };
+    });
 
     registry.master.lastReconcileAt = nowIso();
     registry.master.state = 'running';
@@ -1176,19 +1256,82 @@ export function evaluateStop(options = {}) {
 
 // ---------------------------------------------------------------- CLI
 
+// #76：CLI 参数是闭集，未知参数 fail closed —— 与产品「未知 schema、缺字段、非闭集值
+// 必须 fail closed」的既有口径一致，参数层不例外。静默丢弃曾让 `--required-evidence`
+// 全部蒸发、human open 送出证据为空的盲签请求且 ok:true。
+const FLAG_OPTIONS = Object.freeze(['force', 'json']);
+// 可重复累积的参数：值语义是列表（与报文字段对齐），重复出现是合法输入。
+const REPEATABLE_OPTIONS = Object.freeze(['evidence']);
+const KNOWN_OPTIONS = Object.freeze(new Set([
+  ...FLAG_OPTIONS, ...REPEATABLE_OPTIONS,
+  'dir', 'slots', 'paths', 'repo', 'prefix', 'host', 'branch', 'issue-repo',
+  'legacy-runtime', 'commands-file', 'frontier',
+  'issue', 'issue-file', 'slot', 'model-tier', 'budgets',
+  'job', 'commit', 'payload', 'payload-file', 'commands',
+  'resume-token', 'response', 'response-file',
+  'state', 'kind', 'prompt', 'reason',
+]));
+
 function parseArguments(argv) {
   const options = {};
   const positional = [];
   for (let index = 0; index < argv.length; index += 1) {
     const value = argv[index];
-    if (!value.startsWith('--')) positional.push(value);
-    else {
-      const key = value.slice(2);
-      if (['force', 'json'].includes(key)) options[key] = true;
-      else options[key] = argv[++index];
+    if (!value.startsWith('--')) {
+      positional.push(value);
+      continue;
     }
+    const key = value.slice(2);
+    if (!KNOWN_OPTIONS.has(key)) {
+      throw storeError('UNKNOWN_OPTION', `未知参数 --${key}，拒绝执行（未知参数不静默丢弃）`, {
+        key,
+        // 近似参数给出指路：报文字段叫 requiredEvidence，CLI 参数却叫 --evidence，
+        // 这个不对称正是 #76 的诱因，报错必须替用户把路指对。
+        hint: key === 'required-evidence' ? '证据清单请使用可重复的 --evidence' : null,
+      });
+    }
+    if (FLAG_OPTIONS.includes(key)) {
+      options[key] = true;
+      continue;
+    }
+    const raw = argv[++index];
+    if (raw === undefined) throw storeError('BAD_REQUEST', `参数 --${key} 缺少值`, { key });
+    if (REPEATABLE_OPTIONS.includes(key)) {
+      (options[key] ||= []).push(raw);
+      continue;
+    }
+    // 非累积参数重复出现：静默 last-wins 会无声吞掉前面的值，fail closed。
+    if (key in options) {
+      throw storeError('DUPLICATE_OPTION', `参数 --${key} 重复出现，拒绝静默取最后一个值`, {
+        key, previous: options[key], duplicate: raw,
+      });
+    }
+    options[key] = raw;
   }
   return { options, positional };
+}
+
+// --evidence 支持两种形态并可重复累积：纯字符串（一条证据），或 JSON 数组字符串
+// （历史形态，向下兼容）。以 [ 开头却解析失败的输入直接报错，不静默当作普通字符串吞掉。
+function evidenceListFrom(values = []) {
+  const list = [];
+  for (const value of values) {
+    if (String(value).trimStart().startsWith('[')) {
+      let parsed;
+      try {
+        parsed = JSON.parse(value);
+      } catch (error) {
+        throw storeError('BAD_EVIDENCE', `--evidence 的 JSON 数组解析失败: ${error.message}`, { value });
+      }
+      if (!Array.isArray(parsed) || parsed.some((item) => typeof item !== 'string' || !item.trim())) {
+        throw storeError('BAD_EVIDENCE', '--evidence 的 JSON 形态必须是非空字符串数组', { value });
+      }
+      list.push(...parsed);
+    } else {
+      list.push(value);
+    }
+  }
+  return list;
 }
 
 function payloadFrom(options, key = 'payload') {
@@ -1278,7 +1421,8 @@ async function main(argv = process.argv.slice(2)) {
   if (command === 'human' && action === 'open') {
     return openHumanRequest({
       ...shared, jobId: options.job, state: options.state, kind: options.kind, prompt: options.prompt,
-      requiredEvidence: options.evidence ? JSON.parse(options.evidence) : [],
+      // 重复 --evidence 累积；为空时 openHumanRequest 自会 fail closed（#76）。
+      requiredEvidence: evidenceListFrom(options.evidence),
     });
   }
   if (command === 'human' && action === 'respond') {
