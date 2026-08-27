@@ -25,7 +25,7 @@ import { defaultSlotsFromWorktrees, discoverWorktrees } from './runner-slots.mjs
 import { readJson, readJsonLines, readRegistry, writeJsonAtomic } from './runtime-store.mjs';
 import {
   deliveryMergeScenario, discoveredWorkScenario, integrationBaseAdvanceStaleEvidence, recoveryScenario, runnerLifecycleScenario,
-  stageResultSchemaBackwardCompat,
+  stageResultSchemaBackwardCompat, reviewerIndependenceScenario, missingReviewerSessionIdScenario,
 } from './selftest-v4.mjs';
 import { trajectoryReplayScenario } from './selftest-trajectory.mjs';
 import { boardUiDomain } from './selftest-board-ui.mjs';
@@ -4180,6 +4180,9 @@ async function orchestrationDomain() {
     // AC-007（#62）：integration 前进使旧 base 上取得的证据失效。
     { group: 'stale-base-evidence', name: 'integration-base-advance-stale-evidence', run: integrationBaseAdvanceStaleEvidence },
     { group: 'stale-base-evidence', name: 'stage-result-schema-backward-compat', run: stageResultSchemaBackwardCompat },
+    // #65：reviewer 独立性机械判据。
+    { group: 'reviewer-independence', name: 'reviewer-independence-mechanical-judging', run: reviewerIndependenceScenario },
+    { group: 'reviewer-independence', name: 'missing-reviewer-session-id-fail-closed', run: missingReviewerSessionIdScenario },
   ];
   const p2p3Ids = cases.filter((testCase) => testCase.id).map((testCase) => testCase.id).sort();
   assert.deepEqual(

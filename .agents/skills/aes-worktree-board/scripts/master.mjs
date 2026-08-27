@@ -30,15 +30,18 @@ export const TERMINAL_OUTCOMES = Object.freeze([
   'READY_TO_MERGE', 'BUDGET_EXHAUSTED', 'AWAITING_HUMAN', 'BLOCKED_DEPENDENCY',
   'CONTRACT_CONFLICT', 'BLOCKED_PERMISSION',
 ]);
-
-// stage-result / qa-receipt 的 v1→v2 是纯加法演进（AC-007）：v1 语义永久保持原样
-// （不要求 baseCommit，历史 trajectory replay 语料就是真实的 v1 报文，不得改写）；
-// v2 新增 baseCommit 并强制。产品代码同时接受两版，按报文自带 schemaVersion 分派，
-// 不做「探测环境/回放就放行」的特权判断——分派唯一依据是报文自己声明的版本号。
+// stage-result / qa-receipt 的 v1→v2 是纯加法演进（AC-007 + #65 合流）：v1 语义永久
+// 保持原样——不要求 baseCommit，也不要求 reviewerSessionId；历史 trajectory replay
+// 语料就是真实的 v1 报文，不得改写。v2 起两票要求合并生效：review 类 v2 报文必须
+// 同时携带 baseCommit 与 reviewerSessionId（都 fail closed）；qa 类 v2 只要求
+// baseCommit（reviewerSessionId 不适用于 qa）。产品代码同时接受两版，按报文自带
+// schemaVersion 分派，不做「探测环境/回放就放行」的特权判断——分派唯一依据是
+// 报文自己声明的版本号。
 export const STAGE_RESULT_SCHEMA_V1 = 'aes.issue-worker.stage-result/v1';
 export const STAGE_RESULT_SCHEMA_V2 = 'aes.issue-worker.stage-result/v2';
 export const QA_RECEIPT_SCHEMA_V1 = 'aes.qa.receipt/v1';
 export const QA_RECEIPT_SCHEMA_V2 = 'aes.qa.receipt/v2';
+export const REVIEWER_INDEPENDENCE_VALUES = Object.freeze(['same-session', 'independent', 'unknown']);
 const ACCEPTED_STAGE_RESULT_SCHEMAS = Object.freeze([STAGE_RESULT_SCHEMA_V1, STAGE_RESULT_SCHEMA_V2]);
 const ACCEPTED_QA_RECEIPT_SCHEMAS = Object.freeze([QA_RECEIPT_SCHEMA_V1, QA_RECEIPT_SCHEMA_V2]);
 
@@ -77,6 +80,19 @@ function ctx(options = {}) {
     // host merge 发生地：检出了 integration branch 的那个 worktree。
     hostRoot: resolve(config.hostWorktree || config.repoIdentity.root),
   };
+}
+
+// ---------------------------------------------------------------- attempt helpers
+
+// 测试辅助：设置 attempt 的 ownerThreadId。
+export function setAttemptOwnerThreadId(options = {}) {
+  const { dir } = ctx(options);
+  return updateV4Registry(dir, (registry) => {
+    const attempt = currentAttempt(registry, options.jobId);
+    if (!attempt) throw storeError('NO_CURRENT_ATTEMPT', `job ${options.jobId} 无当前 attempt`, { jobId: options.jobId });
+    attempt.ownerThreadId = options.ownerThreadId;
+    return { ok: true, jobId: options.jobId, attemptId: attempt.attemptId, ownerThreadId: attempt.ownerThreadId };
+  });
 }
 
 // ---------------------------------------------------------------- start / status
@@ -366,13 +382,15 @@ function emptyBudgetUsage() {
 export function recordStageResult(options = {}) {
   const { dir } = ctx(options);
   const payload = options.payload;
+  // qa 与 review 各自的 v1/v2 接受集：review v2 起同时强制 baseCommit（AC-007）与
+  // reviewerSessionId（#65）；qa v2 只强制 baseCommit（reviewerSessionId 不适用于 qa）。
   const isQa = options.stage === 'qa';
   const accepted = isQa ? ACCEPTED_QA_RECEIPT_SCHEMAS : ACCEPTED_STAGE_RESULT_SCHEMAS;
   const latest = isQa ? QA_RECEIPT_SCHEMA_V2 : STAGE_RESULT_SCHEMA_V2;
   return updateV4Registry(dir, (registry) => {
     const attempt = currentAttempt(registry, options.jobId);
     if (!attempt) throw storeError('NO_CURRENT_ATTEMPT', `job ${options.jobId} 无当前 attempt`, { jobId: options.jobId });
-    if (!accepted.includes(payload?.schemaVersion)) {
+    if (!payload || !accepted.includes(payload.schemaVersion)) {
       appendInbox(dir, {
         kind: 'unclassified-stage-result', jobId: options.jobId, stage: options.stage,
         consumed: false, requiredReplacementSchema: latest,
@@ -411,6 +429,16 @@ export function recordStageResult(options = {}) {
       };
     }
 
+    // AC-1: v2 起 review stage-result 必须携带 reviewer 侧会话标识字段，缺失时 fail closed。
+    // v1 是历史轨迹夹具锁定证据的原始语义，不追溯要求（否则 trajectory-replay 场景本身
+    // 就无法通过——那是它存在的意义：暴露 schema 变更对历史证据的破坏，不是被绕过的障碍）。
+    if (options.stage === 'review' && payload.schemaVersion === STAGE_RESULT_SCHEMA_V2 && !payload.reviewerSessionId) {
+      return {
+        ok: false, code: 'MISSING_REVIEWER_SESSION_ID', stage: options.stage,
+        consumed: false, pending: true,
+      };
+    }
+
     attempt.budgetUsage ||= emptyBudgetUsage();
     let failureClass = null;
     if (payload.outcome !== 'PASS' && payload.outcome !== 'AWAITING_HUMAN') {
@@ -425,14 +453,36 @@ export function recordStageResult(options = {}) {
       if (bucket) attempt.budgetUsage[bucket] += 1;
     }
 
+    // AC-2: 机械推导 reviewerIndependence，忽略报文自述该字段。
+    // fail-closed 口径：任何一侧标识缺失都判定不出「独立」，如实记 unknown——
+    // 不把「无法证明独立」偷换成「独立」（v1 legacy 无 reviewerSessionId、或
+    // ownerThreadId 未记录，都落在这一分支，不再默认给 independent）。
+    let reviewerIndependence = null;
+    if (options.stage === 'review') {
+      if (!payload.reviewerSessionId || !attempt.ownerThreadId) {
+        reviewerIndependence = 'unknown';
+      } else {
+        reviewerIndependence = payload.reviewerSessionId === attempt.ownerThreadId ? 'same-session' : 'independent';
+      }
+    }
+
     if (options.stage === 'qa') attempt.qa = payload.outcome === 'PASS' ? payload : null;
-    else attempt.review = payload.outcome === 'PASS' ? payload : null;
+    else {
+      if (payload.outcome === 'PASS') {
+        attempt.review = payload;
+        attempt.reviewerSessionId = payload.reviewerSessionId || null;
+        attempt.reviewerIndependence = reviewerIndependence;
+      } else {
+        attempt.review = null;
+      }
+    }
     attempt.lastStage = { stage: options.stage, outcome: payload.outcome, failureClass, commitSha: payload.commitSha };
     attempt.state = options.stage === 'qa' ? 'qa' : 'reviewing';
     appendReceipt(dir, { kind: options.stage, jobId: options.jobId, attemptId: attempt.attemptId, payload });
     return {
       ok: true, stage: options.stage, jobId: options.jobId, outcome: payload.outcome,
       commitSha: payload.commitSha, failureClass, budgetUsage: { ...attempt.budgetUsage },
+      reviewerIndependence,
     };
   });
 }
