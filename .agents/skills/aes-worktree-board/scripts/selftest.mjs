@@ -26,7 +26,7 @@ import { readJson, readJsonLines, readRegistry, writeJsonAtomic } from './runtim
 import {
   deliveryMergeScenario, discoveredWorkScenario, integrationBaseAdvanceStaleEvidence, recoveryScenario, runnerLifecycleScenario,
   stageResultSchemaBackwardCompat, reviewerIndependenceScenario, missingReviewerSessionIdScenario,
-  acceptanceInvalidationScenario, humanOpenEvidenceScenario,
+  acceptanceInvalidationScenario, humanOpenEvidenceScenario, attemptReassignScenario,
 } from './selftest-v4.mjs';
 import { trajectoryReplayScenario } from './selftest-trajectory.mjs';
 import { boardUiDomain } from './selftest-board-ui.mjs';
@@ -4253,6 +4253,8 @@ async function orchestrationDomain() {
     { group: 'stale-base-evidence', name: 'acceptance-invalidation-on-candidate-advance', run: acceptanceInvalidationScenario },
     // #76：human open 证据清单不得静默为空；CLI 未知/重复参数 fail closed。
     { group: 'recovery', name: 'human-open-required-evidence-fail-closed', run: humanOpenEvidenceScenario },
+    // #78：attemptNew 释放旧租约、绑定新 slot 实时 HEAD；reconcile 检出残留双租约。
+    { group: 'recovery', name: 'attempt-reassign-lease-and-base', run: attemptReassignScenario },
   ];
   const p2p3Ids = cases.filter((testCase) => testCase.id).map((testCase) => testCase.id).sort();
   assert.deepEqual(

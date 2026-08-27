@@ -303,10 +303,35 @@ export function attemptNew(options = {}) {
         jobId, attemptId: previous.attemptId, state: previous.state,
       });
     }
+    const previousSlotId = previous?.slotId || job.slotId || null;
+    const slotId = options.slotId || previousSlotId;
+    const migrating = slotId !== previousSlotId;
+
+    // #78 缺陷二：改派到新 slot 时，baseCommit 必须取新 slot 的实时 HEAD，不能继承
+    // claim 那一刻的 job.baseCommit —— 新 slot 可能早已 release 同步到更新的
+    // integration HEAD。继承陈旧 base 会让 reviewer 按 base..candidate 取 diff 时把
+    // 别的 job 已合入的改动算进本 job，QA 的「在什么基线上验证」也随之失真，而
+    // GATE-commit 只比对 candidate、从不校验 base，兜不住这一层。
+    // 同 slot 续跑则不改 base：worktree 就是上一个 attempt 的现场（HEAD 可能已是
+    // candidate 本身），claim 时记录的 base 仍然是事实。
+    let baseCommit = job.baseCommit;
+    let baseCommitAdvancedFrom = null;
+    if (migrating) {
+      // allowlist 外的 slot 直接 fail closed（slotById 抛 UNKNOWN_SLOT）。
+      const slot = slotById(config, slotId);
+      const liveHead = gitOut(resolve(slot.worktreePath), ['rev-parse', 'HEAD']);
+      if (!liveHead) {
+        throw storeError('SLOT_HEAD_UNRESOLVED', `无法解析 slot ${slotId} 的实时 HEAD，拒绝新建 attempt`, {
+          jobId, slotId, worktreePath: slot.worktreePath,
+        });
+      }
+      if (liveHead !== baseCommit) baseCommitAdvancedFrom = baseCommit;
+      baseCommit = liveHead;
+    }
+
     if (previous) previous.state = 'superseded';
     const ordinal = job.attemptIds.length + 1;
     const attemptId = attemptIdFor(jobId, ordinal);
-    const slotId = options.slotId || previous?.slotId || job.slotId;
     const bundle = previous?.handoffBundle || null;
     registry.attempts[attemptId] = {
       attemptId,
@@ -315,7 +340,7 @@ export function attemptNew(options = {}) {
       slotId,
       ownerThreadId: options.ownerThreadId || null,
       state: 'dispatched',
-      baseCommit: job.baseCommit,
+      baseCommit,
       // 从 handoff bundle 续跑：live worktree 上的 candidate commit 保留，证据不保留
       // （candidate 前进后旧 review/QA 已失效，新 attempt 必须重新绑定）。
       candidateCommit: bundle?.candidateCommit || null,
@@ -329,15 +354,31 @@ export function attemptNew(options = {}) {
     job.attemptIds.push(attemptId);
     job.currentAttemptId = attemptId;
     job.slotId = slotId;
+    // registry 记录的 base 必须与 executor 实际工作的基线一致，否则 gate 的
+    // changedPaths / GATE-review-base / GATE-qa-base 全部基于错误前提。
+    job.baseCommit = baseCommit;
     job.updatedAt = nowIso();
+
+    // #78 缺陷一：改派后释放旧 slot 的租约，否则同一 job 同时持有两个 slot lease，
+    // 干净的旧 slot 会被一条早已迁走的 job 永久占住。仅当旧租约确属本 job 才释放 ——
+    // 旧 slot 可能已被别的 job 合法租用（例如本 job 的租约早先被外力清理），不误伤。
+    let releasedSlotId = null;
+    if (migrating && previousSlotId && registry.runners[previousSlotId]?.lease?.jobId === jobId) {
+      releaseSlot(registry, previousSlotId, { reason: `job ${jobId} 改派至 ${slotId}，旧租约释放`, keepJob: true });
+      releasedSlotId = previousSlotId;
+    }
     if (registry.runners[slotId]) {
       registry.runners[slotId].lease = { jobId, attemptId, acquiredAt: nowIso() };
       registry.runners[slotId].state = 'leased';
       registry.runners[slotId].claimable = false;
     }
-    appendTransition(dir, { kind: 'attempt', jobId, attemptId, to: 'dispatched', reason: 'new-attempt-from-handoff' });
+    appendTransition(dir, {
+      kind: 'attempt', jobId, attemptId, to: 'dispatched', reason: 'new-attempt-from-handoff',
+      baseCommit, baseCommitAdvancedFrom, releasedSlotId,
+    });
     return {
       ok: true, outcome: 'NEW_ATTEMPT', jobId, attemptId, ordinal, slotId,
+      baseCommit, baseCommitAdvancedFrom, releasedSlotId,
       resumedFrom: registry.attempts[attemptId].resumedFrom,
       preservedAttempts: job.attemptIds.length,
       integrationBranch: config.repoIdentity.integrationBranch,
@@ -1085,14 +1126,29 @@ export function masterReconcile(options = {}) {
     }
 
     // 每个 slot 都必须有可解释状态（B21）。
-    const slotExplanations = Object.values(registry.runners).map((runner) => ({
-      slotId: runner.slotId,
-      state: runner.state,
-      reason: runner.reason,
-      recovery: runner.recovery || null,
-      lease: runner.lease || null,
-      explained: Boolean(runner.reason),
-    }));
+    // #78：残留租约是不可解释状态 —— lease 指向的 job 当前并不落在这个 slot
+    // （job.slotId 指向别处，即同一 jobId 持有多个 slot 租约的残留侧），或 job 根本
+    // 不存在（孤儿租约）。改派后旧租约残留会把干净 slot 永久占住，且 status 看不出
+    // 这是残留；这里如实报 unexplained，不替系统圆场。
+    const slotExplanations = Object.values(registry.runners).map((runner) => {
+      const lease = runner.lease || null;
+      const leasedJob = lease ? registry.jobs[lease.jobId] || null : null;
+      const staleLease = Boolean(lease && (!leasedJob || leasedJob.slotId !== runner.slotId));
+      const staleDetail = staleLease
+        ? `残留租约：job ${lease.jobId} ${leasedJob ? `当前登记在 ${leasedJob.slotId}` : '不存在于 registry'}`
+        : null;
+      return {
+        slotId: runner.slotId,
+        state: runner.state,
+        reason: staleLease ? [runner.reason, staleDetail].filter(Boolean).join('；') : runner.reason,
+        recovery: staleLease
+          ? '人工确认 job 已迁移/终结后清理该 slot 的残留租约（编排不自动清理，避免误伤在途 job）'
+          : (runner.recovery || null),
+        lease,
+        staleLease,
+        explained: Boolean(runner.reason) && !staleLease,
+      };
+    });
 
     registry.master.lastReconcileAt = nowIso();
     registry.master.state = 'running';

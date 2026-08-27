@@ -18,7 +18,7 @@ import { HUMAN_REQUEST_SCHEMA } from './human-request.mjs';
 import { decideMerge, evaluateMechanicalGate, resolveMergePolicy } from './merge-policy.mjs';
 import * as master from './master.mjs';
 import {
-  gitOut, issuePayload, makeCandidate, makeConflict, makeFixture, SCRIPT_DIR,
+  git, gitOut, issuePayload, makeCandidate, makeConflict, makeFixture, SCRIPT_DIR,
 } from './selftest-fixture.mjs';
 
 const MASTER_CLI = join(SCRIPT_DIR, 'master.mjs');
@@ -1630,6 +1630,85 @@ export async function humanOpenEvidenceScenario() {
     // 以 [ 开头但不是合法 JSON 数组的 --evidence 必须报错，不得静默当普通字符串。
     const badJson = freshProcess(fixture, [...humanArgs, '--evidence', '["未闭合'], { expectStatus: 'nonzero' });
     assert.equal(badJson.code, 'BAD_EVIDENCE');
+  } finally {
+    fixture.cleanup();
+  }
+}
+
+// #78：attemptNew 改派必须释放旧 slot 租约（仅当确属本 job）、新 attempt 绑定新 slot
+// 的实时 HEAD 而非陈旧 job.baseCommit；reconcile 的 unexplainedSlots 覆盖残留双租约。
+export async function attemptReassignScenario() {
+  const fixture = makeFixture('attempt-reassign', {
+    workers: [{ id: 'worker-1' }, { id: 'worker-2' }, { id: 'worker-3' }],
+  });
+  try {
+    writeSlots(fixture);
+    master.masterStart({ ...base(fixture) });
+    const claim = master.masterClaim({ ...base(fixture), issue: issuePayload({ number: 591 }), slotId: 'worker-1' });
+    const jobId = claim.jobId;
+    const staleBase = claim.workOrder.runner.baseCommit;
+
+    // 复现实测现场：别的 job 合入使 integration 前进，worker-2 已 release 同步到新 HEAD，
+    // 而 job.baseCommit 还停在 claim 那一刻的旧值。
+    writeFileSync(join(fixture.repoRoot, 'other-job.txt'), 'merged by another job\n');
+    git(fixture.repoRoot, ['add', '.']);
+    git(fixture.repoRoot, ['commit', '-m', 'other job merged']);
+    const liveHead = gitOut(fixture.repoRoot, ['rev-parse', 'dev']);
+    git(fixture.worktreeOf('worker-2'), ['reset', '--hard', liveHead]);
+    assert.notEqual(liveHead, staleBase);
+
+    master.attemptInterrupt({ ...base(fixture), jobId, reason: 'slot 被外部占用' });
+    const next = master.attemptNew({ ...base(fixture), jobId, slotId: 'worker-2' });
+
+    // 缺陷二：新 attempt 的 baseCommit 必须是新 slot 的实时 HEAD，不是继承的旧值。
+    assert.equal(next.baseCommit, liveHead, '新 attempt 必须绑定新 slot 的实时 HEAD');
+    assert.equal(next.baseCommitAdvancedFrom, staleBase, 'base 前进必须留下可审计的旧值');
+    let registry = readV4Registry(fixture.v4Dir);
+    assert.equal(registry.attempts[next.attemptId].baseCommit, liveHead);
+    assert.equal(registry.jobs[jobId].baseCommit, liveHead, 'job.baseCommit 必须跟随实际执行基线');
+
+    // 缺陷一：旧 slot 的租约必须释放，同一 job 不得同时持有两个 slot 租约。
+    assert.equal(next.releasedSlotId, 'worker-1');
+    assert.equal(registry.runners['worker-1'].lease, null, '改派后旧 slot 租约必须释放');
+    assert.equal(registry.runners['worker-2'].lease.jobId, jobId);
+    assert.equal(Object.values(registry.runners).filter((runner) => runner.lease?.jobId === jobId).length, 1,
+      '同一 job 在改派后只允许持有一个 slot 租约');
+
+    // 只释放确属本 job 的租约：旧 slot 已被别的 job 租走时不得误伤。
+    updateV4Registry(fixture.v4Dir, (writable) => {
+      writable.runners['worker-2'].lease = {
+        jobId: 'job-foreign', attemptId: 'job-foreign#attempt-1', acquiredAt: '2026-01-01T00:00:00.000Z',
+      };
+    });
+    master.attemptInterrupt({ ...base(fixture), jobId, reason: '再次改派' });
+    const third = master.attemptNew({ ...base(fixture), jobId, slotId: 'worker-3' });
+    registry = readV4Registry(fixture.v4Dir);
+    assert.equal(registry.runners['worker-2'].lease.jobId, 'job-foreign', '不属本 job 的租约不得被释放');
+    assert.equal(third.releasedSlotId, null);
+    assert.equal(registry.runners['worker-3'].lease.jobId, jobId);
+    assert.equal(third.baseCommit, gitOut(fixture.worktreeOf('worker-3'), ['rev-parse', 'HEAD']),
+      '改派目标的实时 HEAD 才是新 attempt 的 base');
+
+    // allowlist 外的 slot 与无法解析 HEAD 的 slot 都 fail closed。
+    master.attemptInterrupt({ ...base(fixture), jobId, reason: '误改派' });
+    assert.throws(() => master.attemptNew({ ...base(fixture), jobId, slotId: 'worker-9' }),
+      (error) => error.code === 'UNKNOWN_SLOT');
+    rmSync(fixture.worktreeOf('worker-1'), { recursive: true, force: true, maxRetries: 5 });
+    assert.throws(() => master.attemptNew({ ...base(fixture), jobId, slotId: 'worker-1' }),
+      (error) => error.code === 'SLOT_HEAD_UNRESOLVED');
+
+    // reconcile：残留双租约（同 jobId 多 lease）必须落进 unexplainedSlots，不得沉默。
+    updateV4Registry(fixture.v4Dir, (writable) => {
+      writable.runners['worker-2'].lease = { jobId, attemptId: claim.attemptId, acquiredAt: '2026-01-01T00:00:00.000Z' };
+    });
+    const reconcile = freshProcess(fixture, ['reconcile']);
+    const residual = reconcile.slots.find((slot) => slot.slotId === 'worker-2');
+    assert.equal(residual.explained, false, '同 job 双租约的残留侧必须是不可解释状态');
+    assert.equal(residual.staleLease, true);
+    assert.ok(/残留租约/.test(residual.reason), '残留租约必须在 reason 里点名');
+    assert.ok(reconcile.unexplainedSlots >= 1, '残留租约必须计入 unexplainedSlots');
+    const holder = reconcile.slots.find((slot) => slot.slotId === 'worker-3');
+    assert.equal(holder.explained, true, '真正持有 job 的 slot 仍是可解释状态');
   } finally {
     fixture.cleanup();
   }
