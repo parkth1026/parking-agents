@@ -2050,17 +2050,31 @@ function parseArguments(argv) {
 async function resolveExistingWorktree(value) {
   const requested = canonicalWorktreeId(value);
   const { siblings } = await listWorktrees();
+  const available = siblings.map((entry) => basename(entry.path));
   const matches = siblings.filter((entry) => canonicalWorktreeId(basename(entry.path)) === requested);
   if (matches.length === 1) return canonicalWorktreeId(basename(matches[0].path));
   // #67: canonical 短名只覆盖 devN/test。嵌套 worker 的 basename（parking-agents-worker-1）
   // 不在该闭集内，因此再走一次与 dispatch/server 同一口径的 basename 解析，
   // 让短名与完整 basename 收敛到同一个 worker identity。
-  if (!matches.length) {
-    const resolved = resolveWorktreeTarget(siblings, value);
-    if (resolved.target) return canonicalWorktreeId(basename(resolved.target.path));
+  // canonical 短名撞出多个候选（两个 -devN 后缀 worktree）与 basename 解析多义是同一事实，
+  // 统一折算成 resolveWorktreeTarget 的返回形状后走同一条判定。
+  const resolved = matches.length > 1
+    ? { target: null, code: 'AMBIGUOUS_WORKTREE', matches, available }
+    : resolveWorktreeTarget(siblings, value);
+  if (resolved.target) return canonicalWorktreeId(basename(resolved.target.path));
+  // #73: 多义不是「不认识」。此前只查 target 空不空，把 AMBIGUOUS_WORKTREE 降级成
+  // UNKNOWN_WORKTREE——后者让使用者去查拼写，而正确动作是把名字写完整。透传 code
+  // 并逐条列出候选，让 orchestrate 与 dispatch/server 对同一多义事实给出同一语义。
+  if (resolved.code === 'AMBIGUOUS_WORKTREE') {
+    const candidates = resolved.matches.map((entry) => basename(entry.path));
+    throw controlError(
+      'AMBIGUOUS_WORKTREE',
+      `worktree "${value}" 同时匹配 ${candidates.join(', ')}，请用完整 basename`,
+      { requested, matches: candidates, available: resolved.available },
+    );
   }
   throw controlError('UNKNOWN_WORKTREE', `worktree "${value}" 不在本仓既有 worktree 列表中`, {
-    requested, available: siblings.map((entry) => basename(entry.path)),
+    requested, available,
   });
 }
 

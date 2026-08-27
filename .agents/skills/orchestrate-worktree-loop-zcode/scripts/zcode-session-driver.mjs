@@ -3,9 +3,11 @@
 //
 // Architecture: a long-lived `daemon` bridges a headless ZCode app-server (NDJSON JSON-RPC
 // over stdio) to a local TCP port. Short-lived CLI subcommands talk to the daemon, so a
-// coordinator session can create / drive / monitor visible top-level sessions across many
-// Bash invocations. Child sessions are ordinary interactive ZCode sessions: persisted in
-// the shared session store, visible in the ZCode UI, and resumable by the user.
+// coordinator session can create / drive / monitor top-level sessions across many Bash
+// invocations. Child sessions are ordinary interactive ZCode sessions: fully persisted in
+// the shared session store and resumable by the user, but NOT guaranteed to appear in the
+// desktop UI sidebar without a manual nudge (issue #79; see
+// references/ui-visibility-limitation.md for the evidence chain).
 //
 // Zero dependencies (Node >= 20). Windows/macOS/Linux best-effort.
 //

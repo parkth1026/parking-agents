@@ -25,7 +25,9 @@ import {
 import { defaultSlotsFromWorktrees, discoverWorktrees } from './runner-slots.mjs';
 import { readJson, readJsonLines, readRegistry, writeJsonAtomic } from './runtime-store.mjs';
 import {
-  deliveryMergeScenario, discoveredWorkScenario, recoveryScenario, runnerLifecycleScenario,
+  deliveryMergeScenario, discoveredWorkScenario, integrationBaseAdvanceStaleEvidence, recoveryScenario, runnerLifecycleScenario,
+  stageResultSchemaBackwardCompat, reviewerIndependenceScenario, missingReviewerSessionIdScenario,
+  acceptanceInvalidationScenario, humanOpenEvidenceScenario, attemptReassignScenario,
 } from './selftest-v4.mjs';
 import { trajectoryReplayScenario } from './selftest-trajectory.mjs';
 import { boardUiDomain } from './selftest-board-ui.mjs';
@@ -528,6 +530,10 @@ function ambiguousLayoutFixture(label) {
     // basename 完全同名：精确匹配自身就是多义（exact.length > 1）。
     dupA: join(root, 'fixture-main-worker', 'left', 'fixture-dup'),
     dupB: join(root, 'fixture-main-alt', 'right', 'fixture-dup'),
+    // #73: canonical 短名（devN）撞出两个候选——orchestrate 的 canonicalWorktreeId 会把
+    // 两个 basename 都折成 dev7，该多义此前也被降级成 UNKNOWN_WORKTREE。
+    'fixture-dev7': join(root, 'fixture-main-worker', 'fixture-dev7'),
+    'team-dev7': join(root, 'fixture-main-alt', 'team-dev7'),
   };
   mkdirSync(main, { recursive: true });
   gitSync(main, ['init', '-b', 'main']);
@@ -1475,6 +1481,71 @@ try {
       await cleanTemp(observerDirB).catch(() => {});
       await cleanRepositoryFixture(peer);
     }
+
+    // #64 BLOCK 1/3：live-gate.mjs 的 CLI 层必须与其余模块共用同一条目标仓解析链
+    // （AES_WORKTREE_BOARD_REPO_ROOT 优先，否则 cwd）。此前 CLI 未传 --repo 时直接
+    // 裸接 process.cwd()，跳过了 env 覆盖——receipt 会静默落到 cwd 所在仓，而不是
+    // 调用方通过 env 指定的目标仓，恰是 #64 要关的问题换了个触发面。这里用真实双仓
+    // fixture 复现该场景：cwd 在 A，env 指向 B，断言 receipt 落 B、A 零新增。
+    // 域挂点选 repo-root：其余「目标仓解析链」的跨仓回归都挂在这里，同一条链、同一处断言。
+    const crossA = repositoryFixture('live-gate-cross-a');
+    const crossB = repositoryFixture('live-gate-cross-b');
+    try {
+      const crossEnv = boardEnv(null, { AES_WORKTREE_BOARD_REPO_ROOT: crossB.main });
+
+      // worktrees 子命令：练 localWorktreeGate → inspectLocalWorktrees。
+      const worktreesRun = spawnSync(process.execPath, [
+        join(SCRIPT_DIR, 'live-gate.mjs'), 'worktrees', '--branch', 'main',
+      ], {
+        ...HEADLESS_CHILD_OPTIONS, cwd: crossA.main, env: crossEnv, encoding: 'utf8',
+      });
+      assert.equal(worktreesRun.status, 0, worktreesRun.stderr || worktreesRun.stdout);
+      assert.equal(JSON.parse(worktreesRun.stdout.trim()).ok, true);
+      const worktreesReceiptPath = join(
+        crossB.main, '.aes-worktree-board', 'receipts', 'ac-007a-worktree-readonly.json',
+      );
+      assert.ok(existsSync(worktreesReceiptPath),
+        'worktrees 子命令未传 --repo 时 receipt 必须落 env 指向的目标仓（B）');
+      const worktreesReceipt = JSON.parse(readFileSync(worktreesReceiptPath, 'utf8'));
+      assert.equal(resolve(worktreesReceipt.repoRoot), resolve(crossB.main));
+      assert.equal(existsSync(join(crossA.main, '.aes-worktree-board')), false,
+        'cwd 所在仓（A）不得因未传 --repo 而承接 receipt');
+
+      // live-receipt 子命令：练 liveRunReceipt，同样不传 --repo。
+      const v4Dir = join(crossB.main, '.aes-worktree-board', 'runtime-v4');
+      mkdirSync(v4Dir, { recursive: true });
+      writeFileSync(join(v4Dir, 'registry.json'), JSON.stringify({
+        jobs: {}, deliveries: {}, attempts: {}, master: null, humanRequests: {}, discoveries: {},
+      }));
+      const liveReceiptRun = spawnSync(process.execPath, [
+        join(SCRIPT_DIR, 'live-gate.mjs'), 'live-receipt', '--branch', 'main',
+        '--issue-repo', 'fixture.invalid/cross-repo',
+      ], {
+        ...HEADLESS_CHILD_OPTIONS, cwd: crossA.main, env: crossEnv, encoding: 'utf8',
+      });
+      assert.equal(liveReceiptRun.status, 0, liveReceiptRun.stderr || liveReceiptRun.stdout);
+      assert.equal(JSON.parse(liveReceiptRun.stdout.trim()).ok, true);
+      const liveReceiptPath = join(crossB.main, '.aes-worktree-board', 'receipts', 'ac-007a-live-run.json');
+      assert.ok(existsSync(liveReceiptPath),
+        'live-receipt 子命令未传 --repo 时 receipt 必须落 env 指向的目标仓（B）');
+      const liveReceipt = JSON.parse(readFileSync(liveReceiptPath, 'utf8'));
+      assert.equal(resolve(liveReceipt.repo.root), resolve(crossB.main));
+      assert.equal(existsSync(join(crossA.main, '.aes-worktree-board', 'receipts')), false,
+        'cwd 所在仓（A）在 live-receipt 子命令下也不得承接 receipt');
+
+      // desktop 子命令需要真实 Chrome，跑不进这个轻量域；改为源码断言：三条子命令分支
+      // 必须全部改走同一条解析函数，不再各自裸接 process.cwd()（含 desktop 在内）。
+      const liveGateSource = readFileSync(join(SCRIPT_DIR, 'live-gate.mjs'), 'utf8');
+      const resolverCalls = liveGateSource.match(/resolveCliRepoRoot\(options\.repo\)/g) || [];
+      assert.equal(resolverCalls.length, 3,
+        'desktop / worktrees / live-receipt 三条子命令都必须走 resolveCliRepoRoot');
+      assert.doesNotMatch(liveGateSource, /options\.repo \|\| process\.cwd\(\)/,
+        'CLI 层不得再出现跳过 AES_WORKTREE_BOARD_REPO_ROOT 的裸 cwd 回落');
+    } finally {
+      await cleanRepositoryFixture(crossA);
+      await cleanRepositoryFixture(crossB);
+    }
+
     assert.deepEqual(
       runtimeTreeSnapshot(join(SKILL_DIR, 'runtime')),
       skillRuntimeBefore,
@@ -2641,6 +2712,69 @@ async function orchestrationPreflightLeaseAndState() {
   } finally {
     await cleanTemp(runtimeDir);
     await cleanTemp(raceRuntime);
+  }
+}
+
+// #73: orchestrate 的 resolveExistingWorktree 曾只查 target 空不空，把 resolveWorktreeTarget
+// 判出的 AMBIGUOUS_WORKTREE 降级成 UNKNOWN_WORKTREE——「太模糊请写全」被说成「不认识请查拼写」，
+// 与 dispatch/server 对同一多义事实给出相反指引。此处钉住 orchestrate CLI 级语义：
+// 多义必须透传 AMBIGUOUS_WORKTREE 并逐条列候选；真正不存在的名字仍是 UNKNOWN_WORKTREE。
+async function orchestrationAmbiguousWorktreeNotDowngraded() {
+  const fixture = ambiguousLayoutFixture('orchestrate-ambiguous');
+  const runtimeDir = join(fixture.root, 'runtime-orchestrate');
+  try {
+    const env = { AES_WORKTREE_BOARD_REPO_ROOT: fixture.main };
+    const taskCreate = (worktree, thread) => orchestrateSync([
+      'task', 'create', '--issue', '18', '--worktree', worktree, '--role', 'executor',
+      '--thread-id', thread, '--model', 'sol-high', '--routing-reason', '#73 ambiguity fixture',
+    ], runtimeDir, env);
+
+    // 三段多义一次盖住：basename 后缀多义（w1）、basename 完全同名（fixture-dup）、
+    // canonical devN 短名撞出两个候选（dev7——走 resolveWorktreeTarget 之前的 canonical 匹配，
+    // 该分支此前同样落进 UNKNOWN_WORKTREE）。
+    for (const [name, expected] of [
+      ['w1', ['fixture-w1', 'team-w1']],
+      ['fixture-dup', ['fixture-dup', 'fixture-dup']],
+      ['dev7', ['fixture-dev7', 'team-dev7']],
+    ]) {
+      const rejected = taskCreate(name, `T-ambiguous-${name}`);
+      assert.equal(rejected.status, 2, `多义 worktree "${name}" 必须以控制错误拒绝: ${rejected.stdout}`);
+      const body = parseJsonLine(rejected.stderr);
+      assert.equal(
+        body.code,
+        'AMBIGUOUS_WORKTREE',
+        `多义必须报 AMBIGUOUS_WORKTREE 而不是 ${body.code}: ${body.message}`,
+      );
+      assert.match(body.message, /请用完整 basename/, '多义报错必须给出可行的下一步');
+      // 候选逐条列出（与 dispatch 同一口径）：同名两条不得折叠；顺序不保证，只比集合。
+      const listed = body.message.match(/同时匹配 (.+)，请用完整 basename/)?.[1];
+      assert.ok(listed, `多义报错缺少候选集合: ${body.message}`);
+      assert.deepEqual(listed.split(', ').sort(), expected.slice().sort(),
+        `候选集合必须逐条列出: ${body.message}`);
+      assert.deepEqual((body.matches || []).slice().sort(), expected.slice().sort(),
+        'details.matches 必须携带候选 basename');
+    }
+
+    // 零候选仍是 UNKNOWN_WORKTREE：两种语义不得互相吞并。
+    const unknown = taskCreate('w9', 'T-ambiguous-unknown');
+    assert.equal(unknown.status, 2);
+    assert.equal(
+      parseJsonLine(unknown.stderr).code,
+      'UNKNOWN_WORKTREE',
+      '不存在的名字必须仍报 UNKNOWN_WORKTREE',
+    );
+
+    // 完整 basename 在多义候选仍在时必须照常受理（精确匹配压过后缀多义）。
+    const accepted = taskCreate('fixture-w1', 'T-ambiguous-exact');
+    assert.equal(accepted.status, 0, `完整 basename 必须唯一命中: ${accepted.stderr}`);
+    assert.equal(parseJsonLine(accepted.stdout).task.worktree, 'fixture-w1');
+    assert.equal(
+      Object.keys(readRegistry(runtimeDir).tasks).length,
+      1,
+      '多义与未知拒绝都不得落 registry 记录',
+    );
+  } finally {
+    await fixture.cleanup();
   }
 }
 
@@ -4341,6 +4475,8 @@ async function orchestrationDomain() {
     { id: 'P2.3-09', group: 'storage', name: 'lock-competition', run: orchestrationLockCompetition },
     { id: 'P2.3-10', group: 'storage', name: 'merge-behind-refresh', run: orchestrationMergeBehindRefresh },
     { group: 'lifecycle', name: 'preflight-lease-state', run: orchestrationPreflightLeaseAndState },
+    // #73：多义 worktree 不得降级成 UNKNOWN_WORKTREE，三入口同一语义。
+    { group: 'lifecycle', name: 'ambiguous-worktree-not-downgraded', run: orchestrationAmbiguousWorktreeNotDowngraded },
     { id: 'P2.3-01', group: 'lifecycle', name: 'inbox-idempotency', run: orchestrationInboxIdempotency },
     { id: 'P2.3-02', group: 'lifecycle', name: 'five-task-polls-not-lost', run: orchestrationFiveTaskFanIn },
     { id: 'P2.3-03', group: 'governance', name: 'circuit-late-event', run: orchestrationCircuitAndLateEvent },
@@ -4368,6 +4504,18 @@ async function orchestrationDomain() {
     { group: 'trajectory-replay', name: 'historical-trajectory-replay', run: trajectoryReplayScenario },
     { group: 'discovered-work', name: 'discovery-reflow', run: discoveredWorkScenario },
     { group: 'delivery-merge', name: 'delivery-and-tiered-merge-gate', run: deliveryMergeScenario },
+    // AC-007（#62）：integration 前进使旧 base 上取得的证据失效。
+    { group: 'stale-base-evidence', name: 'integration-base-advance-stale-evidence', run: integrationBaseAdvanceStaleEvidence },
+    { group: 'stale-base-evidence', name: 'stage-result-schema-backward-compat', run: stageResultSchemaBackwardCompat },
+    // #65：reviewer 独立性机械判据。
+    { group: 'reviewer-independence', name: 'reviewer-independence-mechanical-judging', run: reviewerIndependenceScenario },
+    { group: 'reviewer-independence', name: 'missing-reviewer-session-id-fail-closed', run: missingReviewerSessionIdScenario },
+    // #72：job.acceptance 随 candidate 前进失效，GATE-acceptance 校验取证 commit。
+    { group: 'stale-base-evidence', name: 'acceptance-invalidation-on-candidate-advance', run: acceptanceInvalidationScenario },
+    // #76：human open 证据清单不得静默为空；CLI 未知/重复参数 fail closed。
+    { group: 'recovery', name: 'human-open-required-evidence-fail-closed', run: humanOpenEvidenceScenario },
+    // #78：attemptNew 释放旧租约、绑定新 slot 实时 HEAD；reconcile 检出残留双租约。
+    { group: 'recovery', name: 'attempt-reassign-lease-and-base', run: attemptReassignScenario },
   ];
   const p2p3Ids = cases.filter((testCase) => testCase.id).map((testCase) => testCase.id).sort();
   assert.deepEqual(
