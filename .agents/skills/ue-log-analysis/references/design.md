@@ -36,6 +36,13 @@ UE 打包版/编辑器运行日志（`Saved/Logs/*.log`、`-ABSLOG` 产物）没
 | AC-6 | `summary` 一键运行全部子命令产出 markdown 体检报告；各子命令均支持 `--json` | script |
 | AC-7 | 退出码：参数/文件错误 exit 2；正常分析（含"未发现问题"）exit 0 | script |
 | AC-8 | fixtures 回归：stall（帧 0 卡死+噪声刷屏）、run-freeze（出帧→骤降→空窗→心跳终止）、crash（Fatal 崩溃结尾）三类形态特征均被对应子命令捕获 | script |
+| AC-9 | `env` 提取环境指纹：命令行两级回退（LogInit → CSV 元数据，RHI 早死日志唯一来源是后者）+ 参数/开关解析 + CSV 元数据字段 | script |
+| AC-10 | `inventory` 目录清单：头尾窗口采样扛万级文件；崩溃重试循环聚类（等大小+固定间隔+同终态）抽样死因；非循环文件单列终态/参数 | script |
+| AC-11 | frames 挣扎段：密接对（≤2s，无回绕歧义）测得 0<fps≤5 持续 ≥5s 且紧邻冻结 = 前兆；稀疏心跳不参与（宁漏勿误） | script |
+| AC-12 | `diff` A/B 对比：判活分岔识别冻结侧，其独有错误挂 deathCandidate；共享模式降级为非致死候选；相同日志独有为空 | script |
+| AC-13 | `validate-patterns`：真实 patterns/ 全绿 exit 0；坏 fixture（缺字段/name≠文件名/时序倒置/recurrence 计数不符）检出违规 exit 1 | script |
+| AC-14 | `errors --kb`：签名精确匹配与 match 正则双路命中标注（md 加模式列、json 加 pattern 字段、未命中给入库提示）；不传 --kb 输出不变 | script |
+| AC-15 | log.Timestamp 非日期形态：SinceStart/Timecode 行可解析（判活与冻结段正常）；None 档零前缀给出明确提示而非误判从未出帧 | script |
 | AC-9 | 多日志同因判定（method.md 分层规则）：错误谱一致仅为候选不作同因结论；存在出帧存活份时以其为反例排除共同病灶为致死根因；致死候选=仅卡死份独有模式；报告分"共享缺陷/致死机制"两档结论，修复优先级跟致死机制走 | method |
 | AC-10 | 报告时间线节必须包含 gaps 空窗表（起止时间戳+时长+空窗前最后 3 行）：脚本已算出的空窗不进报告等于没算（iteration-2 实证三臂无一采纳 gaps 输出） | method |
 

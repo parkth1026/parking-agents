@@ -1,0 +1,7 @@
+Log file open, 08/26/26 14:13:01
+LogCsvProfiler: Display: Metadata set : commandline="" -RenderOffScreen -GraphicsAdapter=2 -ABSLOG=D:/WDP/dev/Log/14-13-00.log""
+[2026.08.26-14.13.02:000][  0]LogInit: Display: Starting Game.
+[2026.08.26-15.00.00:000][812]LogPixelStreaming51CloudSSOverGRPC: -> SS: KeepAlive
+Data: 1787727147
+[2026.08.26-15.01.00:000][812]LogPixelStreaming51CloudSSOverGRPC: OnMessage: <- SS: pong
+Data: 

@@ -1,0 +1,4 @@
+Log file open, 08/26/26 14:13:01
+[2026.08.26-14.13.01:100][  0]LogInit: Command Line:  -RenderOffScreen -UNATTENDED ResX=200 -GraphicsAdapter=2 -Mode=1 -ABSLOG=D:\WDP\dev\Log\a.log
+[2026.08.26-14.13.01:101][  0]LogInit: Display: Starting Game.
+[2026.08.26-14.13.02:000][  1]LogTemp: first frame

@@ -1,0 +1,5 @@
+Log file open, 08/26/26 14:13:01
+LogCsvProfiler: Display: Metadata set : commandline="" -RenderOffScreen -GraphicsAdapter=3 -ABSLOG=D:/WDP/dev/Log/14-13-00_2.log""
+[2026.08.26-14.13.02:000][  0]LogInit: Display: Starting Game.
+[2026.08.26-14.20.00:000][300]LogWorld: BeginTearingDown
+[2026.08.26-14.20.01:000][301]LogExit: Exiting
