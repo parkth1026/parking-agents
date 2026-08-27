@@ -125,10 +125,12 @@ aes-merge-worker 的 review 给出 MUST_FIX 时，打回以
 分错类的代价是具体的：把环境问题记成 `must-fix`，两次编码错误就吃掉了修实现的机会。
 闭集之外的取值会被 registry 拒收（`UNCLASSIFIED_STAGE_FAILURE`）。
 
-查预算：
+预算没有独立的查询命令，也不要为看余额去跑 `stage`——那是写操作，会多烧一轮
+预算。每次 `stage` 登记的响应会回带 `budgetUsage`，以此对账；只读总览
+（job 状态 / mergeQueue / 人工态数量）用：
 
 ```bash
-node .agents/skills/aes-worktree-board/scripts/master.mjs stage qa --job <jobId> --payload-file <file>
+node .agents/skills/aes-worktree-board/scripts/master.mjs status
 ```
 
 ## 输出：一个 typed 终局
