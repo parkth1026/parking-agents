@@ -94,7 +94,7 @@ export function applyWaiver(resolution, waiver) {
 // 顺序固定，便于把「卡在第几关」写进 typed disposition。
 export function evaluateMechanicalGate({
   slotOk, slotReason, commitFresh, commitReason, integrationOk, integrationReason,
-  acceptance = [], review = null, qa = null, candidateCommit = null, baseCommit = null, integrationHead = null,
+  acceptance = [], acceptanceCommit = null, review = null, qa = null, candidateCommit = null, baseCommit = null, integrationHead = null,
 }) {
   const checks = [];
   const push = (id, ok, detail) => checks.push({ id, outcome: ok ? 'PASS' : 'FAIL', detail });
@@ -104,8 +104,19 @@ export function evaluateMechanicalGate({
   push('GATE-integration', Boolean(integrationOk), integrationReason || 'integration branch 处于预期 HEAD');
 
   const unmetAc = acceptance.filter((entry) => entry.outcome !== 'PASS');
-  push('GATE-acceptance', acceptance.length > 0 && !unmetAc.length,
-    acceptance.length ? `${acceptance.length - unmetAc.length}/${acceptance.length} AC PASS` : 'AC 列表为空，拒绝放行');
+  // #72：AC 结论必须绑定当前 candidate，candidate 前进使旧 acceptance 过期 ——
+  // 这一层要有自己的失效语义，不靠 GATE-commit 替它兜底（纵深防御奏效不等于该层没漏）。
+  // acceptance 不是 schema 化的外部报文，而是 masterTerminal 落盘的内部状态，取证
+  // commit 由 Master 自己记录；缺失即 FAIL ——「无从比对」不等于「比对通过」
+  // （gate 是最后防线，不假设上游状态机没被绕过）。口径与 GATE-review/qa 的
+  // commit 绑定一致。
+  const acceptanceFresh = Boolean(candidateCommit && acceptanceCommit === candidateCommit);
+  push('GATE-acceptance', acceptance.length > 0 && !unmetAc.length && acceptanceFresh,
+    !acceptance.length
+      ? 'AC 列表为空，拒绝放行'
+      : !acceptanceFresh
+        ? `acceptance 取证 commit=${acceptanceCommit || 'NOT_BOUND'} candidate=${candidateCommit || 'NOT_RUN'}，过期或未绑定`
+        : `${acceptance.length - unmetAc.length}/${acceptance.length} AC PASS`);
 
   // review/QA 必须绑定 candidate commit；commit 前进使旧证据失效（E5）。
   // truthy 的 commitSha 不够 —— 必须与 candidateCommit 精确相等，否则旧 commit 的
