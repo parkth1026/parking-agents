@@ -183,7 +183,7 @@ export function installSkills({
             rmSync(link);
             symlinkSync(desired, link, "junction");
           }
-          repointed.push(`${name}  ${current}  ->  ${desired}`);
+          repointed.push(`${name}\n    旧: ${current}\n    新: ${desired}`);
         }
       } else {
         // Real copy shadowing a repo skill: move it aside, then junction.
