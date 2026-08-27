@@ -16,6 +16,7 @@ import {
 import { resolveCommand } from './command.mjs';
 import { HEADLESS_CHILD_OPTIONS } from './headless.mjs';
 import { prepareGithubAccess, runGithubJson } from './github-identity.mjs';
+import { parseIssueContract, SECTION_FIELD_NAMES } from './issue-contract.mjs';
 import {
   consumeEvent, CONTROL_STATES, createTask, evaluateStop, heartbeatTask, pendingInbox, putInboxEvent,
   EXECUTOR_FINAL_SCHEMA, nextActions, receiveActionReceipt, recordBlock, runPostMergeVerification, setVerdict, startGoal,
@@ -4394,6 +4395,105 @@ async function orchestrationDomain() {
   };
 }
 
+// #69：sectionBody() 曾用 pattern.exec(body) 只取首个匹配小节，正文里同名小节
+// 重复出现时静默取错（例如首个「## 依赖」是散文说明，真正的依赖列表在后面）。
+// 这里锁定：七个契约小节各自重复都必须 fail closed 判 invalid + DUPLICATE_SECTION，
+// 且无重复的单份契约块解析结果必须与既有行为逐字段一致（不破坏 contract-complete Issue）。
+const CONTRACT_SECTION_HEADINGS = Object.freeze({
+  goal: '目标',
+  workflowRole: 'workflow role',
+  acceptanceCriteria: '验收条件',
+  dependencies: '依赖',
+  risk: '风险',
+  allowedSideEffects: '允许的副作用',
+  humanGates: '人工门',
+});
+
+function singleContractIssueBody() {
+  return [
+    '## 目标',
+    '让 issue-contract 的重复小节可靠地判 invalid。',
+    '',
+    '## workflow role',
+    'implement',
+    '',
+    '## 验收条件',
+    '- **AC-1**（automated）：示例验收条件一。',
+    '- **AC-2**（automated）：示例验收条件二。',
+    '',
+    '## 依赖',
+    '无。',
+    '',
+    '## 风险',
+    'riskProfile: low',
+    '',
+    '## 允许的副作用',
+    '- edit-worktree',
+    '- run-tests',
+    '',
+    '## 人工门',
+    '无。全部 AC 可自动验证。',
+    '',
+  ].join('\n');
+}
+
+// 在指定小节的原有内容之前，插入同名标题的第二份（散文）小节 —— 复现 Issue 描述的
+// 「首个为散文的重复小节」场景，同时不破坏其余小节的合法结构。
+function withDuplicateSection(body, sectionKey) {
+  const heading = CONTRACT_SECTION_HEADINGS[sectionKey];
+  const marker = `## ${heading}\n`;
+  const index = body.indexOf(marker);
+  assert.ok(index >= 0, `测试 fixture 缺少小节: ${heading}`);
+  const duplicateBlock = `${marker}（重复占位内容，验证不会被静默取用）\n\n`;
+  return `${body.slice(0, index)}${duplicateBlock}${body.slice(index)}`;
+}
+
+async function contractDomain() {
+  const validBody = singleContractIssueBody();
+
+  // 回归：无重复的单份契约块必须逐字段解析成功，不能因为本次修复而破坏既有
+  // contract-complete Issue。
+  const baseline = parseIssueContract({ number: 1, body: validBody });
+  assert.equal(baseline.complete, true, '无重复的单份契约块必须仍判 complete');
+  assert.deepEqual(baseline.missing, []);
+  assert.deepEqual(baseline.invalid, []);
+  assert.equal(baseline.contract.goal, '让 issue-contract 的重复小节可靠地判 invalid。');
+  assert.equal(baseline.contract.workflowRole, 'implement');
+  assert.deepEqual(
+    baseline.contract.acceptanceCriteria,
+    [
+      { id: 'AC-1', evidenceClass: 'automated', text: '示例验收条件一。' },
+      { id: 'AC-2', evidenceClass: 'automated', text: '示例验收条件二。' },
+    ],
+  );
+  assert.deepEqual(baseline.contract.dependencies, []);
+  assert.equal(baseline.contract.riskProfile, 'low');
+  assert.deepEqual(baseline.contract.allowedSideEffects, ['edit-worktree', 'run-tests']);
+  assert.deepEqual(baseline.contract.humanGates, [], '人工门只认列表项，散文不构成人工门');
+  assert.equal(baseline.contract.executionPolicy, 'for-agent');
+
+  // AC-1：Issue 描述的具体场景 —— 依赖小节重复，首个为散文。
+  const duplicateDependencies = withDuplicateSection(validBody, 'dependencies');
+  const dependenciesResult = parseIssueContract({ number: 2, body: duplicateDependencies });
+  assert.equal(dependenciesResult.complete, false, '依赖小节重复必须判 invalid，complete=false');
+  assert.ok(
+    dependenciesResult.invalid.some((entry) => entry.field === 'dependencies' && entry.reason === 'DUPLICATE_SECTION'),
+    'dependencies 重复必须带 DUPLICATE_SECTION',
+  );
+
+  // AC-2：七个契约小节各自重复时均判 invalid（逐个单独复现，不叠加）。
+  for (const sectionKey of Object.keys(CONTRACT_SECTION_HEADINGS)) {
+    const expectedField = SECTION_FIELD_NAMES[sectionKey];
+    const duplicated = withDuplicateSection(validBody, sectionKey);
+    const result = parseIssueContract({ number: 3, body: duplicated });
+    assert.equal(result.complete, false, `${sectionKey} 小节重复必须判 invalid`);
+    assert.ok(
+      result.invalid.some((entry) => entry.field === expectedField && entry.reason === 'DUPLICATE_SECTION'),
+      `${sectionKey} 重复必须在 invalid 中带 DUPLICATE_SECTION（实际: ${JSON.stringify(result.invalid)}）`,
+    );
+  }
+}
+
 async function layoutDomain() {
   const required = [
     'SKILL.md', 'board.html', 'board.config.json', 'run-tests.mjs', 'references/design.md',
@@ -4509,6 +4609,7 @@ const domains = {
   'board-ui': boardUiDomain,
   collect: collectDomain,
   'collect-live': collectLiveDomain,
+  contract: contractDomain,
   fixture: fixtureDomain,
   dispatch: dispatchDomain,
   server: serverDomain,

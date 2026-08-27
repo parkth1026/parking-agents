@@ -7,8 +7,8 @@ import { HEADLESS_CHILD_OPTIONS } from './scripts/headless.mjs';
 const skillDir = dirname(fileURLToPath(import.meta.url));
 const selftest = join(skillDir, 'scripts', 'selftest.mjs');
 const domains = [
-  'collect', 'fixture', 'dispatch', 'server', 'repo-root', 'layout', 'windows-hide', 'orchestration', 'identity',
-  'board-ui',
+  'collect', 'contract', 'fixture', 'dispatch', 'server', 'repo-root', 'layout', 'windows-hide', 'orchestration',
+  'identity', 'board-ui',
 ];
 // board-ui 需要 --baseline 参数（AC-006 锁定 700x1000）；其余域无额外参数。
 const domainArgs = { 'board-ui': ['--baseline', '700x1000'] };

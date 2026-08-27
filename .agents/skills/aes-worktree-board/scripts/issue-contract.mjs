@@ -44,6 +44,19 @@ const SECTION_PATTERNS = Object.freeze({
   humanGates: /^##\s*人工门\s*$/m,
 });
 
+// 契约小节字段名与 SECTION_PATTERNS 的 key 并非逐一同名（risk 小节对应 riskProfile
+// 字段）；重复检测报出的 invalid.field 要跟 parseIssueContract 里已有的字段名对齐，
+// 不能引入第二套命名。导出供 selftest 复用同一份映射，避免两处手抄失步。
+export const SECTION_FIELD_NAMES = Object.freeze({
+  goal: 'goal',
+  workflowRole: 'workflowRole',
+  acceptanceCriteria: 'acceptanceCriteria',
+  dependencies: 'dependencies',
+  risk: 'riskProfile',
+  allowedSideEffects: 'allowedSideEffects',
+  humanGates: 'humanGates',
+});
+
 function sectionBody(body, pattern) {
   const match = pattern.exec(body);
   if (!match) return null;
@@ -51,6 +64,24 @@ function sectionBody(body, pattern) {
   const rest = body.slice(start);
   const next = /^##\s+/m.exec(rest);
   return (next ? rest.slice(0, next.index) : rest).trim();
+}
+
+// pattern.exec() 只取第一个匹配 —— 同名小节重复时，第二份（往往才是真正想表达的
+// 契约内容）会被静默丢弃，且完全没有信号提示"取错了"。这里独立统计每个小节标题
+// 出现的次数：一旦 >1，无论内容长什么样，一律 fail closed 判 DUPLICATE_SECTION，
+// 不去猜哪一份才是"真的"。
+function countSectionOccurrences(body, pattern) {
+  const flags = pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`;
+  const global = new RegExp(pattern.source, flags);
+  return [...body.matchAll(global)].length;
+}
+
+function findDuplicateSections(body) {
+  const duplicates = [];
+  for (const [key, pattern] of Object.entries(SECTION_PATTERNS)) {
+    if (countSectionOccurrences(body, pattern) > 1) duplicates.push(SECTION_FIELD_NAMES[key]);
+  }
+  return duplicates;
 }
 
 export function parseIssueBody(body) {
@@ -62,6 +93,7 @@ export function parseIssueBody(body) {
   const riskText = sectionBody(text, SECTION_PATTERNS.risk);
   const effectsText = sectionBody(text, SECTION_PATTERNS.allowedSideEffects);
   const gatesText = sectionBody(text, SECTION_PATTERNS.humanGates);
+  const duplicateSections = findDuplicateSections(text);
 
   const contract = {};
   if (goal) contract.goal = goal;
@@ -101,6 +133,7 @@ export function parseIssueBody(body) {
       .map((line) => /^[-*]\s+(.+)$/.exec(line.trim())?.[1]?.trim())
       .filter(Boolean)
     : [];
+  if (duplicateSections.length) contract.duplicateSections = duplicateSections;
   return contract;
 }
 
@@ -113,6 +146,12 @@ export function parseIssueContract(issue) {
     : parseIssueBody(issue?.body);
   const missing = [];
   const invalid = [];
+
+  // 重复小节先于逐字段校验判 invalid：静默取错比"看起来缺字段"更危险，必须
+  // 在结果里留下明确证据（DUPLICATE_SECTION），不能被后面的字段校验掩盖。
+  for (const field of Array.isArray(contract.duplicateSections) ? contract.duplicateSections : []) {
+    invalid.push({ field, reason: 'DUPLICATE_SECTION' });
+  }
 
   const goal = typeof contract.goal === 'string' ? contract.goal.trim() : '';
   if (!goal) missing.push('goal');
