@@ -345,10 +345,11 @@ export function attemptNew(options = {}) {
   });
 }
 
-// candidate commit 前进使旧 review/QA 失效（E5 / 不变清单）。
+// candidate commit 前进使旧 review/QA/acceptance 失效（E5 / 不变清单 / #72）。
 export function recordCandidate(options = {}) {
   const { dir } = ctx(options);
   return updateV4Registry(dir, (registry) => {
+    const job = jobOf(registry, options.jobId);
     const attempt = currentAttempt(registry, options.jobId);
     if (!attempt) throw storeError('NO_CURRENT_ATTEMPT', `job ${options.jobId} 无当前 attempt`, { jobId: options.jobId });
     const previous = attempt.candidateCommit;
@@ -356,6 +357,15 @@ export function recordCandidate(options = {}) {
     if (previous && previous !== options.commitSha) {
       if (attempt.review) invalidated.push({ kind: 'review', commitSha: attempt.review.commitSha });
       if (attempt.qa) invalidated.push({ kind: 'qa', commitSha: attempt.qa.commitSha });
+      // #72：job.acceptance 与 review/qa 同构失效 —— AC 结论是在旧 candidate 上取得的，
+      // candidate 前进后不能继续给新 commit 背书。此前只靠 GATE-commit 拦截过期 terminal
+      // 间接兜住，acceptance 这一层自己没有失效语义；任何使 terminal 与 candidate 重新
+      // 对齐的路径都会让旧 AC 结论直接放行。
+      if (Array.isArray(job.acceptance) && job.acceptance.length) {
+        invalidated.push({ kind: 'acceptance', commitSha: job.acceptanceCommit || null });
+        job.acceptance = null;
+        job.acceptanceCommit = null;
+      }
       attempt.review = null;
       attempt.qa = null;
     }
@@ -538,6 +548,9 @@ export function masterTerminal(options = {}) {
       }
       attempt.state = 'ready-to-merge';
       job.acceptance = payload.acceptance || [];
+      // #72：记录 AC 结论的取证 commit（上方已校验 payload.candidateCommit 与当前
+      // candidate 一致）。GATE-acceptance 据此判断新鲜度，不再依赖 GATE-commit 兜底。
+      job.acceptanceCommit = payload.candidateCommit;
       job.terminal = payload;
       setJobState(registry, job.jobId, 'ready-to-merge', { reason: 'worker READY_TO_MERGE', dir });
       // 串行 merge：进队列，且同一 job 只入队一次（重启后 reconcile 也依赖这个不变量）。
@@ -683,6 +696,7 @@ export function evaluateGate(options = {}) {
     integrationOk: Boolean(integrationHead),
     integrationReason: `integration ${integrationBranch}=${integrationHead || 'UNRESOLVED'}`,
     acceptance: job.acceptance || [],
+    acceptanceCommit: job.acceptanceCommit || null,
     review: attempt?.review || null,
     qa: attempt?.qa || null,
     candidateCommit: attempt?.candidateCommit || null,

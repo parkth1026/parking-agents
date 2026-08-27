@@ -1503,3 +1503,84 @@ export async function missingReviewerSessionIdScenario() {
     fixture.cleanup();
   }
 }
+
+// #72：job.acceptance 不得靠 GATE-commit 兜底 —— candidate 前进时 acceptance 与
+// review/qa 同构失效，且 GATE-acceptance 自己校验取证 commit 等于当前 candidate。
+export async function acceptanceInvalidationScenario() {
+  const fixture = makeFixture('acceptance-stale', { workers: [{ id: 'worker-1' }] });
+  try {
+    writeSlots(fixture);
+    master.masterStart({ ...base(fixture) });
+    const issue = issuePayload({ number: 571 });
+    const job = driveToReadyToMerge(fixture, issue);
+
+    // terminal 落盘时必须记录 acceptance 的取证 commit。
+    let registry = readV4Registry(fixture.v4Dir);
+    assert.equal(registry.jobs[job.jobId].acceptanceCommit, job.candidate, 'terminal 必须记录 acceptance 的取证 commit');
+    assert.equal(master.evaluateGate({ ...base(fixture), jobId: job.jobId }).mechanical.allGreen, true);
+
+    // candidate 前进：review / qa / acceptance 三者一起失效。
+    const second = makeCandidate(fixture, job.slotId, { file: 'acceptance-2.txt' });
+    const advanced = master.recordCandidate({ ...base(fixture), jobId: job.jobId, commitSha: second });
+    assert.deepEqual(advanced.invalidated.map((entry) => entry.kind).sort(), ['acceptance', 'qa', 'review'],
+      'candidate 前进必须同时作废 acceptance（不只 review/qa）');
+    registry = readV4Registry(fixture.v4Dir);
+    assert.equal(registry.jobs[job.jobId].acceptance, null, 'job.acceptance 必须被作废');
+    assert.equal(registry.jobs[job.jobId].acceptanceCommit, null, '取证 commit 必须一并作废');
+
+    // acceptance 失效后 GATE-acceptance 必须自己 FAIL，而不是报 5/5 PASS 让 GATE-commit 兜。
+    const staleGate = master.evaluateGate({ ...base(fixture), jobId: job.jobId });
+    const staleOutcomes = Object.fromEntries(staleGate.mechanical.checks.map((check) => [check.id, check.outcome]));
+    assert.equal(staleOutcomes['GATE-acceptance'], 'FAIL', 'acceptance 失效后 GATE-acceptance 必须自己 FAIL');
+
+    // gate 最后防线：即便上游状态机被绕过（AC 全 PASS 但取证 commit 是旧的），
+    // GATE-acceptance 也必须因 acceptanceCommit != candidateCommit 而 FAIL。
+    const bypass = evaluateMechanicalGate({
+      slotOk: true, commitFresh: true, integrationOk: true,
+      acceptance: [{ id: 'AC-1', outcome: 'PASS' }],
+      acceptanceCommit: job.candidate,
+      review: passingReviewV1(job.jobId, second),
+      qa: passingQaV1(job.jobId, second),
+      candidateCommit: second,
+    });
+    assert.equal(Object.fromEntries(bypass.checks.map((check) => [check.id, check.outcome]))['GATE-acceptance'], 'FAIL',
+      '旧 commit 上取得的 AC 结论不得给新 candidate 放行');
+    assert.equal(decideMerge({ mechanical: bypass, policy: resolveMergePolicy({ declaredRisk: 'low' }) }).decision,
+      'BLOCKED_MECHANICAL');
+
+    // 取证 commit 缺失同样 FAIL ——「无从比对」不等于「比对通过」。
+    const unbound = evaluateMechanicalGate({
+      slotOk: true, commitFresh: true, integrationOk: true,
+      acceptance: [{ id: 'AC-1', outcome: 'PASS' }],
+      acceptanceCommit: null,
+      review: passingReviewV1(job.jobId, second),
+      qa: passingQaV1(job.jobId, second),
+      candidateCommit: second,
+    });
+    assert.equal(Object.fromEntries(unbound.checks.map((check) => [check.id, check.outcome]))['GATE-acceptance'], 'FAIL',
+      'acceptance 取证 commit 缺失不得放行');
+
+    // 正路重新走一遍：新证据 + 新 terminal → acceptance 重新绑定新 commit，gate 全绿。
+    master.recordStageResult({
+      ...base(fixture), jobId: job.jobId, stage: 'review',
+      payload: passingReview(job.jobId, second, job.baseCommit, 'owner-session-1'),
+    });
+    master.recordStageResult({
+      ...base(fixture), jobId: job.jobId, stage: 'qa', payload: passingQa(job.jobId, second, job.baseCommit),
+    });
+    const terminal = master.masterTerminal({
+      ...base(fixture),
+      payload: readyTerminal(
+        { jobId: job.jobId, attemptId: job.attemptId, issue: issue.number, baseCommit: job.baseCommit },
+        second, job.claim.workOrder.issue.contractDigest,
+      ),
+    });
+    assert.equal(terminal.state, 'ready-to-merge');
+    assert.equal(readV4Registry(fixture.v4Dir).jobs[job.jobId].acceptanceCommit, second, '重新取证后绑定新 commit');
+    assert.equal(master.evaluateGate({ ...base(fixture), jobId: job.jobId }).mechanical.allGreen, true,
+      '重新取证后机械门必须全绿');
+  } finally {
+    fixture.cleanup();
+  }
+}
+
