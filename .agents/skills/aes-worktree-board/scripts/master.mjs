@@ -456,7 +456,15 @@ export function masterTerminal(options = {}) {
       if (payload.contractDigest !== job.contractDigest) {
         return { ok: false, code: 'CONTRACT_DIGEST_MISMATCH', jobId: job.jobId, expected: job.contractDigest, actual: payload.contractDigest };
       }
-      attempt.candidateCommit = payload.candidateCommit;
+      // terminal 不是 candidate 前进通道：commit 前进只能走 recordCandidate（那里才有
+      // 证据失效语义）。直接放行不一致的 candidateCommit 等于让旧 review/QA 给新 commit 背书。
+      if (!payload.candidateCommit || payload.candidateCommit !== attempt.candidateCommit) {
+        return {
+          ok: false, code: 'CANDIDATE_MISMATCH', jobId: job.jobId,
+          expected: attempt.candidateCommit || null, actual: payload.candidateCommit || null,
+          requiredAction: 'RECORD_CANDIDATE_FIRST', pending: true,
+        };
+      }
       attempt.state = 'ready-to-merge';
       job.acceptance = payload.acceptance || [];
       job.terminal = payload;
@@ -606,6 +614,7 @@ export function evaluateGate(options = {}) {
     acceptance: job.acceptance || [],
     review: attempt?.review || null,
     qa: attempt?.qa || null,
+    candidateCommit: attempt?.candidateCommit || null,
   });
 
   const decision = decideMerge({ mechanical, policy, humanApproval: job.humanGateApproval || null });
