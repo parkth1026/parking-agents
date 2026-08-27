@@ -528,6 +528,10 @@ function ambiguousLayoutFixture(label) {
     // basename 完全同名：精确匹配自身就是多义（exact.length > 1）。
     dupA: join(root, 'fixture-main-worker', 'left', 'fixture-dup'),
     dupB: join(root, 'fixture-main-alt', 'right', 'fixture-dup'),
+    // #73: canonical 短名（devN）撞出两个候选——orchestrate 的 canonicalWorktreeId 会把
+    // 两个 basename 都折成 dev7，该多义此前也被降级成 UNKNOWN_WORKTREE。
+    'fixture-dev7': join(root, 'fixture-main-worker', 'fixture-dev7'),
+    'team-dev7': join(root, 'fixture-main-alt', 'team-dev7'),
   };
   mkdirSync(main, { recursive: true });
   gitSync(main, ['init', '-b', 'main']);
@@ -2707,6 +2711,69 @@ async function orchestrationPreflightLeaseAndState() {
   }
 }
 
+// #73: orchestrate 的 resolveExistingWorktree 曾只查 target 空不空，把 resolveWorktreeTarget
+// 判出的 AMBIGUOUS_WORKTREE 降级成 UNKNOWN_WORKTREE——「太模糊请写全」被说成「不认识请查拼写」，
+// 与 dispatch/server 对同一多义事实给出相反指引。此处钉住 orchestrate CLI 级语义：
+// 多义必须透传 AMBIGUOUS_WORKTREE 并逐条列候选；真正不存在的名字仍是 UNKNOWN_WORKTREE。
+async function orchestrationAmbiguousWorktreeNotDowngraded() {
+  const fixture = ambiguousLayoutFixture('orchestrate-ambiguous');
+  const runtimeDir = join(fixture.root, 'runtime-orchestrate');
+  try {
+    const env = { AES_WORKTREE_BOARD_REPO_ROOT: fixture.main };
+    const taskCreate = (worktree, thread) => orchestrateSync([
+      'task', 'create', '--issue', '18', '--worktree', worktree, '--role', 'executor',
+      '--thread-id', thread, '--model', 'sol-high', '--routing-reason', '#73 ambiguity fixture',
+    ], runtimeDir, env);
+
+    // 三段多义一次盖住：basename 后缀多义（w1）、basename 完全同名（fixture-dup）、
+    // canonical devN 短名撞出两个候选（dev7——走 resolveWorktreeTarget 之前的 canonical 匹配，
+    // 该分支此前同样落进 UNKNOWN_WORKTREE）。
+    for (const [name, expected] of [
+      ['w1', ['fixture-w1', 'team-w1']],
+      ['fixture-dup', ['fixture-dup', 'fixture-dup']],
+      ['dev7', ['fixture-dev7', 'team-dev7']],
+    ]) {
+      const rejected = taskCreate(name, `T-ambiguous-${name}`);
+      assert.equal(rejected.status, 2, `多义 worktree "${name}" 必须以控制错误拒绝: ${rejected.stdout}`);
+      const body = parseJsonLine(rejected.stderr);
+      assert.equal(
+        body.code,
+        'AMBIGUOUS_WORKTREE',
+        `多义必须报 AMBIGUOUS_WORKTREE 而不是 ${body.code}: ${body.message}`,
+      );
+      assert.match(body.message, /请用完整 basename/, '多义报错必须给出可行的下一步');
+      // 候选逐条列出（与 dispatch 同一口径）：同名两条不得折叠；顺序不保证，只比集合。
+      const listed = body.message.match(/同时匹配 (.+)，请用完整 basename/)?.[1];
+      assert.ok(listed, `多义报错缺少候选集合: ${body.message}`);
+      assert.deepEqual(listed.split(', ').sort(), expected.slice().sort(),
+        `候选集合必须逐条列出: ${body.message}`);
+      assert.deepEqual((body.matches || []).slice().sort(), expected.slice().sort(),
+        'details.matches 必须携带候选 basename');
+    }
+
+    // 零候选仍是 UNKNOWN_WORKTREE：两种语义不得互相吞并。
+    const unknown = taskCreate('w9', 'T-ambiguous-unknown');
+    assert.equal(unknown.status, 2);
+    assert.equal(
+      parseJsonLine(unknown.stderr).code,
+      'UNKNOWN_WORKTREE',
+      '不存在的名字必须仍报 UNKNOWN_WORKTREE',
+    );
+
+    // 完整 basename 在多义候选仍在时必须照常受理（精确匹配压过后缀多义）。
+    const accepted = taskCreate('fixture-w1', 'T-ambiguous-exact');
+    assert.equal(accepted.status, 0, `完整 basename 必须唯一命中: ${accepted.stderr}`);
+    assert.equal(parseJsonLine(accepted.stdout).task.worktree, 'fixture-w1');
+    assert.equal(
+      Object.keys(readRegistry(runtimeDir).tasks).length,
+      1,
+      '多义与未知拒绝都不得落 registry 记录',
+    );
+  } finally {
+    await fixture.cleanup();
+  }
+}
+
 function advanceToReview(taskId, runtimeDir, prefix = 'commit') {
   const task = readRegistry(runtimeDir).tasks[taskId];
   assert.ok(['dispatching', 'executing', 'fixing'].includes(task.state));
@@ -4219,6 +4286,8 @@ async function orchestrationDomain() {
     { id: 'P2.3-09', group: 'storage', name: 'lock-competition', run: orchestrationLockCompetition },
     { id: 'P2.3-10', group: 'storage', name: 'merge-behind-refresh', run: orchestrationMergeBehindRefresh },
     { group: 'lifecycle', name: 'preflight-lease-state', run: orchestrationPreflightLeaseAndState },
+    // #73：多义 worktree 不得降级成 UNKNOWN_WORKTREE，三入口同一语义。
+    { group: 'lifecycle', name: 'ambiguous-worktree-not-downgraded', run: orchestrationAmbiguousWorktreeNotDowngraded },
     { id: 'P2.3-01', group: 'lifecycle', name: 'inbox-idempotency', run: orchestrationInboxIdempotency },
     { id: 'P2.3-02', group: 'lifecycle', name: 'five-task-polls-not-lost', run: orchestrationFiveTaskFanIn },
     { id: 'P2.3-03', group: 'governance', name: 'circuit-late-event', run: orchestrationCircuitAndLateEvent },
