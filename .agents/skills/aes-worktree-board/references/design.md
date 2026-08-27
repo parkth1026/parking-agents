@@ -48,6 +48,26 @@ merge 前先落 `mergeIntent`，重启后 reconcile 用 `git merge-base --is-anc
 所以串行 merge 的实际成本不是排队等待，而是**队列越长，重新证明的次数越多**。这也是
 为什么 hermetic 档的速度不是舒适度问题：它直接决定串行队列能有多长。
 
+### aes-merge-worker：验收方雇佣审查者（2026-08-27 定稿，#83）
+
+worker 闭环重梳（rounds 1–9）把 code-review 从 aes-issue-worker 内移出，归给挂在
+总管之下的专职合并验收 lane `aes-merge-worker`（待建）。取舍：
+
+- **provenance**：review 在 worker 内自派自报时，registry 只验 schema 与 commit
+  绑定、不验 receipt 是谁产的——被审者雇佣审查者，机械上拦不住编造的 PASS。移到
+  merge-worker 后 receipt 由验收方上报，洞被结构性堵死（W-2 同款问题的 review 轴修复）。
+- **schema 零改动的连锁收益**：分档依据（declaredRisk + `resolveMergePolicy` 的
+  effectiveRisk 路径兜底）本来就在 merge gate 侧，work-order 不需要携带 risk 字段。
+- **打回协议** `aes.issue-worker.review-return/v1`：`verdict` 闭集仅 `MUST_FIX`
+  （PASS 不打回）；`findings[].axis` 闭集 `standards|spec`；`commitSha` 必须等于
+  被审 candidate；同一打回单据以新 commit 闭合。reviewLoops 记账权在 merge-worker。
+- **回归不变量**：打回修复产生新 commit，旧 QaReceipt 因 `STALE_EVIDENCE` 作废，
+  必须重走 aes-qa（循环轮收敛 + 最终轮绑新 SHA）——否则打回修复成为全流程唯一
+  未经验证的代码路径。
+- **残留**：merge-worker 载体形态（独立 session 占 host worktree vs 总管兼任）待
+  实现时依宿主能力裁定；merge 后全量回归进入串行临界区，队列吞吐由套件时长决定
+  （见上文「证据失效有两层」）。
+
 ### 竖屏工作台：生成而不是手抄，隔离靠 Shadow DOM
 
 AC-006 要求以确认版 `mock.html` 为真源。手抄的副本会随时间漂移且无人察觉，所以竖屏
@@ -150,3 +170,4 @@ merge gate，Task create 从 fresh Issue labels 自动推导该 interaction clas
 | 2026-08-26 | 目标 A 无人值守控制面：runner/job/attempt 分层模型、Master 重启 reconcile、humanRequest 统一人工态载荷、riskProfile 四档 merge gate、DISCOVERED_WORK 四类回流、5 条历史 trajectory replay、700×1000 竖屏工作台（shadow root + 由 mock 机械生成）与零依赖 CDP 截图 diff。 | 5 个新 orchestration scenario + `board-ui --baseline 700x1000`（逐像素 0 差异）+ 十域 `run-tests.mjs`；AC-007(b) desktop 非回归与本机 worktree 只读校验各留 receipt。 | v3 runtime 只读封存，不推导 job/attempt；v4 走独立 registry。竖屏层与桌面星图靠 shadow DOM 完全隔离，桌面代码零改动。 |
 | 2026-08-26 | AC-007 真实宿主门暴露并修掉三类离线门结构上看不到的缺陷：真源 SHA 绑定工作区字节、生成器锚点吃不掉 CRLF、receipt 写进版本控制目录导致 slot 自我隔离。 | 在真实第二份检出（CRLF worktree）上跑通十域回归；`live-gate.mjs` 三个子命令留证。 | 前两类只在多检出下存在，后一类只在复用真实 slot 时才走到 —— 离线 fixture 每次用全新临时仓，三者都碰不到。这是 live 门不可替代的具体理由。 |
 | 2026-08-27 | 封闭 v4 机械门证据绑定旁路：terminal READY_TO_MERGE 不再是 candidate 前进通道（不一致报文拒收 `CANDIDATE_MISMATCH`，commit 前进只能走 `recordCandidate` 的失效语义）；`GATE-review`/`GATE-qa` 从「commitSha truthy」收紧为「与 candidateCommit 精确相等」，`candidateCommit` 缺失也不放行。 | `evidenceBindingBypass` 双层负向回归（terminal 拒收不推进状态/不入队；gate 纯函数收旧证据+新 candidate 必须 `BLOCKED_MECHANICAL`）+ 红测确认断言真实拦截 + 十域回归。 | 这是让实现符合既有不变量（AC-18 三方 commit 相等 / E5 证据失效），不改契约本身；gate 作为最后防线不信任上游状态机，不新增职责。 |
+| 2026-08-27 | Issue #83 worker 闭环重梳落 prose：hub-and-spoke 三 lane 角色分工（总管不亲自合并）、aes-merge-worker 角色与 review-return/v1 打回协议写入 SKILL 与本文档、aes-issue-worker 闭环重写（aes-qa 循环轮/最终轮/回归单一验证角色、simplify 条件触发、单次 candidate commit）、人参与 lane 定为 for-human 模式角色位。 | 契约 5 条 AC：三条锚点断言翻绿 + `npm test` 与 orchestration 域回归卫保绿 + 十域完整跑；语义逐行对照三份锁定对照物由人工验收。 | 纯 prose、零 .mjs/schema 改动；merge-worker 实现与人参与 lane 实现均另票；aes-gate 联动归 map #47。 |

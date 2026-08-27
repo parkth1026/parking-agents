@@ -5,7 +5,7 @@ description: 在主仓巡检并编排同级既有 worktree：采集全仓 Issue 
 
 # AES Worktree Board
 
-把主仓对话作为 Orchestrator，把 Desktop Task 作为正常执行单元，把看板作为同一份事实的可视入口。宿主工具负责 `create_thread`、`wait_threads` 与合并动作；脚本不模拟宿主工具，只把每次宿主动作登记为可恢复、幂等、可审计的控制面事实。
+把主仓对话作为 Orchestrator，把 Desktop Task 作为正常执行单元，把看板作为同一份事实的可视入口。宿主工具负责 `create_thread`、`wait_threads` 与合并动作；脚本不模拟宿主工具，只把每次宿主动作登记为可恢复、幂等、可审计的控制面事实。（此为 v3 lane 语义；v4 角色分化后，merge 权归 aes-merge-worker lane，见「v4 无人值守控制面」。）
 
 脚本只负责 collect/record/lock/validate/render；脚本不负责自主调度、任务选择或替代宿主的 Desktop Task 生命周期。
 
@@ -80,7 +80,7 @@ collect 只写 schemaVersion 3，承接既有 assessment、终态和全局停止
 
 collect 的 `graph.issues[].labels` 必须保留 GitHub/fixture 输入的 labels（包括 `ready-for-agent`）；live 查询与完整离线 fixture 使用同一字段，快照回退也承接已有 labels，不能用空数组覆盖真实标签。
 
-`recommend`/`MERGE_READY` 需要 code/spec 门禁通过、交付条件闭环、Git 可合并和证据诚实。autonomous 类 Issue 可在 `runtime=NOT_RUN` 时进入 MERGE_READY；明确要求真机的 Issue 不可。合并是宿主主 agent 的受门禁动作：合并前重新核对 registry 与 Git，合并后登记 `merged` 和 merge commit，并在 main 复验。
+`recommend`/`MERGE_READY` 需要 code/spec 门禁通过、交付条件闭环、Git 可合并和证据诚实。autonomous 类 Issue 可在 `runtime=NOT_RUN` 时进入 MERGE_READY；明确要求真机的 Issue 不可。合并是宿主主 agent 的受门禁动作（v3 lane 语义；v4 下 merge 权归 aes-merge-worker，见「v4 无人值守控制面」）：合并前重新核对 registry 与 Git，合并后登记 `merged` 和 merge commit，并在 main 复验。
 
 ## Desktop create_thread 正常路径
 
@@ -367,6 +367,34 @@ node "$skillDir/scripts/master.mjs" release --job <jobId> --slot <slotId>
 旧 commit 的证据不能给新 commit 背书；QA 含 `NOT_RUN` 或 `unexecuted` 非空一律判失败。
 commit 前进只能走 `candidate` 命令（那里作废旧证据）；terminal 报文里的
 `candidateCommit` 与 registry 不一致时拒收（`CANDIDATE_MISMATCH`），不推进状态。
+
+### aes-merge-worker（合并验收 worker，待建）
+
+v4 的角色分工是 **hub-and-spoke**：总管只管 claim / 派单 / slot / queue / 打回与
+人工态路由，**不亲自执行合并**；合并验收是挂在总管之下的专职 worker lane
+（`aes-merge-worker`），与 aes-issue-worker 平级、零直连——一切交接经 registry。
+
+merge-worker 消化 mergeQueue 的完整职责：
+
+1. 从 queue 领取 ready-to-merge 的 job；
+2. 派独立 `code-review` subagent（Standards+Spec 双轴；深度按 `resolveMergePolicy`
+   的 **effectiveRisk** 分档——含路径兜底，比工单自报档更准），review receipt 由
+   merge-worker 侧 `stage review` 上报——**被审的 worker 无法自报 review PASS**；
+3. review PASS → gate 六项 → 串行 merge → **merge 后全量回归**（commands file 跑
+   全量套件，非 targeted）→ 幂等 close → release slot；
+4. review MUST_FIX → 以 `aes.issue-worker.review-return/v1` 经总管打回原 owner
+   session（原 thread 优先、新 attempt 兜底）：报文含 `jobId`/`attemptId`/
+   `commitSha`（必须等于被审 candidate）、`findings[]`（`axis` 闭集
+   `standards|spec`）、`budget.reviewLoops`。同一打回单据以新 commit 闭合，不重复
+   消费；worker 修复后必须重走 aes-qa 回归再重新 READY；
+5. **reviewLoops 由 merge-worker 记账**（每次打回递增）；耗尽后回
+   `REVIEW_BUDGET_EXHAUSTED`，由总管决策（`NEW_ATTEMPT_FRONTIER_MODEL` /
+   `AWAITING_HUMAN`）。普通 finding（非 must-fix）merge-worker 侧自行记录，
+   不打回、不烦扰 worker。
+
+本节先锁协议，实现另票（载体形态——独立 session 占 host worktree 还是总管兼任——
+依宿主能力定）。机械上 merge-worker 与总管调用同一套 `master.mjs` CLI 操作同一
+registry，零 schema 改动。
 
 ### 中断恢复
 

@@ -1,0 +1,222 @@
+<!-- 确认版·锁定 | 用户确认 2026-08-27（round 9：1.确认 2.aes-merge-worker 3.确定） -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>aes-issue-worker 流程重梳 — 架构与流程视图</title>
+<style>
+  :root {
+    --paper:#f5f5f5; --ink:#2d3142; --muted:#4f5d75; --soft:#7a8399;
+    --accent:#eb6c36; --accent-tint:#fdf1ec;
+    --font-ui: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+    --font-mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  }
+  body { margin:0; background:var(--paper); color:var(--ink); font-family:var(--font-ui); padding:24px; }
+  .wrap { max-width:940px; margin:0 auto; }
+  h1 { font-size:20px; margin:0 0 4px; }
+  .lede { font-size:12px; color:var(--soft); margin:0 0 20px; }
+  .lede b { color:var(--accent); font-weight:600; }
+  h2 { font-size:16px; margin:28px 0 8px; }
+  svg { display:block; width:100%; height:auto; background:#fff; border:1px solid #e0e0e0; border-radius:8px; }
+  .ledger { font-family:var(--font-mono); font-size:11px; color:var(--soft); line-height:1.7;
+            border-top:1px solid #ddd; margin-top:12px; padding-top:8px; }
+  .ledger b { color:var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>aes-issue-worker 流程重梳</h1>
+  <p class="lede">图例：<b>橙 = 本次新增/变更</b>，灰 = 既有（不动）。改后态单视图。拓扑总则（round 8）：<b>hub-and-spoke</b>——三类 worker lane 全部挂总管，lane 之间零直连，一切交接经 registry。</p>
+
+  <h2>架构视图 — 角色拓扑（改后态，hub-and-spoke）</h2>
+  <svg viewBox="0 0 880 400" role="img" aria-labelledby="dg1-title dg1-desc">
+    <title id="dg1-title">角色拓扑 v6，改后态</title>
+    <desc id="dg1-desc">aes-worktree-board 总管居中路由：向 aes-issue-worker 派 work-order，向待建的人参与 lane 派 for-human 单，把 merge queue 交给待建的 aes-merge-worker；worker 的 READY terminal 回到总管。issue-worker 组合 tdd/diagnosing-bugs、aes-qa、simplify；人参与 lane 共用 aes-qa；merge-worker 派生 code-review。</desc>
+    <defs>
+      <marker id="dg1-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4f5d75"/></marker>
+    </defs>
+
+    <!-- 连线（z 序在节点下） -->
+    <!-- 总管 → issue-worker（派单） -->
+    <path d="M 388,96 V 120 Q 388,128 380,128 H 160 Q 152,128 152,136 V 156" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#dg1-a)"/>
+    <rect x="196" y="136" width="104" height="12" fill="#f5f5f5"/>
+    <text x="248" y="145" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75">work-order/v1 派单</text>
+    <!-- 总管 → human lane -->
+    <path d="M 440,96 V 156" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#dg1-a)"/>
+    <rect x="448" y="118" width="128" height="12" fill="#f5f5f5"/>
+    <text x="512" y="127" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75">for-human · resumeToken</text>
+    <!-- 总管 → integrator（merge queue） -->
+    <path d="M 492,96 V 120 Q 492,128 500,128 H 720 Q 728,128 728,136 V 156" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#dg1-a)"/>
+    <rect x="592" y="136" width="96" height="12" fill="#f5f5f5"/>
+    <text x="640" y="145" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75">merge queue 领取</text>
+    <!-- issue-worker → 总管（READY terminal，上行） -->
+    <path d="M 216,160 V 148 Q 216,140 224,140 H 412 Q 420,140 420,132 V 100" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#dg1-a)"/>
+    <rect x="248" y="146" width="88" height="12" fill="#f5f5f5"/>
+    <text x="292" y="155" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75">READY terminal</text>
+
+    <!-- issue-worker → 组合技能 -->
+    <path d="M 104,224 V 312" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#dg1-a)"/>
+    <path d="M 200,224 V 260 Q 200,268 208,268 H 328 Q 336,268 336,276 V 312" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#dg1-a)"/>
+    <path d="M 216,224 V 244 Q 216,252 224,252 H 408 a 8,8 0 0 1 16,0 H 520 Q 528,252 528,260 V 312" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#dg1-a)"/>
+    <!-- human lane → aes-qa（共用） -->
+    <path d="M 416,224 V 288 Q 416,296 408,296 H 376 Q 368,296 368,304 V 312" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#dg1-a)"/>
+    <!-- integrator → code-review -->
+    <path d="M 752,224 V 312" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#dg1-a)"/>
+
+    <!-- 总管节点 -->
+    <g>
+      <rect x="340" y="32" width="200" height="64" rx="6" fill="#fff" stroke="#4f5d75" stroke-width="1.25"/>
+      <rect x="348" y="40" width="36" height="12" rx="2" fill="#eef1f6"/>
+      <text x="366" y="49" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75">总管</text>
+      <text x="440" y="68" text-anchor="middle" font-size="12" font-weight="600" fill="#2d3142">aes-worktree-board</text>
+      <text x="440" y="86" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#4f5d75">registry · queue · 打回与人工态路由</text>
+    </g>
+
+    <!-- 三条 lane -->
+    <g>
+      <rect x="64" y="160" width="176" height="64" rx="6" fill="#fff" stroke="#4f5d75" stroke-width="1.25"/>
+      <text x="152" y="186" text-anchor="middle" font-size="12" font-weight="600" fill="#2d3142">aes-issue-worker</text>
+      <text x="152" y="204" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#4f5d75">干活 workflow · owner session</text>
+    </g>
+    <g class="changed">
+      <rect x="352" y="160" width="176" height="64" rx="6" fill="#fdf1ec" stroke="#eb6c36" stroke-width="2"/>
+      <rect x="360" y="166" width="32" height="12" rx="2" fill="#f7dfd3"/>
+      <text x="376" y="175" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#eb6c36">待建</text>
+      <text x="440" y="192" text-anchor="middle" font-size="12" font-weight="600" fill="#2d3142">人参与 worker</text>
+      <text x="440" y="210" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#eb6c36">for-human 模式（已裁）· humanRequest 暂停</text>
+    </g>
+    <g class="changed">
+      <rect x="640" y="160" width="176" height="64" rx="6" fill="#fdf1ec" stroke="#eb6c36" stroke-width="2"/>
+      <rect x="648" y="166" width="32" height="12" rx="2" fill="#f7dfd3"/>
+      <text x="664" y="175" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#eb6c36">待建</text>
+      <text x="728" y="192" text-anchor="middle" font-size="12" font-weight="600" fill="#2d3142">aes-merge-worker</text>
+      <text x="728" y="210" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#eb6c36">review→merge→全量回归</text>
+    </g>
+
+    <!-- 技能行 -->
+    <g>
+      <rect x="32" y="316" width="144" height="56" rx="6" fill="#fff" stroke="#4f5d75" stroke-width="1.25"/>
+      <text x="104" y="338" text-anchor="middle" font-size="11" font-weight="600" fill="#2d3142">tdd · diagnosing-bugs</text>
+      <text x="104" y="356" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#4f5d75">按 workflowRole 路由</text>
+    </g>
+    <g>
+      <rect x="280" y="316" width="144" height="56" rx="6" fill="#fff" stroke="#4f5d75" stroke-width="1.25"/>
+      <text x="352" y="338" text-anchor="middle" font-size="12" font-weight="600" fill="#2d3142">aes-qa</text>
+      <text x="352" y="356" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#4f5d75">两 lane 共用 · 单一角色</text>
+    </g>
+    <g>
+      <rect x="464" y="316" width="128" height="56" rx="6" fill="#fff" stroke="#4f5d75" stroke-width="1.25"/>
+      <text x="528" y="338" text-anchor="middle" font-size="12" font-weight="600" fill="#2d3142">simplify</text>
+      <text x="528" y="356" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#4f5d75">本次新增 · 条件触发</text>
+    </g>
+    <g>
+      <rect x="688" y="316" width="128" height="56" rx="6" fill="#fff" stroke="#4f5d75" stroke-width="1.25"/>
+      <text x="752" y="338" text-anchor="middle" font-size="12" font-weight="600" fill="#2d3142">code-review</text>
+      <text x="752" y="356" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#4f5d75">merge-worker 派生 · 分档</text>
+    </g>
+  </svg>
+  <div class="ledger">
+    <b>Fidelity ledger（架构视图）</b><br>
+    Detail: balanced · 源 = 9 类源对象（总管、三条 lane、5 个技能角色）→ 绘制 8 节点 / 9 边<br>
+    Merged: tdd / diagnosing-bugs（codebase-design 辅助）并为一节点——同为实现方法论、按 workflowRole 二选一<br>
+    Collapsed: work-order/v1 数据节点收进「派单」边标签（零改动，Q1 撤销）；aes-qa 的四种调用形态（循环轮/最终轮/回归/humanChecklist）收进 sub 行；merge-worker 打回经总管的路由边不画——与 READY 上行边同走 registry，见流程视图打回标注<br>
+    Dropped: registry 内部（inbox/receipts/transitions）、gate 六项内部、goal-terminal 其余出口——board map #5 管辖<br>
+    Kept in full: 总管对三条 lane 的全部派发/回收边——hub-and-spoke 是本次修正核心，一条不减<br>
+    删除清单: worker→integrator 直连边（round 8 修正：READY 经 registry）；worker→code-review 旧组合边（round 5）
+  </div>
+
+  <h2>流程视图 — 双泳道闭环（改后态，behavior.md v7 变化行的视图）</h2>
+  <svg viewBox="0 0 880 320" role="img" aria-labelledby="dg2-title dg2-desc">
+    <title id="dg2-title">worker 与 integrator 双泳道流程 v7，改后态</title>
+    <desc id="dg2-desc">worker 泳道：preflight 后 tdd/diagnosing 与 aes-qa 循环轮往复，通过后 simplify、唯一 commit、aes-qa 最终轮出 typed receipt、READY terminal 进总管 queue。merge-worker 泳道：从 queue 领取后派 code-review，PASS 进入 gate、merge 与全量回归管线，MUST_FIX 经总管打回。</desc>
+    <defs>
+      <marker id="dg2-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4f5d75"/></marker>
+      <marker id="dg2-ac" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#eb6c36"/></marker>
+    </defs>
+
+    <text x="16" y="28" font-family="ui-monospace,Consolas,monospace" font-size="10" fill="#7a8399" letter-spacing="1">AES-ISSUE-WORKER · OWNER SESSION（含只读 subagent）</text>
+    <text x="16" y="232" font-family="ui-monospace,Consolas,monospace" font-size="10" fill="#7a8399" letter-spacing="1">AES-MERGE-WORKER · 合并验收 WORKER（待建）· 与 worker 的一切交接经总管 registry</text>
+
+    <path d="M 116,72 H 132" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#dg2-a)"/>
+    <path d="M 236,72 H 252" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#dg2-a)"/>
+    <path d="M 356,72 H 372" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#dg2-a)"/>
+    <path d="M 476,72 H 492" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#dg2-a)"/>
+    <path d="M 596,72 H 612" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#dg2-a)"/>
+    <path d="M 716,72 H 732" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#dg2-a)"/>
+    <path d="M 296,104 V 144 Q 296,152 288,152 H 198 Q 190,152 190,144 V 108" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#dg2-a)"/>
+    <rect x="200" y="156" width="88" height="12" fill="#fff"/>
+    <text x="244" y="165" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75">循环轮 FAIL 回修</text>
+    <path d="M 656,104 V 168 Q 656,176 648,176 H 182 Q 174,176 174,168 V 108" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#dg2-a)"/>
+    <rect x="360" y="180" width="112" height="12" fill="#fff"/>
+    <text x="416" y="189" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75">最终轮 FAIL · 烧 qaLoops</text>
+    <path d="M 786,104 V 200 Q 786,208 778,208 H 674 Q 666,208 666,216 V 236" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#dg2-a)"/>
+    <rect x="652" y="202" width="148" height="12" fill="#fff"/>
+    <text x="726" y="211" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75">READY terminal → 总管 queue → 领取</text>
+    <path d="M 716,272 H 752" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#dg2-a)"/>
+    <path d="M 616,288 H 164 Q 156,288 156,280 V 108" fill="none" stroke="#eb6c36" stroke-width="1.75" marker-end="url(#dg2-ac)"/>
+    <rect x="252" y="292" width="276" height="12" fill="#fff"/>
+    <text x="390" y="301" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#eb6c36">MUST_FIX 经总管打回 · 修复后重走 aes-qa 回归 · merge-worker 烧 reviewLoops</text>
+
+    <g>
+      <rect x="16" y="40" width="100" height="64" rx="6" fill="#fff" stroke="#4f5d75" stroke-width="1.25"/>
+      <text x="66" y="68" text-anchor="middle" font-size="12" font-weight="600" fill="#2d3142">preflight</text>
+      <text x="66" y="84" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#4f5d75">3 项硬检查</text>
+    </g>
+    <g>
+      <rect x="136" y="40" width="100" height="64" rx="6" fill="#fff" stroke="#4f5d75" stroke-width="1.25"/>
+      <text x="186" y="62" text-anchor="middle" font-size="11" font-weight="600" fill="#2d3142">tdd / diagnosing</text>
+      <text x="186" y="80" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#4f5d75">按 workflowRole</text>
+      <text x="186" y="94" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#4f5d75">路由</text>
+    </g>
+    <g>
+      <rect x="256" y="40" width="100" height="64" rx="6" fill="#fff" stroke="#4f5d75" stroke-width="1.25"/>
+      <text x="306" y="62" text-anchor="middle" font-size="11" font-weight="600" fill="#2d3142">aes-qa 循环轮</text>
+      <text x="306" y="80" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#4f5d75">行 1·自动档</text>
+      <text x="306" y="94" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#4f5d75">只出 finding</text>
+    </g>
+    <g>
+      <rect x="376" y="40" width="100" height="64" rx="6" fill="#fff" stroke="#4f5d75" stroke-width="1.25"/>
+      <text x="426" y="68" text-anchor="middle" font-size="12" font-weight="600" fill="#2d3142">simplify</text>
+      <text x="426" y="84" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#4f5d75">行 2·条件触发</text>
+    </g>
+    <g>
+      <rect x="496" y="40" width="100" height="64" rx="6" fill="#fff" stroke="#4f5d75" stroke-width="1.25"/>
+      <text x="546" y="68" text-anchor="middle" font-size="12" font-weight="600" fill="#2d3142">commit</text>
+      <text x="546" y="84" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#4f5d75">行 3·全程唯一</text>
+    </g>
+    <g>
+      <rect x="616" y="40" width="100" height="64" rx="6" fill="#fff" stroke="#4f5d75" stroke-width="1.25"/>
+      <text x="666" y="62" text-anchor="middle" font-size="11" font-weight="600" fill="#2d3142">aes-qa 最终轮</text>
+      <text x="666" y="80" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#4f5d75">行 4·绑 SHA</text>
+      <text x="666" y="94" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#4f5d75">出 typed receipt</text>
+    </g>
+    <g>
+      <rect x="736" y="40" width="100" height="64" rx="6" fill="#fff" stroke="#4f5d75" stroke-width="1.25"/>
+      <text x="786" y="68" text-anchor="middle" font-size="12" font-weight="600" fill="#2d3142">READY</text>
+      <text x="786" y="84" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#4f5d75">行 5·terminal 进 registry</text>
+    </g>
+
+    <g class="changed">
+      <rect x="616" y="240" width="100" height="64" rx="6" fill="#fdf1ec" stroke="#eb6c36" stroke-width="2"/>
+      <text x="666" y="262" text-anchor="middle" font-size="12" font-weight="600" fill="#2d3142">code-review</text>
+      <text x="666" y="280" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#eb6c36">行 6·merge-worker 派生</text>
+      <text x="666" y="294" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#eb6c36">effectiveRisk 分档</text>
+    </g>
+    <g>
+      <rect x="756" y="240" width="108" height="64" rx="6" fill="#fff" stroke="#4f5d75" stroke-width="1.25"/>
+      <text x="810" y="262" text-anchor="middle" font-size="12" font-weight="600" fill="#2d3142">交付管线</text>
+      <text x="810" y="280" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#4f5d75">行 8·gate→merge</text>
+      <text x="810" y="294" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#4f5d75">→全量回归→close</text>
+    </g>
+  </svg>
+  <div class="ledger">
+    <b>Fidelity ledger（流程视图）</b><br>
+    Detail: balanced · 源 = behavior.md v7 的 9 条变化行 + 既有交付管线 → 9 节点 / 11 边 · 2 泳道<br>
+    Merged: gate / merge / 全量回归 / close 并为「交付管线」——机械层复用既有 v4 管线<br>
+    Collapsed: 总管路由（terminal 入 registry、queue 派发、打回传递）收进两条跨泳道边的标签——泳道预算（≤3）让给执行两侧；行 9 的人参与 lane 见架构视图，其内部流程与 worker 泳道同骨架，不重复绘制<br>
+    Dropped: goal-terminal 其余五出口、人工态细节、DISCOVERED_WORK<br>
+    Kept in full: 指向实现的三条失败回边（循环轮 FAIL / 最终轮 FAIL / review 打回）——预算归属不同（不烧 / qaLoops / reviewLoops·integrator 记账），不可合并
+  </div>
+</div>
+</body>
+</html>

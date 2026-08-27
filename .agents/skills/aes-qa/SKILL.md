@@ -1,12 +1,28 @@
 ---
 name: aes-qa
-description: 为一个绑定精确 commit 的 candidate 选择 QA 档位并产出 typed QaReceipt：按影响面决定自动/live/人工，如实记录未执行项与人工债务，绝不把 NOT_RUN 说成 PASS。当 aes-issue-worker 需要在 review 通过后验证改动，或需要为一次交付产出可审计的 QA 证据时使用。
+description: worker 闭环内唯一的验证角色，三种调用形态：循环轮逐轮验证实现（只出 finding）、最终轮为唯一 candidate commit 出具绑定 SHA 的 typed QaReceipt（按影响面决定自动/live/人工）、打回修复后回归重验。如实记录未执行项与人工债务，绝不把 NOT_RUN 说成 PASS。当 aes-issue-worker 在实现循环中逐轮验证、commit 后出具最终 receipt，或需要为一次交付产出可审计的 QA 证据时使用。
 ---
 
 # AES QA
 
 给一个 candidate commit 出具**可审计**的验证结论。本技能的价值不在于「跑测试」，
 而在于**如实**：哪些验证真的跑了、哪些没跑、哪些只有人能做。
+
+## 三种调用形态
+
+aes-qa 是 worker 闭环里**唯一的验证角色**，三种调用是同一技能的不同形态：
+
+| 形态 | 何时 | 输出 | SHA 绑定 |
+| --- | --- | --- | --- |
+| 循环轮 | 实现每轮产出后（工作树上） | 只出 finding，不出 receipt、不进 registry | 无 |
+| 最终轮 | 唯一 candidate commit 登记后 | typed QaReceipt（本文档定义的结构） | 绑 commit SHA |
+| 回归 | aes-merge-worker 打回、修复产生新 commit 后 | 重走循环轮收敛 + 最终轮出新 receipt | 绑新 SHA |
+
+循环轮以 fresh-context 只读 subagent 运行，输入只有 AC + worktree 路径 + 命令，
+不带实现者叙述——独立性来自上下文隔离。最终轮重跑自动档（覆盖 simplify 改动）
+并按影响面补 live/manual 档；它与循环轮的唯一区别是输出格式与 SHA 绑定。
+回归不是新机制：新 commit 使旧 receipt 因 `STALE_EVIDENCE` 作废，重走即可——
+不存在拿旧绿顶新码的合法路径。
 
 ## 唯一硬约束
 

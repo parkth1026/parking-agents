@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "slug": "2026-08-27-aes-issue-worker-流程重梳",
+  "created_at": "2026-08-27T04:00:28Z",
+  "updated_at": "2026-08-27T06:23:12Z",
+  "original_request": "我们用这个严格流程 重新梳理这次 aes-issue-worker 内容，同时你要开 issue 来登记一下。（上游讨论：wayfinder 路由/QA 前置于 review/simplify 进循环/ready for merge 相当于提 PR/master 处理合并/Goal 驱动 vs 双 session）",
+  "goal_oneline": "把五个流程裁定（路由契约锁定、review→QA 顺序、simplify 条件触发进 implement 尾部、review 按 risk 分档深度、单 session 模型）落成 aes-issue-worker SKILL.md 修订 + work-order 带 declaredRisk 的 additive schema 扩展",
+  "target": null,
+  "stage": "3-contract",
+  "next_action": "契约 v3（冷读探针修订）锁定，交接就绪",
+  "stage_gates": {
+    "1-interview": {
+      "status": "done",
+      "closed_at": "2026-08-27T04:15:06Z",
+      "self_assessment": {
+        "意图": "已定",
+        "结果": "已定",
+        "边界": "已定",
+        "约束": "已定",
+        "现状": "已定"
+      }
+    },
+    "2-prototype": {
+      "status": "done",
+      "closed_at": "2026-08-27T05:40:19Z",
+      "artifacts_confirmed": [
+        "behavior",
+        "api-mock",
+        "diagram"
+      ]
+    },
+    "3-contract": {
+      "status": "done",
+      "closed_at": "2026-08-27T06:23:12Z"
+    }
+  },
+  "validation": {
+    "status": "valid",
+    "ac_count": 5,
+    "warnings": [],
+    "ran_at": "2026-08-27T06:20:32Z",
+    "verify_tiers": {
+      "A": 4,
+      "B": 0,
+      "C": 0,
+      "D": 1
+    }
+  },
+  "blocked": [],
+  "residual_risk": null,
+  "status": "ready"
+}

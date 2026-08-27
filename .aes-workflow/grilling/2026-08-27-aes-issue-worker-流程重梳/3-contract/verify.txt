@@ -1,0 +1,12 @@
+# verify @ 2026-08-27T06:20:32Z
+# cwd: G:\GIT\AI_WorkFlow\parking-agents-manual
+
+[FAIL] AC-001  exit=1  $ node -e "const s=require('fs').readFileSync('.agents/skills/aes-issue-worker/SKILL.md','utf8');process.exit(s.includes('循环轮')&&s.includes('最终轮')&&s.includes('aes-merge-worker')&&!s.includes('在本 session 内修')&&!s.includes('实现 → 只读 review')?0:1)"
+[FAIL] AC-002  exit=1  $ node -e "const s=require('fs').readFileSync('.agents/skills/aes-qa/SKILL.md','utf8');process.exit(s.includes('循环轮')&&s.includes('最终轮')&&!s.includes('review 通过后')?0:1)"
+[FAIL] AC-003  exit=1  $ node -e "const f=require('fs');const a=f.readFileSync('.agents/skills/aes-worktree-board/SKILL.md','utf8');const b=f.readFileSync('.agents/skills/aes-worktree-board/references/design.md','utf8');process.exit(a.includes('aes-merge-worker')&&a.includes('review-return')&&b.includes('aes-merge-worker')?0:1)"
+[PASS] AC-005  exit=0  $ npm test && node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration
+         warning: name clash — shared: C:\Users\parking\AppData\Local\Temp\install-skills-test-54bZ02\select-release\productivity\shared skipped, first source wins
+         ERROR: 未知技能: missing-skill
+
+绿 1 / 红 3 / 跑不起来 0
+另有 1 条非 [A] 档没跑：AC-004 [D]
