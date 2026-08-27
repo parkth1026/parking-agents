@@ -80,7 +80,12 @@ if (!existsSync(skillPath) || !statSync(skillPath).isDirectory()) {
 
 // 打包前强制校验（违规目录拒绝打包）
 console.log("校验技能…");
-const { valid, errors } = validateSkill(skillPath);
+const { valid, errors, undecidable } = validateSkill(skillPath);
+if (undecidable && undecidable.length > 0) {
+  console.error(`拒绝打包：${skillPath} 的 frontmatter 含解析器支持子集外的构造，校验无法判定`);
+  for (const u of undecidable) console.error(`  - ${u.key}: ${u.construct} → ${u.detail}`);
+  process.exit(1);
+}
 if (!valid) {
   console.log("校验未通过，拒绝打包:");
   for (const e of errors) console.log(`  - ${e}`);

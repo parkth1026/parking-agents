@@ -37,7 +37,7 @@ function titleCase(name) {
 
 const SKILL_TEMPLATE = (name) => `---
 name: ${name}
-description: [TODO: 写清楚这个技能做什么、何时触发。包含具体场景、文件类型或任务类型——所有"何时使用"的信息都放这里，正文在触发后才加载。]
+description: "[TODO: 写清楚这个技能做什么、何时触发。包含具体场景、文件类型或任务类型——所有「何时使用」的信息都放这里，正文在触发后才加载。]"
 ---
 
 # ${titleCase(name)}

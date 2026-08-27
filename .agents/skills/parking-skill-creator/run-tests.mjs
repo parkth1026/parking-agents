@@ -54,8 +54,14 @@ check("parking-skill-creator 自身 description 保持中文优先", creatorDesc
 // ---- 无嵌套 Agent·headless 触发探针 fallback ----
 console.log("headless 触发探针 fallback：");
 const fallbackDoc = readFileSync(join(CREATOR_DIR, "references", "headless-trigger-fallback.md"), "utf8");
-check("SKILL.md 把无嵌套 Agent 路由到 fallback 或主会话", creatorDoc.includes("references/headless-trigger-fallback.md")
+// 触发评测全流程已下沉到 references/trigger-eval.md（issue #57）。路由契约拆两层校验：
+// SKILL.md 保证「这条降级路径可被发现」，trigger-eval.md 保证「细则完整」。
+const triggerEvalDoc = readFileSync(join(CREATOR_DIR, "references", "trigger-eval.md"), "utf8");
+check("SKILL.md 指针提到无嵌套 Agent 的降级路径", creatorDoc.includes("references/headless-trigger-fallback.md")
   && creatorDoc.includes("交回主会话直跑"));
+check("trigger-eval.md 把无嵌套 Agent 路由到 fallback 或主会话",
+  triggerEvalDoc.includes("references/headless-trigger-fallback.md")
+  && triggerEvalDoc.includes("交回主会话直跑"));
 check("fallback 文档固化三禁、单轮与扫描边界", [
   "不得读取、备份、修改或恢复 `~/.zcode/cli/config.json`",
   "凭据只进进程环境",
@@ -429,6 +435,175 @@ try {
   rmSync(root4, { recursive: true, force: true });
 }
 
+// ---- frontmatter 支持子集边界（issue #54：与宿主 YAML 语义对齐 / 越界失败关闭） ----
+console.log("frontmatter·支持子集与失败关闭：");
+const root54 = mkdtempSync(join(tmpdir(), "fm54-"));
+try {
+  const BS = String.fromCharCode(92);
+  const Q = String.fromCharCode(34);
+  const SQ = String.fromCharCode(39);
+  const mk = (name, fmBody) => {
+    const d = join(root54, name);
+    mkdirSync(d, { recursive: true });
+    writeFileSync(join(d, "SKILL.md"), "---" + "\n" + fmBody + "\n---\n\nbody\n");
+    return d;
+  };
+
+  // 修复类：解析结果必须与宿主一致，判定不能相反
+  const longPlain = mk("long-plain",
+    "name: probe-skill\ndescription: " + "A".repeat(600) + "\n  " + "B".repeat(600));
+  const rLong = runFile("quick-validate.mjs", [longPlain]);
+  check("多行 plain 标量：折叠后按 1201 判超长(旧实现读 600 假 PASS)",
+    rLong.code === 1 && out(rLong).includes("1201"));
+
+  const escQ = mk("esc-quote",
+    "name: probe-skill\ndescription: " + Q + "say " + BS + Q + "hi" + BS + Q + " now" + Q);
+  const rEsc = runFile("quick-validate.mjs", [escQ]);
+  check("双引号转义：解出真引号，长度 12 与宿主一致",
+    rEsc.code === 0 && out(rEsc).includes("12/1024"));
+
+  const uEsc = mk("u-escape",
+    "name: probe-skill\ndescription: " + Q + "tag " + BS + "u003ca" + BS + "u003e end" + Q);
+  const rU = runFile("quick-validate.mjs", [uEsc]);
+  check("\u003c 转义：解出真尖括号并被尖括号规则拦下(旧实现可绕过)",
+    rU.code === 1 && out(rU).includes("尖括号"));
+
+  const cmt = mk("trailing-comment", "name: probe-skill # 这是注释\ndescription: hello world # note");
+  const rCmt = runFile("quick-validate.mjs", [cmt]);
+  check("行尾注释：剥离后 name 不被误判非 kebab-case(旧实现假 FAIL)",
+    rCmt.code === 0 && out(rCmt).includes("11/1024"));
+
+  // 失败关闭类：不猜，退出码 3
+  const flowDesc = mk("flow-desc", "name: probe-skill\ndescription: [a, b, c]");
+  const rFlow = runFile("quick-validate.mjs", [flowDesc]);
+  check("description 是 flow 集合 → 无法判定退出 3",
+    rFlow.code === 3 && out(rFlow).includes("UNDECIDABLE"));
+
+  const crossQ = mk("cross-quote",
+    "name: probe-skill\ndescription: " + Q + "line1\n  line2" + Q);
+  check("跨行引号标量 → 无法判定退出 3", runFile("quick-validate.mjs", [crossQ]).code === 3);
+
+  const sqEsc = mk("sq-escape",
+    "name: probe-skill\ndescription: " + SQ + "it" + SQ + SQ + "s fine" + SQ);
+  check("单引号双写转义 → 无法判定退出 3", runFile("quick-validate.mjs", [sqEsc]).code === 3);
+
+  const keepChomp = mk("keep-chomp", "name: probe-skill\ndescription: |+\n  line1\n  line2");
+  check("块标量 keep chomping(+) → 无法判定退出 3", runFile("quick-validate.mjs", [keepChomp]).code === 3);
+
+  // 越界落在不被校验的键上时不得阻塞（野外 3 处命中全在这类键）
+  const flowTools = mk("flow-tools",
+    "name: probe-skill\ndescription: a normal description\nallowed-tools: [Read, Glob, Grep]");
+  check("allowed-tools 是 flow 集合 → 不阻塞判定(仍 PASS)",
+    runFile("quick-validate.mjs", [flowTools]).code === 0);
+
+  // 打包门禁必须同样守住「无法判定」
+  writeFileSync(join(flowDesc, "run-tests.mjs"), "process.exit(0);\n");
+  const rPkg = runFile("package-skill.mjs", [flowDesc, join(root54, "dist")]);
+  check("无法判定的技能拒绝打包且不产出包",
+    rPkg.code === 1 && !exists(join(root54, "dist", "flow-desc.skill")));
+} finally {
+  rmSync(root54, { recursive: true, force: true });
+}
+
+// ---- frontmatter 键分诊（issue #63：未知键降警告，拼错的已知键仍判错） ----
+console.log("frontmatter·键分诊：");
+const root63 = mkdtempSync(join(tmpdir(), "keys63-"));
+try {
+  const mkKey = (name, extraLine) => {
+    const d = join(root63, name);
+    mkdirSync(d, { recursive: true });
+    writeFileSync(join(d, "SKILL.md"),
+      "---\nname: probe-skill\ndescription: a valid description here\n" + extraLine + "\n---\n\nbody\n");
+    return d;
+  };
+
+  const rTypo = runFile("quick-validate.mjs", [mkKey("typo-desc", "descrption: 拼错")]);
+  check("拼错的已知键判 FAIL 并给出建议",
+    rTypo.code === 1 && out(rTypo).includes("疑似拼错") && out(rTypo).includes("description"));
+
+  const rTypo2 = runFile("quick-validate.mjs", [mkKey("typo-tools", "allowed_tool: Read")]);
+  check("下划线+缺字母的 allowed_tool 判 FAIL", rTypo2.code === 1 && out(rTypo2).includes("疑似拼错"));
+
+  // 宿主对部分键接受 kebab/snake/camel 三种写法，归一后不得误判成拼写错
+  const rSnake = runFile("quick-validate.mjs", [mkKey("snake-ok", "display_name: Demo")]);
+  check("已知键的 snake_case 变体 PASS 且不报拼写错",
+    rSnake.code === 0 && !out(rSnake).includes("疑似拼错"));
+  const rCamel = runFile("quick-validate.mjs", [mkKey("camel-ok", "defaultEnabled: true")]);
+  check("已知键的 camelCase 变体 PASS", rCamel.code === 0);
+
+  // changelog 求证过的宿主键必须在已知集内（否则每次宿主加键都要改 psc）
+  for (const k of ["disable-model-invocation: true", "argument-hint: [x]", "user-invocable: false", "effort: high"]) {
+    const key = k.split(":")[0];
+    const r = runFile("quick-validate.mjs", [mkKey("known-" + key, k)]);
+    check(`已知宿主键 ${key} 不再被拒`, r.code === 0 && !out(r).includes("未知键"));
+  }
+
+  // 宿主新增而 changelog 无 skill 侧记载的键：只警告，不挡退出码
+  const rNew = runFile("quick-validate.mjs", [mkKey("host-new", "version: 1.2.0")]);
+  check("未知键只警告不挡退出码", rNew.code === 0 && out(rNew).includes("未知键"));
+} finally {
+  rmSync(root63, { recursive: true, force: true });
+}
+
+// ---- 全仓复扫防腐化（issue #63：单技能 fixture 看不见门禁腐化） ----
+// 门禁规则腐化只有在真实语料上才暴露——本条正是这么发现的（曾拒掉 58 个技能里的 24 个）。
+// 本仓之外的宿主没有这个目录结构，此时跳过而不是失败，保持技能可移植。
+console.log("全仓复扫·门禁腐化：");
+{
+  const SKILL_DIR_63 = dirname(SCRIPTS);
+  const { pathToFileURL } = await import("node:url");
+  const repoRoot = join(SKILL_DIR_63, "..", "..", "..");
+  // 注意：本文件的 exists() 用 readFileSync 实现，对目录会抛 EISDIR，不能用来判目录。
+  const isDir63 = (p) => { try { return statSync(p).isDirectory(); } catch { return false; } };
+  const roots = ["skills", join(".agents", "skills")]
+    .map((r) => join(repoRoot, r))
+    .filter(isDir63);
+  if (roots.length === 0) {
+    check("全仓复扫：非本仓布局，按设计跳过", true);
+  } else {
+    const { validateSkill } = await import(pathToFileURL(join(SKILL_DIR_63, "scripts", "quick-validate.mjs")).href);
+    const dirs = [];
+    const walk = (d) => {
+      for (const e of readdirSync(d, { withFileTypes: true })) {
+        if (!e.isDirectory()) continue;
+        const p = join(d, e.name);
+        if (exists(join(p, "SKILL.md"))) dirs.push(p);
+        else walk(p);
+      }
+    };
+    for (const r of roots) walk(r);
+    const bad = [];
+    for (const d of dirs) {
+      const r = validateSkill(d);
+      if (r.undecidable && r.undecidable.length) bad.push(`${d} → 无法判定`);
+      else if (!r.valid) bad.push(`${d} → ${r.errors[0]}`);
+    }
+    check(`全仓 ${dirs.length} 个技能全部过门禁${bad.length ? "：" + bad.slice(0, 3).join(" / ") : ""}`,
+      dirs.length > 0 && bad.length === 0);
+  }
+}
+
+// ---- 孤儿资源检测（issue #56：comparator.md 曾在参考清单里挂了 202 行却无调用路径） ----
+// 病根是「文件存在、被索引、但正文没有任何一处说何时用它」。文件存在性测不出这一点，
+// 但「SKILL.md 里根本没提到它」是可测的，也是孤儿的第一道征兆。
+console.log("孤儿资源检测：");
+{
+  const SKILL_DIR_56 = dirname(SCRIPTS);
+  const skillMd = readFileSync(join(SKILL_DIR_56, "SKILL.md"), "utf8");
+  const orphans = [];
+  for (const sub of ["agents", "references"]) {
+    const dir = join(SKILL_DIR_56, sub);
+    let entries = [];
+    try { entries = readdirSync(dir, { withFileTypes: true }); } catch { continue; }
+    for (const e of entries) {
+      if (!e.isFile()) continue;
+      if (!skillMd.includes(`${sub}/${e.name}`)) orphans.push(`${sub}/${e.name}`);
+    }
+  }
+  check(`agents/ 与 references/ 下无孤儿资源${orphans.length ? "：" + orphans.join(", ") : ""}`,
+    orphans.length === 0);
+}
+
 // ---- 打包·设计文档与成绩随包分发（2026-08-17 设计自包含升级） ----
 console.log("打包·设计与成绩随包：");
 const root5 = mkdtempSync(join(tmpdir(), "pkgtest-"));
@@ -800,11 +975,54 @@ try {
     { query_id: "unknown", first_line: "SKILL: trigger-demo", description: "新描述" },
     [],
   ].map((row) => JSON.stringify(row)).join("\n") + "\nnot-json\n", "utf8");
-  const good = runFile("aggregate-trigger.mjs", [root9]);
+  // 本用例考的是选优逻辑，题库刻意小（test=2）；下限另有专门用例，这里显式放宽。
+  const good = runFile("aggregate-trigger.mjs", [root9, "--min-test-queries", "2"]);
   const triggerBenchmark = JSON.parse(readFileSync(join(root9, "trigger-benchmark.json"), "utf8"));
   check("触发聚合: 有效探针产出多轮 benchmark", good.code === 0 && triggerBenchmark.rounds.length === 2
     && triggerBenchmark.valid_probes === 8 && triggerBenchmark.invalid_probes === 4);
   check("触发聚合: best_description 只从有效轮选择", triggerBenchmark.best_description === "新描述");
+
+  // 样本下限（issue #55）：test 证据不足时不宣告 best_description，而不是硬选一个。
+  const floored = runFile("aggregate-trigger.mjs", [root9, "--output", join(root9, "floored.json")]);
+  const flooredJson = JSON.parse(readFileSync(join(root9, "floored.json"), "utf8"));
+  check("样本下限: 默认下限下小题库不宣告 best_description",
+    floored.code === 0 && flooredJson.best_description === null);
+  check("样本下限: 未宣告时给出可读原因并记录下限值",
+    typeof flooredJson.best_description_reason === "string"
+      && flooredJson.best_description_reason.includes("样本不足")
+      && flooredJson.min_test_queries === 6);
+  check("样本下限: 终端显式说明未宣告", out(floored).includes("best_description: 未宣告"));
+  check("样本下限: 仍产出其余指标(不是整体失败)",
+    flooredJson.rounds.length === 2 && flooredJson.valid_probes > 0);
+  check("样本下限: test 计入有效 query 数而非切分声明条数",
+    flooredJson.rounds.every((r) => typeof r.test.evaluated === "number" && r.test.evaluated <= r.test.queries));
+  const badFloor = runFile("aggregate-trigger.mjs", [root9, "--min-test-queries", "0"]);
+  check("样本下限: 非法下限按用法错退出 2", badFloor.code === 2);
+  const nanFloor = runFile("aggregate-trigger.mjs", [root9, "--min-test-queries", "abc"]);
+  check("样本下限: 非整数下限退出 2", nanFloor.code === 2);
+
+  // 反向验证：下限必须不误拦。20 条题库(正10/负10) 在 holdout=0.4 下 test=8 ≥ 6，应正常宣告。
+  const bigWs = join(root9, "big");
+  mkdirSync(bigWs);
+  const bigQueries = [];
+  for (let i = 1; i <= 10; i++) bigQueries.push({ id: `p${i}`, text: `应触发场景 ${i}`, should_trigger: true });
+  for (let i = 1; i <= 10; i++) bigQueries.push({ id: `n${i}`, text: `near-miss 场景 ${i}`, should_trigger: false });
+  writeFileSync(join(bigWs, "trigger-evals.json"),
+    JSON.stringify({ skill: "trigger-demo", queries: bigQueries }), "utf8");
+  const bigRows = [];
+  for (const q of bigQueries) {
+    // 旧描述：应触发的一半漏触发；新描述：全对
+    const oldTrig = q.should_trigger ? Number(q.id.slice(1)) % 2 === 1 : false;
+    bigRows.push({ query_id: q.id, first_line: oldTrig ? "SKILL: trigger-demo" : "SKILL: none", description: "旧描述" });
+    bigRows.push({ query_id: q.id, first_line: q.should_trigger ? "SKILL: trigger-demo" : "SKILL: none", description: "新描述" });
+  }
+  writeFileSync(join(bigWs, "probe-results.jsonl"), bigRows.map((r) => JSON.stringify(r)).join("\n"), "utf8");
+  const bigRun = runFile("aggregate-trigger.mjs", [bigWs]);
+  const bigJson = JSON.parse(readFileSync(join(bigWs, "trigger-benchmark.json"), "utf8"));
+  check("样本下限: 20 条题库(test=8) 正常宣告 best_description",
+    bigRun.code === 0 && bigJson.best_description === "新描述" && bigJson.best_description_reason === null);
+  check("样本下限: 足量时 test.evaluated 达到下限",
+    bigJson.rounds.every((r) => r.test.evaluated >= bigJson.min_test_queries));
 
   const bad = join(root9, "all-invalid");
   mkdirSync(bad);

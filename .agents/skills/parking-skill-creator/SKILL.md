@@ -103,16 +103,11 @@ frontmatter 只允许 name/description（必需）+ license/allowed-tools/metada
 
 ### 中文 Prompt 的语言与术语边界
 
-本技能自身以及它生成的 skill 文档，默认使用中文。English 不是“看起来更专业”的装饰，而只用于机器契约或少量真正能减少歧义的核心标签。
+本技能及它生成的 skill 文档默认中文。English 只用于机器契约（skill `name`、CLI flag、schema field、path…），
+以及同时通过四道 gate（`Named concept` / `Execution impact` / `English information gain` / `Stable mapping`）的少量核心术语——
+短 prompt 与 `description` 最多 2 个 English terms，普通文章或长文档最多 5 个。上限不是配额，不足不凑数。
 
-- 保留中文的自然句子、动作、判断和普通领域词。不要逐句 bilingualize。
-- 保留必须精确匹配的 machine contract：skill `name`、CLI flag、enum、schema field、API、identifier、provider name、path、URL、版本号和脚本命令。这些不是翻译对象。
-- 只有同时满足 `Named concept`、`Execution impact`、`English information gain`、`Stable mapping` 四道 gate，才给核心术语加 English。
-- 短 prompt 或短 `description` 默认最多 2 个 English terms；普通文章或长文档最多 5 个。上限不是配额，不足不要凑数。
-- 优先翻译 semantic nucleus，而不是整句或所有修饰语。例如“钢人分析（steelman）”“分歧核心（crux）”可以保留中文上下文；“问题想清楚”“当前想法”“关键变量”“理由”“下一步行动”通常保持中文。
-- 术语候选不等于行业标准。无法确认时标成 `context-dependent` 或 `unverified`，不要用英文替换制造确定感。
-
-详细规则和示例见 `references/writing-guide.md` 的「中文 Prompt 的术语克制」节；创建或改写中文 skill 时先按该节审一遍。
+完整规则、四道 gate 的判据与正反例见 `references/writing-guide.md` 的「中文 Prompt 的术语克制」节；创建或改写中文 skill 前先按该节审一遍。
 
 ## 第 5 步：quick-validate
 
@@ -120,7 +115,13 @@ frontmatter 只允许 name/description（必需）+ license/allowed-tools/metada
 node scripts/quick-validate.mjs <技能目录>
 ```
 
-官方规则集：name kebab-case ≤64；description ≤1024 且无尖括号；键白名单；compatibility ≤500。合法 → `PASS`（退出码 0）；违规逐条列规则名（退出码 1）；参数缺失出用法（退出码 2）。CRLF 与 LF 同判定。PASS 但缺 `run-tests.mjs` 或 `references/design.md` 时给警告、SKILL.md 仍含待办占位时给提示（都不挡退出码——存量老技能照常工作，升级时补上；新技能必须齐）。修完再跑直到 PASS。PASS 后跑 `node <技能目录>/run-tests.mjs`，自带测试全过才算过本步（主观无测试的技能除外）；此后每次升级改动，先跑它做回归。
+四个退出码：`0` PASS / `1` 违规（逐条列规则名）/ `2` 用法错 / `3` `UNDECIDABLE`——frontmatter 用了解析器支持子集外的构造，
+**既不判 PASS 也不判 FAIL**，因为读不到宿主会读到的值，猜一个比没有门禁更危险。
+规则集是 name kebab-case ≤64、description ≤1024 且无尖括号、compatibility ≤500，加上未知键的拼写分诊。
+
+支持子集的边界、键分诊的阈值与全仓复扫回归见 `references/gate-rules.md`——改校验器或想知道某个写法为什么被拦时读它。
+
+PASS 但缺 `run-tests.mjs` 或 `references/design.md` 时给警告、SKILL.md 仍含待办占位时给提示（都不挡退出码——存量老技能照常工作，升级时补上；新技能必须齐）。修完再跑直到 PASS。PASS 后跑 `node <技能目录>/run-tests.mjs`，自带测试全过才算过本步（主观无测试的技能除外）；此后每次升级改动，先跑它做回归。
 
 ## 第 6 步：输出评测循环
 
@@ -249,80 +250,13 @@ node eval-viewer/generate-review.mjs <workspace>/iteration-<N> [--history <技�
 
 ---
 
-## 触发评测：优化 description 的触发准确率
+## 触发评测（独立入口）
 
-description 决定技能会不会被调用。技能做完（或触发不准）时主动提议跑触发评测。**首选机制：同宿主 subagent 探针**——生产环境用哪个 agent 跑就用哪个 agent 测，同宿主同模型。
+description 是技能的主触发机制。技能做完后主动提议跑一轮；用户说「触发不准 / 和别的技能抢」时直接进这里。
 
-起跑前先确认**当前编排会话**能否 spawn 探针。若没有嵌套 Agent 工具，读取 `references/headless-trigger-fallback.md`：仅在主会话已把同宿主、同模型凭据预置到进程环境时，用安全 launcher 单轮运行 `zcode --prompt`；严禁读写共享 CLI 配置、key 落盘或编排器自答，运行后删除私有 Temp 并扫描凭据前缀。缺少任一宿主能力或授权时停止，把整轮触发评测交回主会话直跑。
-
-### 建评测集
-
-约 20 条 query，存 `<技能目录>/trigger-evals.json`（schema 见 `references/schemas.md`）——题库是定稿资产，随 .skill 包分发；定稿后不改：要改就视为新题库、开新一轮全量重跑，且不与 description 改动混进同一提交（跨轮可比性依赖题库固定）：
-
-```json
-{
-  "skill": "log-classifier",
-  "queries": [
-    { "id": "q1", "text": "把 D:/logs/ 下的 Jenkins 失败日志按错误模式归类", "should_trigger": true },
-    { "id": "q5", "text": "帮我把这段报错截图里的英文翻译成中文", "should_trigger": false }
-  ]
-}
-```
-
-- 必须像真用户会说的话：具体、带细节（路径、上下文、口语、缩写、错别字都要有），别写成抽象指令。
-- **应触发**（8-10 条）：同一意图的多种说法，正式与口语混搭；用户没点名技能但明确需要的场景；和相邻技能竞争但本技能该赢的场景。
-- **不应触发**（8-10 条）：最有价值的是 **near-miss**——关键词重叠但意图不同的请求。「写个斐波那契函数」这种明显无关的反例什么也测不出来。
-- 触发机制的现实：agent 只对「自己不容易直接搞定」的复杂多步任务咨询技能；「读一下 X 文件」这类简单请求即使 description 完全匹配也不会触发——评测集要足够有分量。
-
-写好后向用户过一遍再跑。
-
-### 分批并行 spawn 探针
-
-对每条 query spawn 探针 subagent（同宿主、每条默认 3 个探针；宿主支持无工具 agent 类型时探针优先用无工具类型）。探针按**整条 query 分批**：默认每批 3 条 query（=9 个探针同回合并发，对齐官方 run_eval.py worker-pool 默认 10 并发的量级），同 query 的 3 个探针同批发、一批收完再发下一批；并发受限的宿主按比例调小批。批怎么切不影响聚合（聚合按 query 多数表决），但别为凑并发把全部约 20 条 × 3 探针一次推出去。探针 prompt 模板：
-
-```
-你是一个技能路由判断器。你不需要、也不允许实际执行任务、调用任何工具或浏览任何文件——你只做一件事：从下面的技能清单里选出会用到的技能。
-
-用户向你提出以下请求：
-
-<query 原文>
-
-请先决定你会使用哪个技能来处理它。可用技能清单如下（name + description）：
-<逐条列出会话可见的全部技能清单>
-
-回复格式要求（必须严格遵守）：
-第一行输出 `SKILL: <技能name>`——你会读取并使用的技能名；若不需要任何技能则输出 `SKILL: none`。
-第二行起用不超过 15 个字说明理由。
-```
-
-首行的护栏句必保：没有它，任务形状的请求会诱使探针真去执行任务（实测 5~10 倍 token 与耗时）或翻到评测文件。**防泄漏红线**：探针 prompt 不得包含 should_trigger 预期答案、评测意图暗示、「我们在测试 X 技能」等信息；评测集与探针结果就放在 workspace，探针浏览文件即泄漏，护栏句已禁止。探针要知道的只有：请求原文、技能清单、首行协议。
-
-每个探针完成后，**逐条追加**进 `<workspace>/probe-results.jsonl`（原始探针数据，scratch 不入库）：
-
-```jsonl
-{"query_id": "q1", "probe": 1, "first_line": "SKILL: log-classifier", "triggered": true, "reason": "日志归类任务"}
-```
-
-`first_line` 填探针回复的逐字首行——它是聚合器唯一判定源；不匹配 `SKILL: <名>` 协议的行记 invalid，不猜。
-
-### 聚合
-
-```bash
-node scripts/aggregate-trigger.mjs <workspace> --persist <技能目录>
-```
-
-先校验 `skill`、query id/text/should_trigger 和正负两类样本；探针协议不完整、JSONL 坏行、未知 query 或含换行的 `first_line` 都记 invalid，不猜答案。全无有效探针时退出码 1 且不写 `trigger-benchmark.json`，避免把 0 分假报告当成证据。
-
-输出 `trigger-benchmark.json`：train/test 60/40 按 should_trigger 分层切分（官方 run_loop 口径），每 query 3 探针取严格多数，各层触发率/误触发率/invalid 计数；多轮（改写 description 后再跑探针，jsonl 行带 `description` 字段）时按 **test 正确数**选 best_description，防过拟合。结果同时记录 `valid_probes`，每轮记录有效探针数，便于审计证据是否充足。
-
-`--persist <技能目录>` 把题库读取与成绩写出缺省切到技能目录（`trigger-evals.json`/`trigger-benchmark.json` 沉淀进技能根，显式 `--eval-set`/`--output` 仍可覆盖）；技能目录缺题库或目标不是目录时拒绝（退出 1），**绝不静默回退**读 workspace 旧副本——那是跨轮漂移的源头。probe-results.jsonl 始终留 workspace。成绩为原子整写（非追加），跨轮内容史由 git 记录。不带 `--persist` 时与旧行为完全一致，外部技能一次性评测照旧。
-
-### 迭代 description
-
-读聚合结果里的失败案例（漏触发/误触发的 query 与理由），**你在会话内**改写 description（参考 writing-guide 的 description 写法），更新 SKILL.md frontmatter，再跑下一轮探针——全程不外呼任何 CLI。收敛或不再改善时，把 best_description 写进 frontmatter，向用户展示前后对比与各轮分数。
-
----
-
+完整流程读 `references/trigger-eval.md`——同宿主 subagent 探针、约 20 条题库的写法（含 near-miss 取材）、
+分批并发纪律、防泄漏红线、`aggregate-trigger.mjs` 的分层统计与样本下限、description 迭代收敛，
+以及宿主没有嵌套 Agent 工具时的降级路径（`references/headless-trigger-fallback.md`，能力或授权不足就交回主会话直跑）。
 ## 前向测试（复杂技能上线前）
 
 subagent 前向测试是把技能当评测面：验证泛化，不是验证另一个 agent 能否从泄漏上下文重建答案。纪律见 `references/writing-guide.md` 末节：探针不知道自己在测试技能、传原始工件不传结论、每轮重建上下文并清理上轮残留。只有看得见泄漏上下文才通过的前向测试结果不可信。
@@ -351,34 +285,25 @@ node scripts/package-skill.mjs <技能目录> [输出目录]
 
 迭代能力的分布遵循**裁决：能力集中、证据随技能**——评测与迭代管线只在本技能（Creator）维护一份，技能目录不内嵌自迭代流程（防 N 份副本口径漂移、防污染 description 触发面）；技能只携带证据，clone 本仓库即同时拿到 Creator、全部技能与其完整迭代依据。git 记内容史（谁改了什么、何时），指标文件记成绩史（机器可读、viewer 可渲染），两者互补不重复。迭代一个陌生技能时，先按这六条路径把依据读齐再动手。
 
-## 技能环境配置（族级标准）
+## 宿主与仓库约定
 
-需要环境值（路径、凭据）的技能遵守统一约定，随技能分发到任何宿主仓库都成立：
-
-- 解析链：`$SKILL_ENV` > `~/.config/parking-agents/skill-env.json` > 技能内缺省值；解析逻辑一份为准，放 `scripts/lib/` 共享。
-- 真实环境值不进 git；技能目录内 `config.json` 只放占位说明（键名、格式、示例值），不放假真值。
-- 零配置技能（全 CLI 参数 + 目录约定）不接这条链，也无需 `config.json`。
-
-## 本仓库使用提示
-
-（仓库惯例不进 init 模板，建本仓库技能时在此口径下自行接线。）
-
-- **运行时**：本机 Windows + Node v24，Git Bash 终端。技能脚本一律 `.mjs` + kebab-case，放 `scripts/`，共享代码进 `scripts/lib/`；只用 Node 内置模块，零 npm 依赖、零 python 运行时依赖。
-- **测试**：固化在技能根 `run-tests.mjs`——`check()` 计数器 + `execFileSync` 黑盒跑子命令，退出码 0=全过/1=有失败；fixtures 进 `fixtures/`，黄金输入配 expected 输出逐字段比对。测试随技能分发、每次升级必跑；评测沙箱默认在 `<skill-dir>/../../evals/<技能名>-workspace/`（与 `skills/` 平行，workspace 里出现 `SKILL.md` 产物也不会冒充技能）。
-- **配置**：本技能零配置——不读 config 文件、不依赖 skill-env 命名空间，全部经 CLI 参数与目录约定。
-- **git**：本仓库提交信息用中文、面向用户解释「为什么」，关键参数修正与行业知识修改要点名，不写改动流水账。
-- **技能目录**：由宿主配置技能扫描根；本技能内部只使用 `<skill-dir>`、`scripts/`、`references/` 等相对路径，不把宿主扫描根名称写进文档或脚本。
-
+在本仓库建技能、或技能需要读环境值（路径、凭据）时，读 `references/repo-conventions.md`：
+运行时与脚本约定、测试固化口径、评测沙箱位置、git 提交惯例，以及 `$SKILL_ENV` 族级解析链。
+零配置技能和别的宿主仓库都用不到这一节。
 ## 参考文件
 
-- `references/writing-guide.md` — 技能写作方法论（渐进披露、自由度分级、description 写法、防泄漏纪律）
+**按需读**（正文只留指针，读的时机写在指针那一行）：
+
+- `references/trigger-eval.md` — 触发评测全流程（独立入口：技能做完或触发不准时）
+- `references/gate-rules.md` — quick-validate 的支持子集、键分诊阈值与全仓复扫（改校验器或想知道某写法为何被拦时）
+- `references/repo-conventions.md` — 本仓库运行时/测试/git 约定与 `$SKILL_ENV` 解析链（在本仓库建技能、或技能要读环境值时）
+- `references/writing-guide.md` — 技能写作方法论（渐进披露、自由度分级、description 写法、中文术语克制、防泄漏纪律）
 - `references/headless-trigger-fallback.md` — 无嵌套 Agent 工具时的单轮 headless 探针、安全凭据与残留扫描契约
-- `references/schemas.md` — 全部 JSON 契约（eval_metadata 含 ac 字段/grading/timing/benchmark/feedback/history.json/structure-review/触发评测三契约/comparison/analysis）
-- `references/design.md` — 本技能的意图、设计取舍和 AC-1…AC-12 验收依据
+- `references/schemas.md` — 全部 JSON 契约（eval_metadata 含 ac 字段/grading/timing/benchmark/feedback/history.json/structure-review/触发评测三契约）
+- `references/design.md` — 本技能的意图、设计取舍和 AC-1…AC-16 验收依据
 - `agents/openai.yaml` — 技能列表 UI 元数据，字段值不含宿主路径
 - `agents/grader.md` — grader subagent 指令（评分哲学与 grading.json 契约）
-- `agents/comparator.md` — 盲比较指令（A/B 不知情评审）
-- `agents/analyzer.md` — 基准分析指令（找聚合看不见的模式）
+- `agents/analyzer.md` — 基准分析指令（analyst pass：找聚合看不见的模式）
 - `scripts/` — init-skill / snapshot-skill / check-shadow-skills / quick-validate / aggregate-benchmark / aggregate-trigger / package-skill + lib/
 - `eval-viewer/` — generate-review.mjs（服务器与 --static 模式）+ viewer.html
 
