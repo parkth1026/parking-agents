@@ -1584,3 +1584,53 @@ export async function acceptanceInvalidationScenario() {
   }
 }
 
+// #76：human open 的证据清单不得静默为空。近似参数（--required-evidence）与未知参数
+// fail closed；重复 --evidence 累积成数组；requiredEvidence 为空必须显式失败。
+export async function humanOpenEvidenceScenario() {
+  const fixture = makeFixture('human-evidence', { workers: [{ id: 'worker-1' }] });
+  try {
+    writeSlots(fixture);
+    freshProcess(fixture, ['start']);
+    const claim = master.masterClaim({ ...base(fixture), issue: issuePayload({ number: 581 }) });
+    const humanArgs = ['human', 'open', '--job', claim.jobId, '--state', 'awaiting-human',
+      '--kind', 'risk_approval', '--prompt', '需要人工批准合并'];
+
+    // #76 主缺陷复现路径：--required-evidence 曾被静默丢弃且 ok:true。现在必须报错退出。
+    const unknown = freshProcess(fixture, [...humanArgs, '--required-evidence', '机械门六项全绿'], { expectStatus: 'nonzero' });
+    assert.equal(unknown.code, 'UNKNOWN_OPTION', '近似参数必须 fail closed，不得静默丢弃');
+    assert.ok(/--evidence/.test(unknown.hint || ''), '报错必须指路到正确参数 --evidence');
+    assert.equal(readV4Registry(fixture.v4Dir).jobs[claim.jobId].state, 'dispatched', '未知参数不得推进状态');
+
+    // 证据清单为空必须显式失败：人工门没有证据本身就可疑，不得开出盲签请求。
+    const empty = freshProcess(fixture, humanArgs, { expectStatus: 'nonzero' });
+    assert.equal(empty.code, 'EMPTY_REQUIRED_EVIDENCE');
+    const afterEmpty = readV4Registry(fixture.v4Dir);
+    assert.equal(afterEmpty.jobs[claim.jobId].state, 'dispatched', '空证据请求不得推进状态');
+    assert.equal(Object.keys(afterEmpty.humanRequests).length, 0, '失败的 human open 不得留下 humanRequest');
+
+    // 库函数同口径（CLI 只是入口之一，收紧必须发生在创建侧）。
+    assert.throws(() => master.openHumanRequest({
+      ...base(fixture), jobId: claim.jobId, state: 'awaiting-human', kind: 'risk_approval',
+      prompt: '需要人工批准合并', requiredEvidence: [],
+    }), (error) => error.code === 'EMPTY_REQUIRED_EVIDENCE');
+
+    // 重复 --evidence 累积成数组，且历史 JSON 数组形态继续可用（两者可混用）。
+    const opened = freshProcess(fixture, [...humanArgs,
+      '--evidence', '机械门六项全绿',
+      '--evidence', '["Master 独立复跑 10/10","被测代码零改动"]']);
+    assert.deepEqual(opened.humanRequest.requiredEvidence,
+      ['机械门六项全绿', 'Master 独立复跑 10/10', '被测代码零改动'],
+      '重复 --evidence 与 JSON 数组形态必须都累积进 requiredEvidence');
+    assert.equal(opened.state, 'awaiting-human');
+
+    // 非累积参数重复出现 fail closed，不得静默 last-wins。
+    const duplicated = freshProcess(fixture, ['gate', '--job', claim.jobId, '--job', claim.jobId], { expectStatus: 'nonzero' });
+    assert.equal(duplicated.code, 'DUPLICATE_OPTION');
+
+    // 以 [ 开头但不是合法 JSON 数组的 --evidence 必须报错，不得静默当普通字符串。
+    const badJson = freshProcess(fixture, [...humanArgs, '--evidence', '["未闭合'], { expectStatus: 'nonzero' });
+    assert.equal(badJson.code, 'BAD_EVIDENCE');
+  } finally {
+    fixture.cleanup();
+  }
+}

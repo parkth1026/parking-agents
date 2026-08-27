@@ -616,6 +616,16 @@ function releaseSlot(registry, slotId, { reason, keepJob = false } = {}) {
 
 export function openHumanRequest(options = {}) {
   const { dir } = ctx(options);
+  // #76：分档 gate 让 high 停下来，就是为了让人看着证据做判断；证据清单为空的请求
+  // 等于让人盲签。humanRequest schema 是 v1、语义冻结（空数组在 schema 层合法，
+  // 收紧 schema 会追溯性判历史报文不合格），所以收紧发生在 Master 主动创建这一侧：
+  // requiredEvidence 为空直接 fail closed，而不是静默开出一个没有证据摘要的人工门。
+  const requiredEvidence = options.requiredEvidence || [];
+  if (!Array.isArray(requiredEvidence) || !requiredEvidence.length) {
+    throw storeError('EMPTY_REQUIRED_EVIDENCE', 'humanRequest.requiredEvidence 为空：人工门请求必须携带证据清单', {
+      jobId: options.jobId, kind: options.kind || null,
+    });
+  }
   return updateV4Registry(dir, (registry) => {
     const job = jobOf(registry, options.jobId);
     const attempt = currentAttempt(registry, options.jobId);
@@ -1190,19 +1200,82 @@ export function evaluateStop(options = {}) {
 
 // ---------------------------------------------------------------- CLI
 
+// #76：CLI 参数是闭集，未知参数 fail closed —— 与产品「未知 schema、缺字段、非闭集值
+// 必须 fail closed」的既有口径一致，参数层不例外。静默丢弃曾让 `--required-evidence`
+// 全部蒸发、human open 送出证据为空的盲签请求且 ok:true。
+const FLAG_OPTIONS = Object.freeze(['force', 'json']);
+// 可重复累积的参数：值语义是列表（与报文字段对齐），重复出现是合法输入。
+const REPEATABLE_OPTIONS = Object.freeze(['evidence']);
+const KNOWN_OPTIONS = Object.freeze(new Set([
+  ...FLAG_OPTIONS, ...REPEATABLE_OPTIONS,
+  'dir', 'slots', 'paths', 'repo', 'prefix', 'host', 'branch', 'issue-repo',
+  'legacy-runtime', 'commands-file', 'frontier',
+  'issue', 'issue-file', 'slot', 'model-tier', 'budgets',
+  'job', 'commit', 'payload', 'payload-file', 'commands',
+  'resume-token', 'response', 'response-file',
+  'state', 'kind', 'prompt', 'reason',
+]));
+
 function parseArguments(argv) {
   const options = {};
   const positional = [];
   for (let index = 0; index < argv.length; index += 1) {
     const value = argv[index];
-    if (!value.startsWith('--')) positional.push(value);
-    else {
-      const key = value.slice(2);
-      if (['force', 'json'].includes(key)) options[key] = true;
-      else options[key] = argv[++index];
+    if (!value.startsWith('--')) {
+      positional.push(value);
+      continue;
     }
+    const key = value.slice(2);
+    if (!KNOWN_OPTIONS.has(key)) {
+      throw storeError('UNKNOWN_OPTION', `未知参数 --${key}，拒绝执行（未知参数不静默丢弃）`, {
+        key,
+        // 近似参数给出指路：报文字段叫 requiredEvidence，CLI 参数却叫 --evidence，
+        // 这个不对称正是 #76 的诱因，报错必须替用户把路指对。
+        hint: key === 'required-evidence' ? '证据清单请使用可重复的 --evidence' : null,
+      });
+    }
+    if (FLAG_OPTIONS.includes(key)) {
+      options[key] = true;
+      continue;
+    }
+    const raw = argv[++index];
+    if (raw === undefined) throw storeError('BAD_REQUEST', `参数 --${key} 缺少值`, { key });
+    if (REPEATABLE_OPTIONS.includes(key)) {
+      (options[key] ||= []).push(raw);
+      continue;
+    }
+    // 非累积参数重复出现：静默 last-wins 会无声吞掉前面的值，fail closed。
+    if (key in options) {
+      throw storeError('DUPLICATE_OPTION', `参数 --${key} 重复出现，拒绝静默取最后一个值`, {
+        key, previous: options[key], duplicate: raw,
+      });
+    }
+    options[key] = raw;
   }
   return { options, positional };
+}
+
+// --evidence 支持两种形态并可重复累积：纯字符串（一条证据），或 JSON 数组字符串
+// （历史形态，向下兼容）。以 [ 开头却解析失败的输入直接报错，不静默当作普通字符串吞掉。
+function evidenceListFrom(values = []) {
+  const list = [];
+  for (const value of values) {
+    if (String(value).trimStart().startsWith('[')) {
+      let parsed;
+      try {
+        parsed = JSON.parse(value);
+      } catch (error) {
+        throw storeError('BAD_EVIDENCE', `--evidence 的 JSON 数组解析失败: ${error.message}`, { value });
+      }
+      if (!Array.isArray(parsed) || parsed.some((item) => typeof item !== 'string' || !item.trim())) {
+        throw storeError('BAD_EVIDENCE', '--evidence 的 JSON 形态必须是非空字符串数组', { value });
+      }
+      list.push(...parsed);
+    } else {
+      list.push(value);
+    }
+  }
+  return list;
 }
 
 function payloadFrom(options, key = 'payload') {
@@ -1292,7 +1365,8 @@ async function main(argv = process.argv.slice(2)) {
   if (command === 'human' && action === 'open') {
     return openHumanRequest({
       ...shared, jobId: options.job, state: options.state, kind: options.kind, prompt: options.prompt,
-      requiredEvidence: options.evidence ? JSON.parse(options.evidence) : [],
+      // 重复 --evidence 累积；为空时 openHumanRequest 自会 fail closed（#76）。
+      requiredEvidence: evidenceListFrom(options.evidence),
     });
   }
   if (command === 'human' && action === 'respond') {

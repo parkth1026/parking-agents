@@ -26,7 +26,7 @@ import { readJson, readJsonLines, readRegistry, writeJsonAtomic } from './runtim
 import {
   deliveryMergeScenario, discoveredWorkScenario, integrationBaseAdvanceStaleEvidence, recoveryScenario, runnerLifecycleScenario,
   stageResultSchemaBackwardCompat, reviewerIndependenceScenario, missingReviewerSessionIdScenario,
-  acceptanceInvalidationScenario,
+  acceptanceInvalidationScenario, humanOpenEvidenceScenario,
 } from './selftest-v4.mjs';
 import { trajectoryReplayScenario } from './selftest-trajectory.mjs';
 import { boardUiDomain } from './selftest-board-ui.mjs';
@@ -4251,6 +4251,8 @@ async function orchestrationDomain() {
     { group: 'reviewer-independence', name: 'missing-reviewer-session-id-fail-closed', run: missingReviewerSessionIdScenario },
     // #72：job.acceptance 随 candidate 前进失效，GATE-acceptance 校验取证 commit。
     { group: 'stale-base-evidence', name: 'acceptance-invalidation-on-candidate-advance', run: acceptanceInvalidationScenario },
+    // #76：human open 证据清单不得静默为空；CLI 未知/重复参数 fail closed。
+    { group: 'recovery', name: 'human-open-required-evidence-fail-closed', run: humanOpenEvidenceScenario },
   ];
   const p2p3Ids = cases.filter((testCase) => testCase.id).map((testCase) => testCase.id).sort();
   assert.deepEqual(
