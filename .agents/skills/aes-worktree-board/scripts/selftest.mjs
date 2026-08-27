@@ -18,7 +18,7 @@ import { prepareGithubAccess, runGithubJson } from './github-identity.mjs';
 import {
   consumeEvent, CONTROL_STATES, createTask, evaluateStop, heartbeatTask, pendingInbox, putInboxEvent,
   EXECUTOR_FINAL_SCHEMA, nextActions, receiveActionReceipt, recordBlock, runPostMergeVerification, setVerdict, startGoal,
-  TASK_STATES, transitionTask,
+  TASK_STATES, transitionTask, releaseParkedLane, canonicalWorktreeId, setGoalExecutionMode,
 } from './orchestrate.mjs';
 import { readJson, readJsonLines, readRegistry, writeJsonAtomic } from './runtime-store.mjs';
 import {
@@ -2112,6 +2112,8 @@ async function orchestrationPreflightLeaseAndState() {
   const runtimeDir = tempDirectory('orchestration-lifecycle-preflight');
   const raceRuntime = tempDirectory('orchestration-lifecycle-race');
   try {
+    assert.equal(canonicalWorktreeId('dev1'), 'dev1');
+    assert.equal(canonicalWorktreeId('aes-agent-worker-1'), 'dev1', 'dev1 与完整 worker basename 必须是同一 canonical identity');
     const availableWorker = basename((await listWorktrees()).siblings[0].path);
     let result = orchestrateSync([
       'task', 'create', '--issue', '17', '--worktree', 'dev4', '--role', 'executor', '--agent', 'claude',
@@ -2356,14 +2358,31 @@ async function orchestrationInboxIdempotency() {
       ['E-commentary-approve-bypass', 'E-poll-reviewer', 'E-wake'].sort(),
       'wake 与全部 polls 入箱后只能按 eventId 去重，不得漏掉 poll',
     );
-    consumeViaCli(runtimeDir, 'E-poll-reviewer');
-    const consumed = consumeViaCli(runtimeDir, 'E-wake');
-    assert.deepEqual(consumed.transition, { from: 'reviewing', to: 'approved' });
-    const transitionCount = readJsonLines(join(runtimeDir, 'transitions.jsonl')).length;
-    const duplicate = consumeViaCli(runtimeDir, 'E-wake');
-    assert.equal(duplicate.result, 'already-consumed');
-    assert.equal(readJsonLines(join(runtimeDir, 'transitions.jsonl')).length, transitionCount, '重复事件不得追加转移');
-    const pending = inboxPendingViaCli(runtimeDir);
+  consumeViaCli(runtimeDir, 'E-poll-reviewer');
+  const consumed = consumeViaCli(runtimeDir, 'E-wake');
+  assert.deepEqual(consumed.transition, { from: 'reviewing', to: 'approved' });
+  const approvedReviewer = readRegistry(runtimeDir).tasks[reviewer.taskId];
+  assert.equal(approvedReviewer.state, 'parked', 'reviewer APPROVE 被父 Task 消费后必须收口为 parked');
+  assert.equal(approvedReviewer.phase, 'qa-complete');
+  assert.equal(approvedReviewer.verdict.code, 'PASS');
+  assert.equal(approvedReviewer.lastEventId, 'E-wake');
+  assert.ok(approvedReviewer.finishedAt, 'reviewer QA 完成后必须冻结 finishedAt');
+  const transitionCount = readJsonLines(join(runtimeDir, 'transitions.jsonl')).length;
+  const duplicate = consumeViaCli(runtimeDir, 'E-wake');
+  assert.equal(duplicate.result, 'already-consumed');
+  assert.equal(readJsonLines(join(runtimeDir, 'transitions.jsonl')).length, transitionCount, '重复事件不得追加转移');
+  const staleRegistry = readRegistry(runtimeDir);
+  staleRegistry.tasks[reviewer.taskId].state = 'executing';
+  staleRegistry.tasks[reviewer.taskId].phase = 'executing';
+  staleRegistry.tasks[reviewer.taskId].finishedAt = null;
+  writeJsonAtomic(join(runtimeDir, 'registry.json'), staleRegistry);
+  const reconciled = orchestrateSync(['task', 'reconcile-reviewer', '--task', reviewer.taskId], runtimeDir);
+  assert.equal(reconciled.status, 0, reconciled.stderr);
+  assert.equal(parseJsonLine(reconciled.stdout).result, 'reconciled');
+  const repairedReviewer = readRegistry(runtimeDir).tasks[reviewer.taskId];
+  assert.equal(repairedReviewer.state, 'parked', 'reconcile-reviewer 必须修复旧 registry 的活跃 reviewer 残留');
+  assert.equal(repairedReviewer.phase, 'qa-complete');
+  const pending = inboxPendingViaCli(runtimeDir);
     assert.deepEqual(pending.pending.map((event) => event.eventId), ['E-commentary-approve-bypass']);
     assert.equal(pending.cursors['T-review'], 'cursor-final');
   } finally {
@@ -2561,6 +2580,70 @@ async function orchestrationParkedLateEvent() {
     assert.equal(readRegistry(runtimeDir).tasks[parkedTask.taskId].threadCursors[parkedReviewer.threadId], 'parked-late-cursor');
   } finally {
     await cleanTemp(runtimeDir);
+  }
+}
+
+async function orchestrationParkedLaneRelease() {
+  const runtimeDir = tempDirectory('orchestration-parked-lane-release');
+  const fixture = repositoryFixture('orchestration-parked-lane-release-git');
+  const dirtyPath = join(fixture.sibling, 'release-must-check-clean.txt');
+  try {
+    const workerHead = gitSync(fixture.sibling, ['rev-parse', 'HEAD']);
+    continuousStatus(runtimeDir, [{
+      name: 'dev-reusable', path: fixture.sibling, branch: 'fixture-dev', head: workerHead,
+    }], [
+      { number: 43, status: 'claimed', labels: ['ready-for-agent'] },
+      { number: 44, status: 'frontier', labels: ['ready-for-agent'] },
+    ], { repoRoot: fixture.main, mainHead: gitSync(fixture.main, ['rev-parse', 'HEAD']) });
+    const parked = createTask({
+      issue: 43, worktree: 'dev-reusable', role: 'executor', 'thread-id': 'T-reusable-old',
+      'head-sha': workerHead, model: 'luna-max', 'routing-reason': 'parked lane release fixture',
+    }, runtimeDir).task;
+    transitionTask(parked.taskId, 'executing', {}, runtimeDir);
+    transitionTask(parked.taskId, 'parked', { reason: 'master 接管旧候选' }, runtimeDir);
+    assert.ok(readRegistry(runtimeDir).leases['dev-reusable'], 'parked lane release 前必须仍持有 lease');
+
+    writeFileSync(dirtyPath, 'must fail closed\n');
+    assert.throws(
+      () => releaseParkedLane(parked.taskId, {
+        'authorization-id': 'lane-release-dirty-1',
+        authorization: '用户授权回收停放 lane', reason: '旧候选已由 master 接管',
+      }, runtimeDir),
+      (error) => error.code === 'DIRTY_WORKTREE_REQUIRES_DECISION',
+      '脏 parked lane 不得被静默释放',
+    );
+    assert.ok(readRegistry(runtimeDir).leases['dev-reusable'], '脏检查失败不得释放 lease');
+    rmSync(dirtyPath, { force: true });
+
+    const authorization = '用户授权回收停放 lane 并继续领取新 Issue';
+    const released = releaseParkedLane(parked.taskId, {
+      'authorization-id': 'lane-release-clean-1', authorization, reason: '旧候选已由 master 接管，clean lane 可复用',
+    }, runtimeDir);
+    assert.equal(released.result, 'released');
+    const releasedTask = readRegistry(runtimeDir).tasks[parked.taskId];
+    assert.equal(readRegistry(runtimeDir).leases['dev-reusable'], undefined, '显式 release 必须释放 writer lease');
+    assert.equal(releasedTask.state, 'parked', 'lane release 不得把旧候选伪装成 executing/merged');
+    assert.equal(releasedTask.laneAvailable, true);
+    assert.equal(releasedTask.retryable, true);
+    assert.equal(releasedTask.nextAction, 'CLAIM_NEXT_ISSUE');
+    const replay = releaseParkedLane(parked.taskId, {
+      'authorization-id': 'lane-release-clean-1', authorization, reason: '旧候选已由 master 接管，clean lane 可复用',
+    }, runtimeDir);
+    assert.equal(replay.result, 'already-released', '相同授权重放必须幂等');
+    const claim = actionOf(runtimeDir, 'CLAIM_NEXT_ISSUE', parked.taskId);
+    assert.equal(claim.issue, 44, '释放 lane 后必须重新进入 eligible Issue claim');
+    const next = createTask({
+      issue: 44, worktree: 'dev-reusable', role: 'executor', 'thread-id': 'T-reusable-next',
+      model: 'luna-max', 'routing-reason': 'reused parked lane fixture',
+    }, runtimeDir).task;
+    const claimReceipt = receiveActionReceipt(claim.actionId, 'succeeded', { nextTaskId: next.taskId }, runtimeDir);
+    assert.equal(claimReceipt.type, 'CLAIM_NEXT_ISSUE');
+    assert.equal(readRegistry(runtimeDir).claimReservations['44'].status, 'succeeded');
+    assert.equal(readRegistry(runtimeDir).leases['dev-reusable'].owner, next.taskId);
+  } finally {
+    rmSync(dirtyPath, { force: true });
+    await cleanTemp(runtimeDir);
+    await cleanRepositoryFixture(fixture);
   }
 }
 
@@ -2887,6 +2970,83 @@ async function orchestrationContinuousHostChain() {
   }
 }
 
+async function orchestrationOneTaskPerWorkerMode() {
+  const runtimeDir = tempDirectory('orchestration-one-task-per-worker');
+  try {
+    continuousStatus(runtimeDir, ['dev-one'], [{ number: 43, status: 'frontier', labels: ['ready-for-agent'] }], {
+      repoRoot: ROOT, mainHead: 'base-head',
+    });
+    startGoal({ workers: 'dev-one' }, runtimeDir);
+    const continuous = nextActions(runtimeDir).actions;
+    const claim = continuous.find((action) => action.type === 'CLAIM_NEXT_ISSUE');
+    assert.ok(claim, 'continuous Goal 应为未登记 lane 生成 claim');
+    const authorization = '每个 worker 完成一次任务即可，不需要循环；只做好执行与 QA 流程';
+    const switched = setGoalExecutionMode('one-task-per-worker', {
+      'authorization-id': 'one-task-mode-1', authorization, reason: '用户要求完成当前任务后停止自动领取',
+    }, runtimeDir);
+    assert.equal(switched.result, 'mode-set');
+    assert.deepEqual(switched.cancelledReservations, [43]);
+    assert.equal(readRegistry(runtimeDir).goal.executionMode, 'one-task-per-worker');
+    assert.equal(readRegistry(runtimeDir).claimReservations['43'].status, 'cancelled');
+    const oneShot = nextActions(runtimeDir).actions;
+    assert.equal(oneShot.some((action) => action.type === 'CLAIM_NEXT_ISSUE'), false, 'one-task 模式不得循环 claim');
+    const replay = setGoalExecutionMode('one-task-per-worker', {
+      'authorization-id': 'one-task-mode-1', authorization, reason: '用户要求完成当前任务后停止自动领取',
+    }, runtimeDir);
+    assert.equal(replay.result, 'already-set', 'Goal mode 同授权重放必须幂等');
+  } finally {
+    await cleanTemp(runtimeDir);
+  }
+}
+
+async function orchestrationObservedHostMerge() {
+  const runtimeDir = tempDirectory('orchestration-observed-host-merge');
+  const fixture = repositoryFixture('orchestration-observed-host-merge-git');
+  try {
+    writeFileSync(join(fixture.sibling, 'observed.txt'), 'observed\n');
+    gitSync(fixture.sibling, ['add', 'observed.txt']);
+    gitSync(fixture.sibling, ['commit', '-m', 'observed candidate']);
+    const candidate = gitSync(fixture.sibling, ['rev-parse', 'HEAD']);
+    const preHead = gitSync(fixture.main, ['rev-parse', 'HEAD']);
+    continuousStatus(runtimeDir, [{
+      name: 'dev-observed', path: fixture.sibling, branch: 'fixture-dev', head: candidate,
+    }], [{ number: 43, status: 'claimed', labels: ['ready-for-agent'] }], {
+      repoRoot: fixture.main, mainHead: preHead,
+    });
+    const task = createTask({
+      issue: 43, worktree: 'dev-observed', role: 'executor', 'thread-id': 'T-observed-executor',
+      'head-sha': preHead, model: 'luna-max', 'routing-reason': 'observed host merge fixture',
+    }, runtimeDir);
+    putTypedFinal(runtimeDir, task, task.task.threadId, 'E-observed-final', candidate);
+    const reviewer = hostCreateReviewer(runtimeDir, task, 1);
+    hostApprove(runtimeDir, task, reviewer, 'E-observed-approve');
+    const gate = actionOf(runtimeDir, 'EVALUATE_MERGE_GATE', task.taskId);
+    receiveActionReceipt(gate.actionId, 'succeeded', {
+      code: 'PASS', runtime: 'NOT_RUN', delivery: 'MERGE_READY', mergeCheck: 'clean',
+      headSha: candidate, integrationHead: preHead, integrationBranch: 'main',
+    }, runtimeDir);
+    const merge = actionOf(runtimeDir, 'HOST_MERGE', task.taskId);
+    gitSync(fixture.main, ['merge', '--no-ff', 'fixture-dev', '-m', 'merge observed candidate']);
+    const mergeCommit = gitSync(fixture.main, ['rev-parse', 'HEAD']);
+    const observed = receiveActionReceipt(merge.actionId, 'observed', {
+      integrationBranch: 'main', preHead, postHead: mergeCommit, mergeCommit,
+    }, runtimeDir);
+    assert.equal(observed.status, 'observed');
+    const mergedTask = readRegistry(runtimeDir).tasks[task.taskId];
+    assert.equal(mergedTask.hostMergeReceipt.mergeCommit, mergeCommit);
+    assert.equal(mergedTask.state, 'merge-ready', 'observed merge 后必须等待 post-merge verify');
+    const verify = actionOf(runtimeDir, 'POST_MERGE_VERIFY', task.taskId);
+    runPostMergeVerification(verify.actionId, [{
+      file: process.execPath, args: ['-e', 'process.exit(0)'], label: 'observed merge post-check',
+    }], runtimeDir);
+    assert.equal(readRegistry(runtimeDir).tasks[task.taskId].state, 'merged');
+    assert.equal(readRegistry(runtimeDir).leases['dev-observed'], undefined);
+  } finally {
+    await cleanTemp(runtimeDir);
+    await cleanRepositoryFixture(fixture);
+  }
+}
+
 async function orchestrationUnclassifiedFinal() {
   const runtimeDir = tempDirectory('orchestration-continuous-unclassified');
   try {
@@ -3133,6 +3293,33 @@ async function orchestrationLiveHeadBinding() {
     await cleanTemp(mergeRuntime);
     await cleanRepositoryFixture(gateFixture);
     await cleanRepositoryFixture(mergeFixture);
+  }
+}
+
+async function orchestrationShortHeadReconcile() {
+  const runtimeDir = tempDirectory('orchestration-short-head-reconcile');
+  const fixture = repositoryFixture('orchestration-short-head-reconcile-git');
+  try {
+    const workerHead = gitSync(fixture.sibling, ['rev-parse', 'HEAD']);
+    continuousStatus(runtimeDir, [{
+      name: 'dev-short-head', path: fixture.sibling, branch: 'fixture-dev', head: workerHead,
+    }], [], { repoRoot: fixture.main, mainHead: gitSync(fixture.main, ['rev-parse', 'HEAD']) });
+    const task = createTask({
+      issue: 74, worktree: 'dev-short-head', role: 'executor', 'thread-id': 'T-short-head-executor',
+      'head-sha': workerHead, model: 'luna-max', 'routing-reason': 'short/full SHA reconcile fixture',
+    }, runtimeDir);
+    const status = readJson(join(runtimeDir, 'status.json'));
+    status.worktrees[0].head = gitSync(fixture.sibling, ['rev-parse', '--short', 'HEAD']);
+    writeJsonAtomic(join(runtimeDir, 'status.json'), status);
+    const actions = nextActions(runtimeDir).actions;
+    assert.equal(
+      actions.some((action) => action.type === 'UNCLASSIFIED_FINAL' && action.taskId === task.taskId),
+      false,
+      `同一 Git object 的短/完整 SHA 不得产生 GIT_HEAD_ADVANCED_WITHOUT_TYPED_FINAL: ${JSON.stringify(actions)}`,
+    );
+  } finally {
+    await cleanTemp(runtimeDir);
+    await cleanRepositoryFixture(fixture);
   }
 }
 
@@ -3809,13 +3996,17 @@ async function orchestrationDomain() {
     { id: 'P2.3-02', group: 'lifecycle', name: 'five-task-polls-not-lost', run: orchestrationFiveTaskFanIn },
     { id: 'P2.3-03', group: 'governance', name: 'circuit-late-event', run: orchestrationCircuitAndLateEvent },
     { id: 'P2.3-04', group: 'governance', name: 'park-late-event', run: orchestrationParkedLateEvent },
+    { group: 'governance', name: 'parked-lane-release', run: orchestrationParkedLaneRelease },
     { id: 'P2.3-05', group: 'governance', name: 'autonomous-not-run', run: orchestrationAutonomousNotRun },
     { group: 'governance', name: 'verdict-dimensions', run: orchestrationVerdictDimensions },
     { id: 'P2.3-06', group: 'governance', name: 'global-stop', run: orchestrationGlobalStop },
     { group: 'continuous', name: 'host-final-review-merge-next', run: orchestrationContinuousHostChain },
+    { group: 'continuous', name: 'one-task-per-worker-mode', run: orchestrationOneTaskPerWorkerMode },
+    { group: 'continuous', name: 'observed-host-merge', run: orchestrationObservedHostMerge },
     { group: 'continuous', name: 'unclassified-final', run: orchestrationUnclassifiedFinal },
     { group: 'continuous', name: 'host-block-circuit', run: orchestrationHostBlockCircuit },
     { group: 'continuous', name: 'live-head-binding', run: orchestrationLiveHeadBinding },
+    { group: 'continuous', name: 'short-head-reconcile', run: orchestrationShortHeadReconcile },
     { group: 'continuous', name: 'dead-letter-binding', run: orchestrationDeadLetterBinding },
     { group: 'continuous', name: 'merge-queue-runtime-boundary', run: orchestrationMergeQueueAndRuntimeBoundary },
     { group: 'continuous', name: 'octopus-merge-rejected', run: orchestrationOctopusMergeRejected },
@@ -3934,6 +4125,21 @@ async function layoutDomain() {
     const result = parseJsonLine(assessment.stdout);
     assert.equal(result.assessment.merge, 'not-yet');
     assert.match(result.assessment.reason, /需先补 issue/);
+
+    const aliasSnapshot = JSON.parse(readFileSync(join(assessRuntime, 'status.json'), 'utf8'));
+    aliasSnapshot.worktrees[0].name = 'aes-agent-worker-1';
+    writeFileSync(join(assessRuntime, 'status.json'), `${JSON.stringify(aliasSnapshot, null, 2)}\n`);
+    const aliasAssessment = spawnSync(process.execPath, [
+      join(SCRIPT_DIR, 'assess.mjs'), 'dev1', '--merge', 'blocked', '--done', 'false',
+      '--task', '别名 assessment', '--reason', 'canonical alias probe',
+    ], {
+      ...HEADLESS_CHILD_OPTIONS,
+      cwd: ROOT,
+      encoding: 'utf8',
+      env: { ...process.env, AES_WORKTREE_BOARD_RUNTIME_DIR: assessRuntime },
+    });
+    assert.equal(aliasAssessment.status, 0, aliasAssessment.stderr);
+    assert.equal(parseJsonLine(aliasAssessment.stdout).worktree, 'aes-agent-worker-1', 'assess 必须接受 devN 别名');
 
     const rejected = spawnSync(process.execPath, [
       join(SCRIPT_DIR, 'assess.mjs'), 'missing-worker', '--merge', 'not-yet',

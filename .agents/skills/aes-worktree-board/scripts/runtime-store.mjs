@@ -19,7 +19,8 @@ export function canonicalWorktreeKey(value) {
     throw error;
   }
   const short = raw.match(/(?:^|-)(dev\d+|test)$/i)?.[1];
-  return (short || raw).toLowerCase();
+  const workerBasename = raw.match(/^aes-agent-worker-(\d+)$/i)?.[1];
+  return (short || (workerBasename ? `dev${workerBasename}` : raw)).toLowerCase();
 }
 
 function pause(milliseconds) {
@@ -147,6 +148,12 @@ export function readRegistry(runtimeDir) {
   registry.deadLetters ||= {};
   registry.goal ||= null;
   registry.orchestration ||= emptyRegistry().orchestration;
+  if (registry.goal?.workers) {
+    registry.goal.workers = [...new Set(registry.goal.workers.map((worktree) => canonicalWorktreeKey(worktree)))];
+  }
+  for (const reservation of Object.values(registry.claimReservations)) {
+    if (reservation.worktree) reservation.worktree = canonicalWorktreeKey(reservation.worktree);
+  }
   const leases = {};
   for (const [worktree, lease] of Object.entries(registry.leases)) {
     const key = canonicalWorktreeKey(worktree);

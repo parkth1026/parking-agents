@@ -8,7 +8,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 // #14: runtime 选址与 collect 同一条 env/cwd 解析链（目标仓根下 .aes-worktree-board/runtime）。
 import { RUNTIME_DIR } from './collect.mjs';
-import { readJson, withRuntimeLock, writeJsonAtomic, writeTextAtomic } from './runtime-store.mjs';
+import { canonicalWorktreeKey, readJson, withRuntimeLock, writeJsonAtomic, writeTextAtomic } from './runtime-store.mjs';
 
 const STATUS_JSON = join(RUNTIME_DIR, 'status.json');
 const STATUS_JS = join(RUNTIME_DIR, 'status.js');
@@ -37,9 +37,15 @@ if (opts.merge && !['recommend', 'not-yet', 'blocked'].includes(opts.merge)) {
 try {
   const result = withRuntimeLock(RUNTIME_DIR, () => {
     const status = readJson(STATUS_JSON);
-    const target = status.worktrees.find(
-      (w) => w.name === worktreeArg || w.name.endsWith(`-${worktreeArg}`),
-    );
+    const requestedWorktree = canonicalWorktreeKey(worktreeArg);
+    const target = status.worktrees.find((w) => {
+      try {
+        return canonicalWorktreeKey(w.name) === requestedWorktree
+          || w.name === worktreeArg || w.name.endsWith(`-${worktreeArg}`);
+      } catch {
+        return w.name === worktreeArg || w.name.endsWith(`-${worktreeArg}`);
+      }
+    });
     if (!target) fail(`worktree "${worktreeArg}" 不在 status.json 中，可用: ${status.worktrees.map((w) => w.name).join(', ')}`);
 
     let merge = opts.merge ?? target.assessment?.merge ?? 'not-yet';

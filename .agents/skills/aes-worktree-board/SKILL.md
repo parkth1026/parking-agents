@@ -51,7 +51,7 @@ runtime 选址链保持不变：`AES_WORKTREE_BOARD_RUNTIME_DIR` 优先，否则
 - 只操作 `git worktree list` 中与主仓同级的既有 worktree；`task create` 会把短名与完整 basename 规范化为同一 worker identity，并拒绝不存在的 worktree；不创建、不删除 worktree；`test` worktree 不参与自动调度。
 - dirty worktree 必须先复述修改数与未跟踪数；用户确认后才可继续，确认不能越过 registry 租约。
 - 正常派发只用 Desktop `create_thread`。真实 CLI fallback（`cli-fallback`）必须保留用户授权原话；`test` 假 agent 仅供 selftest 豁免。
-- 模型只用 `luna-max` / `sol-high` 两档；每个 TaskRecord 必须记录 `modelTier` 与 `routingReason`。
+- 新建 executor、reviewer 与 master/subagent Task 统一使用 `luna-max`；每个 TaskRecord 必须记录 `modelTier` 与 `routingReason`。历史 registry 中已有的 `sol-high` 只作为不可篡改的审计事实保留，不得复用或新建。
 - 不把 `runtime=NOT_RUN` 改写为 `PASS`；不把 handoff/park/stop 伪装成 BLOCK；不重复消费同一 eventId。
 - 不清理、reset、强杀或覆盖用户现场。连续三次有效 BLOCK 后停止该线路的 Task/reviewer 自动创建，等待人工交接。
 - 星图设计语言保持 `docs/design/design_handoff_issue_starmap/` 的颜色、半径、光晕、名牌旗、图例与交互；控制面只占六个确认挂点，双视图文案为 `Map / List`。
@@ -70,7 +70,7 @@ collect 只写 schemaVersion 3，承接既有 assessment、终态和全局停止
 
 ## 巡检
 
-1. 在目标主仓运行 `node "$skillDir/scripts/collect.mjs"`。只有明确沿用快照时才加 `--no-gh`。
+1. 在目标主仓运行 `node "$skillDir/scripts/collect.mjs"`。若 integration branch 不是技能默认的 `main`，必须显式设置 `AES_WORKTREE_BOARD_MAIN_BRANCH`（例如 `dev`）；只有明确沿用快照时才加 `--no-gh`。
 2. 读取 `runtime/status.json`，以 registry 派生的 `worktree.task` 与 `orchestration` 为控制事实，再检查 Git ahead/behind、dirty、mergeCheck、Issue 依赖和测试证据。
 3. 仍用 `assess.mjs` 写每个节点的业务判断：
 
@@ -110,8 +110,24 @@ node "$skillDir/scripts/orchestrate.mjs" task attach-thread --task tk-dev4-17-g1
 executor 到达 `committed` 后，独立 reviewer 以 `--parent-task-id` 加入同一 generation。reviewer 是只读 Task，不取得或释放 writer 租约；它的 thread 事件只有在明确关联该 executor 时才能写入父 Task：
 
 ```powershell
-node "$skillDir/scripts/orchestrate.mjs" task create --issue 17 --worktree dev4 --role reviewer --parent-task-id tk-dev4-17-g1 --thread-id T-02R --model sol-high --routing-reason "独立 code/spec review"
+node "$skillDir/scripts/orchestrate.mjs" task create --issue 17 --worktree dev4 --role reviewer --parent-task-id tk-dev4-17-g1 --thread-id T-02R --model luna-max --routing-reason "独立 code/spec review"
 ```
+
+旧候选因 master 接管、冲突停放后，不能让 parked Task 永久占住 writer lease。确认该 executor
+对应 worktree clean、没有活跃关联 reviewer 后，使用带人工授权的 lane release 释放旧 lane；它只
+释放租约并保留完整旧 Task/commit 审计，不改变旧候选的 review 结论，也不把它改成 merge-ready：
+
+```powershell
+node "$skillDir/scripts/orchestrate.mjs" task release --task tk-dev4-17-g1 `
+  --authorization-id issue-17-lane-reuse-1 `
+  --authorization "用户明确授权回收已停放候选并继续领取新 Issue" `
+  --reason "旧候选已由 master 接管，clean lane 可复用"
+```
+
+release 是幂等且 append-only 的控制面动作；脏 worktree、缺失 writer lease、活跃关联 Task 或不同
+授权原文都会 fail closed。释放后 `next-actions` 才会为该 worker 生成 `CLAIM_NEXT_ISSUE`，新 Task
+必须使用更高 generation 和 `luna-max`；不得手改 registry/lease，也不得直接把旧 parked Task
+改写成新 Issue。
 
 ## 事件 fan-in 与幂等消费
 
@@ -122,7 +138,19 @@ node "$skillDir/scripts/orchestrate.mjs" inbox put --thread T-02R --task tk-dev4
 node "$skillDir/scripts/orchestrate.mjs" consume --event-id E-7f3a
 ```
 
-宿主事件有 id 就沿用；否则 eventId 为 thread/kind/payload 摘要的稳定 SHA-1 前 12 位。入箱与消费都校验 thread→Task 直接归属或 reviewer→parent 关联；foreign thread 必须退出 2 `THREAD_TASK_MISMATCH`，不得覆盖 cursor 或 verdict。`approved` 只接受 reviewer `final|verdict` 的显式 `APPROVE|PASS`；普通 commentary/progress 的 `payload.to` 不能冒充裁决。reviewer `BLOCK` consume 在同一 registry 原子更新内完成 commit 校验、去重、计数与 `fixing|handoff-required` 转移，继续返回锁定的 `result=consumed`；显式 `block record` 复用同一逻辑。同一 eventId 再次消费必须返回 `already-consumed`、退出 0、零状态变化。合法 late event 可以落箱和消费但不得复活终态；malformed executor final 例外，必须保持 pending `UNCLASSIFIED_FINAL`。
+宿主事件有 id 就沿用；否则 eventId 为 thread/kind/payload 摘要的稳定 SHA-1 前 12 位。入箱与消费都校验 thread→Task 直接归属或 reviewer→parent 关联；foreign thread 必须退出 2 `THREAD_TASK_MISMATCH`，不得覆盖 cursor 或 verdict。`approved` 只接受 reviewer `final|verdict` 的显式 `APPROVE|PASS`；普通 commentary/progress 的 `payload.to` 不能冒充裁决。reviewer `final|verdict` 入箱时，`--thread` 必须是 reviewer thread，而 `--task` 必须是它的父 executor Task；不能把 verdict 入到 reviewer 自身 Task。reviewer `BLOCK` consume 在同一 registry 原子更新内完成 commit 校验、去重、计数与 `fixing|handoff-required` 转移，继续返回锁定的 `result=consumed`；显式 `block record` 复用同一逻辑。同一 eventId 再次消费必须返回 `already-consumed`、退出 0、零状态变化。合法 late event 可以落箱和消费但不得复活终态；malformed executor final 例外，必须保持 pending `UNCLASSIFIED_FINAL`。
+
+最终 reviewer `APPROVE|BLOCK` 被父 executor Task 消费时，控制面必须在同一 registry 更新中把事件来源 reviewer 收口为 `parked`、`phase=qa-complete`，记录 reviewer verdict evidence 和 `finishedAt`；不能只推进父 Task 而遗留 `executing` reviewer。历史 registry 若因旧版本留下这种可由父 Task 证据证明的活跃 reviewer，使用证据约束的恢复命令，不得手改 JSON：
+
+```powershell
+node "$skillDir/scripts/orchestrate.mjs" task reconcile-reviewer --task tk-dev4-17-g1-review-1
+```
+
+该命令只接受父 Task 已消费且精确绑定 reviewer thread、最终 verdict 和 `reviewCommit` 的证据；缺证据、父 Task 状态不匹配或 commit 不一致都会 fail closed，已收口的 reviewer 重放则幂等返回。
+
+`collect` 的 worker `head` 允许是展示用短 SHA；控制面在 `next-actions`、merge gate 和 receipt 绑定中必须把 observed/registered 值解析为同一 worktree 的完整 Git commit object 后再比较，不能直接比较短字符串与完整 SHA。通过 Windows junction 调用脚本时，CLI 主模块判断必须按 realpath 归一化；命令不能出现“exit 0 但没有写入/输出”的静默 no-op。
+
+`assessment` 是主 agent 的人工判断，不是 collect 自动推断的事实；当 `stale=true` 时，文本 collect 只显示过期提示，不得把旧 reason 当作当前 merge 结论。必须先用 fresh collect 与 registry/Git 证据重评，再通过 `assess.mjs` 写入新的 assessment。
 
 ## 显式 Goal 与连续编排闭环
 
@@ -130,8 +158,22 @@ node "$skillDir/scripts/orchestrate.mjs" consume --event-id E-7f3a
 导出快照等 one-shot 操作不得调用 `goal start`。先运行 fresh collect，再锁定 worker 范围：
 
 ```powershell
-node "$skillDir/scripts/orchestrate.mjs" goal start --workers dev1,dev2,dev3 --manual-test-policy "needs-manual-test + explicit debt permits runtime=NOT_RUN"
+node "$skillDir/scripts/orchestrate.mjs" goal start --workers dev1,dev2,dev3 --execution-mode one-task-per-worker --manual-test-policy "needs-manual-test + explicit debt permits runtime=NOT_RUN"
 ```
+
+`execution-mode` 默认为 `continuous`；用户要求每个 worker 只消化当前一张单时，使用
+`one-task-per-worker`，或对已有 active Goal 用受审计命令切换：
+
+```powershell
+node "$skillDir/scripts/orchestrate.mjs" goal set-mode --mode one-task-per-worker `
+  --authorization-id one-task-qa-only-1 `
+  --authorization "每个 worker 完成一次任务即可，不需要循环；只做好执行与 QA 流程" `
+  --reason "完成当前任务后不再自动领取下一 Issue"
+```
+
+该模式不会取消正在执行的 Task；只取消尚未创建 executor 的 pending claim reservation，保留历史
+审计，并在当前 Task 收口后不再生成下一 Issue。`CREATE_REVIEWER` 在该模式下仅表示独立
+`aes-qa` 验证，不能派发 code-review；`simplify` 由用户策略明确免除。
 
 脚本生成的 Goal 固定目标仓、integration branch、Issue repo、worker、人工验收政策、权限边界，
 并包含可验证的 Outcome / Constraints / Verification。Goal 不扩大权限，也不替代宿主
@@ -154,12 +196,16 @@ actionId 从事实组合稳定派生；宿主完成动作后用 payload file 写
 node "$skillDir/scripts/orchestrate.mjs" action receipt --action-id A-... --status succeeded --payload-file receipt.json
 ```
 
-`CREATE_REVIEWER` receipt 与 reviewer verdict 必须同时满足
+`CREATE_REVIEWER` receipt 与 reviewer verdict 必须同时满足（one-task 模式下 reviewer 只执行
+独立 QA，不执行 code-review）：
 `reviewer.reviewCommit === task.commitSha === action/event.commitSha`。`EVALUATE_MERGE_GATE`
 receipt 必须绑定 live worktree HEAD、integration HEAD、integration branch，并由脚本实时运行
 `git merge-tree`。`HOST_MERGE started/succeeded` 分别绑定 live preHead 与 postHead；succeeded
 会再次读取 worker live HEAD，并只接受恰好两个 parent、第一父为 preHead、第二父精确等于已 review
-commit 的真实 Git merge commit；worker 前进到未审 commit、octopus merge 均明确拒绝。
+commit 的真实 Git merge commit；worker 前进到未审 commit、octopus merge 均明确拒绝。若 master
+session 已在控制面之外完成了该真实 merge，可用同一 `HOST_MERGE` action 的 `status=observed`
+回填；它仍会现场验证 branch、worker HEAD、pre/post HEAD 与两父关系，不能注入任意 merge SHA，
+且回填后仍必须执行 `POST_MERGE_VERIFY` 才进入 `merged`。
 
 `POST_MERGE_VERIFY` 不接受宿主自报的 `exitCode=0` JSON。先把 executable/args 写入 commands file，
 由脚本在 integration repo root 实际执行：

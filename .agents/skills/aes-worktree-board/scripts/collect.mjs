@@ -11,7 +11,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { prepareGithubAccess, runGithubJson } from './github-identity.mjs';
 import {
-  readJson, readJsonLines, readRegistry, TERMINAL_TASK_STATES, withRuntimeLock, writeJsonAtomic, writeTextAtomic,
+  canonicalWorktreeKey, readJson, readJsonLines, readRegistry, TERMINAL_TASK_STATES, withRuntimeLock, writeJsonAtomic, writeTextAtomic,
 } from './runtime-store.mjs';
 
 const pExecFile = promisify(execFile);
@@ -218,9 +218,10 @@ export function assertRuntimeIdentity(runtimeDir, expected, snapshot = undefined
 }
 
 function latestRegistryTask(registry, worktreeName) {
+  const canonicalName = canonicalWorktreeKey(worktreeName);
   return Object.values(registry.tasks || {})
     .filter((task) => task.role === 'executor'
-      && (task.worktree === worktreeName || worktreeName.endsWith(`-${task.worktree}`)))
+      && canonicalWorktreeKey(task.worktree) === canonicalName)
     .sort((left, right) => Number(right.generation) - Number(left.generation) || String(right.updatedAt).localeCompare(String(left.updatedAt)))[0] || null;
 }
 
@@ -659,7 +660,9 @@ if (norm(process.argv[1] || '') === norm(fileURLToPath(import.meta.url))) {
       );
       for (const worker of status.worktrees) {
         const assessment = worker.assessment
-          ? ` · ${worker.assessment.merge}: ${worker.assessment.reason}`
+          ? worker.assessment.stale
+            ? ' · assessment:STALE（旧结论未随最新 Git/Task 事实复核）'
+            : ` · ${worker.assessment.merge}: ${worker.assessment.reason}`
           : '';
         console.log(
           `${worker.name}  ${worker.branch ?? '(detached)'}@${worker.head}`
