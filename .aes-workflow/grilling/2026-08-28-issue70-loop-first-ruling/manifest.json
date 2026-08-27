@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "slug": "2026-08-28-issue70-loop-first-ruling",
+  "created_at": "2026-08-27T17:26:54Z",
+  "updated_at": "2026-08-27T17:38:49Z",
+  "original_request": "#70 裁定（需要你参与的 grilling）：是否采纳「先证明回路，再加装甲」的投入排序改写",
+  "goal_oneline": "裁定 #70 为修改后采纳：下一轮入口=回路证明轮（混合三段串行），行为防御实测反哺，硬化立票门槛定为长期原则",
+  "target": null,
+  "stage": "2-prototype",
+  "next_action": "执行 wayfinder resolution：#70 落 resolution 并 close，刷新 map 与受影响票，建证伪段新票并接线",
+  "stage_gates": {
+    "1-interview": {
+      "status": "done",
+      "closed_at": "2026-08-27T17:38:49Z",
+      "self_assessment": {
+        "意图": "已定",
+        "结果": "已定",
+        "边界": "已定",
+        "约束": "已定",
+        "现状": "已定"
+      }
+    },
+    "2-prototype": {
+      "status": "pending"
+    },
+    "3-contract": {
+      "status": "pending"
+    }
+  },
+  "validation": null,
+  "blocked": [],
+  "residual_risk": null,
+  "status": "in_progress"
+}
