@@ -363,7 +363,10 @@ node "$skillDir/scripts/master.mjs" release --job <jobId> --slot <slotId>
 | `critical` | 拒绝直接 merge，只走 PR；waiver 也不能覆盖 |
 
 机械门六项固定顺序：slot → commit → integration → acceptance → review → QA。
-其中 QA 含 `NOT_RUN` 或 `unexecuted` 非空一律判失败。
+其中 review/QA receipt 的 `commitSha` 必须与当前 candidate commit **精确相等**——
+旧 commit 的证据不能给新 commit 背书；QA 含 `NOT_RUN` 或 `unexecuted` 非空一律判失败。
+commit 前进只能走 `candidate` 命令（那里作废旧证据）；terminal 报文里的
+`candidateCommit` 与 registry 不一致时拒收（`CANDIDATE_MISMATCH`），不推进状态。
 
 ### 中断恢复
 

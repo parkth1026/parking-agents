@@ -94,7 +94,7 @@ export function applyWaiver(resolution, waiver) {
 // 顺序固定，便于把「卡在第几关」写进 typed disposition。
 export function evaluateMechanicalGate({
   slotOk, slotReason, commitFresh, commitReason, integrationOk, integrationReason,
-  acceptance = [], review = null, qa = null,
+  acceptance = [], review = null, qa = null, candidateCommit = null,
 }) {
   const checks = [];
   const push = (id, ok, detail) => checks.push({ id, outcome: ok ? 'PASS' : 'FAIL', detail });
@@ -108,17 +108,21 @@ export function evaluateMechanicalGate({
     acceptance.length ? `${acceptance.length - unmetAc.length}/${acceptance.length} AC PASS` : 'AC 列表为空，拒绝放行');
 
   // review/QA 必须绑定 candidate commit；commit 前进使旧证据失效（E5）。
-  const reviewBound = review && review.outcome === 'PASS' && review.commitSha;
+  // truthy 的 commitSha 不够 —— 必须与 candidateCommit 精确相等，否则旧 commit 的
+  // 证据可以给新 commit 背书（gate 是最后防线，不假设上游状态机没被绕过）。
+  const reviewBound = review && review.outcome === 'PASS'
+    && candidateCommit && review.commitSha === candidateCommit;
   push('GATE-review', Boolean(reviewBound), review
-    ? `review outcome=${review.outcome} commit=${review.commitSha || 'NOT_BOUND'}`
+    ? `review outcome=${review.outcome} commit=${review.commitSha || 'NOT_BOUND'} candidate=${candidateCommit || 'NOT_RUN'}`
     : 'review 证据缺失');
 
   // runtime=NOT_RUN 不得伪装 PASS（不变清单）。
-  const qaOk = qa && qa.outcome === 'PASS' && qa.commitSha
+  const qaOk = qa && qa.outcome === 'PASS'
+    && candidateCommit && qa.commitSha === candidateCommit
     && !(qa.checks || []).some((check) => check.outcome === 'NOT_RUN')
     && !(qa.unexecuted || []).length;
   push('GATE-qa', Boolean(qaOk), qa
-    ? `qa outcome=${qa.outcome} unexecuted=${(qa.unexecuted || []).length}`
+    ? `qa outcome=${qa.outcome} commit=${qa.commitSha || 'NOT_BOUND'} candidate=${candidateCommit || 'NOT_RUN'} unexecuted=${(qa.unexecuted || []).length}`
     : 'QA 证据缺失');
 
   const failed = checks.filter((check) => check.outcome === 'FAIL');

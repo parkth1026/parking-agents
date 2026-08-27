@@ -15,7 +15,7 @@ import {
   projectRunners, validateSlotsConfig,
 } from './runner-slots.mjs';
 import { HUMAN_REQUEST_SCHEMA } from './human-request.mjs';
-import { resolveMergePolicy } from './merge-policy.mjs';
+import { decideMerge, evaluateMechanicalGate, resolveMergePolicy } from './merge-policy.mjs';
 import * as master from './master.mjs';
 import {
   gitOut, issuePayload, makeCandidate, makeConflict, makeFixture, SCRIPT_DIR,
@@ -742,6 +742,7 @@ export async function deliveryMergeScenario() {
   await nextStepDriver();
   await mergePolicyTiers();
   await deliveryHappyPath();
+  await evidenceBindingBypass();
   await postMergeVerificationFailure();
   await mergeConflictDisposition();
   await serialMergeEnforcement();
@@ -949,6 +950,77 @@ async function deliveryHappyPath() {
     assert.equal(
       readV4Registry(fixture.v4Dir).deliveries[job.jobId].runnerRelease.outcome, 'BASELINE_READY',
     );
+  } finally {
+    fixture.cleanup();
+  }
+}
+
+// 证据绑定旁路：review/QA 绑定旧 commit 时，新 commit 不得带着旧证据过门。
+// 两层各测各的 —— terminal 层拒收不一致报文；gate 层即便 registry 被绕过也 BLOCK。
+async function evidenceBindingBypass() {
+  const fixture = makeFixture('delivery-binding', { workers: [{ id: 'worker-1' }] });
+  try {
+    writeSlots(fixture);
+    master.masterStart({ ...base(fixture) });
+    const issue = issuePayload({ number: 541 });
+    const claim = master.masterClaim({ ...base(fixture), issue });
+    const first = makeCandidate(fixture, claim.slotId, { file: 'binding-1.txt' });
+    master.recordCandidate({ ...base(fixture), jobId: claim.jobId, commitSha: first });
+    master.recordStageResult({ ...base(fixture), jobId: claim.jobId, stage: 'review', payload: passingReview(claim.jobId, first) });
+    master.recordStageResult({ ...base(fixture), jobId: claim.jobId, stage: 'qa', payload: passingQa(claim.jobId, first) });
+
+    // worker 又推了新 commit，却不走 recordCandidate 而直接在 terminal 里报新 SHA：
+    // 必须拒收，不得让 first 的 review/QA 给 second 背书。
+    const second = makeCandidate(fixture, claim.slotId, { file: 'binding-2.txt' });
+    const terminalPayload = readyTerminal(
+      { jobId: claim.jobId, attemptId: claim.attemptId, issue: issue.number, baseCommit: claim.workOrder.runner.baseCommit },
+      second, claim.workOrder.issue.contractDigest,
+    );
+    const rejected = master.masterTerminal({ ...base(fixture), payload: terminalPayload });
+    assert.equal(rejected.ok, false);
+    assert.equal(rejected.code, 'CANDIDATE_MISMATCH');
+    assert.equal(rejected.expected, first);
+    assert.equal(rejected.actual, second);
+    assert.equal(rejected.requiredAction, 'RECORD_CANDIDATE_FIRST');
+    const registry = readV4Registry(fixture.v4Dir);
+    assert.equal(registry.attempts[claim.attemptId].candidateCommit, first, 'terminal 不得推进 candidate');
+    assert.notEqual(registry.jobs[claim.jobId].state, 'ready-to-merge', '拒收报文不得推进 job 状态');
+    assert.ok(!registry.mergeQueue.includes(claim.jobId), '拒收报文不得入 merge queue');
+
+    // 正路仍然通：recordCandidate 前进（作废旧证据）→ 重新绑定 second → terminal 接受。
+    const advanced = master.recordCandidate({ ...base(fixture), jobId: claim.jobId, commitSha: second });
+    assert.equal(advanced.invalidated.length, 2, 'candidate 前进必须作废旧 review+QA');
+    master.recordStageResult({ ...base(fixture), jobId: claim.jobId, stage: 'review', payload: passingReview(claim.jobId, second) });
+    master.recordStageResult({ ...base(fixture), jobId: claim.jobId, stage: 'qa', payload: passingQa(claim.jobId, second) });
+    const accepted = master.masterTerminal({ ...base(fixture), payload: terminalPayload });
+    assert.equal(accepted.state, 'ready-to-merge');
+    const gate = master.evaluateGate({ ...base(fixture), jobId: claim.jobId });
+    assert.equal(gate.mechanical.allGreen, true, '重新绑定后机械门必须全绿');
+
+    // gate 层最后防线：即便上游状态机被绕过（直接拿旧证据 + 新 candidate 进门），
+    // GATE-review / GATE-qa 也必须因 commit 不相等而 FAIL。
+    const mechanical = evaluateMechanicalGate({
+      slotOk: true, commitFresh: true, integrationOk: true,
+      acceptance: [{ id: 'AC-1', outcome: 'PASS' }],
+      review: passingReview(claim.jobId, first),
+      qa: passingQa(claim.jobId, first),
+      candidateCommit: second,
+    });
+    const outcomes = Object.fromEntries(mechanical.checks.map((check) => [check.id, check.outcome]));
+    assert.equal(outcomes['GATE-review'], 'FAIL', '绑定旧 commit 的 review 不得过门');
+    assert.equal(outcomes['GATE-qa'], 'FAIL', '绑定旧 commit 的 QA 不得过门');
+    const decision = decideMerge({ mechanical, policy: resolveMergePolicy({ declaredRisk: 'low' }) });
+    assert.equal(decision.decision, 'BLOCKED_MECHANICAL');
+
+    // candidateCommit 缺失时同样不得放行 —— 「无从比对」不等于「比对通过」。
+    const unbound = evaluateMechanicalGate({
+      slotOk: true, commitFresh: true, integrationOk: true,
+      acceptance: [{ id: 'AC-1', outcome: 'PASS' }],
+      review: passingReview(claim.jobId, first),
+      qa: passingQa(claim.jobId, first),
+      candidateCommit: null,
+    });
+    assert.equal(unbound.allGreen, false, 'candidateCommit 缺失时机械门不得全绿');
   } finally {
     fixture.cleanup();
   }
