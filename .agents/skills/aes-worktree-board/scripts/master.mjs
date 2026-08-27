@@ -30,12 +30,20 @@ export const TERMINAL_OUTCOMES = Object.freeze([
   'READY_TO_MERGE', 'BUDGET_EXHAUSTED', 'AWAITING_HUMAN', 'BLOCKED_DEPENDENCY',
   'CONTRACT_CONFLICT', 'BLOCKED_PERMISSION',
 ]);
-// review stage-result 双版本并存（#65）：v1 是历史轨迹夹具锁定证据的原始语义，
-// 永远不要求 reviewerSessionId；v2 起 reviewerSessionId 强制。产品代码按报文
-// 自带 schemaVersion 分派，不按调用方（是否回放）分派——没有回放特权路径。
+// stage-result / qa-receipt 的 v1→v2 是纯加法演进（AC-007 + #65 合流）：v1 语义永久
+// 保持原样——不要求 baseCommit，也不要求 reviewerSessionId；历史 trajectory replay
+// 语料就是真实的 v1 报文，不得改写。v2 起两票要求合并生效：review 类 v2 报文必须
+// 同时携带 baseCommit 与 reviewerSessionId（都 fail closed）；qa 类 v2 只要求
+// baseCommit（reviewerSessionId 不适用于 qa）。产品代码同时接受两版，按报文自带
+// schemaVersion 分派，不做「探测环境/回放就放行」的特权判断——分派唯一依据是
+// 报文自己声明的版本号。
 export const STAGE_RESULT_SCHEMA_V1 = 'aes.issue-worker.stage-result/v1';
 export const STAGE_RESULT_SCHEMA_V2 = 'aes.issue-worker.stage-result/v2';
+export const QA_RECEIPT_SCHEMA_V1 = 'aes.qa.receipt/v1';
+export const QA_RECEIPT_SCHEMA_V2 = 'aes.qa.receipt/v2';
 export const REVIEWER_INDEPENDENCE_VALUES = Object.freeze(['same-session', 'independent', 'unknown']);
+const ACCEPTED_STAGE_RESULT_SCHEMAS = Object.freeze([STAGE_RESULT_SCHEMA_V1, STAGE_RESULT_SCHEMA_V2]);
+const ACCEPTED_QA_RECEIPT_SCHEMAS = Object.freeze([QA_RECEIPT_SCHEMA_V1, QA_RECEIPT_SCHEMA_V2]);
 
 function git(cwd, args) {
   return spawnSync('git', args, { ...HEADLESS_CHILD_OPTIONS, cwd, encoding: 'utf8' });
@@ -374,20 +382,22 @@ function emptyBudgetUsage() {
 export function recordStageResult(options = {}) {
   const { dir } = ctx(options);
   const payload = options.payload;
-  const acceptedSchemas = options.stage === 'qa' ? ['aes.qa.receipt/v1'] : [STAGE_RESULT_SCHEMA_V1, STAGE_RESULT_SCHEMA_V2];
-  // 拒绝态提示的 replacement 一律指向当前最新版本，鼓励新流程升级；不影响已被接受的旧版本。
-  const canonicalSchema = options.stage === 'qa' ? 'aes.qa.receipt/v1' : STAGE_RESULT_SCHEMA_V2;
+  // qa 与 review 各自的 v1/v2 接受集：review v2 起同时强制 baseCommit（AC-007）与
+  // reviewerSessionId（#65）；qa v2 只强制 baseCommit（reviewerSessionId 不适用于 qa）。
+  const isQa = options.stage === 'qa';
+  const accepted = isQa ? ACCEPTED_QA_RECEIPT_SCHEMAS : ACCEPTED_STAGE_RESULT_SCHEMAS;
+  const latest = isQa ? QA_RECEIPT_SCHEMA_V2 : STAGE_RESULT_SCHEMA_V2;
   return updateV4Registry(dir, (registry) => {
     const attempt = currentAttempt(registry, options.jobId);
     if (!attempt) throw storeError('NO_CURRENT_ATTEMPT', `job ${options.jobId} 无当前 attempt`, { jobId: options.jobId });
-    if (!payload || !acceptedSchemas.includes(payload.schemaVersion)) {
+    if (!payload || !accepted.includes(payload.schemaVersion)) {
       appendInbox(dir, {
         kind: 'unclassified-stage-result', jobId: options.jobId, stage: options.stage,
-        consumed: false, requiredReplacementSchema: canonicalSchema,
+        consumed: false, requiredReplacementSchema: latest,
       });
       return {
         ok: false, code: 'UNCLASSIFIED_STAGE_RESULT', stage: options.stage,
-        consumed: false, requiredReplacementSchema: canonicalSchema, pending: true,
+        consumed: false, requiredReplacementSchema: latest, acceptedSchemas: accepted, pending: true,
       };
     }
     // 孤儿证据：receipt 必须绑定到本 job 与本 attempt，不接受「挂在别处的 reviewer」。
@@ -408,6 +418,14 @@ export function recordStageResult(options = {}) {
       return {
         ok: false, code: 'STALE_EVIDENCE', stage: options.stage,
         expectedCommit: attempt.candidateCommit, actualCommit: payload.commitSha || null, pending: true,
+      };
+    }
+    // 证据必须记录取证时的 base commit（AC-1）。只有 v2 承诺了这个字段——v1 语义保持
+    // 原样，不对 v1 报文强制 baseCommit（向下兼容；历史 trajectory replay 依赖这条）。
+    if (payload.schemaVersion === latest && !payload.baseCommit) {
+      return {
+        ok: false, code: 'MISSING_BASE_COMMIT', stage: options.stage,
+        jobId: options.jobId, consumed: false, pending: true,
       };
     }
 
@@ -668,6 +686,8 @@ export function evaluateGate(options = {}) {
     review: attempt?.review || null,
     qa: attempt?.qa || null,
     candidateCommit: attempt?.candidateCommit || null,
+    baseCommit: job.baseCommit || null,
+    integrationHead,
   });
 
   const decision = decideMerge({ mechanical, policy, humanApproval: job.humanGateApproval || null });
