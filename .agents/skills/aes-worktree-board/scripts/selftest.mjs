@@ -1475,6 +1475,71 @@ try {
       await cleanTemp(observerDirB).catch(() => {});
       await cleanRepositoryFixture(peer);
     }
+
+    // #64 BLOCK 1/3：live-gate.mjs 的 CLI 层必须与其余模块共用同一条目标仓解析链
+    // （AES_WORKTREE_BOARD_REPO_ROOT 优先，否则 cwd）。此前 CLI 未传 --repo 时直接
+    // 裸接 process.cwd()，跳过了 env 覆盖——receipt 会静默落到 cwd 所在仓，而不是
+    // 调用方通过 env 指定的目标仓，恰是 #64 要关的问题换了个触发面。这里用真实双仓
+    // fixture 复现该场景：cwd 在 A，env 指向 B，断言 receipt 落 B、A 零新增。
+    // 域挂点选 repo-root：其余「目标仓解析链」的跨仓回归都挂在这里，同一条链、同一处断言。
+    const crossA = repositoryFixture('live-gate-cross-a');
+    const crossB = repositoryFixture('live-gate-cross-b');
+    try {
+      const crossEnv = boardEnv(null, { AES_WORKTREE_BOARD_REPO_ROOT: crossB.main });
+
+      // worktrees 子命令：练 localWorktreeGate → inspectLocalWorktrees。
+      const worktreesRun = spawnSync(process.execPath, [
+        join(SCRIPT_DIR, 'live-gate.mjs'), 'worktrees', '--branch', 'main',
+      ], {
+        ...HEADLESS_CHILD_OPTIONS, cwd: crossA.main, env: crossEnv, encoding: 'utf8',
+      });
+      assert.equal(worktreesRun.status, 0, worktreesRun.stderr || worktreesRun.stdout);
+      assert.equal(JSON.parse(worktreesRun.stdout.trim()).ok, true);
+      const worktreesReceiptPath = join(
+        crossB.main, '.aes-worktree-board', 'receipts', 'ac-007a-worktree-readonly.json',
+      );
+      assert.ok(existsSync(worktreesReceiptPath),
+        'worktrees 子命令未传 --repo 时 receipt 必须落 env 指向的目标仓（B）');
+      const worktreesReceipt = JSON.parse(readFileSync(worktreesReceiptPath, 'utf8'));
+      assert.equal(resolve(worktreesReceipt.repoRoot), resolve(crossB.main));
+      assert.equal(existsSync(join(crossA.main, '.aes-worktree-board')), false,
+        'cwd 所在仓（A）不得因未传 --repo 而承接 receipt');
+
+      // live-receipt 子命令：练 liveRunReceipt，同样不传 --repo。
+      const v4Dir = join(crossB.main, '.aes-worktree-board', 'runtime-v4');
+      mkdirSync(v4Dir, { recursive: true });
+      writeFileSync(join(v4Dir, 'registry.json'), JSON.stringify({
+        jobs: {}, deliveries: {}, attempts: {}, master: null, humanRequests: {}, discoveries: {},
+      }));
+      const liveReceiptRun = spawnSync(process.execPath, [
+        join(SCRIPT_DIR, 'live-gate.mjs'), 'live-receipt', '--branch', 'main',
+        '--issue-repo', 'fixture.invalid/cross-repo',
+      ], {
+        ...HEADLESS_CHILD_OPTIONS, cwd: crossA.main, env: crossEnv, encoding: 'utf8',
+      });
+      assert.equal(liveReceiptRun.status, 0, liveReceiptRun.stderr || liveReceiptRun.stdout);
+      assert.equal(JSON.parse(liveReceiptRun.stdout.trim()).ok, true);
+      const liveReceiptPath = join(crossB.main, '.aes-worktree-board', 'receipts', 'ac-007a-live-run.json');
+      assert.ok(existsSync(liveReceiptPath),
+        'live-receipt 子命令未传 --repo 时 receipt 必须落 env 指向的目标仓（B）');
+      const liveReceipt = JSON.parse(readFileSync(liveReceiptPath, 'utf8'));
+      assert.equal(resolve(liveReceipt.repo.root), resolve(crossB.main));
+      assert.equal(existsSync(join(crossA.main, '.aes-worktree-board', 'receipts')), false,
+        'cwd 所在仓（A）在 live-receipt 子命令下也不得承接 receipt');
+
+      // desktop 子命令需要真实 Chrome，跑不进这个轻量域；改为源码断言：三条子命令分支
+      // 必须全部改走同一条解析函数，不再各自裸接 process.cwd()（含 desktop 在内）。
+      const liveGateSource = readFileSync(join(SCRIPT_DIR, 'live-gate.mjs'), 'utf8');
+      const resolverCalls = liveGateSource.match(/resolveCliRepoRoot\(options\.repo\)/g) || [];
+      assert.equal(resolverCalls.length, 3,
+        'desktop / worktrees / live-receipt 三条子命令都必须走 resolveCliRepoRoot');
+      assert.doesNotMatch(liveGateSource, /options\.repo \|\| process\.cwd\(\)/,
+        'CLI 层不得再出现跳过 AES_WORKTREE_BOARD_REPO_ROOT 的裸 cwd 回落');
+    } finally {
+      await cleanRepositoryFixture(crossA);
+      await cleanRepositoryFixture(crossB);
+    }
+
     assert.deepEqual(
       runtimeTreeSnapshot(join(SKILL_DIR, 'runtime')),
       skillRuntimeBefore,

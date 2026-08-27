@@ -19,14 +19,19 @@ import {
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const SKILL_DIR = dirname(SCRIPT_DIR);
-const REPO_ROOT = resolve(join(SKILL_DIR, '..', '..', '..'));
+// 代码仓的设计真源：从 SKILL_DIR 上溯到代码仓根（跟 SKILL_DIR 走，与 receipt 分离）。
+const CODEBASE_ROOT = resolve(join(SKILL_DIR, '..', '..', '..'));
+// git 操作用的 REPO_ROOT：在 boardUiDomain 内部，跟随目标仓解析链。
+const REPO_ROOT = resolve(process.env.AES_WORKTREE_BOARD_REPO_ROOT || process.cwd());
 // receipt 落在 Git 忽略的 runtime 目录，不落在受版本控制的技能目录。
 // 写进技能目录会让每次跑测试都把 worktree 弄脏，slot 随即被 QUARANTINED_DIRTY ——
 // 编排器于是和自己的不变量打架。D-02 要的是「落盘且绑定 commit」，不是「进版本库」。
+// 跟随目标仓解析链：AES_WORKTREE_BOARD_REPO_ROOT 优先，否则 cwd。技能安装位置不参与判定。
 export const RECEIPT_DIR = join(REPO_ROOT, '.aes-worktree-board', 'receipts');
 // 契约锁定的 mock SHA；产品必须一直跟着这个真源走。
 export const LOCKED_MOCK_SHA = '1A94A5291A37D3969E71E245AFD8399425CA80E13839260A451FC7CD7D736CF4';
-export const DESKTOP_TRUTH = join(REPO_ROOT, 'docs', 'design', 'design_handoff_issue_starmap', '需求星图 7a.dc.html');
+// 设计真源在代码仓里，跟着 CODEBASE_ROOT 走（语义独立于 RECEIPT_DIR）。
+export const DESKTOP_TRUTH = join(CODEBASE_ROOT, 'docs', 'design', 'design_handoff_issue_starmap', '需求星图 7a.dc.html');
 export const LOCKED_DESKTOP_SHA = '2703B1A632292A1AD4927D2BFD6E57384E234248B5E6EF59C9AA11128435B98A';
 
 const BASELINE = { width: 700, height: 1000 };

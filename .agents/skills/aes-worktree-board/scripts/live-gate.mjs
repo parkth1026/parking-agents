@@ -19,10 +19,9 @@ import { classifySlot, probeSlot } from './runner-slots.mjs';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const SKILL_DIR = dirname(SCRIPT_DIR);
-// 同 selftest-board-ui：receipt 是运行产物，落 Git 忽略的 runtime 目录。
-const RECEIPT_DIR = join(resolve(join(SKILL_DIR, '..', '..', '..')), '.aes-worktree-board', 'receipts');
-const DESKTOP_TRUTH = join(resolve(join(SKILL_DIR, '..', '..', '..')),
-  'docs', 'design', 'design_handoff_issue_starmap', '需求星图 7a.dc.html');
+// 代码仓的设计真源：从 SKILL_DIR 上溯到代码仓根（跟 SKILL_DIR 走，与 receipt 分离）。
+const CODEBASE_ROOT = resolve(join(SKILL_DIR, '..', '..', '..'));
+const DESKTOP_TRUTH = join(CODEBASE_ROOT, 'docs', 'design', 'design_handoff_issue_starmap', '需求星图 7a.dc.html');
 const LOCKED_DESKTOP_SHA = '2703B1A632292A1AD4927D2BFD6E57384E234248B5E6EF59C9AA11128435B98A';
 const LOCKED_MOCK_SHA = '1A94A5291A37D3969E71E245AFD8399425CA80E13839260A451FC7CD7D736CF4';
 const DESKTOP_VIEWPORT = { width: 1440, height: 900 };
@@ -47,7 +46,9 @@ function worktreeFingerprint(path) {
 
 // ---------------------------------------------------------------- (b) desktop 非回归
 
-export async function desktopNonRegressionGate({ repoRoot = process.cwd() } = {}) {
+export async function desktopNonRegressionGate({
+  repoRoot = resolve(process.env.AES_WORKTREE_BOARD_REPO_ROOT || process.cwd()),
+} = {}) {
   const desktopTruth = matchesLockedTextSha(DESKTOP_TRUTH, LOCKED_DESKTOP_SHA);
   assert.ok(desktopTruth.matched,
     `desktop 视觉真源已被修改，非回归基准失效: ${JSON.stringify(desktopTruth.variants)}`);
@@ -110,7 +111,9 @@ export async function desktopNonRegressionGate({ repoRoot = process.cwd() } = {}
       'desktop 不得产生 document 溢出');
     assert.deepEqual(page.takeConsoleErrors(), [], 'desktop 渲染不得产生控制台错误或未捕获异常');
 
-    mkdirSync(RECEIPT_DIR, { recursive: true });
+    // receipt 落在目标仓的 .aes-worktree-board/receipts 目录。
+    const receiptDir = join(resolve(repoRoot), '.aes-worktree-board', 'receipts');
+    mkdirSync(receiptDir, { recursive: true });
     const receipt = {
       schemaVersion: 'aes.worktree-board.live-gate-receipt/v1',
       acceptance: 'AC-007(b)',
@@ -131,10 +134,10 @@ export async function desktopNonRegressionGate({ repoRoot = process.cwd() } = {}
       },
       recordedAt: new Date().toISOString(),
     };
-    writeFileSync(join(RECEIPT_DIR, 'ac-007b-desktop-non-regression.json'),
+    writeFileSync(join(receiptDir, 'ac-007b-desktop-non-regression.json'),
       `${JSON.stringify(receipt, null, 2)}\n`);
-    writeFileSync(join(RECEIPT_DIR, 'ac-007b-product-desktop-1440x900.png'), productShot);
-    writeFileSync(join(RECEIPT_DIR, 'ac-007b-design-truth-1440x900.png'), truthShot);
+    writeFileSync(join(receiptDir, 'ac-007b-product-desktop-1440x900.png'), productShot);
+    writeFileSync(join(receiptDir, 'ac-007b-design-truth-1440x900.png'), truthShot);
     return receipt;
   } finally {
     await page.close();
@@ -173,7 +176,9 @@ export function inspectLocalWorktrees({ repoRoot, integrationBranch, worktrees }
 
 export function localWorktreeGate({ repoRoot, integrationBranch = 'dev', worktrees }) {
   const results = inspectLocalWorktrees({ repoRoot, integrationBranch, worktrees });
-  mkdirSync(RECEIPT_DIR, { recursive: true });
+  // receipt 落在目标仓的 .aes-worktree-board/receipts 目录。
+  const receiptDir = join(resolve(repoRoot), '.aes-worktree-board', 'receipts');
+  mkdirSync(receiptDir, { recursive: true });
   const receipt = {
     schemaVersion: 'aes.worktree-board.worktree-inspection-receipt/v1',
     acceptance: 'AC-007(a) 只读校验部分',
@@ -185,7 +190,7 @@ export function localWorktreeGate({ repoRoot, integrationBranch = 'dev', worktre
     worktrees: results,
     recordedAt: new Date().toISOString(),
   };
-  writeFileSync(join(RECEIPT_DIR, 'ac-007a-worktree-readonly.json'), `${JSON.stringify(receipt, null, 2)}\n`);
+  writeFileSync(join(receiptDir, 'ac-007a-worktree-readonly.json'), `${JSON.stringify(receipt, null, 2)}\n`);
   return receipt;
 }
 
@@ -271,8 +276,10 @@ export function liveRunReceipt({ repoRoot, hostWorktree, issueRepo, integrationB
     reviewerIndependence: 'same-session',
   };
 
-  mkdirSync(RECEIPT_DIR, { recursive: true });
-  const path = join(RECEIPT_DIR, 'ac-007a-live-run.json');
+  // receipt 落在目标仓的 .aes-worktree-board/receipts 目录。
+  const receiptDir = join(resolve(repoRoot), '.aes-worktree-board', 'receipts');
+  mkdirSync(receiptDir, { recursive: true });
+  const path = join(receiptDir, 'ac-007a-live-run.json');
   writeFileSync(path, `${JSON.stringify(receipt, null, 2)}\n`);
   return { path, receipt };
 }
@@ -290,26 +297,34 @@ function parseArguments(argv) {
   return { options, positional };
 }
 
+// CLI 回落必须与其余模块共用同一条目标仓解析链（AES_WORKTREE_BOARD_REPO_ROOT 优先，
+// 否则 cwd）。此前三条子命令未传 --repo 时各自直接回落裸 cwd，跳过了 env 覆盖——
+// receipt 会静默落到裸 cwd，而不是调用方通过 env 指定的目标仓。
+function resolveCliRepoRoot(explicit) {
+  return resolve(explicit || process.env.AES_WORKTREE_BOARD_REPO_ROOT || process.cwd());
+}
+
 if (resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url))) {
   const { options, positional } = parseArguments(process.argv.slice(2));
   try {
     if (positional[0] === 'desktop') {
-      const receipt = await desktopNonRegressionGate({ repoRoot: options.repo || process.cwd() });
+      const receipt = await desktopNonRegressionGate({ repoRoot: resolveCliRepoRoot(options.repo) });
       console.log(JSON.stringify({ ok: true, gate: 'AC-007(b)', commit: receipt.commit, browser: receipt.environment.browser }));
     } else if (positional[0] === 'worktrees') {
       const receipt = localWorktreeGate({
-        repoRoot: options.repo || process.cwd(),
+        repoRoot: resolveCliRepoRoot(options.repo),
         integrationBranch: options.branch || 'dev',
         worktrees: (options.paths || '').split(',').map((value) => value.trim()).filter(Boolean),
       });
       console.log(JSON.stringify({ ok: true, gate: 'AC-007(a) readonly', inspected: receipt.inspected, writeSideEffects: 0 }));
     } else if (positional[0] === 'live-receipt') {
+      const repoRoot = resolveCliRepoRoot(options.repo);
       const { path, receipt } = liveRunReceipt({
-        repoRoot: options.repo || process.cwd(),
-        hostWorktree: options.host || options.repo || process.cwd(),
+        repoRoot,
+        hostWorktree: options.host || repoRoot,
         issueRepo: options['issue-repo'] || 'unknown',
         integrationBranch: options.branch || 'dev',
-        v4Dir: options.dir || join(options.repo || process.cwd(), '.aes-worktree-board', 'runtime-v4'),
+        v4Dir: options.dir || join(repoRoot, '.aes-worktree-board', 'runtime-v4'),
         unexpectedUserMessages: Number(options['unexpected-user-messages'] || 0),
       });
       console.log(JSON.stringify({
