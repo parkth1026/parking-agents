@@ -31,6 +31,17 @@ export const TERMINAL_OUTCOMES = Object.freeze([
   'CONTRACT_CONFLICT', 'BLOCKED_PERMISSION',
 ]);
 
+// stage-result / qa-receipt 的 v1→v2 是纯加法演进（AC-007）：v1 语义永久保持原样
+// （不要求 baseCommit，历史 trajectory replay 语料就是真实的 v1 报文，不得改写）；
+// v2 新增 baseCommit 并强制。产品代码同时接受两版，按报文自带 schemaVersion 分派，
+// 不做「探测环境/回放就放行」的特权判断——分派唯一依据是报文自己声明的版本号。
+export const STAGE_RESULT_SCHEMA_V1 = 'aes.issue-worker.stage-result/v1';
+export const STAGE_RESULT_SCHEMA_V2 = 'aes.issue-worker.stage-result/v2';
+export const QA_RECEIPT_SCHEMA_V1 = 'aes.qa.receipt/v1';
+export const QA_RECEIPT_SCHEMA_V2 = 'aes.qa.receipt/v2';
+const ACCEPTED_STAGE_RESULT_SCHEMAS = Object.freeze([STAGE_RESULT_SCHEMA_V1, STAGE_RESULT_SCHEMA_V2]);
+const ACCEPTED_QA_RECEIPT_SCHEMAS = Object.freeze([QA_RECEIPT_SCHEMA_V1, QA_RECEIPT_SCHEMA_V2]);
+
 function git(cwd, args) {
   return spawnSync('git', args, { ...HEADLESS_CHILD_OPTIONS, cwd, encoding: 'utf8' });
 }
@@ -355,18 +366,20 @@ function emptyBudgetUsage() {
 export function recordStageResult(options = {}) {
   const { dir } = ctx(options);
   const payload = options.payload;
-  const expected = options.stage === 'qa' ? 'aes.qa.receipt/v1' : 'aes.issue-worker.stage-result/v1';
+  const isQa = options.stage === 'qa';
+  const accepted = isQa ? ACCEPTED_QA_RECEIPT_SCHEMAS : ACCEPTED_STAGE_RESULT_SCHEMAS;
+  const latest = isQa ? QA_RECEIPT_SCHEMA_V2 : STAGE_RESULT_SCHEMA_V2;
   return updateV4Registry(dir, (registry) => {
     const attempt = currentAttempt(registry, options.jobId);
     if (!attempt) throw storeError('NO_CURRENT_ATTEMPT', `job ${options.jobId} 无当前 attempt`, { jobId: options.jobId });
-    if (payload?.schemaVersion !== expected) {
+    if (!accepted.includes(payload?.schemaVersion)) {
       appendInbox(dir, {
         kind: 'unclassified-stage-result', jobId: options.jobId, stage: options.stage,
-        consumed: false, requiredReplacementSchema: expected,
+        consumed: false, requiredReplacementSchema: latest,
       });
       return {
         ok: false, code: 'UNCLASSIFIED_STAGE_RESULT', stage: options.stage,
-        consumed: false, requiredReplacementSchema: expected, pending: true,
+        consumed: false, requiredReplacementSchema: latest, acceptedSchemas: accepted, pending: true,
       };
     }
     // 孤儿证据：receipt 必须绑定到本 job 与本 attempt，不接受「挂在别处的 reviewer」。
@@ -389,8 +402,9 @@ export function recordStageResult(options = {}) {
         expectedCommit: attempt.candidateCommit, actualCommit: payload.commitSha || null, pending: true,
       };
     }
-    // 证据必须记录取证时的 base commit（AC-1）。缺失则 fail closed。
-    if (!payload.baseCommit) {
+    // 证据必须记录取证时的 base commit（AC-1）。只有 v2 承诺了这个字段——v1 语义保持
+    // 原样，不对 v1 报文强制 baseCommit（向下兼容；历史 trajectory replay 依赖这条）。
+    if (payload.schemaVersion === latest && !payload.baseCommit) {
       return {
         ok: false, code: 'MISSING_BASE_COMMIT', stage: options.stage,
         jobId: options.jobId, consumed: false, pending: true,
