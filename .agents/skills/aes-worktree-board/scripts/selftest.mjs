@@ -25,6 +25,7 @@ import { defaultSlotsFromWorktrees, discoverWorktrees } from './runner-slots.mjs
 import { readJson, readJsonLines, readRegistry, writeJsonAtomic } from './runtime-store.mjs';
 import {
   deliveryMergeScenario, discoveredWorkScenario, recoveryScenario, runnerLifecycleScenario,
+  reviewerIndependenceScenario, missingReviewerSessionIdScenario,
 } from './selftest-v4.mjs';
 import { trajectoryReplayScenario } from './selftest-trajectory.mjs';
 import { boardUiDomain } from './selftest-board-ui.mjs';
@@ -4176,6 +4177,8 @@ async function orchestrationDomain() {
     { group: 'trajectory-replay', name: 'historical-trajectory-replay', run: trajectoryReplayScenario },
     { group: 'discovered-work', name: 'discovery-reflow', run: discoveredWorkScenario },
     { group: 'delivery-merge', name: 'delivery-and-tiered-merge-gate', run: deliveryMergeScenario },
+    { group: 'reviewer-independence', name: 'reviewer-independence-mechanical-judging', run: reviewerIndependenceScenario },
+    { group: 'reviewer-independence', name: 'missing-reviewer-session-id-fail-closed', run: missingReviewerSessionIdScenario },
   ];
   const p2p3Ids = cases.filter((testCase) => testCase.id).map((testCase) => testCase.id).sort();
   assert.deepEqual(

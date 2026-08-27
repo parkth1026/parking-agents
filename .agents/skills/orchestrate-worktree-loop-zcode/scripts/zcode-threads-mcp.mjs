@@ -8,9 +8,14 @@
 //
 // Internally this server owns a headless ZCode app-server (same NDJSON protocol as the
 // bundled zcode-session-driver.mjs daemon). Child sessions are ordinary top-level
-// interactive sessions: persisted in the shared session store, visible and openable
-// in the ZCode UI. Permission requests from child sessions are surfaced through the
-// status/wait tools and answered via the approve tool (escalation policy).
+// interactive sessions, fully persisted in the shared session store (same db.sqlite the
+// ZCode UI reads, confirmed via `session/list`). KNOWN LIMITATION (issue #79): they do
+// NOT reliably show up in the ZCode UI sidebar without a manual nudge — the desktop app's
+// real-time session list appears scoped to workspaces whose tab is currently open in that
+// window (see `references/ui-visibility-limitation.md` for the full evidence chain and the
+// unverified mitigation steps). Do not claim "visible in the ZCode UI" without that caveat.
+// Permission requests from child sessions are surfaced through the status/wait tools and
+// answered via the approve tool (escalation policy).
 //
 // Zero dependencies (Node >= 20). Wire: MCP stdio = NDJSON JSON-RPC 2.0.
 
@@ -256,7 +261,7 @@ async function resultText(sessionId, all) {
 
 // ---------- MCP tool descriptors ----------
 const TOOLS = [
-  { name: "create_session", description: "Create a REAL top-level ZCode session for a workspace (typically a git worktree). Returns sessionId. The session is visible and openable in the ZCode UI session list. Optionally sends the first prompt immediately.", inputSchema: { type: "object", properties: { workspace: { type: "string", description: "Absolute path to the workspace/worktree" }, mode: { type: "string", enum: ["yolo", "build", "plan", "edit"], description: "Permission mode; yolo = no permission prompts (recommended for autonomous delivery)" }, tag: { type: "string", description: "Label for the coordinator map, e.g. wt1" }, prompt: { type: "string", description: "Optional fully self-contained first task prompt" } }, required: ["workspace"] } },
+  { name: "create_session", description: "Create a REAL top-level ZCode session for a workspace (typically a git worktree). Returns sessionId. The session is fully persisted in the shared ZCode session store, but is NOT guaranteed to appear in the desktop UI sidebar without a manual nudge (open/switch to that workspace's tab, or restart ZCode) — see references/ui-visibility-limitation.md. Optionally sends the first prompt immediately.", inputSchema: { type: "object", properties: { workspace: { type: "string", description: "Absolute path to the workspace/worktree" }, mode: { type: "string", enum: ["yolo", "build", "plan", "edit"], description: "Permission mode; yolo = no permission prompts (recommended for autonomous delivery)" }, tag: { type: "string", description: "Label for the coordinator map, e.g. wt1" }, prompt: { type: "string", description: "Optional fully self-contained first task prompt" } }, required: ["workspace"] } },
   { name: "send", description: "Send a follow-up prompt to an existing session. Keeps full context. Fails with -32010 while a turn is still running (use wait first).", inputSchema: { type: "object", properties: { sessionId: { type: "string" }, text: { type: "string" } }, required: ["sessionId", "text"] } },
   { name: "wait", description: "Wait for the session's current turn to settle (idle/waiting/error) and return the final status plus the last assistant message. Guards against the stale-snapshot race right after send.", inputSchema: { type: "object", properties: { sessionId: { type: "string" }, timeoutSeconds: { type: "number", description: "Default 600, max 1800" }, includeResult: { type: "boolean", description: "Include last assistant text (default true)" } }, required: ["sessionId"] } },
   { name: "status", description: "Point-in-time session state: idle/running/waiting/paused/completed/error, active tool calls, and permission requests escalated to the coordinator.", inputSchema: { type: "object", properties: { sessionId: { type: "string" } }, required: ["sessionId"] } },
