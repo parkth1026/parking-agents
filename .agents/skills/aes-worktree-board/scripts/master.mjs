@@ -68,6 +68,19 @@ function ctx(options = {}) {
   };
 }
 
+// ---------------------------------------------------------------- attempt helpers
+
+// 测试辅助：设置 attempt 的 ownerThreadId。
+export function setAttemptOwnerThreadId(options = {}) {
+  const { dir } = ctx(options);
+  return updateV4Registry(dir, (registry) => {
+    const attempt = currentAttempt(registry, options.jobId);
+    if (!attempt) throw storeError('NO_CURRENT_ATTEMPT', `job ${options.jobId} 无当前 attempt`, { jobId: options.jobId });
+    attempt.ownerThreadId = options.ownerThreadId;
+    return { ok: true, jobId: options.jobId, attemptId: attempt.attemptId, ownerThreadId: attempt.ownerThreadId };
+  });
+}
+
 // ---------------------------------------------------------------- start / status
 
 export function masterStart(options = {}) {
@@ -390,6 +403,14 @@ export function recordStageResult(options = {}) {
       };
     }
 
+    // AC-1: review stage-result 必须携带 reviewer 侧会话标识字段，缺失时 schema fail closed。
+    if (options.stage === 'review' && !payload.reviewerSessionId) {
+      return {
+        ok: false, code: 'MISSING_REVIEWER_SESSION_ID', stage: options.stage,
+        consumed: false, pending: true,
+      };
+    }
+
     attempt.budgetUsage ||= emptyBudgetUsage();
     let failureClass = null;
     if (payload.outcome !== 'PASS' && payload.outcome !== 'AWAITING_HUMAN') {
@@ -404,14 +425,32 @@ export function recordStageResult(options = {}) {
       if (bucket) attempt.budgetUsage[bucket] += 1;
     }
 
+    // AC-2: 机械推导 reviewerIndependence，忽略报文自述该字段。
+    let reviewerIndependence = null;
+    if (options.stage === 'review' && payload.reviewerSessionId) {
+      // ownerThreadId 为 null 时无法判定，仍视为 independent（保守假设）
+      reviewerIndependence = attempt.ownerThreadId && payload.reviewerSessionId === attempt.ownerThreadId
+        ? 'same-session'
+        : 'independent';
+    }
+
     if (options.stage === 'qa') attempt.qa = payload.outcome === 'PASS' ? payload : null;
-    else attempt.review = payload.outcome === 'PASS' ? payload : null;
+    else {
+      if (payload.outcome === 'PASS') {
+        attempt.review = payload;
+        attempt.reviewerSessionId = payload.reviewerSessionId;
+        attempt.reviewerIndependence = reviewerIndependence;
+      } else {
+        attempt.review = null;
+      }
+    }
     attempt.lastStage = { stage: options.stage, outcome: payload.outcome, failureClass, commitSha: payload.commitSha };
     attempt.state = options.stage === 'qa' ? 'qa' : 'reviewing';
     appendReceipt(dir, { kind: options.stage, jobId: options.jobId, attemptId: attempt.attemptId, payload });
     return {
       ok: true, stage: options.stage, jobId: options.jobId, outcome: payload.outcome,
       commitSha: payload.commitSha, failureClass, budgetUsage: { ...attempt.budgetUsage },
+      reviewerIndependence,
     };
   });
 }
