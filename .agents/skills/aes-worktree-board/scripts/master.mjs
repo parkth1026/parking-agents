@@ -30,6 +30,12 @@ export const TERMINAL_OUTCOMES = Object.freeze([
   'READY_TO_MERGE', 'BUDGET_EXHAUSTED', 'AWAITING_HUMAN', 'BLOCKED_DEPENDENCY',
   'CONTRACT_CONFLICT', 'BLOCKED_PERMISSION',
 ]);
+// review stage-result 双版本并存（#65）：v1 是历史轨迹夹具锁定证据的原始语义，
+// 永远不要求 reviewerSessionId；v2 起 reviewerSessionId 强制。产品代码按报文
+// 自带 schemaVersion 分派，不按调用方（是否回放）分派——没有回放特权路径。
+export const STAGE_RESULT_SCHEMA_V1 = 'aes.issue-worker.stage-result/v1';
+export const STAGE_RESULT_SCHEMA_V2 = 'aes.issue-worker.stage-result/v2';
+export const REVIEWER_INDEPENDENCE_VALUES = Object.freeze(['same-session', 'independent', 'unknown']);
 
 function git(cwd, args) {
   return spawnSync('git', args, { ...HEADLESS_CHILD_OPTIONS, cwd, encoding: 'utf8' });
@@ -368,18 +374,20 @@ function emptyBudgetUsage() {
 export function recordStageResult(options = {}) {
   const { dir } = ctx(options);
   const payload = options.payload;
-  const expected = options.stage === 'qa' ? 'aes.qa.receipt/v1' : 'aes.issue-worker.stage-result/v1';
+  const acceptedSchemas = options.stage === 'qa' ? ['aes.qa.receipt/v1'] : [STAGE_RESULT_SCHEMA_V1, STAGE_RESULT_SCHEMA_V2];
+  // 拒绝态提示的 replacement 一律指向当前最新版本，鼓励新流程升级；不影响已被接受的旧版本。
+  const canonicalSchema = options.stage === 'qa' ? 'aes.qa.receipt/v1' : STAGE_RESULT_SCHEMA_V2;
   return updateV4Registry(dir, (registry) => {
     const attempt = currentAttempt(registry, options.jobId);
     if (!attempt) throw storeError('NO_CURRENT_ATTEMPT', `job ${options.jobId} 无当前 attempt`, { jobId: options.jobId });
-    if (payload?.schemaVersion !== expected) {
+    if (!payload || !acceptedSchemas.includes(payload.schemaVersion)) {
       appendInbox(dir, {
         kind: 'unclassified-stage-result', jobId: options.jobId, stage: options.stage,
-        consumed: false, requiredReplacementSchema: expected,
+        consumed: false, requiredReplacementSchema: canonicalSchema,
       });
       return {
         ok: false, code: 'UNCLASSIFIED_STAGE_RESULT', stage: options.stage,
-        consumed: false, requiredReplacementSchema: expected, pending: true,
+        consumed: false, requiredReplacementSchema: canonicalSchema, pending: true,
       };
     }
     // 孤儿证据：receipt 必须绑定到本 job 与本 attempt，不接受「挂在别处的 reviewer」。
@@ -403,8 +411,10 @@ export function recordStageResult(options = {}) {
       };
     }
 
-    // AC-1: review stage-result 必须携带 reviewer 侧会话标识字段，缺失时 schema fail closed。
-    if (options.stage === 'review' && !payload.reviewerSessionId) {
+    // AC-1: v2 起 review stage-result 必须携带 reviewer 侧会话标识字段，缺失时 fail closed。
+    // v1 是历史轨迹夹具锁定证据的原始语义，不追溯要求（否则 trajectory-replay 场景本身
+    // 就无法通过——那是它存在的意义：暴露 schema 变更对历史证据的破坏，不是被绕过的障碍）。
+    if (options.stage === 'review' && payload.schemaVersion === STAGE_RESULT_SCHEMA_V2 && !payload.reviewerSessionId) {
       return {
         ok: false, code: 'MISSING_REVIEWER_SESSION_ID', stage: options.stage,
         consumed: false, pending: true,
@@ -426,19 +436,23 @@ export function recordStageResult(options = {}) {
     }
 
     // AC-2: 机械推导 reviewerIndependence，忽略报文自述该字段。
+    // fail-closed 口径：任何一侧标识缺失都判定不出「独立」，如实记 unknown——
+    // 不把「无法证明独立」偷换成「独立」（v1 legacy 无 reviewerSessionId、或
+    // ownerThreadId 未记录，都落在这一分支，不再默认给 independent）。
     let reviewerIndependence = null;
-    if (options.stage === 'review' && payload.reviewerSessionId) {
-      // ownerThreadId 为 null 时无法判定，仍视为 independent（保守假设）
-      reviewerIndependence = attempt.ownerThreadId && payload.reviewerSessionId === attempt.ownerThreadId
-        ? 'same-session'
-        : 'independent';
+    if (options.stage === 'review') {
+      if (!payload.reviewerSessionId || !attempt.ownerThreadId) {
+        reviewerIndependence = 'unknown';
+      } else {
+        reviewerIndependence = payload.reviewerSessionId === attempt.ownerThreadId ? 'same-session' : 'independent';
+      }
     }
 
     if (options.stage === 'qa') attempt.qa = payload.outcome === 'PASS' ? payload : null;
     else {
       if (payload.outcome === 'PASS') {
         attempt.review = payload;
-        attempt.reviewerSessionId = payload.reviewerSessionId;
+        attempt.reviewerSessionId = payload.reviewerSessionId || null;
         attempt.reviewerIndependence = reviewerIndependence;
       } else {
         attempt.review = null;

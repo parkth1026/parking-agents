@@ -47,13 +47,24 @@ function freshProcess(fixture, args, { expectStatus = 0, env = {} } = {}) {
   return JSON.parse(String(text).trim().split(/\r?\n/).pop());
 }
 
+// v2：#65 起的默认现行格式，强制携带 reviewerSessionId。
 function passingReview(jobId, commitSha, reviewerSessionId = 'reviewer-default') {
+  return {
+    schemaVersion: 'aes.issue-worker.stage-result/v2',
+    jobId, stage: 'code-review', commitSha, outcome: 'PASS', findings: [],
+    evidence: [{ kind: 'standards', result: 'PASS' }, { kind: 'spec', result: 'PASS' }],
+    mayAdvance: true,
+    reviewerSessionId,
+  };
+}
+
+// v1：历史轨迹夹具锁定证据的原始语义，不带 reviewerSessionId，永远合法。
+function passingReviewV1(jobId, commitSha) {
   return {
     schemaVersion: 'aes.issue-worker.stage-result/v1',
     jobId, stage: 'code-review', commitSha, outcome: 'PASS', findings: [],
     evidence: [{ kind: 'standards', result: 'PASS' }, { kind: 'spec', result: 'PASS' }],
     mayAdvance: true,
-    reviewerSessionId,
   };
 }
 
@@ -378,7 +389,8 @@ export async function recoveryScenario() {
     });
     assert.equal(unknown.code, 'UNCLASSIFIED_STAGE_RESULT');
     assert.equal(unknown.consumed, false);
-    assert.equal(unknown.requiredReplacementSchema, 'aes.issue-worker.stage-result/v1');
+    // 拒绝态指向当前最新版本（v2），但 v1 本身仍是被接受的合法历史语义（见下方 reviewer-independence 场景）。
+    assert.equal(unknown.requiredReplacementSchema, 'aes.issue-worker.stage-result/v2');
 
     // owner thread 中断：优先恢复原 thread。
     const interrupted = master.attemptInterrupt({ ...base(fixture), jobId, reason: 'owner thread 无响应' });
@@ -1186,7 +1198,9 @@ function hashFile(path) {
 
 // AC-1 ~ AC-5: reviewer 独立性机械判据
 export async function reviewerIndependenceScenario() {
-  const fixture = makeFixture('reviewer-independence', { workers: [{ id: 'worker-1' }] });
+  const fixture = makeFixture('reviewer-independence', {
+    workers: [{ id: 'worker-1' }, { id: 'worker-2' }, { id: 'worker-3' }],
+  });
   try {
     writeSlots(fixture);
     master.masterStart({ ...base(fixture) });
@@ -1194,7 +1208,7 @@ export async function reviewerIndependenceScenario() {
     // 场景 1: same-session review（owner 与 reviewer 同 session）
     const sameSessionJob = driveToReadyToMerge(
       fixture, issuePayload({ number: 601 }),
-      { ownerThreadId: 'session-A', reviewerSessionId: 'session-A' }
+      { slotId: 'worker-1', ownerThreadId: 'session-A', reviewerSessionId: 'session-A' }
     );
     const sameSessionRegistry = readV4Registry(fixture.v4Dir);
     const sameSessionAttempt = sameSessionRegistry.attempts[sameSessionJob.attemptId];
@@ -1207,18 +1221,30 @@ export async function reviewerIndependenceScenario() {
     // 场景 2: independent review（owner 与 reviewer 不同 session）
     const independentJob = driveToReadyToMerge(
       fixture, issuePayload({ number: 602 }),
-      { ownerThreadId: 'session-B', reviewerSessionId: 'reviewer-C' }
+      { slotId: 'worker-2', ownerThreadId: 'session-B', reviewerSessionId: 'reviewer-C' }
     );
     const independentRegistry = readV4Registry(fixture.v4Dir);
     const independentAttempt = independentRegistry.attempts[independentJob.attemptId];
     assert.equal(independentAttempt.reviewerIndependence, 'independent', 'independent 必须被推导');
     assert.equal(independentAttempt.reviewerSessionId, 'reviewer-C', 'reviewer session id 必须被记录');
 
-    // AC-3: 两种情况都不阻断 merge gate
+    // 场景 3: ownerThreadId 未记录（无法判定）→ 必须如实记 unknown，不得默认 independent。
+    // fail-closed 口径：owner 侧标识缺失时，「无法证明独立」不能偷换成「独立」。
+    const unknownOwnerJob = driveToReadyToMerge(
+      fixture, issuePayload({ number: 603 }),
+      { slotId: 'worker-3', ownerThreadId: null, reviewerSessionId: 'reviewer-D' }
+    );
+    const unknownOwnerRegistry = readV4Registry(fixture.v4Dir);
+    const unknownOwnerAttempt = unknownOwnerRegistry.attempts[unknownOwnerJob.attemptId];
+    assert.equal(unknownOwnerAttempt.reviewerIndependence, 'unknown', 'ownerThreadId 缺失时必须记 unknown，不得默认 independent');
+
+    // AC-3: 三种情况都不阻断 merge gate
     const sameSessionGate = master.evaluateGate({ ...base(fixture), jobId: sameSessionJob.jobId });
     assert.equal(sameSessionGate.mechanical.allGreen, true, 'same-session 不得阻断 merge gate');
     const independentGate = master.evaluateGate({ ...base(fixture), jobId: independentJob.jobId });
     assert.equal(independentGate.mechanical.allGreen, true, 'independent 不得阻断 merge gate');
+    const unknownOwnerGate = master.evaluateGate({ ...base(fixture), jobId: unknownOwnerJob.jobId });
+    assert.equal(unknownOwnerGate.mechanical.allGreen, true, 'unknown 不得阻断 merge gate');
 
     // AC-4: same-session 在 receipt 中显式标记
     const sameSessionReceiptPayload = sameSessionReceipts[0].payload;
@@ -1229,7 +1255,7 @@ export async function reviewerIndependenceScenario() {
   }
 }
 
-// AC-1: 缺失 reviewerSessionId 时 schema fail closed
+// AC-1: v2 起缺失 reviewerSessionId 时 schema fail closed；v1 legacy 无此要求（向后兼容）。
 export async function missingReviewerSessionIdScenario() {
   const fixture = makeFixture('missing-reviewer-id', { workers: [{ id: 'worker-1' }] });
   try {
@@ -1242,16 +1268,25 @@ export async function missingReviewerSessionIdScenario() {
     const candidate = makeCandidate(fixture, claim.slotId, { file: 'test.txt' });
     master.recordCandidate({ ...base(fixture), jobId: claim.jobId, commitSha: candidate });
 
-    // 报文缺失 reviewerSessionId
-    const badReview = {
-      schemaVersion: 'aes.issue-worker.stage-result/v1',
+    // v2 报文缺失 reviewerSessionId → fail closed。
+    const badReviewV2 = {
+      schemaVersion: 'aes.issue-worker.stage-result/v2',
       jobId: claim.jobId, stage: 'code-review', commitSha: candidate, outcome: 'PASS',
       findings: [], evidence: [], mayAdvance: true,
       // 缺少 reviewerSessionId
     };
-    const result = master.recordStageResult({ ...base(fixture), jobId: claim.jobId, stage: 'review', payload: badReview });
-    assert.equal(result.ok, false, 'schema 验证失败');
+    const result = master.recordStageResult({ ...base(fixture), jobId: claim.jobId, stage: 'review', payload: badReviewV2 });
+    assert.equal(result.ok, false, 'v2 缺失 reviewerSessionId 必须 fail closed');
     assert.equal(result.code, 'MISSING_REVIEWER_SESSION_ID', '必须报 MISSING_REVIEWER_SESSION_ID');
+
+    // v1 报文同样缺失 reviewerSessionId → 必须被接受（向后兼容历史证据），
+    // 但 reviewerIndependence 推导为 'unknown'，不得被判定为 same-session 或 independent。
+    const legacyReview = passingReviewV1(claim.jobId, candidate);
+    const accepted = master.recordStageResult({ ...base(fixture), jobId: claim.jobId, stage: 'review', payload: legacyReview });
+    assert.equal(accepted.ok, true, 'v1 legacy 报文缺失 reviewerSessionId 必须被接受（不追溯要求）');
+    assert.equal(accepted.reviewerIndependence, 'unknown', 'v1 无 reviewerSessionId 时必须如实记 unknown，不得默认 independent');
+    const registry = readV4Registry(fixture.v4Dir);
+    assert.equal(registry.attempts[claim.attemptId].reviewerIndependence, 'unknown');
   } finally {
     fixture.cleanup();
   }
