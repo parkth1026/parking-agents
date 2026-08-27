@@ -75,6 +75,14 @@ Wait for `BRIDGE_READY`. The CLI subcommands mirror the tools one-to-one: `creat
 3. Prefer `send` on the existing session for follow-up work on the same issue (e.g. after review findings) — the session keeps its context. "A prompt is already running" (-32010) means the turn is still active: `wait`, do not double-send.
 4. Do not run delivery-critical implementation inside the coordinator session; the coordinator inspects evidence, reviews, merges, and steers.
 
+#### UI visibility of bridge sessions (defect #79)
+
+Bridge sessions live in a headless app-server process; the desktop app only indexes sessions its own process creates. Since the #79 fix, `create_session` mirrors each session into the UI's session index (`~/.zcode/v2/tasks-index.sqlite`, table `tasks`) with a native-shaped row — title is `<tag> · <first prompt line>` — and every `status`/`wait` read keeps `task_status` in sync (`running`/`completed`/`error`). This is best-effort: if `node:sqlite` is unavailable or the DB is locked, mirroring is skipped and a single line goes to the server's stderr; orchestration is never blocked. Caveats:
+
+- The sidebar may need an app reload/restart to pick up externally inserted rows; when reporting to the user, say where the sessions are visible instead of promising instant sidebar updates.
+- Opening a mirrored row from the UI shows the session only after the host app can resolve it; if it cannot, treat the rollout file (`~/.zcode/cli/rollout/model-io-<sessionId>.jsonl`) as the raw transcript.
+- The mirror writes only rows for session ids created by this bridge and never deletes or rewrites foreign rows.
+
 Prompt shape (fill every `<...>`; no references to this conversation):
 
 ```text

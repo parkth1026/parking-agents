@@ -1,6 +1,6 @@
 ---
 name: aes-worktree-board
-description: 在主仓巡检并编排同级既有 worktree：采集全仓 Issue Map/List 与队员坐标，用 Desktop create_thread 派发可见 Task，以 registry/inbox/三维 verdict/熔断/全局停止协议恢复和审计执行，并启动需求星图看板。用户要查看所有 worktree、Issue frontier、调度实现与独立 review、判断并执行受门禁保护的合并、恢复中断编排或打开看板时使用。
+description: 在主仓巡检并编排本仓既有 worktree（同级或嵌套在子目录里）：采集全仓 Issue Map/List 与队员坐标，用 Desktop create_thread 派发可见 Task，以 registry/inbox/三维 verdict/熔断/全局停止协议恢复和审计执行，并启动需求星图看板。用户要查看所有 worktree、Issue frontier、调度实现与独立 review、判断并执行受门禁保护的合并、恢复中断编排或打开看板时使用。
 ---
 
 # AES Worktree Board
@@ -48,7 +48,7 @@ runtime 选址链保持不变：`AES_WORKTREE_BOARD_RUNTIME_DIR` 优先，否则
 
 ## 不可越过的边界
 
-- 只操作 `git worktree list` 中与主仓同级的既有 worktree；`task create` 会把短名与完整 basename 规范化为同一 worker identity，并拒绝不存在的 worktree；不创建、不删除 worktree；`test` worktree 不参与自动调度。
+- 只操作 `git worktree list` 中归属本仓的既有 worktree —— 归属以 `git rev-parse --git-common-dir` 判定，同级、嵌套一层或多层都采集，主仓自身与 Temp 下的一次性 worktree 除外；`task create` 会把短名与完整 basename 规范化为同一 worker identity，并拒绝不存在的 worktree；不创建、不删除 worktree；`test` worktree 不参与自动调度。
 - dirty worktree 必须先复述修改数与未跟踪数；用户确认后才可继续，确认不能越过 registry 租约。
 - 正常派发只用 Desktop `create_thread`。真实 CLI fallback（`cli-fallback`）必须保留用户授权原话；`test` 假 agent 仅供 selftest 豁免。
 - 新建 executor、reviewer 与 master/subagent Task 统一使用 `luna-max`；每个 TaskRecord 必须记录 `modelTier` 与 `routingReason`。历史 registry 中已有的 `sol-high` 只作为不可篡改的审计事实保留，不得复用或新建。

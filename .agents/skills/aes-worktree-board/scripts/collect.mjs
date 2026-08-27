@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 采集同级既有 worktree 与全仓 issue 事实，写入 status.json v2 和 file:// 快照。
+// 采集本仓既有 worktree 与全仓 issue 事实，写入 status.json v2 和 file:// 快照。
 // assessment 是主 agent 的判断；采集只保留它并计算 stale，不替 agent 作合并决定。
 import { execFile } from 'node:child_process';
 import { HEADLESS_CHILD_OPTIONS } from './headless.mjs';
@@ -8,6 +8,7 @@ import {
   existsSync, mkdirSync, readFileSync, readdirSync,
 } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { prepareGithubAccess, runGithubJson } from './github-identity.mjs';
 import {
@@ -118,7 +119,57 @@ function parseWorktreeList(output) {
   return entries;
 }
 
-// 仅保留主仓同级的既有 worktree；Temp、嵌套目录和主仓自身均排除。
+function pathKey(path) {
+  const key = norm(path);
+  return process.platform === 'win32' ? key.toLowerCase() : key;
+}
+
+function withinDirectory(parent, child) {
+  const parentKey = pathKey(parent);
+  const childKey = pathKey(child);
+  return childKey === parentKey || childKey.startsWith(`${parentKey}/`);
+}
+
+// 归属判定与 runner-slots.defaultSlotsFromWorktrees 同一口径：git common dir 的上级
+// 才是「同一个仓」的锚点。路径前缀、目录层级都不参与判定。
+async function gitCommonRoot(worktreePath) {
+  try {
+    const commonDir = await git(['rev-parse', '--git-common-dir'], { cwd: worktreePath });
+    if (!commonDir) return null;
+    return norm(resolve(worktreePath, commonDir, '..'));
+  } catch {
+    return null;
+  }
+}
+
+// #67: 以 git common dir 归属判定既有 worktree，同级、嵌套一层或多层一视同仁。
+//
+// 历史口径要求 worktree 与主仓同级（dirname 相等），于是把 worker 收进
+// <repo>-worker/ 之类的子目录后，v3 的采集与派发就再也看不到它们，而 v4 的
+// runner slot（defaultSlotsFromWorktrees）早已改用 git-common-dir，两套口径互相打架。
+// 目录摆放方式不该决定一个 worktree 是不是本仓的 worktree —— `git worktree list` 才是权威。
+//
+// 仍然排除三类：主仓自身（它是 host 不是 worker）、Temp 下的一次性 worktree、
+// 以及 common dir 不同的非同仓路径（目录被替换成别的仓时 git 的登记会滞后）。
+//
+// 排除判定抽成纯函数，便于用合成路径直接回归 Temp 与非同仓两条边界，不必真去建仓。
+export function selectOwnedWorktrees({
+  entries, main, expectedCommonRoot, commonRootOf, tempRoot = tmpdir(), exists = existsSync,
+}) {
+  const temp = norm(resolve(tempRoot));
+  // 整个仓本来就建在 Temp 里时（离线 selftest 的自建 fixture）Temp 排除不适用，
+  // 否则 fixture 一个 worktree 都发现不了。
+  const excludeTemp = !withinDirectory(temp, main.path);
+  return entries.filter((entry) => {
+    if (entry === main || pathKey(entry.path) === pathKey(main.path)) return false;
+    if (!exists(entry.path)) return false;
+    if (excludeTemp && withinDirectory(temp, entry.path)) return false;
+    const commonRoot = commonRootOf(entry.path);
+    return Boolean(commonRoot) && Boolean(expectedCommonRoot)
+      && pathKey(commonRoot) === pathKey(expectedCommonRoot);
+  });
+}
+
 export async function listWorktrees() {
   let repoRoot;
   try {
@@ -127,16 +178,40 @@ export async function listWorktrees() {
     throw new Error(`目标仓根不是有效的 Git worktree: ${norm(REPO_ROOT)}`, { cause: error });
   }
   const entries = parseWorktreeList(await git(['worktree', 'list', '--porcelain']));
-  const main = entries.find((entry) => entry.path.toLowerCase() === repoRoot.toLowerCase())
-    || entries[0];
+  const main = entries.find((entry) => pathKey(entry.path) === pathKey(repoRoot)) || entries[0];
   if (!main) throw new Error('git worktree list 没有返回主 worktree');
-  const mainParent = norm(dirname(main.path)).toLowerCase();
-  const siblings = entries.filter((entry) => (
-    entry !== main
-    && norm(dirname(entry.path)).toLowerCase() === mainParent
-    && existsSync(entry.path)
-  ));
+  const expectedCommonRoot = await gitCommonRoot(main.path);
+  if (!expectedCommonRoot) throw new Error(`无法解析目标仓的 git common dir: ${main.path}`);
+  // 先跑一遍便宜的排除（主仓自身 / 不存在 / Temp），只对幸存者花 git 子进程解析 common dir。
+  const candidates = selectOwnedWorktrees({
+    entries, main, expectedCommonRoot, commonRootOf: () => expectedCommonRoot,
+  });
+  const ownership = await Promise.all(candidates.map((entry) => gitCommonRoot(entry.path)));
+  const byPath = new Map(candidates.map((entry, index) => [entry.path, ownership[index]]));
+  const siblings = selectOwnedWorktrees({
+    entries: candidates, main, expectedCommonRoot, commonRootOf: (path) => byPath.get(path),
+  });
   return { main, siblings };
+}
+
+// #67 AC-2: 短名（worker-1）与完整 basename（parking-agents-worker-1）必须规范化到同一个
+// worktree。精确 basename 优先，其次是唯一的 `-<短名>` 后缀匹配；出现多个候选时拒绝而不猜。
+export function resolveWorktreeTarget(entries, requested) {
+  const available = entries.map((entry) => basename(entry.path));
+  const wanted = String(requested || '').trim().toLowerCase();
+  if (!wanted) return { target: null, code: 'BAD_REQUEST', matches: [], available };
+  const exact = entries.filter((entry) => basename(entry.path).toLowerCase() === wanted);
+  if (exact.length === 1) return { target: exact[0], code: null, matches: exact, available };
+  const suffix = exact.length
+    ? exact
+    : entries.filter((entry) => basename(entry.path).toLowerCase().endsWith(`-${wanted}`));
+  if (suffix.length === 1) return { target: suffix[0], code: null, matches: suffix, available };
+  return {
+    target: null,
+    code: suffix.length ? 'AMBIGUOUS_WORKTREE' : 'BAD_REQUEST',
+    matches: suffix,
+    available,
+  };
 }
 
 function pidAlive(pid) {
