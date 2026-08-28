@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os';
 import { basename, join, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
-  BOARD_API, collectStatus, DEFAULT_RUNTIME_DIR, listWorktrees, loadIssueFixture, loadConfig,
+  BOARD_API, collectStatus, DEFAULT_RUNTIME_DIR, listWorktrees, loadIssueFixture, loadConfig, previousWorktreeIndex,
   resolveWorktreeTarget, selectOwnedWorktrees, SKILL_DIR,
 } from './collect.mjs';
 import { resolveCommand } from './command.mjs';
@@ -2375,12 +2375,34 @@ writeFileSync(process.env.AES_WORKTREE_BOARD_CHAIN_PID_FILE, String(child.pid));
   }
 }
 
+function duplicateBasenameAssessmentIsolation() {
+  const assessment = { currentTask: 'must-not-spread' };
+  const previous = [{
+    name: 'parking-agents', path: 'G:/historical/parking-agents', assessment,
+  }];
+  const current = [
+    { name: 'parking-agents', path: 'E:/codex/a/parking-agents' },
+    { name: 'PARKING-AGENTS', path: 'E:/codex/b/PARKING-AGENTS' },
+  ];
+  const index = previousWorktreeIndex(previous, current);
+  assert.equal(index.find(current[0]), null, '旧快照单条 assessment 不得 fallback 到当前第一条同名新路径');
+  assert.equal(index.find(current[1]), null, 'basename 大小写不同仍属同名，不得复制 assessment');
+  assert.equal(
+    previousWorktreeIndex(previous, [previous[0]]).find(previous[0]).assessment,
+    assessment,
+    '完整路径精确匹配仍应承接 assessment',
+  );
+}
+
 async function orchestrationStorageCompatibility() {
   const runtimeDir = tempDirectory('orchestration-storage-compat');
   try {
+    duplicateBasenameAssessmentIsolation();
     const first = await collectStatus({ runtimeDir, issuesFixture: ISSUE_FIXTURE });
     const worker = first.worktrees[0];
-    assert.ok(worker, 'storage fixture 需要一个同级 worktree');
+    if (!worker) {
+      return { skipped: true, reason: 'storage fixture 需要至少一个本仓 worktree' };
+    }
     first.schemaVersion = 2;
     worker.assessment = {
       currentTask: 'v2-assessment-preserved', done: null, merge: 'not-yet', reason: 'v2 seed',
@@ -2425,6 +2447,47 @@ async function orchestrationStorageCompatibility() {
   } finally {
     await cleanTemp(runtimeDir);
   }
+}
+
+function uniquelyAddressableFromEntries(context, siblings) {
+  const basenameCounts = new Map();
+  for (const entry of siblings) {
+    const name = basename(entry.path).toLowerCase();
+    basenameCounts.set(name, (basenameCounts.get(name) || 0) + 1);
+  }
+  const entry = siblings.find((candidate) => basenameCounts.get(basename(candidate.path).toLowerCase()) === 1);
+  return entry
+    ? { entry, skipped: false }
+    : {
+      entry: null,
+      skipped: true,
+      reason: `${context} fixture 需要至少一个 basename 唯一的本仓 worktree；多义短名由独立场景验证`,
+    };
+}
+
+async function uniquelyAddressableWorktree(context) {
+  return uniquelyAddressableFromEntries(context, (await listWorktrees()).siblings);
+}
+
+function recordOrchestrationOutcome(result, testCase, skipped) {
+  if (!result?.skipped) return true;
+  skipped.push({ scenario: testCase.name, reason: result.reason });
+  return false;
+}
+
+function explicitHostPreconditionSkipContract() {
+  const unavailable = uniquelyAddressableFromEntries('skip probe', [
+    { path: 'E:/codex/a/parking-agents' },
+    { path: 'E:/codex/b/PARKING-AGENTS' },
+  ]);
+  assert.equal(unavailable.skipped, true, '只有大小写差异的同 basename worktree 仍不可唯一寻址');
+  const skipped = [];
+  assert.equal(
+    recordOrchestrationOutcome(unavailable, { name: 'host-precondition-probe' }, skipped),
+    false,
+    '宿主前置条件不足不得计入 passed',
+  );
+  assert.deepEqual(skipped, [{ scenario: 'host-precondition-probe', reason: unavailable.reason }]);
 }
 
 async function orchestrationMergeBehindRefresh() {
@@ -2509,7 +2572,9 @@ for (let index = 0; index < count; index += 1) {
 async function orchestrationLockCompetition() {
   const runtimeDir = tempDirectory('orchestration-storage-lock-competition');
   try {
-    const worker = basename((await listWorktrees()).siblings[0].path);
+    const available = await uniquelyAddressableWorktree('lock competition');
+    if (available.skipped) return available;
+    const worker = basename(available.entry.path);
     const args = (thread) => [
       join(SCRIPT_DIR, 'orchestrate.mjs'), 'task', 'create', '--issue', '18', '--worktree', worker,
       '--role', 'executor', '--thread-id', thread, '--model', 'sol-high', '--routing-reason', 'P2.3 lock competition',
@@ -2534,7 +2599,9 @@ async function orchestrationPreflightLeaseAndState() {
   try {
     assert.equal(canonicalWorktreeId('dev1'), 'dev1');
     assert.equal(canonicalWorktreeId('aes-agent-worker-1'), 'dev1', 'dev1 与完整 worker basename 必须是同一 canonical identity');
-    const availableWorker = basename((await listWorktrees()).siblings[0].path);
+    const available = await uniquelyAddressableWorktree('lifecycle');
+    if (available.skipped) return available;
+    const availableWorker = basename(available.entry.path);
     let result = orchestrateSync([
       'task', 'create', '--issue', '17', '--worktree', 'dev4', '--role', 'executor', '--agent', 'claude',
     ], runtimeDir);
@@ -4467,6 +4534,7 @@ async function orchestrationContractMarkers() {
 }
 
 async function orchestrationDomain() {
+  explicitHostPreconditionSkipContract();
   const scenarioIndex = process.argv.indexOf('--scenario');
   const requested = scenarioIndex >= 0 ? process.argv[scenarioIndex + 1] : null;
   const cases = [
@@ -4527,9 +4595,11 @@ async function orchestrationDomain() {
   const selected = requested ? cases.filter((testCase) => testCase.group === requested) : cases;
   assert.ok(selected.length, `未知 orchestration scenario: ${requested}; 可用 ${groups.join('|')}`);
   let passed = 0;
+  const skipped = [];
   for (const testCase of selected) {
     try {
-      await testCase.run();
+      const result = await testCase.run();
+      if (!recordOrchestrationOutcome(result, testCase, skipped)) continue;
       passed += 1;
     } catch (cause) {
       throw new Error(`orchestration/${testCase.id || testCase.group}/${testCase.name} 失败: ${cause.stack || cause.message}`, { cause });
@@ -4539,6 +4609,7 @@ async function orchestrationDomain() {
     scenario: requested || 'all',
     scenarios: selected.length,
     passed,
+    skipped,
     scenarioIds: selected.filter((testCase) => testCase.id).map((testCase) => testCase.id),
   };
 }

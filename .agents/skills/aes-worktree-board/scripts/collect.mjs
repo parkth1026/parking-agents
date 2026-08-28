@@ -250,6 +250,40 @@ function loadPrevious(runtimeDir) {
   return readJson(runtimePaths(runtimeDir).statusJson, null);
 }
 
+function worktreeNameKey(value) {
+  return String(value || '').toLowerCase();
+}
+
+export function previousWorktreeIndex(worktrees = [], currentWorktrees = []) {
+  const byPath = new Map();
+  const byName = new Map();
+  const currentNameCounts = new Map();
+  for (const worker of worktrees) {
+    if (worker?.path) byPath.set(pathKey(worker.path), worker);
+    if (!worker?.name) continue;
+    const nameKey = worktreeNameKey(worker.name);
+    const matches = byName.get(nameKey) || [];
+    matches.push(worker);
+    byName.set(nameKey, matches);
+  }
+  for (const worker of currentWorktrees) {
+    if (!worker?.path) continue;
+    const nameKey = worktreeNameKey(worker.name || basename(worker.path));
+    currentNameCounts.set(nameKey, (currentNameCounts.get(nameKey) || 0) + 1);
+  }
+  return {
+    find(entry) {
+      const exact = byPath.get(pathKey(entry.path));
+      if (exact) return exact;
+      const nameKey = worktreeNameKey(entry.name || basename(entry.path));
+      const legacyMatches = byName.get(nameKey) || [];
+      return legacyMatches.length === 1 && currentNameCounts.get(nameKey) === 1
+        ? legacyMatches[0]
+        : null;
+    },
+  };
+}
+
 function identityPathKey(value) {
   if (!value) return null;
   const key = norm(resolve(String(value)));
@@ -567,7 +601,10 @@ export async function collectStatus({
   const previous = loadPrevious(runtimeDir);
   assertRuntimeIdentity(runtimeDir, expectedIdentity, previous);
   const registry = readRegistry(runtimeDir);
-  const previousWorktrees = new Map((previous?.worktrees || []).map((worker) => [worker.name, worker]));
+  // basename 不是 worktree identity：Codex 的 detached worktree 常共享同一个目录名。
+  // v2/v3 快照已有 path，优先按规范化完整路径承接；只有旧快照与当前集合两侧名称都唯一时
+  // 才回退 basename，避免新增同名 worktree 后把一条旧 assessment 复制到多条新路径。
+  const previousWorktrees = previousWorktreeIndex(previous?.worktrees, siblings);
   const tasks = readTasks(runtimeDir);
   const mainHead = await git(['rev-parse', '--short', config.mainBranch]);
 
@@ -620,7 +657,7 @@ export async function collectStatus({
       issueNumbers,
       claimedIssue,
       mergeCheck: await mergeCheck(config.mainBranch, entry.branch, ahead),
-      assessment: assessmentWithStale(previousWorktrees.get(name)?.assessment, lastCommitAt, worktreeTasks),
+      assessment: assessmentWithStale(previousWorktrees.find(entry)?.assessment, lastCommitAt, worktreeTasks),
       activeTask,
       recentTasks: worktreeTasks.filter((task) => task.status !== 'running').slice(0, 5),
       task: registryTask,
@@ -632,7 +669,7 @@ export async function collectStatus({
     worktree: worker.name,
   })));
   const worktrees = facts.map((worker) => {
-    const previousWorker = previousWorktrees.get(worker.name);
+    const previousWorker = previousWorktrees.find(worker);
     const hasPosition = worker.claimedIssue && sourceByNumber.has(worker.claimedIssue);
     return {
       name: worker.name,
@@ -687,14 +724,15 @@ export async function collectStatus({
     // collect 计算期间 assess/registry 可能已更新；临写前重新承接，避免旧快照复活。
     const latestSnapshot = readJson(paths.statusJson, null);
     assertRuntimeIdentity(runtimeDir, expectedIdentity, latestSnapshot);
-    const latestAssessments = new Map((latestSnapshot?.worktrees || []).map((worker) => [worker.name, worker.assessment]));
+    const latestWorktrees = previousWorktreeIndex(latestSnapshot?.worktrees, status.worktrees);
     const latestRegistry = readRegistry(runtimeDir);
     status.orchestration = latestRegistry.orchestration;
     status.transitions = readJsonLines(join(runtimeDir, 'transitions.jsonl'));
     for (const worker of status.worktrees) {
-      if (latestAssessments.get(worker.name)) {
+      const latestAssessment = latestWorktrees.find(worker)?.assessment;
+      if (latestAssessment) {
         worker.assessment = assessmentWithStale(
-          latestAssessments.get(worker.name),
+          latestAssessment,
           worker.lastCommitAt,
           [worker.activeTask, ...(worker.recentTasks || [])].filter(Boolean),
         );
