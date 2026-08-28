@@ -142,6 +142,25 @@ function driveToClosing(fixture, issueNumber) {
   return job;
 }
 
+function githubIdentityFixture(fixture, mode = 'ok') {
+  const script = join(fixture.root, `identity-${mode}.mjs`);
+  writeFileSync(script, [
+    "const args = process.argv.slice(2);",
+    `const mode = ${JSON.stringify(mode)};`,
+    "if (args[0] === 'auth' && args[1] === 'status') {",
+    "  if (mode === 'network') { console.error('network unavailable'); process.exit(1); }",
+    "  const accounts = mode === 'multiple' ? ['alice','bob'] : ['alice'];",
+    "  console.log(JSON.stringify({hosts:{'github.com':accounts.map(login=>({login,state:'success'}))}}));",
+    "} else if (args[0] === 'auth' && args[1] === 'token') console.log('ghp_fake_for_test_only');",
+    "else if (args[0] === 'api' && args[1] === 'user') console.log(mode === 'mismatch' ? 'bob' : 'alice');",
+    "else if (args[0] === 'repo' && args[1] === 'view') {",
+    "  if (mode === 'not-found') { console.error('Could not resolve to a Repository'); process.exit(1); }",
+    "  console.log(JSON.stringify({nameWithOwner:args[2],viewerPermission:mode === 'read-only' ? 'READ' : 'WRITE',isPrivate:false}));",
+    "} else console.log('ok');",
+  ].join('\n'));
+  return { ...process.env, AES_WORKTREE_BOARD_GH_COMMAND: JSON.stringify([process.execPath, script]) };
+}
+
 export async function outboxCloseScenario() {
   const fixture = makeFixture('outbox-close', { workers: [{ id: 'worker-1' }] });
   try {
@@ -184,6 +203,21 @@ export async function outboxCloseScenario() {
     const recovered = await master.masterNextStep({ ...base(crashFixture) });
     assert.equal(recovered.result.outbox.state, 'pending', '无人值守重启必须补齐未落盘 outbox');
   } finally { crashFixture.cleanup(); }
+  const legacyFixture = makeFixture('outbox-close-legacy', { workers: [{ id: 'worker-1' }] });
+  try {
+    const job = driveToClosing(legacyFixture, 609);
+    await assert.rejects(master.masterClose({
+      ...base(legacyFixture), jobId: job.jobId,
+      enqueueOutbox: () => { throw new Error('legacy cutover'); },
+    }), /legacy cutover/);
+    updateV4Registry(legacyFixture.v4Dir, (registry) => {
+      registry.deliveries[job.jobId].issueClose.outcome = 'CLOSED';
+    });
+    const legacy = await master.masterClose({ ...base(legacyFixture), jobId: job.jobId });
+    assert.equal(legacy.outcome, 'ALREADY_SUCCEEDED');
+    assert.equal(legacy.outbox, undefined, 'legacy CLOSED 已代表 GitHub 成功，不得重新入队');
+    assert.equal(readOutbox(legacyFixture.v4Dir).length, 0);
+  } finally { legacyFixture.cleanup(); }
 }
 
 export async function outboxFlushScenario() {
@@ -248,6 +282,62 @@ export async function outboxFlushScenario() {
       });
       assert.equal(recovered.flushed, 1, '过期 inFlight 必须可回收并结算');
     } finally { recoveryFixture.cleanup(); }
+    const schemaFixture = makeFixture('outbox-schema', { workers: [{ id: 'worker-1' }] });
+    try {
+      writeSlots(schemaFixture);
+      mkdirSync(schemaFixture.v4Dir, { recursive: true });
+      for (const state of ['succeeded', 'abandoned', 'acknowledged']) {
+        writeFileSync(join(schemaFixture.v4Dir, 'outbox.jsonl'), `${JSON.stringify({
+          schemaVersion: 'aes.worktree-board.outbox-entry/v1', entryId: `bad-${state}`, kind: 'future-kind',
+          state, attempts: [], createdAt: new Date().toISOString(),
+        })}\n`);
+        assert.throws(() => master.masterOutboxStatus({ ...base(schemaFixture) }), (error) => error.code === 'OUTBOX_ENTRY_INVALID');
+      }
+      const generic = {
+        schemaVersion: 'aes.worktree-board.outbox-entry/v1', entryId: 'future-1', kind: 'future-kind',
+        state: 'pending', attempts: [], createdAt: new Date().toISOString(), payload: { value: 1 },
+      };
+      writeFileSync(join(schemaFixture.v4Dir, 'outbox.jsonl'), `${JSON.stringify(generic)}\n`);
+      assert.equal(master.masterOutboxStatus({ ...base(schemaFixture) }).entries[0].kind, 'future-kind');
+      await assert.rejects(master.masterOutboxFlush({ ...base(schemaFixture), gh: async () => ({ stdout: '' }) }),
+        (error) => error.code === 'UNSUPPORTED_OUTBOX_KIND');
+      assert.equal(readOutbox(schemaFixture.v4Dir)[0].inFlight, undefined, '未知 handler 必须在 claim 前 fail closed');
+      const badHandler = { ...generic, entryId: 'bad-handler', kind: 'issue-close' };
+      writeFileSync(join(schemaFixture.v4Dir, 'outbox.jsonl'), `${JSON.stringify(badHandler)}\n`);
+      await assert.rejects(master.masterOutboxFlush({ ...base(schemaFixture), gh: async () => ({ stdout: '' }) }),
+        (error) => error.code === 'OUTBOX_ENTRY_INVALID');
+      assert.equal(readOutbox(schemaFixture.v4Dir)[0].inFlight, undefined);
+      const wrongRepo = {
+        ...generic, entryId: 'wrong-repo', kind: 'issue-close', jobId: 'job-wrong', issue: 99,
+        repo: 'other/repo', commentDigest: 'sha256:wrong', payload: { comment: 'x', closeIssue: true },
+      };
+      writeFileSync(join(schemaFixture.v4Dir, 'outbox.jsonl'), `${JSON.stringify(wrongRepo)}\n`);
+      await assert.rejects(master.masterOutboxFlush({ ...base(schemaFixture), gh: async () => ({ stdout: '' }) }),
+        (error) => error.code === 'OUTBOX_REPO_MISMATCH');
+    } finally { schemaFixture.cleanup(); }
+
+    const identityFixture = makeFixture('outbox-identity', { workers: [{ id: 'worker-1' }] });
+    try {
+      const identityJob = driveToClosing(identityFixture, 610);
+      await master.masterClose({ ...base(identityFixture), jobId: identityJob.jobId });
+      for (const [mode, account, code] of [
+        ['multiple', undefined, 'IDENTITY_REQUIRED'], ['mismatch', 'alice', 'IDENTITY_MISMATCH'],
+        ['read-only', 'alice', 'PERMISSION_DENIED'], ['not-found', 'alice', 'REPO_NOT_FOUND'],
+        ['network', 'alice', 'NETWORK_FAILURE'],
+      ]) {
+        await assert.rejects(master.masterOutboxFlush({
+          ...base(identityFixture), account, env: githubIdentityFixture(identityFixture, mode),
+        }), (error) => {
+          assert.equal(error.code, code, `${mode} 实际错误: ${error.code} ${error.message}`);
+          assert.doesNotMatch(`${error.message}${JSON.stringify(error.details || {})}`, /ghp_fake_for_test_only/);
+          return true;
+        }, `${mode} 必须保留 typed ${code}`);
+        assert.equal(readOutbox(identityFixture.v4Dir)[0].inFlight, undefined, '身份预检失败不得 claim');
+      }
+      const configuredEnv = { ...githubIdentityFixture(identityFixture, 'multiple'), AES_WORKTREE_BOARD_GITHUB_ACCOUNT: 'alice' };
+      const configured = await master.masterOutboxFlush({ ...base(identityFixture), env: configuredEnv });
+      assert.equal(configured.flushed, 1, 'board/env 保存的账号必须被身份边界消费');
+    } finally { identityFixture.cleanup(); }
   } finally {
     fixture.cleanup();
   }
@@ -268,8 +358,11 @@ export async function outboxAckScenario() {
     }
     const acknowledged = master.masterOutboxAcknowledge({ ...base(fixture), entryId, reason: 'merge abc123 已落地；Issue 永久不可达' });
     assert.equal(acknowledged.outcome, 'ACKNOWLEDGED');
+    assert.ok(Number.isFinite(Date.parse(acknowledged.acknowledgedAt)));
     const again = master.masterOutboxAcknowledge({ ...base(fixture), entryId, reason: '不同文案不得覆盖首次签收' });
     assert.equal(again.outcome, 'ALREADY_ACKNOWLEDGED');
+    assert.equal(again.acknowledgedAt, acknowledged.acknowledgedAt);
+    assert.equal(again.acknowledgedBy, acknowledged.acknowledgedBy);
     assert.equal(readOutbox(fixture.v4Dir)[0].state, 'acknowledged');
     assert.ok(readOutboxHistory(fixture.v4Dir).some((entry) => entry.state === 'abandoned'), 'abandoned 历史行必须仍可读');
   } finally { fixture.cleanup(); }

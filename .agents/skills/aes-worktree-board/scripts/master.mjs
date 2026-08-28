@@ -23,8 +23,10 @@ import { assertContractComplete, buildWorkOrder, contractDigestOf } from './issu
 import { buildHumanRequest, validateHumanRequest, validateHumanResponse } from './human-request.mjs';
 import { decideMerge, evaluateMechanicalGate, resolveMergePolicy } from './merge-policy.mjs';
 import { disposeDiscovery, makeWayfinder } from './discovery.mjs';
+import { prepareGithubAccess, runGithubCommand } from './github-identity.mjs';
+import { loadConfig as loadBoardConfig } from './collect.mjs';
 import {
-  acknowledgeOutbox, enqueueIssueClose, flushOutbox, outboxStatus, outboxWarning, readOutbox,
+  acknowledgeOutbox, enqueueIssueClose, flushOutbox, outboxStatus, outboxWarning, preflightOutbox, readOutbox,
 } from './outbox-store.mjs';
 
 export const TERMINAL_SCHEMA = 'aes.issue-worker.goal-terminal/v1';
@@ -974,8 +976,21 @@ export function masterOutboxAcknowledge(options = {}) {
 }
 
 export async function masterOutboxFlush(options = {}) {
-  const { dir, config } = ctx(options);
-  return flushOutbox(dir, options.gh || defaultGh(config.repoIdentity.issueRepo), options);
+  const { dir, config, repoRoot } = ctx(options);
+  const pending = preflightOutbox(dir);
+  if (!pending.length) return { ok: true, flushed: 0, skipped: readOutbox(dir).filter((entry) => entry.state === 'succeeded').length, failed: 0, abandoned: 0, remaining: 0, entries: [] };
+  let gh = options.gh;
+  let auth = null;
+  if (!gh) {
+    auth = await prepareGithubAccess({
+      config: options.githubConfig || loadBoardConfig(), issueRepo: config.repoIdentity.issueRepo,
+      account: options.account, host: options.host, cwd: repoRoot,
+      requiredPermission: 'write', env: options.env || process.env,
+    });
+    gh = (args) => runGithubCommand([...args, '--repo', auth.issueRepo], { auth, cwd: repoRoot });
+  }
+  preflightOutbox(dir, auth?.issueRepo || config.repoIdentity.issueRepo);
+  return flushOutbox(dir, gh, { ...options, expectedRepo: auth?.issueRepo || config.repoIdentity.issueRepo });
 }
 
 function buildCloseComment(job, delivery) {
@@ -1060,6 +1075,7 @@ export function masterReconcile(options = {}) {
     registry.runners = projectRunners(config, registry, options.probeOverride ? { probe: options.probeOverride } : {});
     const actions = [];
     const jobExplanations = [];
+    const outboxDigests = new Set(readOutbox(dir).map((entry) => entry.commentDigest).filter(Boolean));
 
     for (const job of Object.values(registry.jobs)) {
       const attempt = job.currentAttemptId ? registry.attempts[job.currentAttemptId] : null;
@@ -1118,7 +1134,7 @@ export function masterReconcile(options = {}) {
       } else if (job.state === 'closed') {
         const delivery = registry.deliveries[job.jobId];
         const persisted = delivery?.issueClose?.commentDigest
-          && readOutbox(dir).some((entry) => entry.commentDigest === delivery.issueClose.commentDigest);
+          && outboxDigests.has(delivery.issueClose.commentDigest);
         if (delivery?.issueClose?.outcome === 'LOCAL_CLOSED' && !persisted) {
           actions.push({ jobId: job.jobId, action: 'RESUME_OUTBOX_ENQUEUE' });
         }
@@ -1310,7 +1326,7 @@ const KNOWN_OPTIONS = Object.freeze(new Set([
   'job', 'commit', 'payload', 'payload-file', 'commands',
   'resume-token', 'response', 'response-file',
   'state', 'kind', 'prompt', 'reason',
-  'entry',
+  'entry', 'account', 'hostname',
 ]));
 
 function parseArguments(argv) {
@@ -1450,7 +1466,9 @@ async function main(argv = process.argv.slice(2)) {
     return postMergeVerify({ ...shared, jobId: options.job, commands: payloadFrom(options, 'commands') });
   }
   if (command === 'close') return masterClose({ ...shared, jobId: options.job });
-  if (command === 'outbox' && action === 'flush') return masterOutboxFlush(shared);
+  if (command === 'outbox' && action === 'flush') {
+    return masterOutboxFlush({ ...shared, account: options.account, host: options.hostname });
+  }
   if (command === 'outbox' && action === 'status') return masterOutboxStatus(shared);
   if (command === 'outbox' && action === 'acknowledge') {
     return masterOutboxAcknowledge({ ...shared, entryId: options.entry, reason: options.reason });

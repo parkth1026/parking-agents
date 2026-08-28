@@ -5,23 +5,45 @@ import { nowIso, shortDigest, storeError } from './job-store.mjs';
 
 export const OUTBOX_SCHEMA = 'aes.worktree-board.outbox-entry/v1';
 export const OUTBOX_STATES = Object.freeze(['pending', 'succeeded', 'abandoned', 'acknowledged']);
+const ATTEMPT_OUTCOMES = Object.freeze(['SUCCEEDED', 'FAILED']);
 export function outboxPath(dir) { return join(resolve(dir), 'outbox.jsonl'); }
 
 function assertString(value, field) {
   if (typeof value !== 'string' || !value.trim()) throw storeError('OUTBOX_ENTRY_INVALID', `outbox ${field} 必须为非空字符串`, { field });
 }
 
+function assertTime(value, field) {
+  assertString(value, field);
+  const parsed = Date.parse(value);
+  if (!Number.isFinite(parsed) || new Date(parsed).toISOString() !== value) throw storeError('OUTBOX_ENTRY_INVALID', `outbox ${field} 必须为 canonical ISO 时间`, { field });
+}
+
+function validateAttempt(attempt, index) {
+  if (!attempt || typeof attempt !== 'object' || Array.isArray(attempt)) throw storeError('OUTBOX_ENTRY_INVALID', `attempts[${index}] 必须为对象`);
+  assertTime(attempt.at, `attempts[${index}].at`);
+  if (!ATTEMPT_OUTCOMES.includes(attempt.outcome)) throw storeError('OUTBOX_ENTRY_INVALID', `attempts[${index}].outcome 非闭集值`);
+  if (attempt.outcome === 'SUCCEEDED' && attempt.error !== null) throw storeError('OUTBOX_ENTRY_INVALID', `attempts[${index}] 成功时 error 必须为 null`);
+  if (attempt.outcome === 'FAILED') {
+    if (!attempt.error || typeof attempt.error !== 'object' || Array.isArray(attempt.error)) throw storeError('OUTBOX_ENTRY_INVALID', `attempts[${index}] 失败时必须含 error`);
+    assertString(attempt.error.code, `attempts[${index}].error.code`);
+    if (typeof attempt.error.stderr !== 'string') throw storeError('OUTBOX_ENTRY_INVALID', `attempts[${index}].error.stderr 必须为字符串`);
+  }
+}
+
 export function validateOutboxEntry(entry) {
   if (!entry || entry.schemaVersion !== OUTBOX_SCHEMA) throw storeError('OUTBOX_SCHEMA_MISMATCH', `outbox schemaVersion 必须为 ${OUTBOX_SCHEMA}`);
   assertString(entry.entryId, 'entryId');
-  if (entry.kind !== 'issue-close') throw storeError('OUTBOX_ENTRY_INVALID', `未知 outbox kind: ${entry.kind}`);
-  assertString(entry.jobId, 'jobId');
-  if (!Number.isInteger(entry.issue)) throw storeError('OUTBOX_ENTRY_INVALID', 'outbox issue 必须为整数');
+  assertString(entry.kind, 'kind');
+  assertTime(entry.createdAt, 'createdAt');
+  if (entry.jobId !== undefined) assertString(entry.jobId, 'jobId');
   if (!OUTBOX_STATES.includes(entry.state)) throw storeError('OUTBOX_ENTRY_INVALID', `未知 outbox state: ${entry.state}`);
   if (!Array.isArray(entry.attempts)) throw storeError('OUTBOX_ENTRY_INVALID', 'outbox attempts 必须为数组');
+  entry.attempts.forEach(validateAttempt);
   if (entry.inFlight) {
     assertString(entry.inFlight.owner, 'inFlight.owner');
     if (!Number.isInteger(entry.inFlight.pid) || entry.inFlight.pid <= 0) throw storeError('OUTBOX_ENTRY_INVALID', 'inFlight.pid 必须为正整数');
+    assertTime(entry.inFlight.leasedAt, 'inFlight.leasedAt');
+    assertTime(entry.inFlight.expiresAt, 'inFlight.expiresAt');
     const leasedAt = Date.parse(entry.inFlight.leasedAt);
     const expiresAt = Date.parse(entry.inFlight.expiresAt);
     if (!Number.isFinite(leasedAt) || !Number.isFinite(expiresAt) || expiresAt < leasedAt) {
@@ -29,19 +51,46 @@ export function validateOutboxEntry(entry) {
     }
   }
   if (entry.state === 'pending') {
-    assertString(entry.repo, 'repo');
-    assertString(entry.commentDigest, 'commentDigest');
-    if (!entry.payload || typeof entry.payload.comment !== 'string' || entry.payload.closeIssue !== true) {
-      throw storeError('OUTBOX_ENTRY_INVALID', 'pending outbox payload 必须含 comment 与 closeIssue=true');
-    }
-    assertString(entry.createdAt, 'createdAt');
+  } else if (entry.inFlight) {
+    throw storeError('OUTBOX_ENTRY_INVALID', `${entry.state} 终态不得残留 inFlight`);
+  } else if (entry.state === 'succeeded') {
+    if (!entry.attempts.length || entry.attempts.at(-1).outcome !== 'SUCCEEDED') throw storeError('OUTBOX_ENTRY_INVALID', 'succeeded 必须以成功 attempt 结算');
+    assertTime(entry.settledAt, 'settledAt');
+  }
+  if (entry.state === 'abandoned' || entry.state === 'acknowledged') {
+    if (entry.attempts.length < 3 || entry.attempts.at(-1).outcome !== 'FAILED') throw storeError('OUTBOX_ENTRY_INVALID', `${entry.state} 必须保留至少三次且末次失败的 attempts`);
+    assertString(entry.abandonReason, 'abandonReason');
+    assertTime(entry.settledAt, 'settledAt');
   }
   if (entry.state === 'acknowledged') {
     assertString(entry.reason, 'reason');
-    assertString(entry.acknowledgedAt, 'acknowledgedAt');
+    assertTime(entry.acknowledgedAt, 'acknowledgedAt');
     assertString(entry.acknowledgedBy, 'acknowledgedBy');
   }
   return entry;
+}
+
+function validateIssueClose(entry, expectedRepo = null) {
+  assertString(entry.jobId, 'jobId');
+  if (!Number.isInteger(entry.issue)) throw storeError('OUTBOX_ENTRY_INVALID', 'issue-close issue 必须为整数');
+  assertString(entry.repo, 'repo');
+  assertString(entry.commentDigest, 'commentDigest');
+  if (!entry.payload || typeof entry.payload.comment !== 'string' || entry.payload.closeIssue !== true) throw storeError('OUTBOX_ENTRY_INVALID', 'issue-close payload 非法');
+  if (expectedRepo && entry.repo.toLowerCase() !== expectedRepo.toLowerCase()) {
+    throw storeError('OUTBOX_REPO_MISMATCH', `outbox entry repo ${entry.repo} 与已授权仓库 ${expectedRepo} 不一致`, { entryId: entry.entryId, entryRepo: entry.repo, authorizedRepo: expectedRepo });
+  }
+}
+
+const OUTBOX_HANDLERS = Object.freeze({ 'issue-close': validateIssueClose });
+
+export function preflightOutbox(dir, expectedRepo = null) {
+  const entries = readOutbox(dir).filter((entry) => entry.state === 'pending');
+  for (const entry of entries) {
+    const validate = OUTBOX_HANDLERS[entry.kind];
+    if (!validate) throw storeError('UNSUPPORTED_OUTBOX_KIND', `outbox kind 尚无 handler: ${entry.kind}`, { entryId: entry.entryId, kind: entry.kind });
+    validate(entry, expectedRepo);
+  }
+  return entries;
 }
 
 export function readOutboxHistory(dir) { return readJsonLines(outboxPath(dir)); }
@@ -85,6 +134,7 @@ export async function flushOutbox(dir, gh, options = {}) {
   });
   const claimed = withRuntimeLock(dir, () => {
     const at = now();
+    preflightOutbox(dir, options.expectedRepo || null);
     const entries = readOutbox(dir).filter((entry) => entry.state === 'pending' && (
       !entry.inFlight || (Date.parse(entry.inFlight.expiresAt) <= at.getTime() && !isOwnerAlive(entry.inFlight.pid))
     ));
@@ -139,11 +189,11 @@ export function acknowledgeOutbox(dir, entryId, reason, actor = 'operator') {
   return withRuntimeLock(dir, () => {
     const entry = readOutbox(dir).find((candidate) => candidate.entryId === entryId);
     if (!entry) throw storeError('UNKNOWN_OUTBOX_ENTRY', `无此 outbox entry: ${entryId}`, { entryId });
-    if (entry.state === 'acknowledged') return { ok: true, outcome: 'ALREADY_ACKNOWLEDGED', entryId, issue: entry.issue, reason: entry.reason };
+    if (entry.state === 'acknowledged') return { ok: true, outcome: 'ALREADY_ACKNOWLEDGED', entryId, issue: entry.issue, acknowledgedAt: entry.acknowledgedAt, acknowledgedBy: entry.acknowledgedBy, reason: entry.reason };
     if (entry.state !== 'abandoned') return { ok: false, code: 'NOT_ABANDONED', entryId, state: entry.state };
     const acknowledged = { ...entry, state: 'acknowledged', acknowledgedAt: nowIso(), acknowledgedBy: actor, reason: reason.trim() };
     append(dir, acknowledged);
-    return { ok: true, outcome: 'ACKNOWLEDGED', entryId, issue: entry.issue, acknowledgedBy: actor, reason: acknowledged.reason };
+    return { ok: true, outcome: 'ACKNOWLEDGED', entryId, issue: entry.issue, acknowledgedAt: acknowledged.acknowledgedAt, acknowledgedBy: actor, reason: acknowledged.reason };
   });
 }
 
