@@ -898,6 +898,12 @@ async function mergeWorkerReviewLifecycle() {
       budget: { kind: 'reviewLoops', limit: 3, used: 3 },
       recommendedMasterActions: ['NEW_ATTEMPT_FRONTIER_MODEL', 'AWAITING_HUMAN'],
     });
+    const exhaustedReplay = freshProcess(
+      fixture,
+      ['stage', 'review', '--job', job.jobId, '--payload', JSON.stringify(finding)],
+      { expectStatus: 'nonzero' },
+    );
+    assert.deepEqual(exhaustedReplay, exhausted, '预算熔断结果必须按 candidate 幂等重放');
     registry = readV4Registry(fixture.v4Dir);
     assert.equal(registry.attempts[job.attemptId].budgetUsage.reviewLoops, 3);
     assert.equal(registry.jobs[job.jobId].state, 'awaiting-human');

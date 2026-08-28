@@ -415,6 +415,7 @@ export function recordCandidate(options = {}) {
       attempt.qa = null;
       job.reviewLifecycle = null;
       job.lastReviewReturn = null;
+      job.lastReviewDisposition = null;
     }
     attempt.candidateCommit = options.commitSha;
     attempt.state = 'reviewing';
@@ -521,6 +522,7 @@ function recordMergeReviewMustFix(options) {
       throw storeError('REVIEW_POLICY_MISMATCH', 'review 结果必须匹配 merge-worker claim 时的分档', lifecycle);
     }
     validateMustFixFindings(payload.findings);
+    if (job.lastReviewDisposition?.commitSha === attempt.candidateCommit) return job.lastReviewDisposition.response;
     if (job.lastReviewReturn?.commitSha === attempt.candidateCommit) return job.lastReviewReturn;
     attempt.budgetUsage ||= emptyBudgetUsage();
     attempt.budgetUsage.reviewLoops += 1;
@@ -548,13 +550,15 @@ function recordMergeReviewMustFix(options) {
       releaseSlot(registry, job.slotId, { reason: `job ${job.jobId} review 预算耗尽`, keepJob: true });
       setJobState(registry, job.jobId, 'awaiting-human', { reason: 'REVIEW_BUDGET_EXHAUSTED', dir });
       appendReceipt(dir, { kind: 'human-request', jobId: job.jobId, request });
-      return {
+      const response = {
         ok: false,
         code: 'REVIEW_BUDGET_EXHAUSTED',
         jobId: job.jobId,
         budget: { kind: 'reviewLoops', limit, used },
         recommendedMasterActions: ['NEW_ATTEMPT_FRONTIER_MODEL', 'AWAITING_HUMAN'],
       };
+      job.lastReviewDisposition = { commitSha: attempt.candidateCommit, response };
+      return response;
     }
 
     const reviewReturn = {
