@@ -42,6 +42,129 @@ function run(args) {
     crash.maxFrame === 220 && crash.frame0Lines === 1);
 }
 
+// ---------- AC-1b frames 帧号回绕(UE5 原生 mod 1000) ----------
+{
+  const w = run(["frames", FX("fixture-wrap-freeze.log"), "--json"]);
+  check("AC-1b wrap: 检测到帧号回绕",
+    w.frameWrap.detected === true && w.frameWrap.backwardJumps === 2);
+  check("AC-1b wrap: 解绕后真实最大帧 2312(原始列最大 999)",
+    w.frameWrap.realMaxFrame === 2312 && w.maxFrame === 999);
+  check("AC-1b wrap: 尾部冻结判死而非误判存活",
+    w.alive === false && w.tailFrozenMs !== null && w.tailFrozenMs >= 200000
+      && w.verdict.includes("冻结"));
+  check("AC-1b wrap: 冻结段合并为单段(帧 312 恒定, 心跳不切段)",
+    w.stalls.some((s) => s.frame === 312 && s.durMs >= 200000));
+  check("AC-1b wrap: 判活谱首小时有帧变化",
+    w.hourlyChanges.length >= 1 && w.hourlyChanges[0].changes > 0);
+
+  const plain = run(["frames", FX("fixture-run-freeze.log"), "--json"]);
+  check("AC-1b 无回绕日志不受影响",
+    plain.frameWrap.detected === false && plain.frameWrap.realMaxFrame === 831);
+}
+
+// ---------- AC-9 env ----------
+{
+  const early = run(["env", FX("fixture-env-early-death.log"), "--json"]);
+  check("AC-9 env: RHI 早死日志从 CSV 元数据回退提取命令行(无 LogInit 行)",
+    early.source === 'csv-metadata' && early.commandLine.includes('-GraphicsAdapter=6'));
+  check("AC-9 env: 参数与开关解析(-Key=V / 裸 Key=V / Flag)",
+    early.params.GraphicsAdapter === '6' && early.params.TaskId === 'fc721239-c9c1-54db-44a9-340c1667994c'
+      && early.params.ResX === '200' && early.flags.includes('RenderOffScreen'));
+  check("AC-9 env: CSV 元数据字段提取",
+    early.metadata.engineversion.includes('5.5') && early.metadata.cpu.includes('XEON'));
+
+  const normal = run(["env", FX("fixture-env-normal.log"), "--json"]);
+  check("AC-9 env: 正常日志从 LogInit 行提取",
+    normal.source === 'loginit' && normal.params.GraphicsAdapter === '2'
+      && normal.params.ABSLOG.includes('a.log'));
+}
+
+// ---------- AC-10 inventory ----------
+{
+  const inv = run(["inventory", FX("crash-loop"), "--json"]);
+  check("AC-10 inventory: 聚出 1 个崩溃循环簇(5 文件, 6s 间隔, 选卡失败)",
+    inv.totalFiles === 7 && inv.clusters.length === 1 && inv.clusterFileCount === 5
+      && Math.abs(inv.clusters[0].medianIntervalMs - 6000) < 50
+      && inv.clusters[0].endState === 'rhi-adapter-fail'
+      && inv.clusters[0].deathReason.includes('HandleUnsupportedRHI')
+      && inv.clusters[0].graphicsAdapter === '6');
+  check("AC-10 inventory: 非循环文件单列且终态/参数正确",
+    inv.others.length === 2
+      && inv.others.some((o) => o.name.endsWith('14-13-00.log') && o.endState === 'abrupt-heartbeat' && o.graphicsAdapter === '2')
+      && inv.others.some((o) => o.name.endsWith('14-13-00_2.log') && o.endState === 'clean-exit' && o.graphicsAdapter === '3'));
+}
+
+// ---------- AC-11 struggle 挣扎段 ----------
+{
+  const s = run(["frames", FX("fixture-struggle-freeze.log"), "--json"]);
+  check("AC-11 struggle: 检出冻结前挣扎段(低fps, >=5s, 紧邻冻结)",
+    s.struggleSegments.length === 1 && s.struggleSegments[0].durMs >= 5000
+      && s.verdict.includes("挣扎"));
+  const w = run(["frames", FX("fixture-wrap-freeze.log"), "--json"]);
+  check("AC-11 struggle: 无挣扎段日志不误报",
+    w.struggleSegments.length === 0);
+  const idle = run(["frames", FX("fixture-run-freeze.log"), "--json"]);
+  check("AC-11 struggle: 存活日志不误报",
+    idle.struggleSegments.length === 0);
+}
+
+// ---------- AC-13 validate-patterns ----------
+{
+  const code = (args) => {
+    try {
+      execFileSync("node", [join(SKILL_DIR, "scripts", "validate-patterns.mjs"), ...args], { stdio: "pipe" });
+      return 0;
+    } catch (e) { return e.status; }
+  };
+  check("AC-13 patterns 真实库校验全绿 exit 0",
+    code([FX(".")]).toString() === "0" || code([]) === 0 || code([join(SKILL_DIR, "patterns")]) === 0);
+  check("AC-13 坏 fixture 检出违规 exit 1",
+    code([FX("patterns-bad")]) === 1);
+}
+
+// ---------- AC-14 errors --kb ----------
+{
+  const kb = run(["errors", FX("fixture-stall.log"), "--json", "--kb", join(SKILL_DIR, "patterns")]);
+  check("AC-14 kb: ensure 连锁两形态都命中 ensure-chain-missing-package(签名+别名)",
+    kb.kb.hits >= 2
+      && kb.rows.some((r) => r.pattern === 'ensure-chain-missing-package' && r.sample.includes("IsInGameThread"))
+      && kb.rows.some((r) => r.pattern === 'ensure-chain-missing-package' && r.sample.includes("Couldn't find file")));
+  const noKb = run(["errors", FX("fixture-stall.log"), "--json"]);
+  check("AC-14 kb: 不传 --kb 时输出不带 kb 字段且行无 pattern",
+    noKb.kb === null && noKb.rows.every((r) => r.pattern === undefined || r.pattern === null));
+  const md = execFileSync("node",
+    [SCRIPT, "errors", FX("fixture-stall.log"), "--kb", join(SKILL_DIR, "patterns")], { encoding: "utf8" });
+  check("AC-14 kb: markdown 表含模式列与入库提示",
+    md.includes("| 次数 | 模式 |") && md.includes("候选入库"));
+}
+
+// ---------- AC-12 diff ----------
+{
+  const d = run(["diff", FX("fixture-stall.log"), FX("fixture-run-freeze.log"), "--json"]);
+  check("AC-12 diff: 判活分岔识别冻结侧(A=帧0卡死, B=存活)",
+    d.deathSide === 'A' && d.a.alive === false && d.b.alive === true);
+  check("AC-12 diff: 冻结侧独有错误挂 deathCandidate",
+    d.aOnly.length > 0 && d.aOnly.every((r) => r.deathCandidate === true));
+  const same = run(["diff", FX("fixture-stall.log"), FX("fixture-stall.log"), "--json"]);
+  check("AC-12 diff: 相同日志两侧独有为空、共享非空",
+    same.aOnly.length === 0 && same.bOnly.length === 0 && same.shared.length > 0
+      && same.deathSide === null);
+}
+
+// ---------- AC-15 log.Timestamp 非日期形态 ----------
+{
+  const since = run(["frames", FX("fixture-timestamp-sincestart.log"), "--json"]);
+  check("AC-15 SinceStart 形态: 帧判活与冻结段正常(冻结 69s)",
+    since.parsedLines === 8 && since.alive === false
+      && since.stalls.some((x) => x.frame === 30 && x.durMs >= 60000));
+  const tc = run(["frames", FX("fixture-timestamp-timecode.log"), "--json"]);
+  check("AC-15 Timecode 形态: 帧判活正常",
+    tc.parsedLines === 4 && tc.alive === true && tc.maxFrame === 36);
+  const none = run(["frames", FX("fixture-timestamp-none.log"), "--json"]);
+  check("AC-15 None 形态: 零前缀给出明确提示而非误判'从未出帧'",
+    none.parsedLines === 0 && none.verdict.includes("log.Timestamp"));
+}
+
 // ---------- AC-2 gaps ----------
 {
   const freeze = run(["gaps", FX("fixture-run-freeze.log"), "--json"]);

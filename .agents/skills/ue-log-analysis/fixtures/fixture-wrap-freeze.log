@@ -1,0 +1,59 @@
+Log file open, 08/26/26 14:49:00
+[2026.08.26-14.49.00:000][  0]LogInit: Starting Game
+[2026.08.26-14.49.00:100][  1]LogTemp: frame 1
+[2026.08.26-14.49.00:200][  2]LogTemp: frame 2
+[2026.08.26-14.49.00:300][  4]LogTemp: frame 4
+[2026.08.26-14.49.00:400][  8]LogTemp: frame 8
+[2026.08.26-14.49.00:500][ 16]LogTemp: frame 16
+[2026.08.26-14.49.00:600][ 32]LogTemp: frame 32
+[2026.08.26-14.49.00:700][ 64]LogTemp: frame 64
+[2026.08.26-14.49.00:800][128]LogTemp: frame 128
+[2026.08.26-14.49.00:900][256]LogTemp: frame 256
+[2026.08.26-14.49.01:000][400]LogTemp: frame 400
+[2026.08.26-14.49.02:000][500]LogTemp: ramp continue
+[2026.08.26-14.49.02:020][510]LogTemp: ramp continue
+[2026.08.26-14.49.02:040][520]LogTemp: ramp continue
+[2026.08.26-14.49.02:060][530]LogTemp: ramp continue
+[2026.08.26-14.49.02:080][540]LogTemp: ramp continue
+[2026.08.26-14.49.02:100][550]LogTemp: ramp continue
+[2026.08.26-14.49.02:500][700]LogTemp: ramp continue
+[2026.08.26-14.49.03:000][800]LogTemp: ramp continue
+[2026.08.26-14.49.03:500][900]LogTemp: ramp continue
+[2026.08.26-14.49.03:960][998]LogTemp: near wrap
+[2026.08.26-14.49.04:000][999]LogTemp: near wrap
+[2026.08.26-14.49.04:040][  0]LogTemp: wrapped (real 1000)
+[2026.08.26-14.49.04:080][ 10]LogTemp: wrapped (real 1010)
+[2026.08.26-14.49.04:120][ 20]LogTemp: wrapped (real 1020)
+[2026.08.26-14.49.04:160][ 30]LogTemp: wrapped (real 1030)
+[2026.08.26-14.49.04:200][ 40]LogTemp: wrapped (real 1040)
+[2026.08.26-14.49.04:240][ 50]LogTemp: wrapped (real 1050)
+[2026.08.26-14.49.04:280][ 60]LogTemp: wrapped (real 1060)
+[2026.08.26-14.49.04:320][ 70]LogTemp: wrapped (real 1070)
+[2026.08.26-14.49.04:360][ 80]LogTemp: wrapped (real 1080)
+[2026.08.26-14.49.04:400][ 90]LogTemp: wrapped (real 1090)
+[2026.08.26-14.49.05:000][200]LogTemp: wrapped (real 1200)
+[2026.08.26-14.49.05:500][400]LogTemp: wrapped (real 1400)
+[2026.08.26-14.49.06:000][600]LogTemp: wrapped (real 1600)
+[2026.08.26-14.49.06:500][800]LogTemp: wrapped (real 1800)
+[2026.08.26-14.49.07:000][950]LogTemp: near second wrap
+[2026.08.26-14.49.07:040][998]LogTemp: near second wrap
+[2026.08.26-14.49.07:080][999]LogTemp: near second wrap
+[2026.08.26-14.49.07:120][  0]LogTemp: second wrap (real 2000)
+[2026.08.26-14.49.07:160][ 50]LogTemp: second wrap (real 2050)
+[2026.08.26-14.49.07:200][100]LogTemp: second wrap (real 2100)
+[2026.08.26-14.49.07:240][150]LogTemp: second wrap (real 2150)
+[2026.08.26-14.49.07:280][200]LogTemp: second wrap (real 2200)
+[2026.08.26-14.49.07:320][250]LogTemp: second wrap (real 2250)
+[2026.08.26-14.49.07:360][300]LogTemp: second wrap (real 2300)
+[2026.08.26-14.49.07:400][310]LogTemp: last frames (real 2310)
+[2026.08.26-14.49.07:440][311]LogTemp: last frames (real 2311)
+[2026.08.26-14.49.07:480][312]LogTemp: last frame before freeze (real 2312)
+[2026.08.26-14.50.07:500][312]LogPixelStreaming51CloudSSOverGRPC: -> SS: KeepAlive
+Data: 1787727147
+[2026.08.26-14.51.07:500][312]LogPixelStreaming51CloudSSOverGRPC: -> SS: KeepAlive
+Data: 1787727207
+[2026.08.26-14.52.07:500][312]LogPixelStreaming51CloudSSOverGRPC: -> SS: KeepAlive
+Data: 1787727267
+[2026.08.26-14.53.07:500][312]LogPixelStreaming51CloudSSOverGRPC: -> SS: KeepAlive
+Data: 1787727327
+[2026.08.26-14.54.07:500][312]LogPixelStreaming51CloudWebRTC: stun_port keepalive

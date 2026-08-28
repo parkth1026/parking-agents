@@ -1,0 +1,12 @@
+Log file open, 08/26/26 10:00:00
+LogWindows: Failed to load 'aqProf.dll' (GetLastError=126)
+[0000.10][  1]LogInit: Display: Starting Game.
+[0000.20][  6]LogTemp: ramp 6
+[0000.30][ 12]LogTemp: ramp 12
+[0000.40][ 18]LogTemp: ramp 18
+[0000.50][ 24]LogTemp: ramp 24
+[0001.00][ 30]LogTemp: ramp 30
+[0010.00][ 30]LogPixelStreaming51CloudSSOverGRPC: -> SS: KeepAlive
+Data: 1787727147
+[0070.00][ 30]LogPixelStreaming51CloudSSOverGRPC: -> SS: KeepAlive
+Data: 1787727207

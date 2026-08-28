@@ -24,11 +24,16 @@ description: |
 ```bash
 SCRIPT="<skill目录>/scripts/ue-log-analysis.mjs"
 node "$SCRIPT" summary <logfile>              # 一键 markdown 体检报告
-node "$SCRIPT" frames   <logfile> --json      # 帧号: 判活/停滞段/FPS 骤降
+node "$SCRIPT" frames   <logfile> --json      # 帧号: 判活/冻结段/挣扎段/FPS 骤降/回绕检测/判活谱
 node "$SCRIPT" timeline <logfile>             # 里程碑 + 终止形态 + 心跳
 node "$SCRIPT" gaps     <logfile> --min-ms 3000   # 空窗 + 前后上下文
 node "$SCRIPT" errors   <logfile>             # 错误频次(按次数降序)
 node "$SCRIPT" noise    <logfile> --min-count 10  # 刷屏模式聚类
+node "$SCRIPT" env      <logfile>             # 环境指纹: 命令行/参数/开关(早死日志走 CSV 元数据)
+node "$SCRIPT" inventory <logdir>             # 目录清单 + 崩溃重试循环聚类(海量小文件场景)
+node "$SCRIPT" diff     <logA> <logB>         # A/B 对比: 判活分岔 + 错误谱共享/独有(归因素材)
+node "$SCRIPT" errors  <logfile> --kb patterns # 错误频次 + 模式库命中标注(候选入库提示)
+node scripts/validate-patterns.mjs            # 模式库(patterns/)不变量校验, 入库前后必跑
 ```
 
 退出码：0=正常（含"未发现问题"），2=参数/文件错误。`--json` 对除 summary 外的
@@ -38,6 +43,8 @@ node "$SCRIPT" noise    <logfile> --min-count 10  # 刷屏模式聚类
 
 1. **判活**：`frames` + `timeline` 四问——出过帧吗、帧号停在哪、怎么终止的、
    活着但慢吗。帧号是 UE 日志独有的判活信号，**不要用 GPU 占用判断健康度**。
+   多文件目录先 `inventory`（崩溃循环聚类，抽 1 个深解）；两份日志对比用 `diff`
+   （存活份携带的错误自动降级为非致死候选）；分类取径查 `references/error-classification.md`。
 2. **定位卡点**：`gaps` 的空窗前最后几行 = 阻塞开始时正在做的事。
 3. **错误分组**：`errors` 表里排第一的不一定是根因，从首次错误往前追触发者
    （常见连锁：找不到包 → 异步加载线程 ensure）。
@@ -46,12 +53,17 @@ node "$SCRIPT" noise    <logfile> --min-count 10  # 刷屏模式聚类
 
 ## 何时读哪个参考文件
 
-- `references/method.md` — 完整工作流、报告结构、五个常见陷阱（帧号归属、
-  GPU 占用语义、日志终止≠崩溃、`_2` 后缀日志、UTC 时间戳）
+- `references/method.md` — 完整工作流、报告结构、七个常见陷阱（帧号归属、
+  GPU 占用语义、日志终止≠崩溃、`_2` 后缀日志、时间戳时区、帧号 mod 1000 回绕、
+  海量小文件=编排器重试循环）
 - `references/ue-log-format.md` — 行格式解剖、帧号语义表、日志类别速查、
   终止形态判定表、常见错误模式库（ensure 连锁/PSO 等待/LOW-POWER 语义/
-  PROJ 刷屏，实战沉淀）
-- `references/design.md` — 设计取舍与验收条件 AC-1…AC-8
+  PROJ 刷屏/帧号回绕/GraphicsAdapter 落软件卡/多线程委托数据竞争，实战沉淀）
+- `references/error-classification.md` — 运行时错误分类路由表：
+  先分类(crash/ensure/hang/GPU设备级/infra/启动失败/网络信令/编排)再取径，
+  含误报防范与案例索引
+- `patterns/` — 错误模式增长库（schema/去重/recurrence 回流，纪律见 method.md）；`scripts/validate-patterns.mjs` 校验
+- `references/design.md` — 设计取舍与验收条件
 
 ## 测试
 
@@ -61,5 +73,8 @@ node "$SCRIPT" noise    <logfile> --min-count 10  # 刷屏模式聚类
 node run-tests.mjs
 ```
 
-fixtures 固化三类日志形态：stall（帧 0 卡死+噪声刷屏）、run-freeze（出帧→
-骤降→空窗→心跳终止）、crash（Fatal 崩溃结尾）。
+fixtures 固化七类日志形态：stall（帧 0 卡死+噪声刷屏）、run-freeze（出帧→
+骤降→空窗→心跳终止）、crash（Fatal 崩溃结尾）、wrap-freeze（帧号 mod 1000
+回绕后冻结——判活不受回绕干扰）、struggle-freeze（低fps挣扎段→冻结前兆）、
+env-early-death/env-normal（CSV 元数据/LogInit 两条命令行来源）、
+crash-loop/（目录级崩溃重试循环聚类）、patterns-bad/（校验器反例）。

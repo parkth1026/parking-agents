@@ -1,0 +1,17 @@
+Log file open, 08/26/26 14:48:52
+LogWindows: Failed to load 'aqProf.dll' (GetLastError=126)
+LogConsoleManager: Warning: Console object named 'r.AesPOI.Text' already exists but is being registered again, but we weren't expected it to be! (FConsoleManager::AddConsoleObject)
+LogCsvProfiler: Display: Metadata set : platform="Windows"
+LogCsvProfiler: Display: Metadata set : config="Development"
+LogCsvProfiler: Display: Metadata set : buildversion="++UE5+Release-5.5-CL-40574608"
+LogCsvProfiler: Display: Metadata set : engineversion="5.5.4-40574608+++UE5+Release-5.5"
+LogCsvProfiler: Display: Metadata set : os="Windows Server 2022 (24H2) [10.0.26200.33296] "
+LogCsvProfiler: Display: Metadata set : cpu="GenuineIntel|INTEL(R) XEON(R) GOLD 6530"
+LogCsvProfiler: Display: Metadata set : commandline="" -UseAesFileSystem -TaskId=fc721239-c9c1-54db-44a9-340c1667994c -RenderOffScreen -ForceRes -UNATTENDED -FullScreen ResX=200 ResY=200 -GraphicsAdapter=6 -Mode=1 -ABSLOG=D:\WDP\dev\Log\14-48-51.log""
+LogPluginManager: Mounting Engine plugin PixelStreaming51Cloud
+LogRHI: Using Default RHI: D3D12
+LogD3D12RHI: Found D3D12 adapter 6: Microsoft Basic Render Driver (VendorId: 1414, DeviceId: 008c
+LogD3D12RHI: Error: Failed to choose a D3D12 Adapter.
+LogD3D12RHI: Adapter was not found
+LogWindows: FPlatformMisc::RequestExit(1, HandleUnsupportedRHI.D3D12)
+LogCore: Engine exit requested (reason: Win RequestExit)
