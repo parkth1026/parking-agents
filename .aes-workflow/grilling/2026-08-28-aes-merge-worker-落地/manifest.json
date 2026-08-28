@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "slug": "2026-08-28-aes-merge-worker-落地",
+  "created_at": "2026-08-28T08:58:46Z",
+  "updated_at": "2026-08-28T09:37:19Z",
+  "original_request": "#126（aes-merge-worker 落地）范围边界访谈：#131 四项设计输入归属、live 验证轮拆分、载体形态待裁",
+  "goal_oneline": "#126 范围锁定：SKILL.md prose + 三机械增量 + close 完整解耦（通用出站队列只接 close、显式 flush）；happy path live 一轮留本票 AC，MUST_FIX+#114 拆 live 票；偏差8/7 外置",
+  "target": null,
+  "stage": "3-contract",
+  "next_action": "aes-goal-contract：从四份确认版对照物聚验收条件，逐条问清「这条错了会怎样、那就怎么验」",
+  "stage_gates": {
+    "1-interview": {
+      "status": "done",
+      "closed_at": "2026-08-28T09:06:10Z",
+      "self_assessment": {
+        "意图": "已定",
+        "结果": "已定",
+        "边界": "已定",
+        "约束": "已定",
+        "现状": "已定"
+      }
+    },
+    "2-prototype": {
+      "status": "done",
+      "closed_at": "2026-08-28T09:37:19Z",
+      "artifacts_confirmed": [
+        "behavior",
+        "api-mock",
+        "example-run",
+        "diagram"
+      ]
+    },
+    "3-contract": {
+      "status": "pending"
+    }
+  },
+  "validation": null,
+  "blocked": [],
+  "residual_risk": null,
+  "status": "in_progress"
+}

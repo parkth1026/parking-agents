@@ -1,0 +1,249 @@
+<!doctype html>
+<!-- draft v1 | published 2026-08-28T21:30:00+08:00
+     用户意见：P2 采纳 acknowledge 修改，P1/P3/P4 保持
+     状态：confirmed as diagram.html -->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>aes-merge-worker 落地（#126）— 架构与流程视图</title>
+<style>
+  :root{
+    --font-ui: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+    --font-mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    --paper:#f5f5f5; --ink:#2d3142; --muted:#4f5d75; --soft:#7a8399;
+    --accent:#eb6c36; --accent-tint:#fdf1ec;
+  }
+  body{background:var(--paper);color:var(--ink);font-family:var(--font-ui);
+       margin:0;padding:32px;line-height:1.6;}
+  .wrap{max-width:1024px;margin:0 auto;}
+  .eyebrow{font-size:12px;color:var(--soft);letter-spacing:.08em;text-transform:uppercase;margin:0 0 4px;}
+  h1{font-size:24px;margin:0 0 4px;}
+  h2{font-size:20px;margin:48px 0 4px;}
+  .sub{font-size:12px;color:var(--soft);margin:0 0 20px;}
+  svg{display:block;max-width:100%;height:auto;background:#fff;
+      border:1px solid #e2e5eb;border-radius:8px;}
+  svg text{font-family:var(--font-ui);fill:var(--ink);}
+  svg text.m{font-family:var(--font-mono);}
+  svg text.tag{font-size:9px;font-family:var(--font-mono);fill:var(--muted);text-anchor:middle;}
+  svg text.tag-on{font-size:9px;font-family:var(--font-mono);fill:var(--ink);text-anchor:middle;}
+  svg text.name{font-size:16px;text-anchor:middle;}
+  svg text.edge{font-size:10px;font-family:var(--font-mono);fill:var(--soft);}
+  svg .node{fill:#ffffff;stroke:var(--muted);stroke-width:1.25;}
+  svg .node-on{fill:var(--accent-tint);stroke:var(--accent);stroke-width:1.75;}
+  svg .chip{fill:#eef1f6;}
+  svg .chip-on{fill:#f7dfd3;}
+  svg .mask{fill:var(--paper);}
+  svg .link{fill:none;stroke:var(--muted);stroke-width:1.5;}
+  .legend{display:flex;gap:24px;margin:12px 0 0;font-size:12px;color:var(--soft);}
+  .legend i{display:inline-block;width:24px;height:0;border-top-width:2px;
+            border-top-style:solid;vertical-align:middle;margin-right:8px;}
+  .ledger{margin:20px 0 0;font-size:12px;border-collapse:collapse;width:100%;}
+  .ledger th,.ledger td{border:1px solid #e2e5eb;padding:4px 8px;text-align:left;vertical-align:top;}
+  .ledger th{background:#eef1f6;font-weight:600;width:96px;}
+  code{font-family:var(--font-mono);font-size:12px;}
+  .note{font-size:12px;color:var(--soft);margin:12px 0 0;}
+  .del{margin:12px 0 0;font-size:12px;color:var(--soft);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<p class="eyebrow">对照物 · 第七面 架构与依赖</p>
+<h1>aes-merge-worker 落地（#126）</h1>
+<p class="sub">改后态单视图。橙 = 本次新增/变更，灰 = 既有（不动）。</p>
+
+<h2>架构视图 — hub-and-spoke 三 lane 与出站解耦</h2>
+<p class="sub">拓扑事实源：模块归属、依赖方向、本次动的是哪条边。</p>
+
+<svg viewBox="0 0 960 560" role="img" aria-labelledby="arch-title arch-desc"
+     xmlns="http://www.w3.org/2000/svg">
+  <title id="arch-title">aes-worktree-board 改后架构：总管之下三条平级 lane，全部经 master.mjs 与 registry 交接；新增 aes-merge-worker lane 与 outbox 出站队列</title>
+  <desc id="arch-desc">总管在顶层，向下连三条 lane：aes-issue-worker、新增的 aes-merge-worker、人参与 lane。三条 lane 互不直连，各自向下连到 master.mjs 控制面。master.mjs 向下写 registry、新增的 outbox.jsonl 出站队列，以及 Git 的 dev 分支。outbox.jsonl 经 flush 才连到 GitHub，因此 GitHub 不可达时交付链路不中断。</desc>
+
+  <defs>
+    <marker id="arch-arw" viewBox="0 0 8 8" refX="7" refY="4"
+            markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L8,4 L0,8 z" fill="#4f5d75"/>
+    </marker>
+  </defs>
+
+  <g class="link" marker-end="url(#arch-arw)">
+    <path d="M 440,104 V 128 Q 440,136 432,136 H 168 Q 160,136 160,144 V 156"/>
+    <path d="M 480,104 V 156"/>
+    <path d="M 520,104 V 128 Q 520,136 528,136 H 792 Q 800,136 800,144 V 156"/>
+    <path d="M 160,216 V 240 Q 160,248 168,248 H 356 Q 364,248 364,256 V 296"/>
+    <path d="M 480,216 V 268"/>
+    <path d="M 800,216 V 240 Q 800,248 792,248 H 604 Q 596,248 596,256 V 296"/>
+    <path d="M 420,328 V 352 Q 420,360 412,360 H 168 Q 160,360 160,368 V 380"/>
+    <path d="M 480,328 V 380"/>
+    <path d="M 540,328 V 352 Q 540,360 548,360 H 792 Q 800,360 800,368 V 380"/>
+    <path d="M 480,440 V 468"/>
+  </g>
+
+  <g>
+    <rect class="mask" x="492" y="176" width="104" height="16"/>
+    <text class="edge" x="496" y="188">派 IssueWorkOrder</text>
+    <rect class="mask" x="492" y="288" width="120" height="16"/>
+    <text class="edge" x="496" y="300">stage / gate / merge</text>
+    <rect class="mask" x="492" y="446" width="40" height="16"/>
+    <text class="edge" x="496" y="458">flush</text>
+  </g>
+
+  <g>
+    <rect class="node" x="368" y="48" width="224" height="56" rx="6"/>
+    <text class="name" x="480" y="74">总管 Master</text>
+    <rect class="chip" x="416" y="82" width="128" height="14" rx="2"/>
+    <text class="tag" x="480" y="93">claim / 派单 / 路由</text>
+
+    <rect class="node" x="48" y="160" width="224" height="56" rx="6"/>
+    <text class="name" x="160" y="186">aes-issue-worker</text>
+    <rect class="chip" x="96" y="194" width="128" height="14" rx="2"/>
+    <text class="tag" x="160" y="205">干活 lane · 永不 merge</text>
+
+    <rect class="node-on" x="368" y="160" width="224" height="56" rx="6"/>
+    <text class="name" x="480" y="186">aes-merge-worker</text>
+    <rect class="chip-on" x="408" y="194" width="144" height="14" rx="2"/>
+    <text class="tag-on" x="480" y="205">新增 · 验收方雇佣审查者</text>
+
+    <rect class="node" x="688" y="160" width="224" height="56" rx="6"/>
+    <text class="name" x="800" y="186">人参与 lane</text>
+    <rect class="chip" x="744" y="194" width="112" height="14" rx="2"/>
+    <text class="tag" x="800" y="205">for-human · 角色位</text>
+
+    <rect class="node" x="368" y="272" width="224" height="56" rx="6"/>
+    <text class="name m" x="480" y="298">master.mjs</text>
+    <rect class="chip" x="416" y="306" width="128" height="14" rx="2"/>
+    <text class="tag" x="480" y="317">控制面 CLI · 机械层</text>
+
+    <rect class="node" x="48" y="384" width="224" height="56" rx="6"/>
+    <text class="name m" x="160" y="410">registry.json</text>
+    <rect class="chip" x="104" y="418" width="112" height="14" rx="2"/>
+    <text class="tag" x="160" y="429">意图真源</text>
+
+    <rect class="node-on" x="368" y="384" width="224" height="56" rx="6"/>
+    <text class="name m" x="480" y="410">outbox.jsonl</text>
+    <rect class="chip-on" x="392" y="418" width="176" height="14" rx="2"/>
+    <text class="tag-on" x="480" y="429">新增 · 出站队列 append-only</text>
+
+    <rect class="node" x="688" y="384" width="224" height="56" rx="6"/>
+    <text class="name m" x="800" y="410">Git · dev</text>
+    <rect class="chip" x="744" y="418" width="112" height="14" rx="2"/>
+    <text class="tag" x="800" y="429">事实真源</text>
+
+    <rect class="node" x="368" y="472" width="224" height="56" rx="6"/>
+    <text class="name" x="480" y="498">GitHub</text>
+    <rect class="chip" x="408" y="506" width="144" height="14" rx="2"/>
+    <text class="tag" x="480" y="517">出网 · 可失败可积压</text>
+  </g>
+</svg>
+
+<div class="legend">
+  <span><i style="border-color:#eb6c36"></i>本次新增/变更</span>
+  <span><i style="border-color:#4f5d75"></i>既有（不动）</span>
+</div>
+
+<p class="note"><strong>这张图要被质疑的两处：</strong>
+① <code>aes-merge-worker</code> 与另两条 lane <em>平级</em>、彼此零直连——它不挂在
+issue-worker 下面；
+② <code>outbox.jsonl</code> 把 GitHub 从交付主链上摘了下来——<code>master.mjs</code>
+到 GitHub <em>没有直接边</em>，唯一出网路径是 <code>flush</code>。</p>
+
+<table class="ledger">
+  <tr><th>Detail</th><td>三条 lane 的平级关系与零直连；<code>master.mjs</code> → <code>outbox.jsonl</code> → GitHub 的三段式出站路径；registry 与 Git 的双真源分工。</td></tr>
+  <tr><th>Merged</th><td><code>registry.json</code> 一个节点代表 runtime-v4 目录下的 registry.json / transitions.jsonl / inbox.jsonl / receipts.jsonl 四件（同进同出，本票不区分）。</td></tr>
+  <tr><th>Collapsed</th><td>master.mjs 的十余条子命令折成一个节点；code-review subagent 折进 <code>aes-merge-worker</code> 节点内（由该 lane 派生、不独立持有 registry 权限）。</td></tr>
+  <tr><th>Dropped</th><td>看板 server.mjs 与星图 UI（本票零触碰，见 impact-surface 第 1 面判「无」）；slot 租约与 worktree 物理目录（拓扑上不改）。</td></tr>
+  <tr><th>Kept</th><td>「lane 间零直连、一切交接经 registry」为 v7 不变量，图上刻意不画任何 lane 到 lane 的边——<em>没有那条边</em>本身就是断言。</td></tr>
+</table>
+
+<p class="del"><strong>删除清单：</strong>无。本票不删除既有模块；<code>masterClose</code> 内联的
+两次 <code>gh</code> 调用不是删除而是<em>移位</em>到 flush 路径（见下方流程视图）。</p>
+
+<h2>流程视图 — close 出站解耦（behavior.md B1–B5 的视图）</h2>
+<p class="sub">行是源、图是面：本图不另立内容，画的是变化行 B1/B3/B4/B5。</p>
+
+<svg viewBox="0 0 960 344" role="img" aria-labelledby="flow-title flow-desc"
+     xmlns="http://www.w3.org/2000/svg">
+  <title id="flow-title">close 出站解耦流程：merge 与 verify 之后，close 只写 registry 并入队，GitHub 动作改由 flush 单独送达，永久失败转 abandoned 留档</title>
+  <desc id="flow-desc">流程自左向右：merge、verify、close、outbox flush、GitHub。close 步骤不再联网，它把出站动作写进 outbox 队列；flush 步骤从队列取出并调用 gh；连续三次失败的条目转为 abandoned 并保留在队列中作为补偿审计证据。</desc>
+
+  <defs>
+    <marker id="flow-arw" viewBox="0 0 8 8" refX="7" refY="4"
+            markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L8,4 L0,8 z" fill="#4f5d75"/>
+    </marker>
+  </defs>
+
+  <g class="link" marker-end="url(#flow-arw)">
+    <path d="M 176,92 H 204"/>
+    <path d="M 352,92 H 380"/>
+    <path d="M 464,120 V 164"/>
+    <path d="M 608,200 H 672 Q 680,200 680,192 V 124"/>
+    <path d="M 768,92 H 796"/>
+    <path d="M 736,120 V 260"/>
+  </g>
+
+  <g>
+    <rect class="mask" x="468" y="132" width="32" height="16"/>
+    <text class="edge" x="472" y="144">入队</text>
+    <rect class="mask" x="612" y="152" width="64" height="16"/>
+    <text class="edge" x="616" y="164">取 pending</text>
+    <rect class="mask" x="740" y="180" width="80" height="16"/>
+    <text class="edge" x="744" y="192">连续 3 次失败</text>
+  </g>
+
+  <g>
+    <rect class="node" x="32" y="64" width="144" height="56" rx="6"/>
+    <text class="name m" x="104" y="88">merge</text>
+    <text class="tag" x="104" y="106">+ 血统校验 B11/B12</text>
+
+    <rect class="node" x="208" y="64" width="144" height="56" rx="6"/>
+    <text class="name m" x="280" y="88">verify</text>
+    <text class="tag" x="280" y="106">全量回归 · 不变</text>
+
+    <rect class="node-on" x="384" y="64" width="160" height="56" rx="6"/>
+    <text class="name m" x="464" y="88">close</text>
+    <text class="tag-on" x="464" y="106">变化行 B1 · 不再联网</text>
+
+    <rect class="node-on" x="608" y="64" width="160" height="56" rx="6"/>
+    <text class="name m" x="688" y="88">outbox flush</text>
+    <text class="tag-on" x="688" y="106">变化行 B3/B4/B5</text>
+
+    <rect class="node" x="800" y="64" width="144" height="56" rx="6"/>
+    <text class="name" x="872" y="88">GitHub</text>
+    <text class="tag" x="872" y="106">可失败</text>
+
+    <rect class="node" x="416" y="164" width="192" height="56" rx="6" stroke-dasharray="4 3"/>
+    <text class="name m" x="512" y="190" font-size="12">outbox.jsonl</text>
+    <text class="tag" x="512" y="208">pending / succeeded / abandoned</text>
+
+    <rect class="node" x="640" y="260" width="192" height="56" rx="6"/>
+    <text class="name m" x="736" y="286" font-size="12">abandoned（留档）</text>
+    <text class="tag" x="736" y="304">变化行 B5 · 补偿审计，永不删除</text>
+  </g>
+</svg>
+
+<div class="legend">
+  <span><i style="border-color:#eb6c36"></i>本次变更的步骤</span>
+  <span><i style="border-color:#4f5d75"></i>既有步骤 / 数据</span>
+</div>
+
+<p class="note"><strong>这张图要被质疑的一处：</strong>
+<code>close</code> 与 <code>GitHub</code> 之间<em>没有直接边</em>——所以「GitHub 挂了，
+交付照样落地、slot 照样释放」是拓扑保证的，不是靠 try/catch 兜的。</p>
+
+<table class="ledger">
+  <tr><th>Detail</th><td>close 的入队动作、flush 的取件与送达、三次失败转 abandoned 的分支。</td></tr>
+  <tr><th>Merged</th><td>gh issue comment 与 gh issue close 两次调用合成 GitHub 一个节点（同一条目内原子处理）。</td></tr>
+  <tr><th>Collapsed</th><td>可重试失败（B4）不单独画节点——它表现为条目留在 outbox.jsonl 的 pending 态，即图中队列节点自身。</td></tr>
+  <tr><th>Dropped</th><td>merge 之前的 claim / stage / gate 各步（本流程不改，属架构视图与既有 prose）。</td></tr>
+  <tr><th>Kept</th><td>merge 到 verify 的先后与「verify 不 PASS 不进 close」保持原样，画在图上是为了让改动步的位置有参照。</td></tr>
+</table>
+
+<p class="del"><strong>删除清单：</strong><code>masterClose</code> 内部的两行 gh 调用
+（issue comment 与 issue close）——不占图面，语义移位至 flush 步骤。
+<code>options.gh</code> 注入点本身保留（见 behavior.md 不变清单 K5）。</p>
+
+</div>
+</body>
+</html>
