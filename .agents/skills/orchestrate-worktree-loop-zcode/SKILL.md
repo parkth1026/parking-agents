@@ -1,6 +1,6 @@
 ---
 name: orchestrate-worktree-loop-zcode
-description: "ZCode-native variant of orchestrate-worktree-loop: orchestrate one REAL top-level ZCode session (visible in the ZCode UI session list, driven through the bundled app-server bridge) per Git worktree, through a strict issue-delivery loop (inspect, implement, test, Standards+Spec review, commit, merge into integration branch, verify, claim next issue). Use in the ZCode harness when the user asks to 总管/巡检多个 worktree, 再来一轮, finish-and-merge issues, or wants parallel per-worktree sessions that are NOT subagents. In Codex, use orchestrate-worktree-loop (Codex thread tools) instead."
+description: "ZCode-native variant of orchestrate-worktree-loop: orchestrate one REAL top-level ZCode session (persisted in the shared session store, driven through the bundled app-server bridge; sidebar visibility has a known gap, see references/ui-visibility-limitation.md) per Git worktree, through a strict issue-delivery loop (inspect, implement, test, Standards+Spec review, commit, merge into integration branch, verify, claim next issue). Use in the ZCode harness when the user asks to 总管/巡检多个 worktree, 再来一轮, finish-and-merge issues, or wants parallel per-worktree sessions that are NOT subagents. In Codex, use orchestrate-worktree-loop (Codex thread tools) instead."
 ---
 
 # Worktree Issue Delivery Loop (top-level ZCode sessions)
@@ -17,7 +17,7 @@ Run a state-driven delivery loop with one real top-level ZCode session per workt
 
 1. Preserve dirty worktrees. Never reset, checkout away, clean, stash, or overwrite user changes to manufacture a clean state.
 2. Use one active issue and one top-level session per worktree.
-3. These sessions are ordinary top-level ZCode sessions: the user can see them in the session list and may open them and chat mid-loop. Never assume exclusive control of a session between your operations — re-check `status` and re-verify evidence before acting. Only the coordinator drives the delivery loop itself.
+3. These sessions are ordinary top-level ZCode sessions the user may open and chat with mid-loop if they can find them in the sidebar (see the known UI-visibility gap in `references/ui-visibility-limitation.md`). Never assume exclusive control of a session between your operations — re-check `status` and re-verify evidence before acting. Only the coordinator drives the delivery loop itself.
 4. Do not mark a state complete without evidence you verified yourself from the current tree/commit (git commands, test runs), never from a session's summary alone.
 5. A code change invalidates affected test evidence. A code change after review invalidates that review. Re-run the affected gates and review.
 6. Merge worktrees into the integration branch serially. Choose merge order from dependencies and conflict risk, not arrival time.
@@ -38,7 +38,7 @@ node scripts/inspect-worktrees.mjs --paths "D:\repo-dev1,D:\repo-dev2" --integra
 
 ## Phase 1: Start the bridge and own top-level sessions
 
-Two equivalent control surfaces exist for driving REAL top-level ZCode sessions (not subagents). Sessions created through either are ordinary top-level interactive sessions — persisted in the shared session store, visible and openable in the ZCode UI, sharing the user's configured model provider. Both share the coordinator registry (`~/.zcode/bridge/sessions.json`).
+Two equivalent control surfaces exist for driving REAL top-level ZCode sessions (not subagents). Sessions created through either are ordinary top-level interactive sessions — fully persisted in the shared session store, sharing the user's configured model provider. **Known limitation (issue #79):** they are not guaranteed to show up in the ZCode UI sidebar without a manual nudge (open/switch to that workspace's tab, or restart ZCode) — see `references/ui-visibility-limitation.md` for the full evidence chain. Both surfaces share the coordinator registry (`~/.zcode/bridge/sessions.json`).
 
 ### Surface A — native MCP tools (preferred when present)
 
@@ -71,7 +71,7 @@ Wait for `BRIDGE_READY`. The CLI subcommands mirror the tools one-to-one: `creat
 ### Common rules (both surfaces)
 
 1. Create one session per worktree with a self-contained prompt (the session's cwd is the worktree, but spell out absolute paths anyway). `--mode yolo` / `mode: "yolo"` matches how delivery worktrees normally run; omit to inherit the workspace default. Record the `sessionId` in the coordinator map immediately.
-2. **Maintain the coordinator map** `worktree -> sessionId -> issue -> state`. The registry (`~/.zcode/bridge/sessions.json`) and the ZCode session store persist it; after a daemon/server restart the next operation auto-resumes known sessions. If a sessionId is somehow lost, it is recoverable from the registry file or the UI session list — treat as BLOCKED only if the session itself is gone.
+2. **Maintain the coordinator map** `worktree -> sessionId -> issue -> state`. The registry (`~/.zcode/bridge/sessions.json`) and the ZCode session store persist it; after a daemon/server restart the next operation auto-resumes known sessions. If a sessionId is somehow lost, it is recoverable from the registry file (authoritative) or `list`/`session/list` (query by workspace directory) — do not rely on the UI sidebar for recovery, its list may not reflect these sessions (see `references/ui-visibility-limitation.md`). Treat as BLOCKED only if the session itself is gone.
 3. Prefer `send` on the existing session for follow-up work on the same issue (e.g. after review findings) — the session keeps its context. "A prompt is already running" (-32010) means the turn is still active: `wait`, do not double-send.
 4. Do not run delivery-critical implementation inside the coordinator session; the coordinator inspects evidence, reviews, merges, and steers.
 

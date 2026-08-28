@@ -16,6 +16,7 @@ import {
 import { resolveCommand } from './command.mjs';
 import { HEADLESS_CHILD_OPTIONS } from './headless.mjs';
 import { prepareGithubAccess, runGithubJson } from './github-identity.mjs';
+import { parseIssueContract, SECTION_FIELD_NAMES } from './issue-contract.mjs';
 import {
   consumeEvent, CONTROL_STATES, createTask, evaluateStop, heartbeatTask, pendingInbox, putInboxEvent,
   EXECUTOR_FINAL_SCHEMA, nextActions, receiveActionReceipt, recordBlock, runPostMergeVerification, setVerdict, startGoal,
@@ -24,7 +25,9 @@ import {
 import { defaultSlotsFromWorktrees, discoverWorktrees } from './runner-slots.mjs';
 import { readJson, readJsonLines, readRegistry, writeJsonAtomic } from './runtime-store.mjs';
 import {
-  deliveryMergeScenario, discoveredWorkScenario, recoveryScenario, runnerLifecycleScenario,
+  deliveryMergeScenario, discoveredWorkScenario, integrationBaseAdvanceStaleEvidence, recoveryScenario, runnerLifecycleScenario,
+  stageResultSchemaBackwardCompat, reviewerIndependenceScenario, missingReviewerSessionIdScenario,
+  acceptanceInvalidationScenario, humanOpenEvidenceScenario, attemptReassignScenario,
 } from './selftest-v4.mjs';
 import { trajectoryReplayScenario } from './selftest-trajectory.mjs';
 import { boardUiDomain } from './selftest-board-ui.mjs';
@@ -527,6 +530,10 @@ function ambiguousLayoutFixture(label) {
     // basename 完全同名：精确匹配自身就是多义（exact.length > 1）。
     dupA: join(root, 'fixture-main-worker', 'left', 'fixture-dup'),
     dupB: join(root, 'fixture-main-alt', 'right', 'fixture-dup'),
+    // #73: canonical 短名（devN）撞出两个候选——orchestrate 的 canonicalWorktreeId 会把
+    // 两个 basename 都折成 dev7，该多义此前也被降级成 UNKNOWN_WORKTREE。
+    'fixture-dev7': join(root, 'fixture-main-worker', 'fixture-dev7'),
+    'team-dev7': join(root, 'fixture-main-alt', 'team-dev7'),
   };
   mkdirSync(main, { recursive: true });
   gitSync(main, ['init', '-b', 'main']);
@@ -1474,6 +1481,71 @@ try {
       await cleanTemp(observerDirB).catch(() => {});
       await cleanRepositoryFixture(peer);
     }
+
+    // #64 BLOCK 1/3：live-gate.mjs 的 CLI 层必须与其余模块共用同一条目标仓解析链
+    // （AES_WORKTREE_BOARD_REPO_ROOT 优先，否则 cwd）。此前 CLI 未传 --repo 时直接
+    // 裸接 process.cwd()，跳过了 env 覆盖——receipt 会静默落到 cwd 所在仓，而不是
+    // 调用方通过 env 指定的目标仓，恰是 #64 要关的问题换了个触发面。这里用真实双仓
+    // fixture 复现该场景：cwd 在 A，env 指向 B，断言 receipt 落 B、A 零新增。
+    // 域挂点选 repo-root：其余「目标仓解析链」的跨仓回归都挂在这里，同一条链、同一处断言。
+    const crossA = repositoryFixture('live-gate-cross-a');
+    const crossB = repositoryFixture('live-gate-cross-b');
+    try {
+      const crossEnv = boardEnv(null, { AES_WORKTREE_BOARD_REPO_ROOT: crossB.main });
+
+      // worktrees 子命令：练 localWorktreeGate → inspectLocalWorktrees。
+      const worktreesRun = spawnSync(process.execPath, [
+        join(SCRIPT_DIR, 'live-gate.mjs'), 'worktrees', '--branch', 'main',
+      ], {
+        ...HEADLESS_CHILD_OPTIONS, cwd: crossA.main, env: crossEnv, encoding: 'utf8',
+      });
+      assert.equal(worktreesRun.status, 0, worktreesRun.stderr || worktreesRun.stdout);
+      assert.equal(JSON.parse(worktreesRun.stdout.trim()).ok, true);
+      const worktreesReceiptPath = join(
+        crossB.main, '.aes-worktree-board', 'receipts', 'ac-007a-worktree-readonly.json',
+      );
+      assert.ok(existsSync(worktreesReceiptPath),
+        'worktrees 子命令未传 --repo 时 receipt 必须落 env 指向的目标仓（B）');
+      const worktreesReceipt = JSON.parse(readFileSync(worktreesReceiptPath, 'utf8'));
+      assert.equal(resolve(worktreesReceipt.repoRoot), resolve(crossB.main));
+      assert.equal(existsSync(join(crossA.main, '.aes-worktree-board')), false,
+        'cwd 所在仓（A）不得因未传 --repo 而承接 receipt');
+
+      // live-receipt 子命令：练 liveRunReceipt，同样不传 --repo。
+      const v4Dir = join(crossB.main, '.aes-worktree-board', 'runtime-v4');
+      mkdirSync(v4Dir, { recursive: true });
+      writeFileSync(join(v4Dir, 'registry.json'), JSON.stringify({
+        jobs: {}, deliveries: {}, attempts: {}, master: null, humanRequests: {}, discoveries: {},
+      }));
+      const liveReceiptRun = spawnSync(process.execPath, [
+        join(SCRIPT_DIR, 'live-gate.mjs'), 'live-receipt', '--branch', 'main',
+        '--issue-repo', 'fixture.invalid/cross-repo',
+      ], {
+        ...HEADLESS_CHILD_OPTIONS, cwd: crossA.main, env: crossEnv, encoding: 'utf8',
+      });
+      assert.equal(liveReceiptRun.status, 0, liveReceiptRun.stderr || liveReceiptRun.stdout);
+      assert.equal(JSON.parse(liveReceiptRun.stdout.trim()).ok, true);
+      const liveReceiptPath = join(crossB.main, '.aes-worktree-board', 'receipts', 'ac-007a-live-run.json');
+      assert.ok(existsSync(liveReceiptPath),
+        'live-receipt 子命令未传 --repo 时 receipt 必须落 env 指向的目标仓（B）');
+      const liveReceipt = JSON.parse(readFileSync(liveReceiptPath, 'utf8'));
+      assert.equal(resolve(liveReceipt.repo.root), resolve(crossB.main));
+      assert.equal(existsSync(join(crossA.main, '.aes-worktree-board', 'receipts')), false,
+        'cwd 所在仓（A）在 live-receipt 子命令下也不得承接 receipt');
+
+      // desktop 子命令需要真实 Chrome，跑不进这个轻量域；改为源码断言：三条子命令分支
+      // 必须全部改走同一条解析函数，不再各自裸接 process.cwd()（含 desktop 在内）。
+      const liveGateSource = readFileSync(join(SCRIPT_DIR, 'live-gate.mjs'), 'utf8');
+      const resolverCalls = liveGateSource.match(/resolveCliRepoRoot\(options\.repo\)/g) || [];
+      assert.equal(resolverCalls.length, 3,
+        'desktop / worktrees / live-receipt 三条子命令都必须走 resolveCliRepoRoot');
+      assert.doesNotMatch(liveGateSource, /options\.repo \|\| process\.cwd\(\)/,
+        'CLI 层不得再出现跳过 AES_WORKTREE_BOARD_REPO_ROOT 的裸 cwd 回落');
+    } finally {
+      await cleanRepositoryFixture(crossA);
+      await cleanRepositoryFixture(crossB);
+    }
+
     assert.deepEqual(
       runtimeTreeSnapshot(join(SKILL_DIR, 'runtime')),
       skillRuntimeBefore,
@@ -2640,6 +2712,69 @@ async function orchestrationPreflightLeaseAndState() {
   } finally {
     await cleanTemp(runtimeDir);
     await cleanTemp(raceRuntime);
+  }
+}
+
+// #73: orchestrate 的 resolveExistingWorktree 曾只查 target 空不空，把 resolveWorktreeTarget
+// 判出的 AMBIGUOUS_WORKTREE 降级成 UNKNOWN_WORKTREE——「太模糊请写全」被说成「不认识请查拼写」，
+// 与 dispatch/server 对同一多义事实给出相反指引。此处钉住 orchestrate CLI 级语义：
+// 多义必须透传 AMBIGUOUS_WORKTREE 并逐条列候选；真正不存在的名字仍是 UNKNOWN_WORKTREE。
+async function orchestrationAmbiguousWorktreeNotDowngraded() {
+  const fixture = ambiguousLayoutFixture('orchestrate-ambiguous');
+  const runtimeDir = join(fixture.root, 'runtime-orchestrate');
+  try {
+    const env = { AES_WORKTREE_BOARD_REPO_ROOT: fixture.main };
+    const taskCreate = (worktree, thread) => orchestrateSync([
+      'task', 'create', '--issue', '18', '--worktree', worktree, '--role', 'executor',
+      '--thread-id', thread, '--model', 'sol-high', '--routing-reason', '#73 ambiguity fixture',
+    ], runtimeDir, env);
+
+    // 三段多义一次盖住：basename 后缀多义（w1）、basename 完全同名（fixture-dup）、
+    // canonical devN 短名撞出两个候选（dev7——走 resolveWorktreeTarget 之前的 canonical 匹配，
+    // 该分支此前同样落进 UNKNOWN_WORKTREE）。
+    for (const [name, expected] of [
+      ['w1', ['fixture-w1', 'team-w1']],
+      ['fixture-dup', ['fixture-dup', 'fixture-dup']],
+      ['dev7', ['fixture-dev7', 'team-dev7']],
+    ]) {
+      const rejected = taskCreate(name, `T-ambiguous-${name}`);
+      assert.equal(rejected.status, 2, `多义 worktree "${name}" 必须以控制错误拒绝: ${rejected.stdout}`);
+      const body = parseJsonLine(rejected.stderr);
+      assert.equal(
+        body.code,
+        'AMBIGUOUS_WORKTREE',
+        `多义必须报 AMBIGUOUS_WORKTREE 而不是 ${body.code}: ${body.message}`,
+      );
+      assert.match(body.message, /请用完整 basename/, '多义报错必须给出可行的下一步');
+      // 候选逐条列出（与 dispatch 同一口径）：同名两条不得折叠；顺序不保证，只比集合。
+      const listed = body.message.match(/同时匹配 (.+)，请用完整 basename/)?.[1];
+      assert.ok(listed, `多义报错缺少候选集合: ${body.message}`);
+      assert.deepEqual(listed.split(', ').sort(), expected.slice().sort(),
+        `候选集合必须逐条列出: ${body.message}`);
+      assert.deepEqual((body.matches || []).slice().sort(), expected.slice().sort(),
+        'details.matches 必须携带候选 basename');
+    }
+
+    // 零候选仍是 UNKNOWN_WORKTREE：两种语义不得互相吞并。
+    const unknown = taskCreate('w9', 'T-ambiguous-unknown');
+    assert.equal(unknown.status, 2);
+    assert.equal(
+      parseJsonLine(unknown.stderr).code,
+      'UNKNOWN_WORKTREE',
+      '不存在的名字必须仍报 UNKNOWN_WORKTREE',
+    );
+
+    // 完整 basename 在多义候选仍在时必须照常受理（精确匹配压过后缀多义）。
+    const accepted = taskCreate('fixture-w1', 'T-ambiguous-exact');
+    assert.equal(accepted.status, 0, `完整 basename 必须唯一命中: ${accepted.stderr}`);
+    assert.equal(parseJsonLine(accepted.stdout).task.worktree, 'fixture-w1');
+    assert.equal(
+      Object.keys(readRegistry(runtimeDir).tasks).length,
+      1,
+      '多义与未知拒绝都不得落 registry 记录',
+    );
+  } finally {
+    await fixture.cleanup();
   }
 }
 
@@ -4340,6 +4475,8 @@ async function orchestrationDomain() {
     { id: 'P2.3-09', group: 'storage', name: 'lock-competition', run: orchestrationLockCompetition },
     { id: 'P2.3-10', group: 'storage', name: 'merge-behind-refresh', run: orchestrationMergeBehindRefresh },
     { group: 'lifecycle', name: 'preflight-lease-state', run: orchestrationPreflightLeaseAndState },
+    // #73：多义 worktree 不得降级成 UNKNOWN_WORKTREE，三入口同一语义。
+    { group: 'lifecycle', name: 'ambiguous-worktree-not-downgraded', run: orchestrationAmbiguousWorktreeNotDowngraded },
     { id: 'P2.3-01', group: 'lifecycle', name: 'inbox-idempotency', run: orchestrationInboxIdempotency },
     { id: 'P2.3-02', group: 'lifecycle', name: 'five-task-polls-not-lost', run: orchestrationFiveTaskFanIn },
     { id: 'P2.3-03', group: 'governance', name: 'circuit-late-event', run: orchestrationCircuitAndLateEvent },
@@ -4367,6 +4504,18 @@ async function orchestrationDomain() {
     { group: 'trajectory-replay', name: 'historical-trajectory-replay', run: trajectoryReplayScenario },
     { group: 'discovered-work', name: 'discovery-reflow', run: discoveredWorkScenario },
     { group: 'delivery-merge', name: 'delivery-and-tiered-merge-gate', run: deliveryMergeScenario },
+    // AC-007（#62）：integration 前进使旧 base 上取得的证据失效。
+    { group: 'stale-base-evidence', name: 'integration-base-advance-stale-evidence', run: integrationBaseAdvanceStaleEvidence },
+    { group: 'stale-base-evidence', name: 'stage-result-schema-backward-compat', run: stageResultSchemaBackwardCompat },
+    // #65：reviewer 独立性机械判据。
+    { group: 'reviewer-independence', name: 'reviewer-independence-mechanical-judging', run: reviewerIndependenceScenario },
+    { group: 'reviewer-independence', name: 'missing-reviewer-session-id-fail-closed', run: missingReviewerSessionIdScenario },
+    // #72：job.acceptance 随 candidate 前进失效，GATE-acceptance 校验取证 commit。
+    { group: 'stale-base-evidence', name: 'acceptance-invalidation-on-candidate-advance', run: acceptanceInvalidationScenario },
+    // #76：human open 证据清单不得静默为空；CLI 未知/重复参数 fail closed。
+    { group: 'recovery', name: 'human-open-required-evidence-fail-closed', run: humanOpenEvidenceScenario },
+    // #78：attemptNew 释放旧租约、绑定新 slot 实时 HEAD；reconcile 检出残留双租约。
+    { group: 'recovery', name: 'attempt-reassign-lease-and-base', run: attemptReassignScenario },
   ];
   const p2p3Ids = cases.filter((testCase) => testCase.id).map((testCase) => testCase.id).sort();
   assert.deepEqual(
@@ -4392,6 +4541,105 @@ async function orchestrationDomain() {
     passed,
     scenarioIds: selected.filter((testCase) => testCase.id).map((testCase) => testCase.id),
   };
+}
+
+// #69：sectionBody() 曾用 pattern.exec(body) 只取首个匹配小节，正文里同名小节
+// 重复出现时静默取错（例如首个「## 依赖」是散文说明，真正的依赖列表在后面）。
+// 这里锁定：七个契约小节各自重复都必须 fail closed 判 invalid + DUPLICATE_SECTION，
+// 且无重复的单份契约块解析结果必须与既有行为逐字段一致（不破坏 contract-complete Issue）。
+const CONTRACT_SECTION_HEADINGS = Object.freeze({
+  goal: '目标',
+  workflowRole: 'workflow role',
+  acceptanceCriteria: '验收条件',
+  dependencies: '依赖',
+  risk: '风险',
+  allowedSideEffects: '允许的副作用',
+  humanGates: '人工门',
+});
+
+function singleContractIssueBody() {
+  return [
+    '## 目标',
+    '让 issue-contract 的重复小节可靠地判 invalid。',
+    '',
+    '## workflow role',
+    'implement',
+    '',
+    '## 验收条件',
+    '- **AC-1**（automated）：示例验收条件一。',
+    '- **AC-2**（automated）：示例验收条件二。',
+    '',
+    '## 依赖',
+    '无。',
+    '',
+    '## 风险',
+    'riskProfile: low',
+    '',
+    '## 允许的副作用',
+    '- edit-worktree',
+    '- run-tests',
+    '',
+    '## 人工门',
+    '无。全部 AC 可自动验证。',
+    '',
+  ].join('\n');
+}
+
+// 在指定小节的原有内容之前，插入同名标题的第二份（散文）小节 —— 复现 Issue 描述的
+// 「首个为散文的重复小节」场景，同时不破坏其余小节的合法结构。
+function withDuplicateSection(body, sectionKey) {
+  const heading = CONTRACT_SECTION_HEADINGS[sectionKey];
+  const marker = `## ${heading}\n`;
+  const index = body.indexOf(marker);
+  assert.ok(index >= 0, `测试 fixture 缺少小节: ${heading}`);
+  const duplicateBlock = `${marker}（重复占位内容，验证不会被静默取用）\n\n`;
+  return `${body.slice(0, index)}${duplicateBlock}${body.slice(index)}`;
+}
+
+async function contractDomain() {
+  const validBody = singleContractIssueBody();
+
+  // 回归：无重复的单份契约块必须逐字段解析成功，不能因为本次修复而破坏既有
+  // contract-complete Issue。
+  const baseline = parseIssueContract({ number: 1, body: validBody });
+  assert.equal(baseline.complete, true, '无重复的单份契约块必须仍判 complete');
+  assert.deepEqual(baseline.missing, []);
+  assert.deepEqual(baseline.invalid, []);
+  assert.equal(baseline.contract.goal, '让 issue-contract 的重复小节可靠地判 invalid。');
+  assert.equal(baseline.contract.workflowRole, 'implement');
+  assert.deepEqual(
+    baseline.contract.acceptanceCriteria,
+    [
+      { id: 'AC-1', evidenceClass: 'automated', text: '示例验收条件一。' },
+      { id: 'AC-2', evidenceClass: 'automated', text: '示例验收条件二。' },
+    ],
+  );
+  assert.deepEqual(baseline.contract.dependencies, []);
+  assert.equal(baseline.contract.riskProfile, 'low');
+  assert.deepEqual(baseline.contract.allowedSideEffects, ['edit-worktree', 'run-tests']);
+  assert.deepEqual(baseline.contract.humanGates, [], '人工门只认列表项，散文不构成人工门');
+  assert.equal(baseline.contract.executionPolicy, 'for-agent');
+
+  // AC-1：Issue 描述的具体场景 —— 依赖小节重复，首个为散文。
+  const duplicateDependencies = withDuplicateSection(validBody, 'dependencies');
+  const dependenciesResult = parseIssueContract({ number: 2, body: duplicateDependencies });
+  assert.equal(dependenciesResult.complete, false, '依赖小节重复必须判 invalid，complete=false');
+  assert.ok(
+    dependenciesResult.invalid.some((entry) => entry.field === 'dependencies' && entry.reason === 'DUPLICATE_SECTION'),
+    'dependencies 重复必须带 DUPLICATE_SECTION',
+  );
+
+  // AC-2：七个契约小节各自重复时均判 invalid（逐个单独复现，不叠加）。
+  for (const sectionKey of Object.keys(CONTRACT_SECTION_HEADINGS)) {
+    const expectedField = SECTION_FIELD_NAMES[sectionKey];
+    const duplicated = withDuplicateSection(validBody, sectionKey);
+    const result = parseIssueContract({ number: 3, body: duplicated });
+    assert.equal(result.complete, false, `${sectionKey} 小节重复必须判 invalid`);
+    assert.ok(
+      result.invalid.some((entry) => entry.field === expectedField && entry.reason === 'DUPLICATE_SECTION'),
+      `${sectionKey} 重复必须在 invalid 中带 DUPLICATE_SECTION（实际: ${JSON.stringify(result.invalid)}）`,
+    );
+  }
 }
 
 async function layoutDomain() {
@@ -4509,6 +4757,7 @@ const domains = {
   'board-ui': boardUiDomain,
   collect: collectDomain,
   'collect-live': collectLiveDomain,
+  contract: contractDomain,
   fixture: fixtureDomain,
   dispatch: dispatchDomain,
   server: serverDomain,
