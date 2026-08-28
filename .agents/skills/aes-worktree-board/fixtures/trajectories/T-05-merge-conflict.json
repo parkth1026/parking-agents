@@ -25,6 +25,7 @@
     { "action": "merge", "job": "job-a", "as": "conflict-merge" },
     { "action": "reconcile", "as": "restart-after-conflict" },
 
+    { "action": "sync", "job": "job-b" },
     { "action": "candidate", "job": "job-b", "file": "unrelated.txt" },
     { "action": "review", "job": "job-b", "outcome": "PASS" },
     { "action": "qa", "job": "job-b", "outcome": "PASS" },

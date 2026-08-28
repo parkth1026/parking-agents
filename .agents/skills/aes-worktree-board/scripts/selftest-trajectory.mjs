@@ -4,10 +4,12 @@
 // 语料是脱敏后的「历史上出过什么错」，断言是「新控制面不再复现」。因此 fixture 里
 // 存的是步骤与期望，不是快照 diff —— 快照会随实现细节漂移，而失败形态不会。
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readReceipts, readV4Registry } from './job-store.mjs';
+import { HEADLESS_CHILD_OPTIONS } from './headless.mjs';
 import { initSlots } from './runner-slots.mjs';
 import * as master from './master.mjs';
 import { makeWayfinder } from './discovery.mjs';
@@ -49,6 +51,13 @@ async function runStep(world, step) {
       // commit 一律按 job 归档；`as` 只是步骤结果的标签，两者不可混用。
       world.commits[step.job] = commit;
       return master.recordCandidate({ ...shared, jobId: job.jobId, commitSha: commit });
+    }
+    case 'sync': {
+      const job = world.jobs[step.job];
+      execFileSync('git', [
+        '-C', fixture.worktreeOf(job.slotId), 'merge', '--ff-only', fixture.repoIdentity.integrationBranch,
+      ], { ...HEADLESS_CHILD_OPTIONS, stdio: 'pipe' });
+      return { ok: true, jobId: job.jobId, integrationHead: gitOut(fixture.repoRoot, ['rev-parse', fixture.repoIdentity.integrationBranch]) };
     }
     case 'review': {
       const job = world.jobs[step.job];

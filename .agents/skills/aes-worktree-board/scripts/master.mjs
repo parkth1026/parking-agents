@@ -1112,17 +1112,18 @@ export function respondHumanRequest(options = {}) {
 // ---------------------------------------------------------------- merge gate
 
 export function evaluateGate(options = {}) {
-  const { dir, config, hostRoot } = ctx(options);
+  const { dir, config, repoRoot } = ctx(options);
   const registry = readV4Registry(dir);
   const job = jobOf(registry, options.jobId);
   const attempt = currentAttempt(registry, options.jobId);
   const runner = registry.runners[job.slotId] || null;
   const integrationBranch = config.repoIdentity.integrationBranch;
-  const integrationHead = options.integrationHead ?? gitOut(hostRoot, ['rev-parse', integrationBranch]);
+  // gate 解析固定仓库身份；host checkout 是否属于该仓库由 merge preflight 单独判定。
+  const integrationHead = options.integrationHead ?? gitOut(repoRoot, ['rev-parse', integrationBranch]);
 
   const changedPaths = options.changedPaths
     || (attempt?.candidateCommit && job.baseCommit
-      ? changedPathsBetween(hostRoot, job.baseCommit, attempt.candidateCommit)
+      ? changedPathsBetween(repoRoot, job.baseCommit, attempt.candidateCommit)
       : []);
   const policy = resolveMergePolicy({ declaredRisk: job.declaredRisk, changedPaths });
 
