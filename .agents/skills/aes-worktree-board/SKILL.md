@@ -408,7 +408,9 @@ node "$skillDir/scripts/master.mjs" release --job <jobId> --slot <slotId>
 | `high` | 机械门全绿**仍**停在 humanGate 等人工批准 |
 | `critical` | 拒绝直接 merge，只走 PR；waiver 也不能覆盖 |
 
-机械门六项固定顺序：slot → commit → integration → acceptance → review → QA。
+机械门八项固定顺序：slot → commit → integration → acceptance → review → review-base → QA → qa-base。
+`gate` 另返回 `outboxWarning` 提醒未送达的 GitHub 出站条目；该字段只提供可观测性，
+不改变八门 outcome，也不参与 `decision.mayMerge`。
 其中 review/QA receipt 的 `commitSha` 必须与当前 candidate commit **精确相等**——
 旧 commit 的证据不能给新 commit 背书；QA 含 `NOT_RUN` 或 `unexecuted` 非空一律判失败。
 commit 前进只能走 `candidate` 命令（那里作废旧证据）；terminal 报文里的
@@ -426,7 +428,7 @@ merge-worker 消化 mergeQueue 的完整职责：
 2. 派独立 `code-review` subagent（Standards+Spec 双轴；深度按 `resolveMergePolicy`
    的 **effectiveRisk** 分档——含路径兜底，比工单自报档更准），review receipt 由
    merge-worker 侧 `stage review` 上报——**被审的 worker 无法自报 review PASS**；
-3. review PASS → gate 六项 → 串行 merge → **merge 后全量回归**（commands file 跑
+3. review PASS → gate 八项 → 串行 merge → **merge 后全量回归**（commands file 跑
    全量套件，非 targeted）→ 幂等 close → release slot；
 4. review MUST_FIX → 以 `aes.issue-worker.review-return/v1` 经总管打回原 owner
    session（原 thread 优先、新 attempt 兜底）：报文含 `jobId`/`attemptId`/
