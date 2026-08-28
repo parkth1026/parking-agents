@@ -82,8 +82,8 @@
     {
       "id": "E-5",
       "check": "human-requests-open",
-      "equals": 0,
-      "why": "普通 review finding 与预算耗尽都不得打断用户；BUDGET_EXHAUSTED 是给 Master 的 typed 结果，不是人工态"
+      "equals": 1,
+      "why": "第三次 merge-worker MUST_FIX 耗尽预算后必须留下可恢复的 AWAITING_HUMAN 请求"
     },
     {
       "id": "E-6",

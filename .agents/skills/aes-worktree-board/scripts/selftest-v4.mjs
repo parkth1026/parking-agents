@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { HEADLESS_CHILD_OPTIONS } from './headless.mjs';
-import { acknowledgeEntry, enqueueIssueClose, flushOutbox, readOutbox } from './outbox.mjs';
+import { acknowledgeEntry, enqueueIssueClose, flushOutbox, readOutbox as readLegacyOutbox } from './outbox.mjs';
 import { readV4Registry, readReceipts, readTransitions, updateV4Registry } from './job-store.mjs';
 import {
   defaultSlotsFromWorktrees, discoverWorktrees, initSlots, loadSlotsConfig, normalizePath,
@@ -18,6 +18,7 @@ import {
 import { HUMAN_REQUEST_SCHEMA } from './human-request.mjs';
 import { decideMerge, evaluateMechanicalGate, resolveMergePolicy } from './merge-policy.mjs';
 import * as master from './master.mjs';
+import { readOutbox, readOutboxHistory } from './outbox-store.mjs';
 import {
   git, gitOut, issuePayload, makeCandidate, makeConflict, makeFixture, SCRIPT_DIR,
 } from './selftest-fixture.mjs';
@@ -115,9 +116,6 @@ function driveToReadyToMerge(fixture, issue, { slotId, ownerThreadId = 'owner-se
   const candidate = makeCandidate(fixture, claim.slotId, { file: `feature-${issue.number}.txt` });
   master.recordCandidate({ ...base(fixture), jobId: claim.jobId, commitSha: candidate });
 
-  // 使用提供的或默认的 reviewer session id：如果没指定，就用 ownerThreadId 来测试 same-session
-  const actualReviewerSessionId = reviewerSessionId || ownerThreadId;
-  master.recordStageResult({ ...base(fixture), jobId: claim.jobId, stage: 'review', payload: passingReview(claim.jobId, candidate, baseCommit, actualReviewerSessionId) });
   master.recordStageResult({ ...base(fixture), jobId: claim.jobId, stage: 'qa', payload: passingQa(claim.jobId, candidate, baseCommit) });
   const terminal = master.masterTerminal({
     ...base(fixture),
@@ -127,7 +125,282 @@ function driveToReadyToMerge(fixture, issue, { slotId, ownerThreadId = 'owner-se
     ),
   });
   assert.equal(terminal.state, 'ready-to-merge');
+  // review 由 merge-worker 在 READY_TO_MERGE 后领取并上报；worker 不能自报 PASS。
+  const lifecycle = master.claimMergeReview({ ...base(fixture), jobId: claim.jobId });
+  const actualReviewerSessionId = reviewerSessionId || ownerThreadId;
+  master.recordStageResult({
+    ...base(fixture), jobId: claim.jobId, stage: 'review',
+    payload: {
+      ...passingReview(claim.jobId, candidate, baseCommit, actualReviewerSessionId),
+      attemptId: claim.attemptId,
+      effectiveRisk: lifecycle.effectiveRisk,
+      depthTier: lifecycle.depthTier,
+    },
+  });
   return { jobId: claim.jobId, attemptId: claim.attemptId, candidate, slotId: claim.slotId, claim, baseCommit };
+}
+
+function driveToClosing(fixture, issueNumber) {
+  writeSlots(fixture);
+  master.masterStart({ ...base(fixture) });
+  const job = driveToReadyToMerge(fixture, issuePayload({ number: issueNumber }));
+  assert.equal(master.masterMerge({ ...base(fixture), jobId: job.jobId }).ok, true);
+  assert.equal(master.postMergeVerify({
+    ...base(fixture), jobId: job.jobId,
+    commands: [{ command: process.execPath, args: ['-e', 'process.exit(0)'] }],
+  }).outcome, 'PASS');
+  return job;
+}
+
+function githubIdentityFixture(fixture, mode = 'ok') {
+  const script = join(fixture.root, `identity-${mode}.mjs`);
+  writeFileSync(script, [
+    "const args = process.argv.slice(2);",
+    `const mode = ${JSON.stringify(mode)};`,
+    "if (args[0] === 'auth' && args[1] === 'status') {",
+    "  if (mode === 'network') { console.error('network unavailable'); process.exit(1); }",
+    "  const accounts = mode === 'multiple' ? ['alice','bob'] : ['alice'];",
+    "  console.log(JSON.stringify({hosts:{'github.com':accounts.map(login=>({login,state:'success'}))}}));",
+    "} else if (args[0] === 'auth' && args[1] === 'token') console.log('ghp_fake_for_test_only');",
+    "else if (args[0] === 'api' && args[1] === 'user') console.log(mode === 'mismatch' ? 'bob' : 'alice');",
+    "else if (args[0] === 'repo' && args[1] === 'view') {",
+    "  if (mode === 'not-found') { console.error('Could not resolve to a Repository'); process.exit(1); }",
+    "  console.log(JSON.stringify({nameWithOwner:args[2],viewerPermission:mode === 'read-only' ? 'READ' : 'WRITE',isPrivate:false}));",
+    "} else console.log('ok');",
+  ].join('\n'));
+  return { ...process.env, AES_WORKTREE_BOARD_GH_COMMAND: JSON.stringify([process.execPath, script]) };
+}
+
+export async function outboxCloseScenario() {
+  const fixture = makeFixture('outbox-close', { workers: [{ id: 'worker-1' }] });
+  try {
+    const job = driveToClosing(fixture, 601);
+    let calls = 0;
+    const closed = await master.masterClose({
+      ...base(fixture), jobId: job.jobId,
+      gh: async () => { calls += 1; throw new Error('close 不得调用 gh'); },
+    });
+    assert.equal(calls, 0, 'close 命令内 gh 调用次数必须为 0');
+    assert.equal(closed.outcome, 'CLOSED');
+    assert.equal(readV4Registry(fixture.v4Dir).jobs[job.jobId].state, 'closed');
+    assert.equal(readV4Registry(fixture.v4Dir).runners['worker-1'].lease, null);
+    assert.equal(readOutbox(fixture.v4Dir)[0].state, 'pending');
+
+    const repeated = await master.masterClose({
+      ...base(fixture), jobId: job.jobId,
+      gh: async () => { calls += 1; return { stdout: '' }; },
+    });
+    assert.equal(calls, 0, '幂等 close 同样不得调用 gh');
+    assert.equal(repeated.outbox.enqueued, false);
+    assert.equal(readOutbox(fixture.v4Dir).length, 1, '幂等 close 不得重复入队');
+    assert.deepEqual(Object.keys(closed).sort(), ['commentDigest', 'delivery', 'issue', 'jobId', 'ok', 'outbox', 'outcome'].sort());
+  } finally {
+    fixture.cleanup();
+  }
+  const crashFixture = makeFixture('outbox-close-crash', { workers: [{ id: 'worker-1' }] });
+  try {
+    const job = driveToClosing(crashFixture, 607);
+    await assert.rejects(master.masterClose({
+      ...base(crashFixture), jobId: job.jobId,
+      enqueueOutbox: () => { throw new Error('crash after registry close'); },
+    }), /crash after registry close/);
+    const registry = readV4Registry(crashFixture.v4Dir);
+    assert.equal(registry.jobs[job.jobId].state, 'closed', '入队前崩溃也必须已完成 registry 终局');
+    assert.equal(registry.runners['worker-1'].lease, null, '入队前崩溃也必须释放 slot');
+    assert.equal(readOutbox(crashFixture.v4Dir).length, 0);
+    const reconcile = master.masterReconcile({ ...base(crashFixture) });
+    assert.ok(reconcile.actions.some((action) => action.jobId === job.jobId && action.action === 'RESUME_OUTBOX_ENQUEUE'));
+    const recovered = await master.masterNextStep({ ...base(crashFixture) });
+    assert.equal(recovered.result.outbox.state, 'pending', '无人值守重启必须补齐未落盘 outbox');
+  } finally { crashFixture.cleanup(); }
+  const legacyFixture = makeFixture('outbox-close-legacy', { workers: [{ id: 'worker-1' }] });
+  try {
+    const job = driveToClosing(legacyFixture, 609);
+    await assert.rejects(master.masterClose({
+      ...base(legacyFixture), jobId: job.jobId,
+      enqueueOutbox: () => { throw new Error('legacy cutover'); },
+    }), /legacy cutover/);
+    updateV4Registry(legacyFixture.v4Dir, (registry) => {
+      registry.deliveries[job.jobId].issueClose.outcome = 'CLOSED';
+    });
+    const legacy = await master.masterClose({ ...base(legacyFixture), jobId: job.jobId });
+    assert.equal(legacy.outcome, 'ALREADY_SUCCEEDED');
+    assert.equal(legacy.outbox, undefined, 'legacy CLOSED 已代表 GitHub 成功，不得重新入队');
+    assert.equal(readOutbox(legacyFixture.v4Dir).length, 0);
+  } finally { legacyFixture.cleanup(); }
+}
+
+export async function outboxFlushScenario() {
+  const fixture = makeFixture('outbox-flush', { workers: [{ id: 'worker-1' }] });
+  try {
+    const job = driveToClosing(fixture, 602);
+    await master.masterClose({ ...base(fixture), jobId: job.jobId });
+    let fail = true;
+    const gh = async () => {
+      if (fail) { const error = new Error('HTTP 503'); error.code = 'GH_COMMAND_FAILED'; throw error; }
+      return { stdout: '' };
+    };
+    const first = await master.masterOutboxFlush({ ...base(fixture), gh });
+    assert.equal(first.ok, true); assert.equal(first.failed, 1); assert.equal(first.entries[0].attempt, 1);
+    const second = await master.masterOutboxFlush({ ...base(fixture), gh });
+    assert.equal(second.failed, 1); assert.equal(second.entries[0].attempt, 2);
+    const third = await master.masterOutboxFlush({ ...base(fixture), gh });
+    assert.equal(third.abandoned, 1); assert.equal(third.entries[0].attempts, 3);
+    const skipped = await master.masterOutboxFlush({ ...base(fixture), gh });
+    assert.equal(skipped.failed, 0); assert.equal(skipped.abandoned, 0); assert.equal(skipped.remaining, 0);
+
+    const successFixture = makeFixture('outbox-flush-success', { workers: [{ id: 'worker-1' }] });
+    try {
+      const successJob = driveToClosing(successFixture, 603);
+      await master.masterClose({ ...base(successFixture), jobId: successJob.jobId });
+      fail = false;
+      let successCalls = 0;
+      const concurrentGh = async () => { successCalls += 1; await new Promise((resolveWait) => setTimeout(resolveWait, 10)); return { stdout: '' }; };
+      const concurrent = await Promise.all([
+        master.masterOutboxFlush({ ...base(successFixture), gh: concurrentGh }),
+        master.masterOutboxFlush({ ...base(successFixture), gh: concurrentGh }),
+      ]);
+      assert.deepEqual(concurrent.map((result) => result.flushed).sort(), [0, 1], '并发 flush 只能有一个领取 pending 条目');
+      assert.equal(successCalls, 2, '同一 issue-close 只能发送一次 comment + close');
+      assert.equal(readOutbox(successFixture.v4Dir)[0].state, 'succeeded');
+      const idempotent = await master.masterOutboxFlush({ ...base(successFixture), gh: async () => { throw new Error('succeeded 不得重送'); } });
+      assert.equal(idempotent.flushed, 0); assert.equal(idempotent.skipped, 1);
+      const emptyFixture = makeFixture('outbox-flush-empty', { workers: [{ id: 'worker-1' }] });
+      try {
+        writeSlots(emptyFixture);
+        const empty = freshProcess(emptyFixture, ['outbox', 'flush'], { env: { AES_WORKTREE_BOARD_GH_COMMAND: JSON.stringify([process.execPath, '-e', 'process.exit(9)']) } });
+        assert.deepEqual(empty, { ok: true, flushed: 0, skipped: 0, failed: 0, abandoned: 0, remaining: 0, entries: [] });
+      } finally { emptyFixture.cleanup(); }
+    } finally { successFixture.cleanup(); }
+
+    const recoveryFixture = makeFixture('outbox-flush-recovery', { workers: [{ id: 'worker-1' }] });
+    try {
+      const recoveryJob = driveToClosing(recoveryFixture, 608);
+      await master.masterClose({ ...base(recoveryFixture), jobId: recoveryJob.jobId });
+      const started = new Date('2026-08-28T12:00:00.000Z');
+      await assert.rejects(master.masterOutboxFlush({
+        ...base(recoveryFixture), owner: 'crashed-flush', leaseMs: 1000, now: () => started,
+        gh: async () => { throw new Error('network must not start before crash hook'); },
+        afterClaim: async () => { throw new Error('crash after claim'); },
+      }), /crash after claim/);
+      assert.equal(readOutbox(recoveryFixture.v4Dir)[0].inFlight.owner, 'crashed-flush');
+      const blocked = await master.masterOutboxFlush({ ...base(recoveryFixture), owner: 'early-retry', now: () => started, gh: async () => ({ stdout: '' }) });
+      assert.equal(blocked.flushed, 0, '未过期 lease 不得被抢占');
+      const recovered = await master.masterOutboxFlush({
+        ...base(recoveryFixture), owner: 'recovered-flush', now: () => new Date(started.getTime() + 1001),
+        isOwnerAlive: () => false, gh: async () => ({ stdout: '' }),
+      });
+      assert.equal(recovered.flushed, 1, '过期 inFlight 必须可回收并结算');
+    } finally { recoveryFixture.cleanup(); }
+    const schemaFixture = makeFixture('outbox-schema', { workers: [{ id: 'worker-1' }] });
+    try {
+      writeSlots(schemaFixture);
+      mkdirSync(schemaFixture.v4Dir, { recursive: true });
+      for (const state of ['succeeded', 'abandoned', 'acknowledged']) {
+        writeFileSync(join(schemaFixture.v4Dir, 'outbox.jsonl'), `${JSON.stringify({
+          schemaVersion: 'aes.worktree-board.outbox-entry/v1', entryId: `bad-${state}`, kind: 'future-kind',
+          state, attempts: [], createdAt: new Date().toISOString(),
+        })}\n`);
+        assert.throws(() => master.masterOutboxStatus({ ...base(schemaFixture) }), (error) => error.code === 'OUTBOX_ENTRY_INVALID');
+      }
+      const generic = {
+        schemaVersion: 'aes.worktree-board.outbox-entry/v1', entryId: 'future-1', kind: 'future-kind',
+        state: 'pending', attempts: [], createdAt: new Date().toISOString(), payload: { value: 1 },
+      };
+      writeFileSync(join(schemaFixture.v4Dir, 'outbox.jsonl'), `${JSON.stringify(generic)}\n`);
+      assert.equal(master.masterOutboxStatus({ ...base(schemaFixture) }).entries[0].kind, 'future-kind');
+      await assert.rejects(master.masterOutboxFlush({ ...base(schemaFixture), gh: async () => ({ stdout: '' }) }),
+        (error) => error.code === 'UNSUPPORTED_OUTBOX_KIND');
+      assert.equal(readOutbox(schemaFixture.v4Dir)[0].inFlight, undefined, '未知 handler 必须在 claim 前 fail closed');
+      const badHandler = { ...generic, entryId: 'bad-handler', kind: 'issue-close' };
+      writeFileSync(join(schemaFixture.v4Dir, 'outbox.jsonl'), `${JSON.stringify(badHandler)}\n`);
+      await assert.rejects(master.masterOutboxFlush({ ...base(schemaFixture), gh: async () => ({ stdout: '' }) }),
+        (error) => error.code === 'OUTBOX_ENTRY_INVALID');
+      assert.equal(readOutbox(schemaFixture.v4Dir)[0].inFlight, undefined);
+      const wrongRepo = {
+        ...generic, entryId: 'wrong-repo', kind: 'issue-close', jobId: 'job-wrong', issue: 99,
+        repo: 'other/repo', commentDigest: 'sha256:wrong', payload: { comment: 'x', closeIssue: true },
+      };
+      writeFileSync(join(schemaFixture.v4Dir, 'outbox.jsonl'), `${JSON.stringify(wrongRepo)}\n`);
+      await assert.rejects(master.masterOutboxFlush({ ...base(schemaFixture), gh: async () => ({ stdout: '' }) }),
+        (error) => error.code === 'OUTBOX_REPO_MISMATCH');
+    } finally { schemaFixture.cleanup(); }
+
+    const identityFixture = makeFixture('outbox-identity', { workers: [{ id: 'worker-1' }] });
+    try {
+      const identityJob = driveToClosing(identityFixture, 610);
+      await master.masterClose({ ...base(identityFixture), jobId: identityJob.jobId });
+      for (const [mode, account, code] of [
+        ['multiple', undefined, 'IDENTITY_REQUIRED'], ['mismatch', 'alice', 'IDENTITY_MISMATCH'],
+        ['read-only', 'alice', 'PERMISSION_DENIED'], ['not-found', 'alice', 'REPO_NOT_FOUND'],
+        ['network', 'alice', 'NETWORK_FAILURE'],
+      ]) {
+        await assert.rejects(master.masterOutboxFlush({
+          ...base(identityFixture), account, env: githubIdentityFixture(identityFixture, mode),
+        }), (error) => {
+          assert.equal(error.code, code, `${mode} 实际错误: ${error.code} ${error.message}`);
+          assert.doesNotMatch(`${error.message}${JSON.stringify(error.details || {})}`, /ghp_fake_for_test_only/);
+          return true;
+        }, `${mode} 必须保留 typed ${code}`);
+        assert.equal(readOutbox(identityFixture.v4Dir)[0].inFlight, undefined, '身份预检失败不得 claim');
+      }
+      const configuredEnv = { ...githubIdentityFixture(identityFixture, 'multiple'), AES_WORKTREE_BOARD_GITHUB_ACCOUNT: 'alice' };
+      const configured = await master.masterOutboxFlush({ ...base(identityFixture), env: configuredEnv });
+      assert.equal(configured.flushed, 1, 'board/env 保存的账号必须被身份边界消费');
+    } finally { identityFixture.cleanup(); }
+  } finally {
+    fixture.cleanup();
+  }
+}
+
+export async function outboxAckScenario() {
+  const fixture = makeFixture('outbox-ack', { workers: [{ id: 'worker-1' }] });
+  try {
+    const job = driveToClosing(fixture, 604);
+    const closed = await master.masterClose({ ...base(fixture), jobId: job.jobId });
+    const entryId = closed.outbox.entryId;
+    const notAbandoned = master.masterOutboxAcknowledge({ ...base(fixture), entryId, reason: 'too early' });
+    assert.equal(notAbandoned.code, 'NOT_ABANDONED');
+    const missing = freshProcess(fixture, ['outbox', 'acknowledge', '--entry', entryId], { expectStatus: 'nonzero' });
+    assert.equal(missing.code, 'REASON_REQUIRED');
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      await master.masterOutboxFlush({ ...base(fixture), gh: async () => { throw new Error('unreachable'); } });
+    }
+    const acknowledged = master.masterOutboxAcknowledge({ ...base(fixture), entryId, reason: 'merge abc123 已落地；Issue 永久不可达' });
+    assert.equal(acknowledged.outcome, 'ACKNOWLEDGED');
+    assert.ok(Number.isFinite(Date.parse(acknowledged.acknowledgedAt)));
+    const again = master.masterOutboxAcknowledge({ ...base(fixture), entryId, reason: '不同文案不得覆盖首次签收' });
+    assert.equal(again.outcome, 'ALREADY_ACKNOWLEDGED');
+    assert.equal(again.acknowledgedAt, acknowledged.acknowledgedAt);
+    assert.equal(again.acknowledgedBy, acknowledged.acknowledgedBy);
+    assert.equal(readOutbox(fixture.v4Dir)[0].state, 'acknowledged');
+    assert.ok(readOutboxHistory(fixture.v4Dir).some((entry) => entry.state === 'abandoned'), 'abandoned 历史行必须仍可读');
+  } finally { fixture.cleanup(); }
+}
+
+export async function outboxGateScenario() {
+  const fixture = makeFixture('outbox-gate', { workers: [{ id: 'worker-1' }, { id: 'worker-2' }] });
+  try {
+    writeSlots(fixture);
+    master.masterStart({ ...base(fixture) });
+    const gateJob = driveToReadyToMerge(fixture, issuePayload({ number: 605 }), { slotId: 'worker-1', reviewerSessionId: 'reviewer-independent' });
+    const before = master.evaluateGate({ ...base(fixture), jobId: gateJob.jobId });
+    assert.equal(before.outboxWarning, null);
+    const closeJob = driveToReadyToMerge(fixture, issuePayload({ number: 606 }), { slotId: 'worker-2', reviewerSessionId: 'reviewer-independent-2' });
+    assert.equal(master.masterMerge({ ...base(fixture), jobId: closeJob.jobId }).ok, true);
+    master.postMergeVerify({ ...base(fixture), jobId: closeJob.jobId, commands: [{ command: process.execPath, args: ['-e', 'process.exit(0)'] }] });
+    const closed = await master.masterClose({ ...base(fixture), jobId: closeJob.jobId });
+    const withPending = master.evaluateGate({ ...base(fixture), jobId: gateJob.jobId, integrationHead: before.integrationHead });
+    assert.equal(withPending.outboxWarning.pending, 1);
+    assert.deepEqual(withPending.mechanical, before.mechanical);
+    assert.deepEqual(withPending.decision, before.decision);
+    for (let attempt = 0; attempt < 3; attempt += 1) await master.masterOutboxFlush({ ...base(fixture), gh: async () => { throw new Error('gone'); } });
+    master.masterOutboxAcknowledge({ ...base(fixture), entryId: closed.outbox.entryId, reason: 'merge abc123 已落地；Issue 永久不可达' });
+    const acknowledged = master.evaluateGate({ ...base(fixture), jobId: gateJob.jobId, integrationHead: before.integrationHead });
+    assert.equal(acknowledged.outboxWarning, null);
+    assert.deepEqual(acknowledged.mechanical, before.mechanical);
+    assert.equal(acknowledged.decision.mayMerge, before.decision.mayMerge);
+  } finally { fixture.cleanup(); }
 }
 
 // ============================================================ AC-001 runner-lifecycle
@@ -383,19 +656,41 @@ export async function recoveryScenario() {
     master.recordCandidate({ ...base(fixture), jobId, commitSha: first });
     // 设置 ownerThreadId 以便测试 reviewerIndependence
     master.setAttemptOwnerThreadId({ ...base(fixture), jobId, ownerThreadId: 'owner-recovery' });
-    master.recordStageResult({ ...base(fixture), jobId, stage: 'review', payload: passingReview(jobId, first, baseCommit, 'owner-recovery') });
+    master.recordStageResult({ ...base(fixture), jobId, stage: 'qa', payload: passingQa(jobId, first, baseCommit) });
+    const terminal = master.masterTerminal({
+      ...base(fixture),
+      payload: readyTerminal(
+        { jobId, attemptId: claim.attemptId, issue: issue.number, baseCommit },
+        first, claim.workOrder.issue.contractDigest,
+      ),
+    });
+    assert.equal(terminal.state, 'ready-to-merge');
+    const lifecycle = master.claimMergeReview({ ...base(fixture), jobId });
+    master.recordStageResult({
+      ...base(fixture), jobId, stage: 'review',
+      payload: {
+        ...passingReview(jobId, first, baseCommit, 'reviewer-recovery'),
+        attemptId: claim.attemptId,
+        effectiveRisk: lifecycle.effectiveRisk,
+        depthTier: lifecycle.depthTier,
+      },
+    });
 
     // candidate 前进使旧 review/QA 失效（E5）。
     const second = makeCandidate(fixture, claim.slotId, { file: 'r2.txt' });
     const advanced = master.recordCandidate({ ...base(fixture), jobId, commitSha: second });
-    assert.equal(advanced.invalidated.length, 1, 'candidate 前进必须使旧 review 失效');
-    assert.equal(advanced.invalidated[0].commitSha, first);
+    assert.deepEqual(
+      advanced.invalidated.map((item) => item.kind).sort(),
+      ['acceptance', 'qa', 'review'],
+      'candidate 前进必须同时使旧 review、QA 与 acceptance 失效',
+    );
+    assert.equal(advanced.invalidated.find((item) => item.kind === 'review').commitSha, first);
     assert.equal(readV4Registry(fixture.v4Dir).attempts[claim.attemptId].review, null);
 
     // 绑定旧 commit 的证据必须被拒收，不得推进。
     const stale = master.recordStageResult({ ...base(fixture), jobId, stage: 'review', payload: passingReview(jobId, first, baseCommit) });
     assert.equal(stale.ok, false);
-    assert.equal(stale.code, 'STALE_EVIDENCE');
+    assert.equal(stale.code, 'REVIEW_NOT_CLAIMED');
     assert.equal(stale.pending, true);
 
     // E4: 未知 schema 的 StageResult 不推进，保持 pending 并要求合法 replacement。
@@ -410,11 +705,12 @@ export async function recoveryScenario() {
     assert.equal(unknown.requiredReplacementSchema, master.STAGE_RESULT_SCHEMA_V2);
     assert.deepEqual(unknown.acceptedSchemas, [master.STAGE_RESULT_SCHEMA_V1, master.STAGE_RESULT_SCHEMA_V2]);
 
-    // v1（历史 schema，无 baseCommit / reviewerSessionId）仍必须被接受——向下兼容不是可选项。
+    // candidate 前进后必须由 merge-worker 重新 claim；旧 v1 review 只可读取，不能再推进 PASS。
+    master.claimMergeReview({ ...base(fixture), jobId });
     const legacyV1 = master.recordStageResult({ ...base(fixture), jobId, stage: 'review', payload: passingReviewV1(jobId, second) });
-    assert.equal(legacyV1.ok, true, 'v1 报文必须仍被接受（向下兼容）');
-    assert.equal(readV4Registry(fixture.v4Dir).attempts[claim.attemptId].review.baseCommit, undefined,
-      'v1 报文不携带 baseCommit，落盘也不应凭空补上');
+    assert.equal(legacyV1.ok, false);
+    assert.equal(legacyV1.code, 'MERGE_WORKER_REVIEW_REQUIRES_V2');
+    assert.equal(readV4Registry(fixture.v4Dir).attempts[claim.attemptId].review, null);
 
     // v2 报文缺 baseCommit 必须 fail closed（AC-1），不得推进、不得清空既有证据。
     const missingBase = master.recordStageResult({
@@ -423,7 +719,7 @@ export async function recoveryScenario() {
     });
     assert.equal(missingBase.ok, false);
     assert.equal(missingBase.code, 'MISSING_BASE_COMMIT');
-    assert.ok(readV4Registry(fixture.v4Dir).attempts[claim.attemptId].review, 'fail closed 不清空既有 v1 证据');
+    assert.equal(readV4Registry(fixture.v4Dir).attempts[claim.attemptId].review, null, 'fail closed 不得伪造 review 证据');
 
     // v2 报文缺 reviewerSessionId 必须 fail closed（#65 AC-1），不得推进、不得清空既有证据。
     const missingReviewer = master.recordStageResult({
@@ -432,7 +728,7 @@ export async function recoveryScenario() {
     });
     assert.equal(missingReviewer.ok, false);
     assert.equal(missingReviewer.code, 'MISSING_REVIEWER_SESSION_ID');
-    assert.ok(readV4Registry(fixture.v4Dir).attempts[claim.attemptId].review, 'fail closed 不清空既有 v1 证据');
+    assert.equal(readV4Registry(fixture.v4Dir).attempts[claim.attemptId].review, null, 'fail closed 不得伪造 review 证据');
 
     // owner thread 中断：优先恢复原 thread。
     const interrupted = master.attemptInterrupt({ ...base(fixture), jobId, reason: 'owner thread 无响应' });
@@ -562,13 +858,8 @@ async function masterRestartAfterMergeBeforeClose() {
     const record = async (args) => { calls.push(`${args[0]} ${args[1]}`); return { stdout: '' }; };
     const closed = await master.masterClose({ ...base(fixture), jobId: job.jobId, gh: record });
     assert.equal(closed.outcome, 'CLOSED');
-    // #142：close 不联网。「GitHub 侧动作确实发生且只发生一次」这条守卫没取消，
-    // 随出站动作一起挪到 flush 上——重启续跑的关注点是不重复，不是在哪一步发生。
-    assert.deepEqual(calls, [], 'close 不得联网');
-    await flushOutbox(fixture.v4Dir, { gh: record });
-    assert.deepEqual(calls, ['issue comment', 'issue close'], 'flush 必须恰好送出一组写入');
-    await flushOutbox(fixture.v4Dir, { gh: record });
-    assert.deepEqual(calls, ['issue comment', 'issue close'], '重复 flush 不得再写一组');
+    assert.deepEqual(calls, [], 'recovery close 也不得调用 gh');
+    assert.equal(readOutbox(fixture.v4Dir)[0].state, 'pending');
     assert.equal(countMergeCommits(fixture, job.candidate), 1);
 
     // 关闭后再 reconcile：不得把已完成的 job 重新排队（无假完成、无重复 merge）。
@@ -812,7 +1103,7 @@ export async function discoveredWorkScenario() {
 // 「gh 失败时重试了几次」，只问「close 的成败是否与 gh 的死活无关」。
 
 // AC-001：close 落账即终局，命令内根本不联网。
-export async function outboxCloseScenario() {
+export async function legacyOutboxCloseScenario() {
   const fixture = makeFixture('outbox-close', { workers: [{ id: 'worker-1' }] });
   try {
     writeSlots(fixture);
@@ -864,7 +1155,7 @@ export async function outboxCloseScenario() {
 }
 
 // AC-002：flush 的五种结局，退出码语义恒为「ok:true」——积压是待办不是失败。
-export async function outboxFlushScenario() {
+export async function legacyOutboxFlushScenario() {
   const fixture = makeFixture('outbox-flush', { workers: [{ id: 'worker-1' }] });
   try {
     writeSlots(fixture);
@@ -900,7 +1191,7 @@ export async function outboxFlushScenario() {
     assert.equal(third.abandoned, 1, '累计第 3 次失败必须转 abandoned');
     assert.equal(third.entries[0].abandonReason, 'ISSUE_UNREACHABLE');
     assert.equal(third.remaining, 0);
-    const abandoned = readOutbox(dir).find((entry) => entry.state === 'abandoned');
+    const abandoned = readLegacyOutbox(dir).find((entry) => entry.state === 'abandoned');
     assert.equal(abandoned.attempts.length, 3, '尺子是 attempts 长度，锁死在这里');
 
     // 结局 1 + 4：直接入队一条走成功路径，再 flush 一次验幂等跳过。
@@ -919,7 +1210,7 @@ export async function outboxFlushScenario() {
 }
 
 // AC-003：签收只对 abandoned 生效、必须带理由、幂等，且条目永不删除。
-export async function outboxAckScenario() {
+export async function legacyOutboxAckScenario() {
   const fixture = makeFixture('outbox-ack', { workers: [{ id: 'worker-1' }] });
   try {
     writeSlots(fixture);
@@ -943,7 +1234,7 @@ export async function outboxAckScenario() {
 
     const failing = async () => { throw new Error('Could not resolve to an Issue'); };
     for (let i = 0; i < 3; i += 1) await flushOutbox(dir, { gh: failing });
-    assert.equal(readOutbox(dir).find((e) => e.entryId === entryId).state, 'abandoned');
+    assert.equal(readLegacyOutbox(dir).find((e) => e.entryId === entryId).state, 'abandoned');
 
     // 负向 2：缺理由拒收——无理由的签收等于静默删除，正是本设计要防的。
     const noReason = acknowledgeEntry(dir, { entryId });
@@ -957,7 +1248,7 @@ export async function outboxAckScenario() {
     assert.equal(acknowledgeEntry(dir, { entryId, reason: '再签一次' }).outcome, 'ALREADY_ACKNOWLEDGED');
 
     // 条目仍在，且理由可读——补偿审计不因签收而消失。
-    const still = readOutbox(dir).find((entry) => entry.entryId === entryId);
+    const still = readLegacyOutbox(dir).find((entry) => entry.entryId === entryId);
     assert.equal(still.state, 'acknowledged');
     assert.match(still.reason, /永久 404/);
     assert.equal(still.abandonReason, 'ISSUE_UNREACHABLE', 'abandon 原因必须保留');
@@ -994,7 +1285,7 @@ export async function outboxAckScenario() {
 }
 
 // AC-004：gate 的 outboxWarning 只是可观测性，八门与 mayMerge 一字不动。
-export async function outboxGateScenario() {
+export async function legacyOutboxGateScenario() {
   const fixture = makeFixture('outbox-gate', { workers: [{ id: 'worker-1' }] });
   try {
     writeSlots(fixture);
@@ -1051,7 +1342,7 @@ export async function outboxGateScenario() {
       master.evaluateGate({ ...base(fixture), jobId: job.jobId }).outboxWarning,
       '未签收的 abandoned 必须仍在告警里',
     );
-    const abandoned = readOutbox(dir).find((entry) => entry.state === 'abandoned');
+    const abandoned = readLegacyOutbox(dir).find((entry) => entry.state === 'abandoned');
     acknowledgeEntry(dir, { entryId: abandoned.entryId, reason: '目标 Issue 永久不可达，交付已落地' });
     assert.equal(
       master.evaluateGate({ ...base(fixture), jobId: job.jobId }).outboxWarning, null,
@@ -1067,8 +1358,378 @@ export async function deliveryMergeScenario() {
   await evidenceBindingBypass();
   await postMergeVerificationFailure();
   await mergeConflictDisposition();
+  await candidateAncestryDivergenceDisposition();
+  await unrelatedChangesDisposition();
+  await gateSnapshotStaleDisposition();
+  await shortCandidateIsCanonicalized();
+  await hostCheckoutBindingDisposition();
+  await preexistingGitOperationsArePreserved();
+  await mergeRefreshesRunnerTopology();
   await serialMergeEnforcement();
   await legacyArchiveStable();
+}
+
+async function gateSnapshotStaleDisposition() {
+  const mutations = {
+    candidate(fixture, job) {
+      const candidateB = makeCandidate(fixture, job.slotId, { file: 'candidate-b.txt' });
+      updateV4Registry(fixture.v4Dir, (registry) => {
+        registry.attempts[job.attemptId].candidateCommit = candidateB;
+        return { ok: true };
+      });
+    },
+    terminal(fixture, job) {
+      updateV4Registry(fixture.v4Dir, (registry) => {
+        registry.jobs[job.jobId].terminal = { ...registry.jobs[job.jobId].terminal, qaReceipt: 'changed-after-gate' };
+        return { ok: true };
+      });
+    },
+    review(fixture, job) {
+      updateV4Registry(fixture.v4Dir, (registry) => {
+        const attempt = registry.attempts[job.attemptId];
+        attempt.review = { ...attempt.review, evidence: [...attempt.review.evidence, { kind: 'late', result: 'PASS' }] };
+        return { ok: true };
+      });
+    },
+    qa(fixture, job) {
+      updateV4Registry(fixture.v4Dir, (registry) => {
+        const attempt = registry.attempts[job.attemptId];
+        attempt.qa = { ...attempt.qa, checks: [...attempt.qa.checks, { id: 'QA-late', kind: 'automated', outcome: 'PASS' }] };
+        return { ok: true };
+      });
+    },
+    acceptance(fixture, job) {
+      updateV4Registry(fixture.v4Dir, (registry) => {
+        registry.jobs[job.jobId].acceptance = registry.jobs[job.jobId].acceptance.map((entry) => ({
+          ...entry, evidenceRefs: [...entry.evidenceRefs, 'late:evidence'],
+        }));
+        return { ok: true };
+      });
+    },
+    risk(fixture, job) {
+      updateV4Registry(fixture.v4Dir, (registry) => {
+        registry.jobs[job.jobId].declaredRisk = 'critical';
+        return { ok: true };
+      });
+    },
+    humanApproval(fixture, job) {
+      updateV4Registry(fixture.v4Dir, (registry) => {
+        registry.jobs[job.jobId].humanGateApproval = { outcome: 'PASS', resumeToken: 'late-approval' };
+        return { ok: true };
+      });
+    },
+    runnerLease(fixture, job) {
+      updateV4Registry(fixture.v4Dir, (registry) => {
+        registry.runners[job.slotId].lease = { ...registry.runners[job.slotId].lease, attemptId: 'reassigned-after-gate' };
+        return { ok: true };
+      });
+    },
+    runnerState(fixture, job) {
+      updateV4Registry(fixture.v4Dir, (registry) => {
+        registry.runners[job.slotId].state = 'QUARANTINED_DIRTY';
+        return { ok: true };
+      });
+    },
+  };
+  for (const [kind, mutate] of Object.entries(mutations)) {
+    const fixture = makeFixture(`delivery-stale-${kind}`, { workers: [{ id: 'worker-1' }] });
+    try {
+      writeSlots(fixture);
+      master.masterStart({ ...base(fixture) });
+      const job = driveToReadyToMerge(fixture, issuePayload({ number: 535 }));
+      const gateA = master.evaluateGate({ ...base(fixture), jobId: job.jobId });
+      mutate(fixture, job);
+
+      assert.throws(
+        () => master.openMergeIntent({ ...base(fixture), jobId: job.jobId, gate: gateA }),
+        (error) => error.code === 'GATE_SNAPSHOT_STALE',
+        `${kind} gate snapshot 变化必须 fail closed`,
+      );
+      const registry = readV4Registry(fixture.v4Dir);
+      assert.equal(registry.jobs[job.jobId].mergeIntent, undefined, `${kind} stale gate 不得建立 intent`);
+      assert.notEqual(registry.jobs[job.jobId].state, 'merging', `${kind} stale gate 不得推进 merging`);
+      assert.equal(gitOut(fixture.repoRoot, ['rev-parse', 'dev']), job.baseCommit, `${kind} stale gate 不得触碰 integration`);
+    } finally {
+      fixture.cleanup();
+    }
+  }
+}
+
+async function shortCandidateIsCanonicalized() {
+  const fixture = makeFixture('delivery-short-candidate', { workers: [{ id: 'worker-1' }] });
+  try {
+    writeSlots(fixture);
+    master.masterStart({ ...base(fixture) });
+    const issue = issuePayload({ number: 538 });
+    const claim = master.masterClaim({ ...base(fixture), issue });
+    const fullCandidate = makeCandidate(fixture, claim.slotId, { file: 'short-candidate.txt' });
+    const shortCandidate = fullCandidate.slice(0, 12);
+    master.setAttemptOwnerThreadId({ ...base(fixture), jobId: claim.jobId, ownerThreadId: 'owner-short' });
+    master.recordCandidate({ ...base(fixture), jobId: claim.jobId, commitSha: shortCandidate });
+    master.recordStageResult({
+      ...base(fixture), jobId: claim.jobId, stage: 'qa',
+      payload: passingQa(claim.jobId, shortCandidate, claim.workOrder.runner.baseCommit),
+    });
+    const terminal = master.masterTerminal({
+      ...base(fixture),
+      payload: readyTerminal(
+        { jobId: claim.jobId, attemptId: claim.attemptId, issue: issue.number, baseCommit: claim.workOrder.runner.baseCommit },
+        shortCandidate, claim.workOrder.issue.contractDigest,
+      ),
+    });
+    assert.equal(terminal.state, 'ready-to-merge');
+    const lifecycle = master.claimMergeReview({ ...base(fixture), jobId: claim.jobId });
+    master.recordStageResult({
+      ...base(fixture), jobId: claim.jobId, stage: 'review',
+      payload: {
+        ...passingReview(claim.jobId, shortCandidate, lifecycle.baseCommit, 'reviewer-short'),
+        attemptId: claim.attemptId,
+        effectiveRisk: lifecycle.effectiveRisk,
+        depthTier: lifecycle.depthTier,
+      },
+    });
+
+    const result = master.masterMerge({ ...base(fixture), jobId: claim.jobId });
+    assert.equal(result.ok, true);
+    assert.equal(result.candidateCommit, fullCandidate, 'merge result 必须写 canonical full SHA');
+    const registry = readV4Registry(fixture.v4Dir);
+    assert.equal(registry.jobs[claim.jobId].mergeIntent.candidateCommit, fullCandidate);
+    assert.equal(registry.deliveries[claim.jobId].candidateCommit, fullCandidate);
+  } finally {
+    fixture.cleanup();
+  }
+}
+
+async function hostCheckoutBindingDisposition() {
+  const fixture = makeFixture('delivery-host-binding', { workers: [{ id: 'worker-1' }] });
+  try {
+    writeSlots(fixture);
+    master.masterStart({ ...base(fixture) });
+    const job = driveToReadyToMerge(fixture, issuePayload({ number: 536 }));
+    const devBefore = gitOut(fixture.repoRoot, ['rev-parse', 'dev']);
+    git(fixture.repoRoot, ['checkout', '-b', 'wrong-host-branch']);
+    const wrongBefore = gitOut(fixture.repoRoot, ['rev-parse', 'HEAD']);
+
+    const result = freshProcess(fixture, ['merge', '--job', job.jobId], { expectStatus: 'nonzero' });
+    assert.equal(result.code, 'HOST_CHECKOUT_MISMATCH');
+    assert.equal(gitOut(fixture.repoRoot, ['symbolic-ref', '--short', 'HEAD']), 'wrong-host-branch');
+    assert.equal(gitOut(fixture.repoRoot, ['rev-parse', 'HEAD']), wrongBefore, '错误 checkout 不得被写入');
+    assert.equal(gitOut(fixture.repoRoot, ['rev-parse', 'dev']), devBefore, 'integration branch 不得被写入');
+    assert.equal(readV4Registry(fixture.v4Dir).jobs[job.jobId].mergeIntent, undefined);
+  } finally {
+    fixture.cleanup();
+  }
+
+  const detachedFixture = makeFixture('delivery-host-detached', { workers: [{ id: 'worker-1' }] });
+  try {
+    writeSlots(detachedFixture);
+    master.masterStart({ ...base(detachedFixture) });
+    const job = driveToReadyToMerge(detachedFixture, issuePayload({ number: 536 }));
+    const devBefore = gitOut(detachedFixture.repoRoot, ['rev-parse', 'dev']);
+    git(detachedFixture.repoRoot, ['checkout', '--detach', devBefore]);
+    const result = master.masterMerge({ ...base(detachedFixture), jobId: job.jobId });
+    assert.equal(result.code, 'HOST_CHECKOUT_MISMATCH');
+    assert.equal(result.actualBranch, null);
+    assert.equal(gitOut(detachedFixture.repoRoot, ['rev-parse', 'HEAD']), devBefore);
+    assert.equal(gitOut(detachedFixture.repoRoot, ['rev-parse', 'dev']), devBefore);
+    assert.equal(readV4Registry(detachedFixture.v4Dir).jobs[job.jobId].mergeIntent, undefined);
+  } finally {
+    detachedFixture.cleanup();
+  }
+
+  const dirtyFixture = makeFixture('delivery-host-dirty', { workers: [{ id: 'worker-1' }] });
+  try {
+    writeSlots(dirtyFixture);
+    master.masterStart({ ...base(dirtyFixture) });
+    const job = driveToReadyToMerge(dirtyFixture, issuePayload({ number: 536 }));
+    writeFileSync(join(dirtyFixture.repoRoot, 'host-user-scratch.txt'), 'do not touch\n');
+    const statusBefore = gitOut(dirtyFixture.repoRoot, ['status', '--porcelain=v1', '--untracked-files=all']);
+    const result = master.masterMerge({ ...base(dirtyFixture), jobId: job.jobId });
+    assert.equal(result.code, 'HOST_WORKTREE_DIRTY');
+    assert.equal(gitOut(dirtyFixture.repoRoot, ['status', '--porcelain=v1', '--untracked-files=all']), statusBefore);
+    assert.equal(readV4Registry(dirtyFixture.v4Dir).jobs[job.jobId].mergeIntent, undefined);
+  } finally {
+    dirtyFixture.cleanup();
+  }
+
+  const movedFixture = makeFixture('delivery-host-moved', { workers: [{ id: 'worker-1' }] });
+  try {
+    writeSlots(movedFixture);
+    master.masterStart({ ...base(movedFixture) });
+    const job = driveToReadyToMerge(movedFixture, issuePayload({ number: 536 }));
+    const intent = master.openMergeIntent({ ...base(movedFixture), jobId: job.jobId });
+    writeFileSync(join(movedFixture.repoRoot, 'integration-moved.txt'), 'moved after gate\n');
+    git(movedFixture.repoRoot, ['add', '.']);
+    git(movedFixture.repoRoot, ['commit', '-m', 'integration moved after gate']);
+    const movedHead = gitOut(movedFixture.repoRoot, ['rev-parse', 'HEAD']);
+    const result = master.runIntegrationMerge({ ...base(movedFixture), intent });
+    assert.equal(result.code, 'INTEGRATION_HEAD_MOVED');
+    assert.equal(gitOut(movedFixture.repoRoot, ['rev-parse', 'HEAD']), movedHead);
+    assert.notEqual(
+      git(movedFixture.repoRoot, ['merge-base', '--is-ancestor', job.candidate, 'dev'], { allowFailure: true }).status,
+      0,
+      'HEAD 前进后不得偷偷合入 candidate',
+    );
+  } finally {
+    movedFixture.cleanup();
+  }
+
+  const repoFixture = makeFixture('delivery-host-repo', {
+    workers: [{ id: 'worker-1' }, { id: 'foreign-host', foreignRepo: true }],
+  });
+  try {
+    writeSlots(repoFixture);
+    master.masterStart({ ...base(repoFixture) });
+    const job = driveToReadyToMerge(repoFixture, issuePayload({ number: 536 }), { slotId: 'worker-1' });
+    // review 已在正确 integration host 上完成；随后仅把 merge host 漂移到外部仓库，
+    // 证明 merge 时的 repo identity preflight 会 fail closed。
+    initSlots({
+      path: repoFixture.slotsPath, repoIdentity: repoFixture.repoIdentity,
+      slots: repoFixture.slots, hostWorktree: repoFixture.worktreeOf('foreign-host'), force: true,
+    });
+    const foreignBefore = gitOut(repoFixture.worktreeOf('foreign-host'), ['rev-parse', 'HEAD']);
+    const result = master.masterMerge({ ...base(repoFixture), jobId: job.jobId });
+    assert.equal(result.code, 'HOST_REPO_MISMATCH');
+    assert.equal(gitOut(repoFixture.worktreeOf('foreign-host'), ['rev-parse', 'HEAD']), foreignBefore);
+    assert.equal(readV4Registry(repoFixture.v4Dir).jobs[job.jobId].mergeIntent, undefined);
+  } finally {
+    repoFixture.cleanup();
+  }
+}
+
+function gitOperationFingerprint(fixture) {
+  const optionalRef = (name) => {
+    const result = git(fixture.repoRoot, ['rev-parse', '-q', '--verify', name], { allowFailure: true });
+    return result.status === 0 ? String(result.stdout || '').trim() : null;
+  };
+  return {
+    head: gitOut(fixture.repoRoot, ['rev-parse', 'HEAD']),
+    branch: optionalRef('HEAD') ? String(git(fixture.repoRoot, ['symbolic-ref', '--quiet', '--short', 'HEAD'], { allowFailure: true }).stdout || '').trim() : null,
+    status: gitOut(fixture.repoRoot, ['status', '--porcelain=v2', '--branch']),
+    mergeHead: optionalRef('MERGE_HEAD'),
+    cherryPickHead: optionalRef('CHERRY_PICK_HEAD'),
+    rebaseHead: optionalRef('REBASE_HEAD'),
+  };
+}
+
+function createConflictingGitOperation(fixture, kind) {
+  const opCommit = makeConflict(fixture, 'op-worker', 'operation-conflict.txt');
+  const commands = {
+    merge: ['merge', opCommit],
+    rebase: ['rebase', opCommit],
+    'cherry-pick': ['cherry-pick', opCommit],
+  };
+  const operation = commands[kind];
+  const started = git(fixture.repoRoot, operation, { allowFailure: true });
+  assert.notEqual(started.status, 0, `${kind} fixture 必须进入冲突现场`);
+}
+
+async function preexistingGitOperationsArePreserved() {
+  for (const kind of ['merge', 'rebase', 'cherry-pick']) {
+    const fixture = makeFixture(`delivery-existing-${kind}`, {
+      workers: [{ id: 'worker-1' }, { id: 'op-worker' }],
+    });
+    try {
+      writeSlots(fixture);
+      master.masterStart({ ...base(fixture) });
+      const job = driveToReadyToMerge(fixture, issuePayload({ number: 537 }), { slotId: 'worker-1' });
+      const intent = master.openMergeIntent({ ...base(fixture), jobId: job.jobId });
+      createConflictingGitOperation(fixture, kind);
+      const before = gitOperationFingerprint(fixture);
+
+      const result = master.runIntegrationMerge({ ...base(fixture), intent });
+      const finalized = master.finalizeMerge({ ...base(fixture), result: { intent, ...result } });
+      assert.equal(finalized.code, 'HOST_GIT_OPERATION_IN_PROGRESS');
+      assert.equal(finalized.operation, kind);
+      assert.deepEqual(gitOperationFingerprint(fixture), before, `${kind} 现场不得被 abort 或改写`);
+    } finally {
+      fixture.cleanup();
+    }
+  }
+}
+
+async function candidateAncestryDivergenceDisposition() {
+  const fixture = makeFixture('delivery-ancestry', { workers: [{ id: 'worker-1' }] });
+  try {
+    writeSlots(fixture);
+    master.masterStart({ ...base(fixture) });
+    const job = driveToReadyToMerge(fixture, issuePayload({ number: 532 }));
+    makeCandidate(fixture, job.slotId, { file: 'integration-only.txt', content: 'integration moved\n' });
+    git(fixture.repoRoot, ['cherry-pick', gitOut(fixture.worktreeOf(job.slotId), ['rev-parse', 'HEAD'])]);
+    git(fixture.worktreeOf(job.slotId), ['reset', '--hard', job.candidate]);
+
+    const headBefore = gitOut(fixture.repoRoot, ['rev-parse', 'dev']);
+    const result = freshProcess(fixture, ['merge', '--job', job.jobId], { expectStatus: 'nonzero' });
+    assert.equal(result.code, 'CANDIDATE_ANCESTRY_DIVERGED');
+    assert.equal(result.candidateCommit, job.candidate);
+    assert.equal(result.integrationHead, headBefore);
+    assert.equal(gitOut(fixture.repoRoot, ['rev-parse', 'dev']), headBefore);
+    assert.equal(readV4Registry(fixture.v4Dir).jobs[job.jobId].state, 'ready-to-merge');
+  } finally {
+    fixture.cleanup();
+  }
+}
+
+async function unrelatedChangesDisposition() {
+  const fixture = makeFixture('delivery-unrelated', { workers: [{ id: 'worker-1' }] });
+  try {
+    writeSlots(fixture);
+    master.masterStart({ ...base(fixture) });
+    const issue = issuePayload({ number: 533 });
+    const claim = master.masterClaim({ ...base(fixture), issue });
+    makeCandidate(fixture, claim.slotId, { file: 'foreign.txt', content: 'foreign session\n' });
+    const candidate = makeCandidate(fixture, claim.slotId, { file: 'feature-533.txt' });
+    master.recordCandidate({ ...base(fixture), jobId: claim.jobId, commitSha: candidate });
+    master.setAttemptOwnerThreadId({ ...base(fixture), jobId: claim.jobId, ownerThreadId: 'owner-unrelated' });
+    master.recordStageResult({ ...base(fixture), jobId: claim.jobId, stage: 'qa', payload: passingQa(claim.jobId, candidate, claim.workOrder.runner.baseCommit) });
+    const terminal = master.masterTerminal({
+      ...base(fixture),
+      payload: readyTerminal(
+        { jobId: claim.jobId, attemptId: claim.attemptId, issue: issue.number, baseCommit: claim.workOrder.runner.baseCommit },
+        candidate, claim.workOrder.issue.contractDigest,
+      ),
+    });
+    assert.equal(terminal.state, 'ready-to-merge');
+    const lifecycle = master.claimMergeReview({ ...base(fixture), jobId: claim.jobId });
+    master.recordStageResult({
+      ...base(fixture), jobId: claim.jobId, stage: 'review',
+      payload: {
+        ...passingReview(claim.jobId, candidate, lifecycle.baseCommit, 'reviewer-unrelated'),
+        attemptId: claim.attemptId,
+        effectiveRisk: lifecycle.effectiveRisk,
+        depthTier: lifecycle.depthTier,
+      },
+    });
+
+    const headBefore = gitOut(fixture.repoRoot, ['rev-parse', 'dev']);
+    const result = freshProcess(fixture, ['merge', '--job', claim.jobId], { expectStatus: 'nonzero' });
+    assert.equal(result.code, 'UNRELATED_CHANGES');
+    assert.equal(result.commitCount, 2);
+    assert.equal(result.commits.length, 2);
+    assert.equal(gitOut(fixture.repoRoot, ['rev-parse', 'dev']), headBefore);
+    assert.equal(readV4Registry(fixture.v4Dir).jobs[claim.jobId].state, 'ready-to-merge');
+  } finally {
+    fixture.cleanup();
+  }
+}
+
+async function mergeRefreshesRunnerTopology() {
+  const fixture = makeFixture('delivery-refresh', { workers: [{ id: 'worker-1' }, { id: 'worker-2' }] });
+  try {
+    writeSlots(fixture);
+    master.masterStart({ ...base(fixture) });
+    const job = driveToReadyToMerge(fixture, issuePayload({ number: 534 }), { slotId: 'worker-1' });
+    const result = freshProcess(fixture, ['merge', '--job', job.jobId]);
+    const registry = readV4Registry(fixture.v4Dir);
+    assert.equal(registry.deliveries[job.jobId].mergeCommit, result.mergeCommit);
+    assert.deepEqual(
+      { ahead: registry.runners['worker-2'].ahead, behind: registry.runners['worker-2'].behind },
+      { ahead: 0, behind: 2 },
+      'merge 写回时必须以新 integration HEAD 刷新其他 worktree 拓扑',
+    );
+  } finally {
+    fixture.cleanup();
+  }
 }
 
 // #53: next-step 把 reconcile 已经算出的动作直接执行掉一步。
@@ -1078,15 +1739,13 @@ async function nextStepDriver() {
   const fixture = makeFixture('next-step', { workers: [{ id: 'worker-1' }, { id: 'worker-2' }] });
   const commandsFile = join(fixture.root, 'verify-commands.json');
   writeFileSync(commandsFile, JSON.stringify([{ command: process.execPath, args: ['-e', 'process.exit(0)'] }]));
-  // #142 之后 close 不再调用 gh，出站动作改由 outbox flush 送达。离线 scenario 绝不允许
-  // 触达真实 GitHub，所以从既有注入点接管，并把每次调用记到 trace 里——原来「只允许
-  // comment + close 两次写入」这条守卫没有取消，只是随出站动作一起挪到了 flush 上。
+  // close 只落 registry + outbox，不得触达真实 GitHub；注入桩用于证明调用次数为零。
   const ghTrace = join(fixture.root, 'gh-trace.jsonl');
   const ghScript = join(fixture.root, 'fake-gh.mjs');
   writeFileSync(ghScript, [
     "import { appendFileSync } from 'node:fs';",
     `appendFileSync(${JSON.stringify(ghTrace)}, JSON.stringify(process.argv.slice(2)) + '\\n');`,
-    "console.log('ok');",
+    "process.exit(9);",
   ].join('\n'));
   const ghEnv = { AES_WORKTREE_BOARD_GH_COMMAND: JSON.stringify([process.execPath, ghScript]) };
   try {
@@ -1119,22 +1778,8 @@ async function nextStepDriver() {
     const closed = freshProcess(fixture, ['next-step', '--commands-file', commandsFile], { env: ghEnv });
     assert.equal(closed.kind, 'close');
     assert.equal(readV4Registry(fixture.v4Dir).jobs[job.jobId].state, 'closed');
-    // 拓扑断言：走完整条 CLI 交付链到 close，GitHub 侧一次都没被碰过。
-    assert.equal(existsSync(ghTrace), false, 'close 不得联网——出站是 flush 的事');
-
-    // 守卫挪到 flush：送达时仍然只允许 comment + close 两次写入。
-    const flushed = freshProcess(fixture, ['outbox', 'flush'], { env: ghEnv });
-    assert.equal(flushed.flushed, 1, 'flush 必须送出那条积压');
-    const ghCalls = readFileSync(ghTrace, 'utf8').split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line));
-    assert.deepEqual(ghCalls.map((call) => `${call[0]} ${call[1]}`), ['issue comment', 'issue close'],
-      'flush 只允许 comment + close 两次写入');
-
-    // 幂等：再 flush 一次不得产生第二组写入。
-    freshProcess(fixture, ['outbox', 'flush'], { env: ghEnv });
-    assert.equal(
-      readFileSync(ghTrace, 'utf8').split(/\r?\n/).filter(Boolean).length, 2,
-      '已送达的条目不得被重复送出',
-    );
+    assert.equal(existsSync(ghTrace), false, 'close 命令内不得调用 gh');
+    assert.equal(readOutbox(fixture.v4Dir).length, 1, 'close 必须把 GitHub 副作用入队');
 
     // AC-2: 全部终态后回到 NOOP，退出码 0，且不再改动 integration。
     const headAfter = gitOut(fixture.repoRoot, ['rev-parse', 'dev']);
@@ -1267,12 +1912,12 @@ async function deliveryHappyPath() {
     });
     assert.equal(verify.outcome, 'PASS');
 
-    const calls = [];
     const closed = await master.masterClose({
       ...base(fixture), jobId: job.jobId,
-      gh: async (args) => { calls.push(args[1]); return { stdout: '' }; },
+      gh: async () => { throw new Error('close 不得调用 gh'); },
     });
     assert.equal(closed.outcome, 'CLOSED');
+    assert.equal(closed.outbox.state, 'pending');
     // close 幂等：相同 comment digest 视为 already-succeeded，且不再调用 gh。
     const again = await master.masterClose({
       ...base(fixture), jobId: job.jobId,
@@ -1306,10 +1951,7 @@ async function evidenceBindingBypass() {
     const claim = master.masterClaim({ ...base(fixture), issue });
     const first = makeCandidate(fixture, claim.slotId, { file: 'binding-1.txt' });
     master.recordCandidate({ ...base(fixture), jobId: claim.jobId, commitSha: first });
-    // 本测试只关心 commit 绑定旁路（#84），与 baseCommit（AC-007）/ reviewerSessionId
-    // （#65）无关，用 v1 证据保持聚焦——v1 在 GATE-review-base/qa-base 与
-    // MISSING_REVIEWER_SESSION_ID 上都天然豁免，不干扰这里的断言。
-    master.recordStageResult({ ...base(fixture), jobId: claim.jobId, stage: 'review', payload: passingReviewV1(claim.jobId, first) });
+    // worker 侧只登记 QA；review 必须等 READY 后由 merge-worker claim。
     master.recordStageResult({ ...base(fixture), jobId: claim.jobId, stage: 'qa', payload: passingQaV1(claim.jobId, first) });
 
     // worker 又推了新 commit，却不走 recordCandidate 而直接在 terminal 里报新 SHA：
@@ -1332,11 +1974,20 @@ async function evidenceBindingBypass() {
 
     // 正路仍然通：recordCandidate 前进（作废旧证据）→ 重新绑定 second → terminal 接受。
     const advanced = master.recordCandidate({ ...base(fixture), jobId: claim.jobId, commitSha: second });
-    assert.equal(advanced.invalidated.length, 2, 'candidate 前进必须作废旧 review+QA');
-    master.recordStageResult({ ...base(fixture), jobId: claim.jobId, stage: 'review', payload: passingReviewV1(claim.jobId, second) });
+    assert.deepEqual(advanced.invalidated.map((item) => item.kind), ['qa'], 'candidate 前进必须作废旧 QA');
     master.recordStageResult({ ...base(fixture), jobId: claim.jobId, stage: 'qa', payload: passingQaV1(claim.jobId, second) });
     const accepted = master.masterTerminal({ ...base(fixture), payload: terminalPayload });
     assert.equal(accepted.state, 'ready-to-merge');
+    const lifecycle = master.claimMergeReview({ ...base(fixture), jobId: claim.jobId });
+    master.recordStageResult({
+      ...base(fixture), jobId: claim.jobId, stage: 'review',
+      payload: {
+        ...passingReview(claim.jobId, second, lifecycle.baseCommit, 'reviewer-binding'),
+        attemptId: claim.attemptId,
+        effectiveRisk: lifecycle.effectiveRisk,
+        depthTier: lifecycle.depthTier,
+      },
+    });
     const gate = master.evaluateGate({ ...base(fixture), jobId: claim.jobId });
     assert.equal(gate.mechanical.allGreen, true, '重新绑定后机械门必须全绿');
 
@@ -1423,14 +2074,24 @@ async function mergeConflictDisposition() {
     const candidate = makeConflict(fixture, claim.slotId);
     master.recordCandidate({ ...base(fixture), jobId: claim.jobId, commitSha: candidate });
     master.setAttemptOwnerThreadId({ ...base(fixture), jobId: claim.jobId, ownerThreadId: 'owner-conflict' });
-    master.recordStageResult({ ...base(fixture), jobId: claim.jobId, stage: 'review', payload: passingReview(claim.jobId, candidate, baseCommit, 'owner-conflict') });
     master.recordStageResult({ ...base(fixture), jobId: claim.jobId, stage: 'qa', payload: passingQa(claim.jobId, candidate, baseCommit) });
-    master.masterTerminal({
+    const terminal = master.masterTerminal({
       ...base(fixture),
       payload: readyTerminal(
         { jobId: claim.jobId, attemptId: claim.attemptId, issue: 531, baseCommit: claim.workOrder.runner.baseCommit },
         candidate, claim.workOrder.issue.contractDigest,
       ),
+    });
+    assert.equal(terminal.state, 'ready-to-merge');
+    const lifecycle = master.claimMergeReview({ ...base(fixture), jobId: claim.jobId });
+    master.recordStageResult({
+      ...base(fixture), jobId: claim.jobId, stage: 'review',
+      payload: {
+        ...passingReview(claim.jobId, candidate, baseCommit, 'reviewer-conflict'),
+        attemptId: claim.attemptId,
+        effectiveRisk: lifecycle.effectiveRisk,
+        depthTier: lifecycle.depthTier,
+      },
     });
 
     const headBefore = gitOut(fixture.repoRoot, ['rev-parse', 'dev']);
@@ -1464,11 +2125,13 @@ async function serialMergeEnforcement() {
       (error) => error.code === 'MERGE_NOT_SERIAL');
     assert.equal(readV4Registry(fixture.v4Dir).jobs[second.jobId].state, 'ready-to-merge');
 
-    // 完成第一个后第二个才能进。
+    // 完成第一个后串行槽位释放；第二个 job 能被重新评估，但旧基线 candidate
+    // 必须由 ancestry 门拒绝，不能趁前一单完成后搭便车 merge。
     const result = master.runIntegrationMerge({ ...base(fixture), intent: readV4Registry(fixture.v4Dir).jobs[first.jobId].mergeIntent });
     master.finalizeMerge({ ...base(fixture), result: { intent: readV4Registry(fixture.v4Dir).jobs[first.jobId].mergeIntent, ...result } });
     const secondMerge = master.masterMerge({ ...base(fixture), jobId: second.jobId });
-    assert.equal(secondMerge.ok, true);
+    assert.equal(secondMerge.ok, false);
+    assert.equal(secondMerge.code, 'CANDIDATE_ANCESTRY_DIVERGED');
   } finally {
     fixture.cleanup();
   }
@@ -1490,11 +2153,6 @@ export async function integrationBaseAdvanceStaleEvidence() {
     // 第一部分：在旧 base 上取得 review/QA 证据。
     const candidate = makeCandidate(fixture, claim.slotId, { file: 'ac4.txt' });
     master.recordCandidate({ ...base(fixture), jobId, commitSha: candidate });
-    const reviewResult = master.recordStageResult({
-      ...base(fixture), jobId, stage: 'review', payload: passingReview(jobId, candidate, oldBaseCommit),
-    });
-    assert.equal(reviewResult.ok, true, 'review 在旧 base 上应该通过');
-
     const qaResult = master.recordStageResult({
       ...base(fixture), jobId, stage: 'qa', payload: passingQa(jobId, candidate, oldBaseCommit),
     });
@@ -1509,6 +2167,17 @@ export async function integrationBaseAdvanceStaleEvidence() {
       ),
     });
     assert.equal(terminalResult.state, 'ready-to-merge', 'terminal 应该将 job 推送到 ready-to-merge');
+    const oldLifecycle = master.claimMergeReview({ ...base(fixture), jobId });
+    const reviewResult = master.recordStageResult({
+      ...base(fixture), jobId, stage: 'review',
+      payload: {
+        ...passingReview(jobId, candidate, oldBaseCommit, 'reviewer-old-base'),
+        attemptId: claim.attemptId,
+        effectiveRisk: oldLifecycle.effectiveRisk,
+        depthTier: oldLifecycle.depthTier,
+      },
+    });
+    assert.equal(reviewResult.ok, true, 'review 在旧 base 上应该通过');
 
     // 此时 gate 应该通过（证据绑定当前 base）。
     const gateBeforeAdvance = master.evaluateGate({ ...base(fixture), jobId });
@@ -1526,7 +2195,7 @@ export async function integrationBaseAdvanceStaleEvidence() {
     assert.equal(updated.oldBase, oldBaseCommit);
 
     // 第三部分：gate 应该判 review/QA 为 STALE（baseCommit 不匹配）。
-    const gateAfterAdvance = master.evaluateGate({ ...base(fixture), jobId });
+    const gateAfterAdvance = master.evaluateGate({ ...base(fixture), jobId, changedPaths: ['ac4.txt'] });
     const failedChecks = gateAfterAdvance.mechanical.failed.map((c) => c.id);
     assert.ok(failedChecks.includes('GATE-review-base'), 'review baseCommit 不匹配应该拒绝放行');
     assert.ok(failedChecks.includes('GATE-qa-base'), 'QA baseCommit 不匹配应该拒绝放行');
@@ -1538,19 +2207,35 @@ export async function integrationBaseAdvanceStaleEvidence() {
     assert.ok(attempt.review, 'STALE 判定不应该清空 review 证据');
     assert.ok(attempt.qa, 'STALE 判定不应该清空 QA 证据');
 
-    // 第四部分：在新 base 上重新取得证据。
+    // 第四部分：worker 先把 candidate 更新到新 base，再重新取得证据。
+    const rebasedCandidate = makeCandidate(fixture, claim.slotId, { file: 'ac4-rebased.txt' });
+    master.recordCandidate({ ...base(fixture), jobId, commitSha: rebasedCandidate });
+    const newQaResult = master.recordStageResult({
+      ...base(fixture), jobId, stage: 'qa', payload: passingQa(jobId, rebasedCandidate, newBaseCommit),
+    });
+    assert.equal(newQaResult.ok, true, 'QA 在新 base 上应该通过');
+    const refreshedTerminal = master.masterTerminal({
+      ...base(fixture),
+      payload: readyTerminal(
+        { jobId, attemptId: claim.attemptId, issue: issue.number, baseCommit: newBaseCommit },
+        rebasedCandidate, claim.workOrder.issue.contractDigest,
+      ),
+    });
+    assert.equal(refreshedTerminal.state, 'ready-to-merge');
+    const newLifecycle = master.claimMergeReview({ ...base(fixture), jobId });
     const newReviewResult = master.recordStageResult({
-      ...base(fixture), jobId, stage: 'review', payload: passingReview(jobId, candidate, newBaseCommit),
+      ...base(fixture), jobId, stage: 'review',
+      payload: {
+        ...passingReview(jobId, rebasedCandidate, newBaseCommit, 'reviewer-new-base'),
+        attemptId: claim.attemptId,
+        effectiveRisk: newLifecycle.effectiveRisk,
+        depthTier: newLifecycle.depthTier,
+      },
     });
     assert.equal(newReviewResult.ok, true, 'review 在新 base 上应该通过');
 
-    const newQaResult = master.recordStageResult({
-      ...base(fixture), jobId, stage: 'qa', payload: passingQa(jobId, candidate, newBaseCommit),
-    });
-    assert.equal(newQaResult.ok, true, 'QA 在新 base 上应该通过');
-
     // 第五部分：重新 gate，应该全绿放行。
-    const gateFinal = master.evaluateGate({ ...base(fixture), jobId });
+    const gateFinal = master.evaluateGate({ ...base(fixture), jobId, changedPaths: ['ac4.txt'] });
     assert.equal(gateFinal.mechanical.allGreen, true, '新 base 证据应该通过 gate');
     assert.ok(gateFinal.decision.mayMerge, '新 base 证据应该允许 merge');
   } finally {
@@ -1578,14 +2263,9 @@ export async function stageResultSchemaBackwardCompat() {
     const claimV2 = master.masterClaim({ ...base(fixture), issue: issueV2, slotId: 'worker-2' });
     const oldBase = claimV2.workOrder.runner.baseCommit;
 
-    // --- 分支一：纯 v1 证据必须能走完整条链路到 merge。 ---
+    // --- 分支一：v1 review 只保留读取兼容，不再允许绕过 merge-worker claim 推进 PASS。 ---
     const candidateV1 = makeCandidate(fixture, claimV1.slotId, { file: 'compat-v1.txt' });
     master.recordCandidate({ ...base(fixture), jobId: claimV1.jobId, commitSha: candidateV1 });
-
-    const reviewV1 = master.recordStageResult({
-      ...base(fixture), jobId: claimV1.jobId, stage: 'review', payload: passingReviewV1(claimV1.jobId, candidateV1),
-    });
-    assert.equal(reviewV1.ok, true, 'v1 review 必须被接受');
     const qaV1 = master.recordStageResult({
       ...base(fixture), jobId: claimV1.jobId, stage: 'qa', payload: passingQaV1(claimV1.jobId, candidateV1),
     });
@@ -1599,33 +2279,44 @@ export async function stageResultSchemaBackwardCompat() {
       ),
     });
     assert.equal(terminalV1.state, 'ready-to-merge');
-
-    const gateV1 = master.evaluateGate({ ...base(fixture), jobId: claimV1.jobId });
-    const v1Checks = Object.fromEntries(gateV1.mechanical.checks.map((c) => [c.id, c.outcome]));
-    assert.equal(v1Checks['GATE-review-base'], 'PASS', 'v1 证据在 GATE-review-base 上应豁免通过');
-    assert.equal(v1Checks['GATE-qa-base'], 'PASS', 'v1 证据在 GATE-qa-base 上应豁免通过');
-    assert.equal(gateV1.mechanical.allGreen, true, 'v1 全套证据应该通过机械门');
-    assert.ok(gateV1.decision.mayMerge, 'v1 全套证据应该允许 merge（向下兼容不变量）');
-
-    const mergedV1 = master.masterMerge({ ...base(fixture), jobId: claimV1.jobId });
-    assert.equal(mergedV1.ok, true, 'v1 证据必须能真实 merge 成功');
+    master.claimMergeReview({ ...base(fixture), jobId: claimV1.jobId });
+    const reviewV1 = master.recordStageResult({
+      ...base(fixture), jobId: claimV1.jobId, stage: 'review', payload: passingReviewV1(claimV1.jobId, candidateV1),
+    });
+    assert.equal(reviewV1.ok, false);
+    assert.equal(reviewV1.code, 'MERGE_WORKER_REVIEW_REQUIRES_V2');
 
     // --- 分支二：v2 证据下，integration 前进后旧 baseCommit 必须判 STALE；
     //     同样的 mismatch 对 v1 不生效，用以对照两版本语义的差异是设计出来的，不是漏洞。 ---
     const candidateV2 = makeCandidate(fixture, claimV2.slotId, { file: 'compat-v2.txt' });
     master.recordCandidate({ ...base(fixture), jobId: claimV2.jobId, commitSha: candidateV2 });
     master.recordStageResult({
-      ...base(fixture), jobId: claimV2.jobId, stage: 'review', payload: passingReview(claimV2.jobId, candidateV2, oldBase),
-    });
-    master.recordStageResult({
       ...base(fixture), jobId: claimV2.jobId, stage: 'qa', payload: passingQa(claimV2.jobId, candidateV2, oldBase),
+    });
+    const terminalV2 = master.masterTerminal({
+      ...base(fixture),
+      payload: readyTerminal(
+        { jobId: claimV2.jobId, attemptId: claimV2.attemptId, issue: issueV2.number, baseCommit: oldBase },
+        candidateV2, claimV2.workOrder.issue.contractDigest,
+      ),
+    });
+    assert.equal(terminalV2.state, 'ready-to-merge');
+    const lifecycleV2 = master.claimMergeReview({ ...base(fixture), jobId: claimV2.jobId });
+    master.recordStageResult({
+      ...base(fixture), jobId: claimV2.jobId, stage: 'review',
+      payload: {
+        ...passingReview(claimV2.jobId, candidateV2, oldBase, 'reviewer-compat-v2'),
+        attemptId: claimV2.attemptId,
+        effectiveRisk: lifecycleV2.effectiveRisk,
+        depthTier: lifecycleV2.depthTier,
+      },
     });
 
     // 模拟 integration 前进（同 integrationBaseAdvanceStaleEvidence 的手法）。
     const newBase = makeCandidate(fixture, claimV2.slotId, { file: 'compat-unrelated.txt' });
     updateV4Registry(fixture.v4Dir, (registry) => { registry.jobs[claimV2.jobId].baseCommit = newBase; });
 
-    const gateV2Stale = master.evaluateGate({ ...base(fixture), jobId: claimV2.jobId });
+    const gateV2Stale = master.evaluateGate({ ...base(fixture), jobId: claimV2.jobId, changedPaths: ['compat-v2.txt'] });
     const v2Checks = Object.fromEntries(gateV2Stale.mechanical.checks.map((c) => [c.id, c.outcome]));
     assert.equal(v2Checks['GATE-review-base'], 'FAIL', 'v2 证据在 base 前进后必须判 STALE（不豁免）');
     assert.equal(v2Checks['GATE-qa-base'], 'FAIL', 'v2 QA 证据在 base 前进后必须判 STALE（不豁免）');
@@ -1749,6 +2440,18 @@ export async function missingReviewerSessionIdScenario() {
 
     const candidate = makeCandidate(fixture, claim.slotId, { file: 'test.txt' });
     master.recordCandidate({ ...base(fixture), jobId: claim.jobId, commitSha: candidate });
+    master.recordStageResult({
+      ...base(fixture), jobId: claim.jobId, stage: 'qa',
+      payload: passingQa(claim.jobId, candidate, claim.workOrder.runner.baseCommit),
+    });
+    master.masterTerminal({
+      ...base(fixture),
+      payload: readyTerminal(
+        { jobId: claim.jobId, attemptId: claim.attemptId, issue: issue.number, baseCommit: claim.workOrder.runner.baseCommit },
+        candidate, claim.workOrder.issue.contractDigest,
+      ),
+    });
+    master.claimMergeReview({ ...base(fixture), jobId: claim.jobId });
 
     // v2 报文缺失 reviewerSessionId → fail closed。带上 baseCommit 使其满足 AC-007
     // 的必填项，本测试才能精确定位到 reviewerSessionId 这一个缺口（否则会先撞上
@@ -1764,14 +2467,13 @@ export async function missingReviewerSessionIdScenario() {
     assert.equal(result.ok, false, 'v2 缺失 reviewerSessionId 必须 fail closed');
     assert.equal(result.code, 'MISSING_REVIEWER_SESSION_ID', '必须报 MISSING_REVIEWER_SESSION_ID');
 
-    // v1 报文同样缺失 reviewerSessionId → 必须被接受（向后兼容历史证据），
-    // 但 reviewerIndependence 推导为 'unknown'，不得被判定为 same-session 或 independent。
+    // v1 报文可读取但不能作为 merge-worker PASS 推进。
     const legacyReview = passingReviewV1(claim.jobId, candidate);
     const accepted = master.recordStageResult({ ...base(fixture), jobId: claim.jobId, stage: 'review', payload: legacyReview });
-    assert.equal(accepted.ok, true, 'v1 legacy 报文缺失 reviewerSessionId 必须被接受（不追溯要求）');
-    assert.equal(accepted.reviewerIndependence, 'unknown', 'v1 无 reviewerSessionId 时必须如实记 unknown，不得默认 independent');
+    assert.equal(accepted.ok, false);
+    assert.equal(accepted.code, 'MERGE_WORKER_REVIEW_REQUIRES_V2');
     const registry = readV4Registry(fixture.v4Dir);
-    assert.equal(registry.attempts[claim.attemptId].reviewerIndependence, 'unknown');
+    assert.equal(registry.attempts[claim.attemptId].review, null);
   } finally {
     fixture.cleanup();
   }
@@ -1835,10 +2537,6 @@ export async function acceptanceInvalidationScenario() {
 
     // 正路重新走一遍：新证据 + 新 terminal → acceptance 重新绑定新 commit，gate 全绿。
     master.recordStageResult({
-      ...base(fixture), jobId: job.jobId, stage: 'review',
-      payload: passingReview(job.jobId, second, job.baseCommit, 'owner-session-1'),
-    });
-    master.recordStageResult({
       ...base(fixture), jobId: job.jobId, stage: 'qa', payload: passingQa(job.jobId, second, job.baseCommit),
     });
     const terminal = master.masterTerminal({
@@ -1849,6 +2547,16 @@ export async function acceptanceInvalidationScenario() {
       ),
     });
     assert.equal(terminal.state, 'ready-to-merge');
+    const lifecycle = master.claimMergeReview({ ...base(fixture), jobId: job.jobId });
+    master.recordStageResult({
+      ...base(fixture), jobId: job.jobId, stage: 'review',
+      payload: {
+        ...passingReview(job.jobId, second, job.baseCommit, 'reviewer-acceptance'),
+        attemptId: job.attemptId,
+        effectiveRisk: lifecycle.effectiveRisk,
+        depthTier: lifecycle.depthTier,
+      },
+    });
     assert.equal(readV4Registry(fixture.v4Dir).jobs[job.jobId].acceptanceCommit, second, '重新取证后绑定新 commit');
     assert.equal(master.evaluateGate({ ...base(fixture), jobId: job.jobId }).mechanical.allGreen, true,
       '重新取证后机械门必须全绿');
@@ -1869,7 +2577,7 @@ export async function humanOpenEvidenceScenario() {
       '--kind', 'risk_approval', '--prompt', '需要人工批准合并'];
 
     // #76 主缺陷复现路径：--required-evidence 曾被静默丢弃且 ok:true。现在必须报错退出。
-    const unknown = freshProcess(fixture, [...humanArgs, '--required-evidence', '机械门六项全绿'], { expectStatus: 'nonzero' });
+    const unknown = freshProcess(fixture, [...humanArgs, '--required-evidence', '机械门八项全绿'], { expectStatus: 'nonzero' });
     assert.equal(unknown.code, 'UNKNOWN_OPTION', '近似参数必须 fail closed，不得静默丢弃');
     assert.ok(/--evidence/.test(unknown.hint || ''), '报错必须指路到正确参数 --evidence');
     assert.equal(readV4Registry(fixture.v4Dir).jobs[claim.jobId].state, 'dispatched', '未知参数不得推进状态');
@@ -1889,10 +2597,10 @@ export async function humanOpenEvidenceScenario() {
 
     // 重复 --evidence 累积成数组，且历史 JSON 数组形态继续可用（两者可混用）。
     const opened = freshProcess(fixture, [...humanArgs,
-      '--evidence', '机械门六项全绿',
+      '--evidence', '机械门八项全绿',
       '--evidence', '["Master 独立复跑 10/10","被测代码零改动"]']);
     assert.deepEqual(opened.humanRequest.requiredEvidence,
-      ['机械门六项全绿', 'Master 独立复跑 10/10', '被测代码零改动'],
+      ['机械门八项全绿', 'Master 独立复跑 10/10', '被测代码零改动'],
       '重复 --evidence 与 JSON 数组形态必须都累积进 requiredEvidence');
     assert.equal(opened.state, 'awaiting-human');
 

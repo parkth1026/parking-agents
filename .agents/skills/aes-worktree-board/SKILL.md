@@ -408,7 +408,9 @@ node "$skillDir/scripts/master.mjs" release --job <jobId> --slot <slotId>
 | `high` | 机械门全绿**仍**停在 humanGate 等人工批准 |
 | `critical` | 拒绝直接 merge，只走 PR；waiver 也不能覆盖 |
 
-机械门八项固定顺序：slot → commit → integration → acceptance → review → review-base → qa → qa-base。
+机械门八项固定顺序：slot → commit → integration → acceptance → review → review-base → QA → qa-base。
+`gate` 另返回 `outboxWarning` 提醒未送达的 GitHub 出站条目；该字段只提供可观测性，
+不改变八门 outcome，也不参与 `decision.mayMerge`。
 其中 `-base` 两项校验证据取自的 integration base 仍等于当前 base，不等判 STALE
 （#62 交付；integration 前进会使旧 base 上取得的 review/QA 证据失效）。
 其中 review/QA receipt 的 `commitSha` 必须与当前 candidate commit **精确相等**——
@@ -448,7 +450,7 @@ node "$skillDir/scripts/master.mjs" outbox acknowledge --entry <id> --reason "<�
 静默孵化一个平行 registry；反过来，跑 `selftest` / `run-tests` 时**不得**继承该变量，
 它会污染 fixture 场景。
 
-### aes-merge-worker（合并验收 worker，待建）
+### aes-merge-worker（合并验收 worker）
 
 v4 的角色分工是 **hub-and-spoke**：总管只管 claim / 派单 / slot / queue / 打回与
 人工态路由，**不亲自执行合并**；合并验收是挂在总管之下的专职 worker lane
@@ -472,9 +474,10 @@ merge-worker 消化 mergeQueue 的完整职责：
    `AWAITING_HUMAN`）。普通 finding（非 must-fix）merge-worker 侧自行记录，
    不打回、不烦扰 worker。
 
-本节先锁协议，实现另票（载体形态——独立 session 占 host worktree 还是总管兼任——
-依宿主能力定）。机械上 merge-worker 与总管调用同一套 `master.mjs` CLI 操作同一
-registry，零 schema 改动。
+机械入口先用 `review claim --job <jobId>` 领取 review：它按 candidate 的实际改动路径
+推导 `effectiveRisk`，并固定 `low|medium → light`、`high|critical → deep` 后落 registry。
+review subagent 的结果只由 merge-worker 用 `stage review` 上报；MUST_FIX 会生成 typed
+打回，PASS 才能进入后续 gate。载体形态不改变这条 provenance 边界。
 
 ### 中断恢复
 

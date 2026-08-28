@@ -6,7 +6,7 @@
 // 重启后 reconcile 用 `git merge-base --is-ancestor` 去问 Git 到底 merge 没 merge，
 // 而不是相信可能在崩溃前没写完的状态位。这是「无重复 merge / 无假完成」的真正依据。
 import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { HEADLESS_CHILD_OPTIONS } from './headless.mjs';
@@ -16,16 +16,20 @@ import {
   setJobState, storeError, updateV4Registry, V4_DIR,
 } from './job-store.mjs';
 import {
-  assertStartable, defaultSlotsFromWorktrees, initSlots, loadSlotsConfig, projectRunners,
+  assertStartable, defaultSlotsFromWorktrees, initSlots, loadSlotsConfig, normalizePath, projectRunners,
   slotById, SLOTS_PATH, syncSlotBaseline, updateSlots,
 } from './runner-slots.mjs';
-import { assertContractComplete, buildWorkOrder, contractDigestOf } from './issue-contract.mjs';
-import { buildHumanRequest, validateHumanRequest, validateHumanResponse } from './human-request.mjs';
-import { decideMerge, evaluateMechanicalGate, resolveMergePolicy } from './merge-policy.mjs';
-import { disposeDiscovery, makeWayfinder } from './discovery.mjs';
 import {
-  acknowledgeEntry, enqueueIssueClose, flushOutbox, outboxStatus, outboxWarning,
-} from './outbox.mjs';
+  assertContractComplete, buildWorkOrder, contractDigestOf, resolveWorkOrderBudgets, WORK_ORDER_BUDGET_DEFAULTS,
+} from './issue-contract.mjs';
+import { buildHumanRequest, validateHumanRequest, validateHumanResponse } from './human-request.mjs';
+import { decideMerge, evaluateMechanicalGate, resolveMergePolicy, reviewDepthForRisk } from './merge-policy.mjs';
+import { disposeDiscovery, makeWayfinder } from './discovery.mjs';
+import { prepareGithubAccess, runGithubCommand } from './github-identity.mjs';
+import { loadConfig as loadBoardConfig } from './collect.mjs';
+import {
+  acknowledgeOutbox, enqueueIssueClose, flushOutbox, outboxStatus, outboxWarning, preflightOutbox, readOutbox,
+} from './outbox-store.mjs';
 
 export const TERMINAL_SCHEMA = 'aes.issue-worker.goal-terminal/v1';
 export const DELIVERY_SCHEMA = 'aes.worktree-board.delivery-receipt/v1';
@@ -44,6 +48,7 @@ export const STAGE_RESULT_SCHEMA_V1 = 'aes.issue-worker.stage-result/v1';
 export const STAGE_RESULT_SCHEMA_V2 = 'aes.issue-worker.stage-result/v2';
 export const QA_RECEIPT_SCHEMA_V1 = 'aes.qa.receipt/v1';
 export const QA_RECEIPT_SCHEMA_V2 = 'aes.qa.receipt/v2';
+export const REVIEW_RETURN_SCHEMA = 'aes.issue-worker.review-return/v1';
 export const REVIEWER_INDEPENDENCE_VALUES = Object.freeze(['same-session', 'independent', 'unknown']);
 const ACCEPTED_STAGE_RESULT_SCHEMAS = Object.freeze([STAGE_RESULT_SCHEMA_V1, STAGE_RESULT_SCHEMA_V2]);
 const ACCEPTED_QA_RECEIPT_SCHEMAS = Object.freeze([QA_RECEIPT_SCHEMA_V1, QA_RECEIPT_SCHEMA_V2]);
@@ -66,8 +71,158 @@ export function isAncestor(repoRoot, candidate, branch) {
 }
 
 function changedPathsBetween(repoRoot, base, candidate) {
-  const out = gitOut(repoRoot, ['diff', '--name-only', `${base}...${candidate}`]);
-  return out ? out.split(/\r?\n/).filter(Boolean) : [];
+  const result = git(repoRoot, ['diff', '--name-only', `${base}...${candidate}`]);
+  if (result.status !== 0) {
+    throw storeError('REVIEW_DIFF_UNRESOLVED', '无法解析 review candidate 的改动路径，拒绝风险降档', {
+      baseCommit: base || null,
+      candidateCommit: candidate || null,
+      detail: String(result.stderr || result.stdout || '').trim().slice(0, 600),
+    });
+  }
+  const paths = String(result.stdout || '').trim().split(/\r?\n/).filter(Boolean);
+  if (!paths.length) {
+    throw storeError('REVIEW_DIFF_EMPTY', 'review candidate 与 base 之间没有可审查改动，拒绝风险降档', {
+      baseCommit: base || null, candidateCommit: candidate || null,
+    });
+  }
+  return paths;
+}
+
+function mergeGateSnapshot(job, attempt, runner) {
+  return {
+    jobState: job.state,
+    slotId: job.slotId,
+    currentAttemptId: job.currentAttemptId,
+    declaredRisk: job.declaredRisk,
+    humanGateApprovalDigest: digestOf(job.humanGateApproval || null),
+    runnerDigest: digestOf(runner ? {
+      slotId: runner.slotId, state: runner.state, lease: runner.lease || null,
+    } : null),
+    candidateCommit: attempt?.candidateCommit || null,
+    terminalCandidateCommit: job.terminal?.candidateCommit || null,
+    terminalDigest: digestOf(job.terminal || null),
+    reviewDigest: digestOf(attempt?.review || null),
+    qaDigest: digestOf(attempt?.qa || null),
+    acceptanceDigest: digestOf(job.acceptance || null),
+    acceptanceCommit: job.acceptanceCommit || null,
+    baseCommit: job.baseCommit || null,
+  };
+}
+
+function gitPath(cwd, name) {
+  const path = gitOut(cwd, ['rev-parse', '--git-path', name]);
+  return path ? resolve(cwd, path) : null;
+}
+
+function activeGitOperation(hostRoot) {
+  for (const [operation, markers] of [
+    ['merge', ['MERGE_HEAD']],
+    ['rebase', ['rebase-merge', 'rebase-apply', 'REBASE_HEAD']],
+    ['cherry-pick', ['CHERRY_PICK_HEAD']],
+  ]) {
+    if (markers.some((marker) => {
+      const path = gitPath(hostRoot, marker);
+      return path && existsSync(path);
+    })) return operation;
+  }
+  return null;
+}
+
+function inspectHostCheckout(options = {}) {
+  const { config, hostRoot } = ctx(options);
+  const integrationBranch = config.repoIdentity.integrationBranch;
+  const commonDir = gitOut(hostRoot, ['rev-parse', '--git-common-dir']);
+  const commonRoot = commonDir ? resolve(hostRoot, commonDir, '..') : null;
+  if (!commonRoot || normalizePath(commonRoot) !== normalizePath(config.repoIdentity.root)) {
+    return {
+      ok: false, code: 'HOST_REPO_MISMATCH', disposition: 'REJECTED_MECHANICAL',
+      expectedRepoRoot: resolve(config.repoIdentity.root), actualRepoRoot: commonRoot,
+    };
+  }
+  const operation = activeGitOperation(hostRoot);
+  if (operation) {
+    return {
+      ok: false, code: 'HOST_GIT_OPERATION_IN_PROGRESS', disposition: 'REJECTED_MECHANICAL', operation,
+    };
+  }
+  const branch = gitOut(hostRoot, ['symbolic-ref', '--quiet', '--short', 'HEAD']);
+  if (branch !== integrationBranch) {
+    return {
+      ok: false, code: 'HOST_CHECKOUT_MISMATCH', disposition: 'REJECTED_MECHANICAL',
+      expectedBranch: integrationBranch, actualBranch: branch,
+    };
+  }
+  const head = gitOut(hostRoot, ['rev-parse', 'HEAD']);
+  if (head !== options.integrationHead) {
+    return {
+      ok: false, code: 'INTEGRATION_HEAD_MOVED', disposition: 'REJECTED_MECHANICAL',
+      expectedIntegrationHead: options.integrationHead, integrationHead: head,
+    };
+  }
+  const statusResult = git(hostRoot, ['status', '--porcelain=v1', '--untracked-files=all']);
+  if (statusResult.status !== 0) {
+    return {
+      ok: false, code: 'HOST_STATUS_UNRESOLVED', disposition: 'REJECTED_MECHANICAL',
+      detail: String(statusResult.error?.message || statusResult.stderr || '').slice(0, 600),
+    };
+  }
+  const status = String(statusResult.stdout || '').trim();
+  if (status) {
+    return {
+      ok: false, code: 'HOST_WORKTREE_DIRTY', disposition: 'REJECTED_MECHANICAL',
+      dirtyEntries: status.split(/\r?\n/).filter(Boolean).slice(0, 10),
+    };
+  }
+  return { ok: true, integrationBranch, integrationHead: head };
+}
+
+function commitSummaryBetween(repoRoot, base, candidate) {
+  const count = Number(gitOut(repoRoot, ['rev-list', '--count', `${base}..${candidate}`]) || 0);
+  const sampleOut = gitOut(repoRoot, ['rev-list', '--max-count=5', `${base}..${candidate}`]);
+  return { count, sample: sampleOut ? sampleOut.split(/\r?\n/).filter(Boolean) : [] };
+}
+
+// merge 时点只回答 Git 事实，不写 registry、不触碰 working tree。
+// 冲突优先于 ancestry：发生真实内容冲突时，调用方需要拿到 MERGE_CONFLICT；
+// 无冲突的分叉才归入 candidate 血统断裂。
+export function inspectMergeCandidate(options = {}) {
+  const { hostRoot } = ctx(options);
+  const integrationHead = options.integrationHead;
+  const candidateCommit = options.candidateCommit;
+  const resolvedIntegration = gitOut(hostRoot, ['rev-parse', `${integrationHead}^{commit}`]);
+  const resolvedCandidate = gitOut(hostRoot, ['rev-parse', `${candidateCommit}^{commit}`]);
+  if (!resolvedIntegration || !resolvedCandidate) {
+    return {
+      ok: false, code: 'MERGE_COMMIT_UNRESOLVED', disposition: 'REJECTED_MECHANICAL',
+      integrationHead: resolvedIntegration || integrationHead || null,
+      candidateCommit: resolvedCandidate || candidateCommit || null,
+    };
+  }
+
+  if (!isAncestor(hostRoot, resolvedIntegration, resolvedCandidate)) {
+    const mergeTree = git(hostRoot, ['merge-tree', '--write-tree', resolvedIntegration, resolvedCandidate]);
+    if (mergeTree.status !== 0) {
+      return {
+        ok: false, code: 'MERGE_CONFLICT', disposition: 'AWAITING_FIX',
+        integrationHead: resolvedIntegration, candidateCommit: resolvedCandidate,
+        detail: String(mergeTree.stderr || mergeTree.stdout || '').slice(0, 600),
+      };
+    }
+    return {
+      ok: false, code: 'CANDIDATE_ANCESTRY_DIVERGED', disposition: 'REJECTED_MECHANICAL',
+      integrationHead: resolvedIntegration, candidateCommit: resolvedCandidate,
+    };
+  }
+
+  const commits = commitSummaryBetween(hostRoot, resolvedIntegration, resolvedCandidate);
+  if (commits.count !== 1 || commits.sample[0] !== resolvedCandidate) {
+    return {
+      ok: false, code: 'UNRELATED_CHANGES', disposition: 'REJECTED_MECHANICAL',
+      integrationHead: resolvedIntegration, candidateCommit: resolvedCandidate,
+      commitCount: commits.count, commits: commits.sample, commitsTruncated: commits.count > commits.sample.length,
+    };
+  }
+  return { ok: true, integrationHead: resolvedIntegration, candidateCommit: resolvedCandidate };
 }
 
 function ctx(options = {}) {
@@ -203,6 +358,8 @@ export function masterClaim(options = {}) {
       acceptanceCriteria: parsed.contract.acceptanceCriteria,
       declaredRisk: parsed.contract.riskProfile,
       humanGates: parsed.contract.humanGates,
+      budgets: resolveWorkOrderBudgets(options.budgets),
+      budgetUsage: emptyBudgetUsage(),
       state: 'dispatched',
       attemptIds: [attemptId],
       currentAttemptId: attemptId,
@@ -356,6 +513,9 @@ export function attemptNew(options = {}) {
     };
     job.attemptIds.push(attemptId);
     job.currentAttemptId = attemptId;
+    job.reviewLifecycle = null;
+    job.lastReviewReturn = null;
+    job.lastReviewDisposition = null;
     job.slotId = slotId;
     // registry 记录的 base 必须与 executor 实际工作的基线一致，否则 gate 的
     // changedPaths / GATE-review-base / GATE-qa-base 全部基于错误前提。
@@ -412,6 +572,9 @@ export function recordCandidate(options = {}) {
       }
       attempt.review = null;
       attempt.qa = null;
+      job.reviewLifecycle = null;
+      job.lastReviewReturn = null;
+      job.lastReviewDisposition = null;
     }
     attempt.candidateCommit = options.commitSha;
     attempt.state = 'reviewing';
@@ -432,8 +595,190 @@ function emptyBudgetUsage() {
   return { reviewLoops: 0, qaLoops: 0, environmentRetries: 0, modelUpgrades: 0 };
 }
 
+export function claimMergeReview(options = {}) {
+  const { dir, hostRoot } = ctx(options);
+  const snapshot = readV4Registry(dir);
+  const snapshotJob = jobOf(snapshot, options.jobId);
+  const snapshotAttempt = currentAttempt(snapshot, options.jobId);
+  if (snapshotJob.reviewLifecycle?.candidateCommit === snapshotAttempt?.candidateCommit
+    && snapshotJob.reviewLifecycle?.baseCommit === snapshotJob.baseCommit
+    && snapshotJob.reviewLifecycle?.attemptId === snapshotAttempt?.attemptId) {
+    return { ok: true, jobId: snapshotJob.jobId, attemptId: snapshotAttempt.attemptId, ...snapshotJob.reviewLifecycle };
+  }
+  if (snapshotJob.state !== 'ready-to-merge' || !snapshot.mergeQueue.includes(snapshotJob.jobId)) {
+    throw storeError('REVIEW_NOT_CLAIMABLE', `job ${snapshotJob.jobId} 不在 mergeQueue ready 状态`, { state: snapshotJob.state });
+  }
+  const changedPaths = changedPathsBetween(hostRoot, snapshotJob.baseCommit, snapshotAttempt?.candidateCommit);
+  const policy = resolveMergePolicy({ declaredRisk: snapshotJob.declaredRisk, changedPaths });
+  const prepared = {
+    effectiveRisk: policy.effectiveRisk,
+    depthTier: reviewDepthForRisk(policy.effectiveRisk),
+    attemptId: snapshotAttempt.attemptId,
+    baseCommit: snapshotJob.baseCommit,
+    candidateCommit: snapshotAttempt.candidateCommit,
+    claimedAt: nowIso(),
+    changedPathCount: changedPaths.length,
+    changedPathsDigest: digestOf(changedPaths),
+    triggeredRules: policy.triggeredRules,
+  };
+  return updateV4Registry(dir, (registry) => {
+    const job = jobOf(registry, options.jobId);
+    const attempt = currentAttempt(registry, options.jobId);
+    if (job.state !== 'ready-to-merge' || !registry.mergeQueue.includes(job.jobId)) {
+      throw storeError('REVIEW_NOT_CLAIMABLE', `job ${job.jobId} 不在 mergeQueue ready 状态`, { state: job.state });
+    }
+    if (job.baseCommit !== prepared.baseCommit || attempt?.candidateCommit !== prepared.candidateCommit) {
+      throw storeError('REVIEW_CLAIM_RACE', 'review 分档期间 base/candidate 已变化，拒绝写入陈旧 claim');
+    }
+    const reviewLifecycle = prepared;
+    job.reviewLifecycle = reviewLifecycle;
+    attempt.state = 'reviewing';
+    appendReceipt(dir, { kind: 'merge-review-claim', jobId: job.jobId, attemptId: attempt.attemptId, ...reviewLifecycle });
+    return { ok: true, jobId: job.jobId, attemptId: attempt.attemptId, ...reviewLifecycle };
+  });
+}
+
+function validateMustFixFindings(findings) {
+  if (!Array.isArray(findings) || !findings.length) {
+    throw storeError('BAD_REVIEW_FINDINGS', 'MUST_FIX 必须携带非空 findings');
+  }
+  const required = ['id', 'axis', 'severity', 'location', 'finding', 'requiredAction'];
+  for (const finding of findings) {
+    for (const field of required) {
+      if (typeof finding?.[field] !== 'string' || !finding[field].trim()) {
+        throw storeError('BAD_REVIEW_FINDINGS', `findings[].${field} 必须为非空字符串`, { field });
+      }
+    }
+    if (!['standards', 'spec'].includes(finding.axis) || finding.severity !== 'must-fix') {
+      throw storeError('BAD_REVIEW_FINDINGS', 'finding axis/severity 不符合 review-return/v1 闭集', {
+        axis: finding.axis, severity: finding.severity,
+      });
+    }
+  }
+}
+
+function recordMergeReviewMustFix(options) {
+  const { dir } = ctx(options);
+  const payload = options.payload;
+  const snapshot = readV4Registry(dir);
+  const snapshotJob = jobOf(snapshot, options.jobId);
+  if (snapshotJob.lastReviewDisposition?.commitSha === payload?.commitSha
+    && snapshotJob.lastReviewDisposition?.attemptId === payload?.attemptId) {
+    return snapshotJob.lastReviewDisposition.response;
+  }
+  if (snapshotJob.lastReviewReturn?.commitSha === payload?.commitSha
+    && snapshotJob.lastReviewReturn?.attemptId === payload?.attemptId) return snapshotJob.lastReviewReturn;
+  return updateV4Registry(dir, (registry) => {
+    const job = jobOf(registry, options.jobId);
+    const attempt = currentAttempt(registry, options.jobId);
+    if (job.lastReviewDisposition?.commitSha === payload?.commitSha
+      && job.lastReviewDisposition?.attemptId === payload?.attemptId) return job.lastReviewDisposition.response;
+    if (job.lastReviewReturn?.commitSha === payload?.commitSha
+      && job.lastReviewReturn?.attemptId === payload?.attemptId) return job.lastReviewReturn;
+    const lifecycle = job.reviewLifecycle;
+    if (!lifecycle) throw storeError('REVIEW_NOT_CLAIMED', `job ${job.jobId} 尚未由 merge-worker claim review`);
+    if (job.state !== 'ready-to-merge' || !registry.mergeQueue.includes(job.jobId)) {
+      throw storeError('REVIEW_NOT_CLAIMABLE', 'MUST_FIX 只接受 mergeQueue 中 ready-to-merge job');
+    }
+    if (lifecycle.attemptId !== attempt.attemptId) {
+      throw storeError('STALE_REVIEW_CLAIM', 'review claim 不属于当前 attempt，必须重新 claim');
+    }
+    if (lifecycle.baseCommit !== job.baseCommit) {
+      throw storeError('STALE_REVIEW_CLAIM', 'review claim 的 base 已落后于当前 job base，必须重新 claim', {
+        claimedBaseCommit: lifecycle.baseCommit, currentBaseCommit: job.baseCommit,
+      });
+    }
+    if (lifecycle.candidateCommit !== attempt.candidateCommit) {
+      throw storeError('STALE_REVIEW_CLAIM', 'review claim 与当前 candidate 不一致，必须重新 claim');
+    }
+    if (payload?.schemaVersion !== STAGE_RESULT_SCHEMA_V2
+      || payload.jobId !== job.jobId || payload.attemptId !== attempt.attemptId
+      || payload.commitSha !== attempt.candidateCommit) {
+      throw storeError('BAD_REVIEW_RETURN_PARENT', 'MUST_FIX 必须精确绑定当前 job/attempt/candidate');
+    }
+    if (!payload.baseCommit) {
+      throw storeError('MISSING_BASE_COMMIT', 'merge-worker MUST_FIX 必须记录 review baseCommit');
+    }
+    if (payload.baseCommit !== lifecycle.baseCommit) {
+      throw storeError('REVIEW_BASE_MISMATCH', 'MUST_FIX baseCommit 必须等于 review claim 锁定的 base', {
+        expectedBaseCommit: lifecycle.baseCommit, actualBaseCommit: payload.baseCommit,
+      });
+    }
+    if (!payload.reviewerSessionId) {
+      throw storeError('MISSING_REVIEWER_SESSION_ID', 'merge-worker MUST_FIX 必须携带 reviewerSessionId');
+    }
+    if (payload.effectiveRisk !== lifecycle.effectiveRisk || payload.depthTier !== lifecycle.depthTier) {
+      throw storeError('REVIEW_POLICY_MISMATCH', 'review 结果必须匹配 merge-worker claim 时的分档', lifecycle);
+    }
+    validateMustFixFindings(payload.findings);
+    job.budgetUsage ||= emptyBudgetUsage();
+    job.budgetUsage.reviewLoops += 1;
+    const used = job.budgetUsage.reviewLoops;
+    const limit = job.budgets?.reviewLoops ?? WORK_ORDER_BUDGET_DEFAULTS.reviewLoops;
+    attempt.review = null;
+    attempt.lastStage = { stage: 'review', outcome: 'MUST_FIX', failureClass: 'must-fix', commitSha: payload.commitSha };
+    appendReceipt(dir, { kind: 'review', jobId: job.jobId, attemptId: attempt.attemptId, payload });
+
+    if (used >= limit) {
+      const request = buildHumanRequest({
+        jobId: job.jobId,
+        attemptId: attempt.attemptId,
+        state: 'awaiting-human',
+        kind: 'decision',
+        prompt: `reviewLoops 已耗尽（${used}/${limit}），需要人工决定新 attempt 或接管`,
+        requiredEvidence: payload.findings.map((finding) => `${finding.id}: ${finding.requiredAction}`),
+        context: { candidateCommit: attempt.candidateCommit, findings: payload.findings },
+      });
+      registry.humanRequests[request.resumeToken] = { ...request, jobId: job.jobId, state: 'awaiting-human', open: true };
+      job.humanRequestId = request.resumeToken;
+      attempt.state = 'failed';
+      attempt.endedAt = nowIso();
+      registry.mergeQueue = registry.mergeQueue.filter((id) => id !== job.jobId);
+      releaseSlot(registry, job.slotId, { reason: `job ${job.jobId} review 预算耗尽`, keepJob: true });
+      setJobState(registry, job.jobId, 'awaiting-human', { reason: 'REVIEW_BUDGET_EXHAUSTED', dir });
+      appendReceipt(dir, { kind: 'human-request', jobId: job.jobId, request });
+      const response = {
+        ok: false,
+        code: 'REVIEW_BUDGET_EXHAUSTED',
+        jobId: job.jobId,
+        budget: { kind: 'reviewLoops', limit, used },
+        recommendedMasterActions: ['NEW_ATTEMPT_FRONTIER_MODEL', 'AWAITING_HUMAN'],
+      };
+      job.lastReviewDisposition = { attemptId: attempt.attemptId, commitSha: attempt.candidateCommit, response };
+      job.reviewLifecycle = null;
+      return response;
+    }
+
+    const reviewReturn = {
+      schemaVersion: REVIEW_RETURN_SCHEMA,
+      jobId: job.jobId,
+      attemptId: attempt.attemptId,
+      commitSha: attempt.candidateCommit,
+      verdict: 'MUST_FIX',
+      findings: payload.findings,
+      budget: { reviewLoops: { used, limit } },
+    };
+    job.lastReviewReturn = reviewReturn;
+    job.reviewLifecycle = null;
+    registry.mergeQueue = registry.mergeQueue.filter((id) => id !== job.jobId);
+    attempt.state = 'implementing';
+    setJobState(registry, job.jobId, 'dispatched', { reason: 'merge-worker review MUST_FIX', dir });
+    appendInbox(dir, { kind: 'review-return', ...reviewReturn, consumed: false });
+    return reviewReturn;
+  });
+}
+
 // E4: review/QA 未知 schema 时不推进 cursor/commit gate，StageResult 保持 pending。
 export function recordStageResult(options = {}) {
+  if (options.stage === 'review' && options.payload?.outcome === 'MUST_FIX') {
+    return recordMergeReviewMustFix(options);
+  }
+  if (options.stage === 'review' && options.payload?.outcome !== 'PASS') {
+    return {
+      ok: false, code: 'UNSUPPORTED_REVIEW_OUTCOME', allowed: ['PASS', 'MUST_FIX'],
+      consumed: false, pending: true,
+    };
+  }
   const { dir } = ctx(options);
   const payload = options.payload;
   // qa 与 review 各自的 v1/v2 接受集：review v2 起同时强制 baseCommit（AC-007）与
@@ -453,6 +798,31 @@ export function recordStageResult(options = {}) {
         ok: false, code: 'UNCLASSIFIED_STAGE_RESULT', stage: options.stage,
         consumed: false, requiredReplacementSchema: latest, acceptedSchemas: accepted, pending: true,
       };
+    }
+    if (options.stage === 'review' && payload.outcome === 'PASS') {
+      const lifecycle = jobOf(registry, options.jobId).reviewLifecycle;
+      if (!lifecycle) {
+        return { ok: false, code: 'REVIEW_NOT_CLAIMED', consumed: false, pending: true };
+      }
+      const job = jobOf(registry, options.jobId);
+      if (job.state !== 'ready-to-merge' || !registry.mergeQueue.includes(job.jobId)) {
+        return { ok: false, code: 'REVIEW_NOT_CLAIMABLE', consumed: false, pending: true };
+      }
+      if (lifecycle.attemptId !== attempt.attemptId) {
+        return { ok: false, code: 'STALE_REVIEW_CLAIM', consumed: false, pending: true };
+      }
+      if (lifecycle.baseCommit !== job.baseCommit) {
+        return {
+          ok: false, code: 'STALE_REVIEW_CLAIM', claimedBaseCommit: lifecycle.baseCommit,
+          currentBaseCommit: job.baseCommit, consumed: false, pending: true,
+        };
+      }
+      if (lifecycle.candidateCommit !== currentAttempt(registry, options.jobId)?.candidateCommit) {
+        return { ok: false, code: 'STALE_REVIEW_CLAIM', consumed: false, pending: true };
+      }
+      if (payload.schemaVersion !== STAGE_RESULT_SCHEMA_V2) {
+        return { ok: false, code: 'MERGE_WORKER_REVIEW_REQUIRES_V2', consumed: false, pending: true };
+      }
     }
     // 孤儿证据：receipt 必须绑定到本 job 与本 attempt，不接受「挂在别处的 reviewer」。
     if (payload.jobId !== options.jobId) {
@@ -492,6 +862,18 @@ export function recordStageResult(options = {}) {
         consumed: false, pending: true,
       };
     }
+    if (options.stage === 'review' && payload.outcome === 'PASS') {
+      const lifecycle = jobOf(registry, options.jobId).reviewLifecycle;
+      if (payload.effectiveRisk !== lifecycle.effectiveRisk || payload.depthTier !== lifecycle.depthTier) {
+        return { ok: false, code: 'REVIEW_POLICY_MISMATCH', expected: lifecycle, consumed: false, pending: true };
+      }
+      if (payload.baseCommit !== lifecycle.baseCommit) {
+        return {
+          ok: false, code: 'REVIEW_BASE_MISMATCH', expectedBaseCommit: lifecycle.baseCommit,
+          actualBaseCommit: payload.baseCommit, consumed: false, pending: true,
+        };
+      }
+    }
 
     attempt.budgetUsage ||= emptyBudgetUsage();
     let failureClass = null;
@@ -526,6 +908,7 @@ export function recordStageResult(options = {}) {
         attempt.review = payload;
         attempt.reviewerSessionId = payload.reviewerSessionId || null;
         attempt.reviewerIndependence = reviewerIndependence;
+        jobOf(registry, options.jobId).reviewLifecycle = null;
       } else {
         attempt.review = null;
       }
@@ -546,9 +929,10 @@ export function checkBudget(options = {}) {
   const { dir } = ctx(options);
   const registry = readV4Registry(dir);
   const attempt = currentAttempt(registry, options.jobId);
+  const job = jobOf(registry, options.jobId);
   if (!attempt) throw storeError('NO_CURRENT_ATTEMPT', `job ${options.jobId} 无当前 attempt`, { jobId: options.jobId });
-  const limits = { reviewLoops: 3, qaLoops: 3, environmentRetries: 2, modelUpgrades: 1, ...(options.budgets || {}) };
-  const usage = attempt.budgetUsage || emptyBudgetUsage();
+  const { wallClockSeconds: _wallClockSeconds, ...limits } = resolveWorkOrderBudgets(options.budgets);
+  const usage = { ...(attempt.budgetUsage || emptyBudgetUsage()), reviewLoops: job.budgetUsage?.reviewLoops || 0 };
   const exceeded = Object.keys(limits).filter((key) => usage[key] >= limits[key]);
   return {
     ok: true, jobId: options.jobId, attemptId: attempt.attemptId, usage, limits, exceeded,
@@ -728,17 +1112,18 @@ export function respondHumanRequest(options = {}) {
 // ---------------------------------------------------------------- merge gate
 
 export function evaluateGate(options = {}) {
-  const { dir, config, hostRoot } = ctx(options);
+  const { dir, config, repoRoot } = ctx(options);
   const registry = readV4Registry(dir);
   const job = jobOf(registry, options.jobId);
   const attempt = currentAttempt(registry, options.jobId);
   const runner = registry.runners[job.slotId] || null;
   const integrationBranch = config.repoIdentity.integrationBranch;
-  const integrationHead = options.integrationHead ?? gitOut(hostRoot, ['rev-parse', integrationBranch]);
+  // gate 解析固定仓库身份；host checkout 是否属于该仓库由 merge preflight 单独判定。
+  const integrationHead = options.integrationHead ?? gitOut(repoRoot, ['rev-parse', integrationBranch]);
 
   const changedPaths = options.changedPaths
     || (attempt?.candidateCommit && job.baseCommit
-      ? changedPathsBetween(hostRoot, job.baseCommit, attempt.candidateCommit)
+      ? changedPathsBetween(repoRoot, job.baseCommit, attempt.candidateCommit)
       : []);
   const policy = resolveMergePolicy({ declaredRisk: job.declaredRisk, changedPaths });
 
@@ -762,8 +1147,8 @@ export function evaluateGate(options = {}) {
   return {
     ok: true, jobId: job.jobId, policy, mechanical, decision,
     candidateCommit: attempt?.candidateCommit || null, integrationHead, changedPaths,
-    // 可观测性，不是第七道门：机械门恒为六项，mayMerge 不受它影响。
     outboxWarning: outboxWarning(dir),
+    snapshot: mergeGateSnapshot(job, attempt, runner),
   };
 }
 
@@ -782,9 +1167,20 @@ export function openMergeIntent(options = {}) {
     }
     const job = jobOf(registry, options.jobId);
     const attempt = currentAttempt(registry, options.jobId);
+    const runner = registry.runners[job.slotId] || null;
+    const actualSnapshot = mergeGateSnapshot(job, attempt, runner);
+    if (!gate.snapshot || digestOf(gate.snapshot) !== digestOf(actualSnapshot)) {
+      throw storeError('GATE_SNAPSHOT_STALE', `job ${job.jobId} 的 gate snapshot 已失效，必须重新 gate`, {
+        jobId: job.jobId,
+        expectedCandidate: gate.snapshot?.candidateCommit || gate.candidateCommit || null,
+        actualCandidate: actualSnapshot.candidateCommit,
+        expectedSnapshot: gate.snapshot || null,
+        actualSnapshot,
+      });
+    }
     const record = {
       jobId: job.jobId,
-      candidateCommit: attempt.candidateCommit,
+      candidateCommit: options.canonicalCandidateCommit || gate.snapshot.candidateCommit,
       integrationBranch: config.repoIdentity.integrationBranch,
       integrationHeadBefore: gate.integrationHead,
       decision: gate.decision.decision,
@@ -802,13 +1198,27 @@ export function openMergeIntent(options = {}) {
 export function runIntegrationMerge(options = {}) {
   const { hostRoot } = ctx(options);
   const intent = options.intent;
+  const host = inspectHostCheckout({ ...options, integrationHead: intent.integrationHeadBefore });
+  if (!host.ok) return { merged: false, mergeCommit: null, candidateCommit: intent.candidateCommit, ...host };
+  const inspected = inspectMergeCandidate({
+    ...options, integrationHead: host.integrationHead, candidateCommit: intent.candidateCommit,
+  });
+  if (!inspected.ok) return { merged: false, mergeCommit: null, ...inspected };
+  const finalHost = inspectHostCheckout({ ...options, integrationHead: intent.integrationHeadBefore });
+  if (!finalHost.ok) {
+    return { merged: false, mergeCommit: null, candidateCommit: inspected.candidateCommit, ...finalHost };
+  }
+  const mergeHeadBefore = gitOut(hostRoot, ['rev-parse', '-q', '--verify', 'MERGE_HEAD']);
   const merge = git(hostRoot, ['merge', '--no-ff', '-m',
-    `merge(${intent.integrationBranch}): job ${intent.jobId} candidate ${String(intent.candidateCommit).slice(0, 8)}`,
-    intent.candidateCommit]);
+    `merge(${intent.integrationBranch}): job ${intent.jobId} candidate ${String(inspected.candidateCommit).slice(0, 8)}`,
+    inspected.candidateCommit]);
+  const mergeHeadAfter = gitOut(hostRoot, ['rev-parse', '-q', '--verify', 'MERGE_HEAD']);
   return {
     merged: merge.status === 0,
     mergeCommit: merge.status === 0 ? gitOut(hostRoot, ['rev-parse', 'HEAD']) : null,
     detail: merge.status === 0 ? null : String(merge.stderr || merge.stdout || '').slice(0, 600),
+    candidateCommit: inspected.candidateCommit,
+    ownedMergeHead: !mergeHeadBefore && mergeHeadAfter === inspected.candidateCommit ? mergeHeadAfter : null,
   };
 }
 
@@ -816,15 +1226,38 @@ export function runIntegrationMerge(options = {}) {
 export function finalizeMerge(options = {}) {
   const { dir, config, hostRoot } = ctx(options);
   const { intent, merged, mergeCommit, detail } = options.result;
+  const projected = merged
+    ? projectRunners(config, readV4Registry(dir), options.probeOverride ? { probe: options.probeOverride } : {})
+    : null;
   return updateV4Registry(dir, (registry) => {
     const job = jobOf(registry, intent.jobId);
     if (!merged) {
-      // merge conflict：不 close、不释放 slot、保留失败证据进 typed disposition。
-      git(hostRoot, ['merge', '--abort']);
-      job.mergeIntent = { ...intent, closedAt: nowIso(), outcome: 'CONFLICT' };
-      setJobState(registry, job.jobId, 'ready-to-merge', { reason: 'merge conflict', dir });
-      appendReceipt(dir, { kind: 'merge-failed', jobId: job.jobId, reason: 'MERGE_CONFLICT', detail });
-      return { ok: false, code: 'MERGE_CONFLICT', jobId: job.jobId, disposition: 'AWAITING_FIX', detail };
+      // 只清理由本次 git merge 创建且仍绑定同一 candidate 的 MERGE_HEAD。
+      // 预存在 merge/rebase/cherry-pick 现场不属于本调用，绝不能借失败清理破坏。
+      const liveMergeHead = gitOut(hostRoot, ['rev-parse', '-q', '--verify', 'MERGE_HEAD']);
+      if (options.result.ownedMergeHead && liveMergeHead === options.result.ownedMergeHead) {
+        git(hostRoot, ['merge', '--abort']);
+      }
+      const code = options.result.code || 'MERGE_CONFLICT';
+      const disposition = options.result.disposition || 'AWAITING_FIX';
+      const failureDetails = {
+        operation: options.result.operation || null,
+        expectedRepoRoot: options.result.expectedRepoRoot || null,
+        actualRepoRoot: options.result.actualRepoRoot || null,
+        expectedBranch: options.result.expectedBranch || null,
+        actualBranch: options.result.actualBranch || null,
+        expectedIntegrationHead: options.result.expectedIntegrationHead || null,
+        integrationHead: options.result.integrationHead || null,
+        dirtyEntries: options.result.dirtyEntries || [],
+      };
+      job.mergeIntent = { ...intent, closedAt: nowIso(), outcome: code };
+      setJobState(registry, job.jobId, 'ready-to-merge', { reason: code, dir });
+      appendReceipt(dir, {
+        kind: 'merge-failed', jobId: job.jobId, reason: code, disposition, detail, ...failureDetails,
+      });
+      return {
+        ok: false, code, jobId: job.jobId, disposition, detail, ...failureDetails,
+      };
     }
     job.mergeIntent = { ...intent, closedAt: nowIso(), outcome: 'MERGED', mergeCommit };
     registry.deliveries[job.jobId] = {
@@ -840,6 +1273,15 @@ export function finalizeMerge(options = {}) {
     };
     setJobState(registry, job.jobId, 'merged', { reason: 'host merge 完成', dir });
     registry.mergeQueue = registry.mergeQueue.filter((id) => id !== job.jobId);
+    // merge 改变了所有 worktree 相对 integration 的拓扑；写回 delivery 时同步刷新，
+    // 避免看板继续展示 merge 前的 ahead/behind 快照。
+    for (const [slotId, facts] of Object.entries(projected || {})) {
+      if (!registry.runners[slotId]) continue;
+      Object.assign(registry.runners[slotId], {
+        head: facts.head, integrationHead: facts.integrationHead,
+        ahead: facts.ahead, behind: facts.behind, evaluatedAt: facts.evaluatedAt,
+      });
+    }
     appendReceipt(dir, { kind: 'merge', jobId: job.jobId, mergeCommit, candidateCommit: intent.candidateCommit });
     return { ok: true, jobId: job.jobId, mergeCommit, candidateCommit: intent.candidateCommit, state: 'merged' };
   });
@@ -866,7 +1308,30 @@ export function masterMerge(options = {}) {
     }
     return { ok: false, jobId: options.jobId, ...gate.decision, policy: gate.policy, mechanical: gate.mechanical };
   }
-  const intent = openMergeIntent({ ...options, gate });
+  const host = inspectHostCheckout({ ...options, integrationHead: gate.integrationHead });
+  if (!host.ok) {
+    appendReceipt(dir, {
+      kind: 'merge-failed', jobId: options.jobId, reason: host.code,
+      disposition: host.disposition, integrationHead: host.integrationHead || gate.integrationHead,
+      candidateCommit: gate.candidateCommit, operation: host.operation || null,
+      expectedBranch: host.expectedBranch, actualBranch: host.actualBranch,
+    });
+    return { ...host, jobId: options.jobId, candidateCommit: gate.candidateCommit };
+  }
+  const inspected = inspectMergeCandidate({
+    ...options, integrationHead: gate.integrationHead, candidateCommit: gate.candidateCommit,
+  });
+  if (!inspected.ok) {
+    appendReceipt(dir, {
+      kind: 'merge-failed', jobId: options.jobId, reason: inspected.code,
+      disposition: inspected.disposition, integrationHead: inspected.integrationHead,
+      candidateCommit: inspected.candidateCommit, detail: inspected.detail || null,
+      commitCount: inspected.commitCount, commits: inspected.commits,
+      commitsTruncated: inspected.commitsTruncated,
+    });
+    return { ...inspected, jobId: options.jobId };
+  }
+  const intent = openMergeIntent({ ...options, gate, canonicalCandidateCommit: inspected.candidateCommit });
   const result = runIntegrationMerge({ ...options, intent });
   return finalizeMerge({ ...options, result: { intent, ...result } });
 }
@@ -929,29 +1394,21 @@ export async function masterClose(options = {}) {
   }
   const body = buildCloseComment(job, delivery);
   const commentDigest = digestOf(body);
-  if (delivery.issueClose?.commentDigest === commentDigest
-    && ['CLOSED', 'LOCAL_CLOSED'].includes(delivery.issueClose.outcome)) {
-    const existing = enqueueIssueClose(dir, {
+  if (delivery.issueClose?.commentDigest === commentDigest && delivery.issueClose.outcome === 'CLOSED') {
+    return { ok: true, outcome: 'ALREADY_SUCCEEDED', jobId: job.jobId, issue: job.issue, commentDigest };
+  }
+  if (delivery.issueClose?.commentDigest === commentDigest && delivery.issueClose.outcome === 'LOCAL_CLOSED') {
+    const queued = enqueueIssueClose(dir, {
       jobId: job.jobId, issue: job.issue, repo: config.repoIdentity.issueRepo,
-      comment: body, commentDigest,
+      commentDigest, comment: body,
     });
     return {
-      ok: true, outcome: 'ALREADY_SUCCEEDED', jobId: job.jobId, issue: job.issue,
-      commentDigest, outbox: existing,
+      ok: true, outcome: 'ALREADY_SUCCEEDED', jobId: job.jobId, issue: job.issue, commentDigest,
+      outbox: { entryId: queued.entry.entryId, state: queued.entry.state, enqueued: false },
     };
   }
-  // #142：close 不联网。registry 落账即终局，GitHub 侧动作入出站队列。
-  // gh 在不在，这条命令的返回结构逐字段相同——「GitHub 挂了交付照样落地」
-  // 是拓扑保证的，不是靠 try/catch 兜的。
-  const enqueued = enqueueIssueClose(dir, {
-    jobId: job.jobId,
-    issue: job.issue,
-    repo: config.repoIdentity.issueRepo,
-    comment: body,
-    commentDigest,
-  });
 
-  const result = updateV4Registry(dir, (writable) => {
+  const closed = updateV4Registry(dir, (writable) => {
     const target = writable.deliveries[job.jobId];
     target.issueClose = { outcome: 'LOCAL_CLOSED', commentDigest, closedAt: nowIso() };
     const released = releaseSlot(writable, job.slotId, { reason: `job ${job.jobId} 已交付，等待 baseline 同步` });
@@ -964,7 +1421,40 @@ export async function masterClose(options = {}) {
     appendReceipt(dir, { kind: 'delivery', jobId: job.jobId, delivery: target });
     return { ok: true, outcome: 'CLOSED', jobId: job.jobId, issue: job.issue, commentDigest, delivery: target };
   });
-  return { ...result, outbox: enqueued };
+  const enqueue = options.enqueueOutbox || enqueueIssueClose;
+  const queued = enqueue(dir, {
+    jobId: job.jobId, issue: job.issue, repo: config.repoIdentity.issueRepo,
+    commentDigest, comment: body,
+  });
+  return { ...closed, outbox: { entryId: queued.entry.entryId, state: queued.entry.state, enqueued: queued.enqueued } };
+}
+
+export function masterOutboxStatus(options = {}) {
+  const { dir } = ctx(options);
+  return outboxStatus(dir);
+}
+
+export function masterOutboxAcknowledge(options = {}) {
+  const { dir } = ctx(options);
+  return acknowledgeOutbox(dir, options.entryId, options.reason, options.actor || process.env.GITHUB_ACTOR || 'operator');
+}
+
+export async function masterOutboxFlush(options = {}) {
+  const { dir, config, repoRoot } = ctx(options);
+  const pending = preflightOutbox(dir);
+  if (!pending.length) return { ok: true, flushed: 0, skipped: readOutbox(dir).filter((entry) => entry.state === 'succeeded').length, failed: 0, abandoned: 0, remaining: 0, entries: [] };
+  let gh = options.gh;
+  let auth = null;
+  if (!gh) {
+    auth = await prepareGithubAccess({
+      config: options.githubConfig || loadBoardConfig(), issueRepo: config.repoIdentity.issueRepo,
+      account: options.account, host: options.host, cwd: repoRoot,
+      requiredPermission: 'write', env: options.env || process.env,
+    });
+    gh = (args) => runGithubCommand([...args, '--repo', auth.issueRepo], { auth, cwd: repoRoot });
+  }
+  preflightOutbox(dir, auth?.issueRepo || config.repoIdentity.issueRepo);
+  return flushOutbox(dir, gh, { ...options, expectedRepo: auth?.issueRepo || config.repoIdentity.issueRepo });
 }
 
 function buildCloseComment(job, delivery) {
@@ -1049,6 +1539,7 @@ export function masterReconcile(options = {}) {
     registry.runners = projectRunners(config, registry, options.probeOverride ? { probe: options.probeOverride } : {});
     const actions = [];
     const jobExplanations = [];
+    const outboxDigests = new Set(readOutbox(dir).map((entry) => entry.commentDigest).filter(Boolean));
 
     for (const job of Object.values(registry.jobs)) {
       const attempt = job.currentAttemptId ? registry.attempts[job.currentAttemptId] : null;
@@ -1103,6 +1594,13 @@ export function masterReconcile(options = {}) {
           actions.push({ jobId: job.jobId, action: 'RESUME_POST_MERGE_VERIFY' });
         } else if (delivery.postMergeVerification.outcome === 'FAIL') {
           actions.push({ jobId: job.jobId, action: 'HOLD_FAILED_VERIFICATION' });
+        }
+      } else if (job.state === 'closed') {
+        const delivery = registry.deliveries[job.jobId];
+        const persisted = delivery?.issueClose?.commentDigest
+          && outboxDigests.has(delivery.issueClose.commentDigest);
+        if (delivery?.issueClose?.outcome === 'LOCAL_CLOSED' && !persisted) {
+          actions.push({ jobId: job.jobId, action: 'RESUME_OUTBOX_ENQUEUE' });
         }
       } else if (job.state === 'dispatched') {
         // 中断点 1：owner thread 状态未知。优先恢复原 thread，不直接新建 attempt。
@@ -1198,6 +1696,7 @@ const MACHINE_ACTIONABLE = Object.freeze({
   REQUEUE_FOR_MERGE: 'merge',
   RESUME_POST_MERGE_VERIFY: 'verify',
   RESUME_CLOSE: 'close',
+  RESUME_OUTBOX_ENQUEUE: 'close',
 });
 
 // 把 reconcile 的结论直接执行掉一步。无人值守循环因此不需要调用方自己解析
@@ -1291,7 +1790,7 @@ const KNOWN_OPTIONS = Object.freeze(new Set([
   'job', 'commit', 'payload', 'payload-file', 'commands',
   'resume-token', 'response', 'response-file',
   'state', 'kind', 'prompt', 'reason',
-  'entry', 'actor',
+  'entry', 'account', 'hostname',
 ]));
 
 function parseArguments(argv) {
@@ -1421,6 +1920,7 @@ async function main(argv = process.argv.slice(2)) {
     });
   }
   if (command === 'candidate') return recordCandidate({ ...shared, jobId: options.job, commitSha: options.commit });
+  if (command === 'review' && action === 'claim') return claimMergeReview({ ...shared, jobId: options.job });
   if (command === 'stage') {
     return recordStageResult({ ...shared, jobId: options.job, stage: action, payload: payloadFrom(options) });
   }
@@ -1431,20 +1931,12 @@ async function main(argv = process.argv.slice(2)) {
     return postMergeVerify({ ...shared, jobId: options.job, commands: payloadFrom(options, 'commands') });
   }
   if (command === 'close') return masterClose({ ...shared, jobId: options.job });
-  if (command === 'outbox') {
-    // 走同一条 ctx() 解析链：dir 的 env override 与 slots 配置口径必须与其余子命令一致，
-    // 否则 outbox 会在另一个 registry 目录上自说自话（#131 偏差 4 的同族陷阱）。
-    const { dir, config } = ctx(shared);
-    if (action === 'flush') {
-      return flushOutbox(dir, { gh: options.gh || defaultGh(config.repoIdentity.issueRepo) });
-    }
-    if (action === 'status') return outboxStatus(dir);
-    if (action === 'acknowledge') {
-      return acknowledgeEntry(dir, {
-        entryId: options.entry, reason: options.reason, actor: options.actor || 'human',
-      });
-    }
-    throw storeError('BAD_REQUEST', '用法: outbox flush|outbox status|outbox acknowledge');
+  if (command === 'outbox' && action === 'flush') {
+    return masterOutboxFlush({ ...shared, account: options.account, host: options.hostname });
+  }
+  if (command === 'outbox' && action === 'status') return masterOutboxStatus(shared);
+  if (command === 'outbox' && action === 'acknowledge') {
+    return masterOutboxAcknowledge({ ...shared, entryId: options.entry, reason: options.reason });
   }
   if (command === 'release') return releaseAndSync({ ...shared, jobId: options.job, slotId: options.slot });
   if (command === 'discovery') return masterDiscovery({ ...shared, payload: payloadFrom(options) });
@@ -1465,7 +1957,7 @@ async function main(argv = process.argv.slice(2)) {
   if (command === 'human' && action === 'respond') {
     return respondHumanRequest({ ...shared, resumeToken: options['resume-token'], response: payloadFrom(options, 'response') });
   }
-  throw storeError('BAD_REQUEST', '用法: master.mjs runner init|runner update|start|status|reconcile|next-step|stop eval|claim|candidate|stage review|stage qa|terminal|gate|merge|verify|close|outbox flush|outbox status|outbox acknowledge|release|discovery|attempt interrupt|attempt resume|attempt new|human open|human respond');
+  throw storeError('BAD_REQUEST', '用法: master.mjs runner init|runner update|start|status|reconcile|next-step|stop eval|claim|candidate|review claim|stage review|stage qa|terminal|gate|merge|verify|close|outbox flush|outbox status|outbox acknowledge|release|discovery|attempt interrupt|attempt resume|attempt new|human open|human respond');
 }
 
 if (resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url))) {
