@@ -67,6 +67,55 @@ function changedPathsBetween(repoRoot, base, candidate) {
   return out ? out.split(/\r?\n/).filter(Boolean) : [];
 }
 
+function commitSummaryBetween(repoRoot, base, candidate) {
+  const count = Number(gitOut(repoRoot, ['rev-list', '--count', `${base}..${candidate}`]) || 0);
+  const sampleOut = gitOut(repoRoot, ['rev-list', '--max-count=5', `${base}..${candidate}`]);
+  return { count, sample: sampleOut ? sampleOut.split(/\r?\n/).filter(Boolean) : [] };
+}
+
+// merge 时点只回答 Git 事实，不写 registry、不触碰 working tree。
+// 冲突优先于 ancestry：发生真实内容冲突时，调用方需要拿到 MERGE_CONFLICT；
+// 无冲突的分叉才归入 candidate 血统断裂。
+export function inspectMergeCandidate(options = {}) {
+  const { hostRoot } = ctx(options);
+  const integrationHead = options.integrationHead;
+  const candidateCommit = options.candidateCommit;
+  const resolvedIntegration = gitOut(hostRoot, ['rev-parse', `${integrationHead}^{commit}`]);
+  const resolvedCandidate = gitOut(hostRoot, ['rev-parse', `${candidateCommit}^{commit}`]);
+  if (!resolvedIntegration || !resolvedCandidate) {
+    return {
+      ok: false, code: 'MERGE_COMMIT_UNRESOLVED', disposition: 'REJECTED_MECHANICAL',
+      integrationHead: resolvedIntegration || integrationHead || null,
+      candidateCommit: resolvedCandidate || candidateCommit || null,
+    };
+  }
+
+  if (!isAncestor(hostRoot, resolvedIntegration, resolvedCandidate)) {
+    const mergeTree = git(hostRoot, ['merge-tree', '--write-tree', resolvedIntegration, resolvedCandidate]);
+    if (mergeTree.status !== 0) {
+      return {
+        ok: false, code: 'MERGE_CONFLICT', disposition: 'AWAITING_FIX',
+        integrationHead: resolvedIntegration, candidateCommit: resolvedCandidate,
+        detail: String(mergeTree.stderr || mergeTree.stdout || '').slice(0, 600),
+      };
+    }
+    return {
+      ok: false, code: 'CANDIDATE_ANCESTRY_DIVERGED', disposition: 'REJECTED_MECHANICAL',
+      integrationHead: resolvedIntegration, candidateCommit: resolvedCandidate,
+    };
+  }
+
+  const commits = commitSummaryBetween(hostRoot, resolvedIntegration, resolvedCandidate);
+  if (commits.count !== 1 || commits.sample[0] !== resolvedCandidate) {
+    return {
+      ok: false, code: 'UNRELATED_CHANGES', disposition: 'REJECTED_MECHANICAL',
+      integrationHead: resolvedIntegration, candidateCommit: resolvedCandidate,
+      commitCount: commits.count, commits: commits.sample, commitsTruncated: commits.count > commits.sample.length,
+    };
+  }
+  return { ok: true, integrationHead: resolvedIntegration, candidateCommit: resolvedCandidate };
+}
+
 function ctx(options = {}) {
   const dir = resolve(options.dir || process.env.AES_WORKTREE_BOARD_V4_DIR || V4_DIR);
   const slotsPath = resolve(options.slotsPath || process.env.AES_WORKTREE_BOARD_SLOTS_PATH || SLOTS_PATH);
@@ -797,6 +846,18 @@ export function openMergeIntent(options = {}) {
 export function runIntegrationMerge(options = {}) {
   const { hostRoot } = ctx(options);
   const intent = options.intent;
+  const liveIntegrationHead = gitOut(hostRoot, ['rev-parse', intent.integrationBranch]);
+  if (liveIntegrationHead !== intent.integrationHeadBefore) {
+    return {
+      merged: false, code: 'INTEGRATION_HEAD_MOVED', disposition: 'REJECTED_MECHANICAL',
+      mergeCommit: null, integrationHead: liveIntegrationHead, candidateCommit: intent.candidateCommit,
+      detail: `integration HEAD 已从 ${intent.integrationHeadBefore} 前进到 ${liveIntegrationHead || 'UNRESOLVED'}，必须重新 gate`,
+    };
+  }
+  const inspected = inspectMergeCandidate({
+    ...options, integrationHead: liveIntegrationHead, candidateCommit: intent.candidateCommit,
+  });
+  if (!inspected.ok) return { merged: false, mergeCommit: null, ...inspected };
   const merge = git(hostRoot, ['merge', '--no-ff', '-m',
     `merge(${intent.integrationBranch}): job ${intent.jobId} candidate ${String(intent.candidateCommit).slice(0, 8)}`,
     intent.candidateCommit]);
@@ -811,15 +872,20 @@ export function runIntegrationMerge(options = {}) {
 export function finalizeMerge(options = {}) {
   const { dir, config, hostRoot } = ctx(options);
   const { intent, merged, mergeCommit, detail } = options.result;
+  const projected = merged
+    ? projectRunners(config, readV4Registry(dir), options.probeOverride ? { probe: options.probeOverride } : {})
+    : null;
   return updateV4Registry(dir, (registry) => {
     const job = jobOf(registry, intent.jobId);
     if (!merged) {
       // merge conflict：不 close、不释放 slot、保留失败证据进 typed disposition。
       git(hostRoot, ['merge', '--abort']);
-      job.mergeIntent = { ...intent, closedAt: nowIso(), outcome: 'CONFLICT' };
-      setJobState(registry, job.jobId, 'ready-to-merge', { reason: 'merge conflict', dir });
-      appendReceipt(dir, { kind: 'merge-failed', jobId: job.jobId, reason: 'MERGE_CONFLICT', detail });
-      return { ok: false, code: 'MERGE_CONFLICT', jobId: job.jobId, disposition: 'AWAITING_FIX', detail };
+      const code = options.result.code || 'MERGE_CONFLICT';
+      const disposition = options.result.disposition || 'AWAITING_FIX';
+      job.mergeIntent = { ...intent, closedAt: nowIso(), outcome: code };
+      setJobState(registry, job.jobId, 'ready-to-merge', { reason: code, dir });
+      appendReceipt(dir, { kind: 'merge-failed', jobId: job.jobId, reason: code, disposition, detail });
+      return { ok: false, code, jobId: job.jobId, disposition, detail };
     }
     job.mergeIntent = { ...intent, closedAt: nowIso(), outcome: 'MERGED', mergeCommit };
     registry.deliveries[job.jobId] = {
@@ -835,6 +901,15 @@ export function finalizeMerge(options = {}) {
     };
     setJobState(registry, job.jobId, 'merged', { reason: 'host merge 完成', dir });
     registry.mergeQueue = registry.mergeQueue.filter((id) => id !== job.jobId);
+    // merge 改变了所有 worktree 相对 integration 的拓扑；写回 delivery 时同步刷新，
+    // 避免看板继续展示 merge 前的 ahead/behind 快照。
+    for (const [slotId, facts] of Object.entries(projected || {})) {
+      if (!registry.runners[slotId]) continue;
+      Object.assign(registry.runners[slotId], {
+        head: facts.head, integrationHead: facts.integrationHead,
+        ahead: facts.ahead, behind: facts.behind, evaluatedAt: facts.evaluatedAt,
+      });
+    }
     appendReceipt(dir, { kind: 'merge', jobId: job.jobId, mergeCommit, candidateCommit: intent.candidateCommit });
     return { ok: true, jobId: job.jobId, mergeCommit, candidateCommit: intent.candidateCommit, state: 'merged' };
   });
@@ -860,6 +935,19 @@ export function masterMerge(options = {}) {
       });
     }
     return { ok: false, jobId: options.jobId, ...gate.decision, policy: gate.policy, mechanical: gate.mechanical };
+  }
+  const inspected = inspectMergeCandidate({
+    ...options, integrationHead: gate.integrationHead, candidateCommit: gate.candidateCommit,
+  });
+  if (!inspected.ok) {
+    appendReceipt(dir, {
+      kind: 'merge-failed', jobId: options.jobId, reason: inspected.code,
+      disposition: inspected.disposition, integrationHead: inspected.integrationHead,
+      candidateCommit: inspected.candidateCommit, detail: inspected.detail || null,
+      commitCount: inspected.commitCount, commits: inspected.commits,
+      commitsTruncated: inspected.commitsTruncated,
+    });
+    return { ...inspected, jobId: options.jobId };
   }
   const intent = openMergeIntent({ ...options, gate });
   const result = runIntegrationMerge({ ...options, intent });

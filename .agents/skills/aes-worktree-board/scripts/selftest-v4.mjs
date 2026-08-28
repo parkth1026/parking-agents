@@ -808,8 +808,85 @@ export async function deliveryMergeScenario() {
   await evidenceBindingBypass();
   await postMergeVerificationFailure();
   await mergeConflictDisposition();
+  await candidateAncestryDivergenceDisposition();
+  await unrelatedChangesDisposition();
+  await mergeRefreshesRunnerTopology();
   await serialMergeEnforcement();
   await legacyArchiveStable();
+}
+
+async function candidateAncestryDivergenceDisposition() {
+  const fixture = makeFixture('delivery-ancestry', { workers: [{ id: 'worker-1' }] });
+  try {
+    writeSlots(fixture);
+    master.masterStart({ ...base(fixture) });
+    const job = driveToReadyToMerge(fixture, issuePayload({ number: 532 }));
+    makeCandidate(fixture, job.slotId, { file: 'integration-only.txt', content: 'integration moved\n' });
+    git(fixture.repoRoot, ['cherry-pick', gitOut(fixture.worktreeOf(job.slotId), ['rev-parse', 'HEAD'])]);
+    git(fixture.worktreeOf(job.slotId), ['reset', '--hard', job.candidate]);
+
+    const headBefore = gitOut(fixture.repoRoot, ['rev-parse', 'dev']);
+    const result = freshProcess(fixture, ['merge', '--job', job.jobId], { expectStatus: 'nonzero' });
+    assert.equal(result.code, 'CANDIDATE_ANCESTRY_DIVERGED');
+    assert.equal(result.candidateCommit, job.candidate);
+    assert.equal(result.integrationHead, headBefore);
+    assert.equal(gitOut(fixture.repoRoot, ['rev-parse', 'dev']), headBefore);
+    assert.equal(readV4Registry(fixture.v4Dir).jobs[job.jobId].state, 'ready-to-merge');
+  } finally {
+    fixture.cleanup();
+  }
+}
+
+async function unrelatedChangesDisposition() {
+  const fixture = makeFixture('delivery-unrelated', { workers: [{ id: 'worker-1' }] });
+  try {
+    writeSlots(fixture);
+    master.masterStart({ ...base(fixture) });
+    const issue = issuePayload({ number: 533 });
+    const claim = master.masterClaim({ ...base(fixture), issue });
+    makeCandidate(fixture, claim.slotId, { file: 'foreign.txt', content: 'foreign session\n' });
+    const candidate = makeCandidate(fixture, claim.slotId, { file: 'feature-533.txt' });
+    master.recordCandidate({ ...base(fixture), jobId: claim.jobId, commitSha: candidate });
+    master.setAttemptOwnerThreadId({ ...base(fixture), jobId: claim.jobId, ownerThreadId: 'owner-unrelated' });
+    master.recordStageResult({ ...base(fixture), jobId: claim.jobId, stage: 'review', payload: passingReview(claim.jobId, candidate, claim.workOrder.runner.baseCommit, 'reviewer-unrelated') });
+    master.recordStageResult({ ...base(fixture), jobId: claim.jobId, stage: 'qa', payload: passingQa(claim.jobId, candidate, claim.workOrder.runner.baseCommit) });
+    master.masterTerminal({
+      ...base(fixture),
+      payload: readyTerminal(
+        { jobId: claim.jobId, attemptId: claim.attemptId, issue: issue.number, baseCommit: claim.workOrder.runner.baseCommit },
+        candidate, claim.workOrder.issue.contractDigest,
+      ),
+    });
+
+    const headBefore = gitOut(fixture.repoRoot, ['rev-parse', 'dev']);
+    const result = freshProcess(fixture, ['merge', '--job', claim.jobId], { expectStatus: 'nonzero' });
+    assert.equal(result.code, 'UNRELATED_CHANGES');
+    assert.equal(result.commitCount, 2);
+    assert.equal(result.commits.length, 2);
+    assert.equal(gitOut(fixture.repoRoot, ['rev-parse', 'dev']), headBefore);
+    assert.equal(readV4Registry(fixture.v4Dir).jobs[claim.jobId].state, 'ready-to-merge');
+  } finally {
+    fixture.cleanup();
+  }
+}
+
+async function mergeRefreshesRunnerTopology() {
+  const fixture = makeFixture('delivery-refresh', { workers: [{ id: 'worker-1' }, { id: 'worker-2' }] });
+  try {
+    writeSlots(fixture);
+    master.masterStart({ ...base(fixture) });
+    const job = driveToReadyToMerge(fixture, issuePayload({ number: 534 }), { slotId: 'worker-1' });
+    const result = freshProcess(fixture, ['merge', '--job', job.jobId]);
+    const registry = readV4Registry(fixture.v4Dir);
+    assert.equal(registry.deliveries[job.jobId].mergeCommit, result.mergeCommit);
+    assert.deepEqual(
+      { ahead: registry.runners['worker-2'].ahead, behind: registry.runners['worker-2'].behind },
+      { ahead: 0, behind: 2 },
+      'merge 写回时必须以新 integration HEAD 刷新其他 worktree 拓扑',
+    );
+  } finally {
+    fixture.cleanup();
+  }
 }
 
 // #53: next-step 把 reconcile 已经算出的动作直接执行掉一步。
@@ -1191,11 +1268,13 @@ async function serialMergeEnforcement() {
       (error) => error.code === 'MERGE_NOT_SERIAL');
     assert.equal(readV4Registry(fixture.v4Dir).jobs[second.jobId].state, 'ready-to-merge');
 
-    // 完成第一个后第二个才能进。
+    // 完成第一个后串行槽位释放；第二个 job 能被重新评估，但旧基线 candidate
+    // 必须由 ancestry 门拒绝，不能趁前一单完成后搭便车 merge。
     const result = master.runIntegrationMerge({ ...base(fixture), intent: readV4Registry(fixture.v4Dir).jobs[first.jobId].mergeIntent });
     master.finalizeMerge({ ...base(fixture), result: { intent: readV4Registry(fixture.v4Dir).jobs[first.jobId].mergeIntent, ...result } });
     const secondMerge = master.masterMerge({ ...base(fixture), jobId: second.jobId });
-    assert.equal(secondMerge.ok, true);
+    assert.equal(secondMerge.ok, false);
+    assert.equal(secondMerge.code, 'CANDIDATE_ANCESTRY_DIVERGED');
   } finally {
     fixture.cleanup();
   }
