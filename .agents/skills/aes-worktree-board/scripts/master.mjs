@@ -1291,6 +1291,7 @@ const KNOWN_OPTIONS = Object.freeze(new Set([
   'job', 'commit', 'payload', 'payload-file', 'commands',
   'resume-token', 'response', 'response-file',
   'state', 'kind', 'prompt', 'reason',
+  'entry', 'actor',
 ]));
 
 function parseArguments(argv) {

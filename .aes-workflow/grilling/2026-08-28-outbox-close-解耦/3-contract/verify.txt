@@ -1,15 +1,15 @@
-# verify @ 2026-08-28T10:41:22Z
+# verify @ 2026-08-28T11:19:20Z
 # cwd: G:\GIT\AI_WorkFlow\parking-agents-manual
 
 [PASS] AC-001  exit=0  $ node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration --scenario outbox-close
-         {"ok":true,"domain":"orchestration","scenario":"outbox-close","scenarios":1,"passed":1,"scenarioIds":[]}
+         {"ok":true,"domain":"orchestration","scenario":"outbox-close","scenarios":1,"passed":1,"skipped":[],"scenarioIds":[]}
 [PASS] AC-002  exit=0  $ node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration --scenario outbox-flush
-         {"ok":true,"domain":"orchestration","scenario":"outbox-flush","scenarios":1,"passed":1,"scenarioIds":[]}
+         {"ok":true,"domain":"orchestration","scenario":"outbox-flush","scenarios":1,"passed":1,"skipped":[],"scenarioIds":[]}
 [PASS] AC-003  exit=0  $ node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration --scenario outbox-ack
-         {"ok":true,"domain":"orchestration","scenario":"outbox-ack","scenarios":1,"passed":1,"scenarioIds":[]}
+         {"ok":true,"domain":"orchestration","scenario":"outbox-ack","scenarios":1,"passed":1,"skipped":[],"scenarioIds":[]}
 [PASS] AC-004  exit=0  $ node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration --scenario outbox-gate && node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration --scenario delivery-merge
-         {"ok":true,"domain":"orchestration","scenario":"outbox-gate","scenarios":1,"passed":1,"scenarioIds":[]}
-         {"ok":true,"domain":"orchestration","scenario":"delivery-merge","scenarios":1,"passed":1,"scenarioIds":[]}
+         {"ok":true,"domain":"orchestration","scenario":"outbox-gate","scenarios":1,"passed":1,"skipped":[],"scenarioIds":[]}
+         {"ok":true,"domain":"orchestration","scenario":"delivery-merge","scenarios":1,"passed":1,"skipped":[],"scenarioIds":[]}
 
 绿 4 / 红 0 / 跑不起来 0
 另有 1 条非 [A] 档没跑：AC-005 [C]

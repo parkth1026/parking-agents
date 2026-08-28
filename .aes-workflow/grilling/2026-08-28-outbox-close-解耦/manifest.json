@@ -2,7 +2,7 @@
   "schema_version": 1,
   "slug": "2026-08-28-outbox-close-解耦",
   "created_at": "2026-08-28T09:47:59Z",
-  "updated_at": "2026-08-28T10:41:48Z",
+  "updated_at": "2026-08-28T11:19:50Z",
   "original_request": null,
   "goal_oneline": null,
   "target": null,
@@ -39,7 +39,7 @@
     "status": "valid",
     "ac_count": 5,
     "warnings": [],
-    "ran_at": "2026-08-28T10:41:22Z",
+    "ran_at": "2026-08-28T11:19:20Z",
     "verify_tiers": {
       "A": 4,
       "B": 0,

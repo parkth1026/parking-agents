@@ -961,6 +961,35 @@ export async function outboxAckScenario() {
     assert.equal(still.state, 'acknowledged');
     assert.match(still.reason, /永久 404/);
     assert.equal(still.abandonReason, 'ISSUE_UNREACHABLE', 'abandon 原因必须保留');
+
+    // CLI 路径必须同样走得通。库函数绿而 CLI 红是真实发生过的事：#142 的 live 轮上
+    // `outbox acknowledge` 被参数白名单以 UNKNOWN_OPTION 拒了，而这里的库级断言全绿——
+    // 参数白名单是 CLI 独有的一层，不走 CLI 就测不到它。
+    // 上一个 job 合并后 integration 已前移，slot 必须先同步 baseline 才可再领取。
+    master.releaseAndSync({ ...base(fixture), slotId: 'worker-1' });
+    const cliJob = driveToReadyToMerge(fixture, issuePayload({ number: 622 }));
+    master.masterMerge({ ...base(fixture), jobId: cliJob.jobId });
+    master.postMergeVerify({
+      ...base(fixture), jobId: cliJob.jobId,
+      commands: [{ command: process.execPath, args: ['-e', 'process.exit(0)'] }],
+    });
+    const cliClosed = await master.masterClose({
+      ...base(fixture), jobId: cliJob.jobId, gh: async () => ({ stdout: '' }),
+    });
+    const cliEntry = cliClosed.outbox.entryId;
+    const ghFail = JSON.stringify([process.execPath, '-e', 'process.exit(1)']);
+    for (let i = 0; i < 3; i += 1) {
+      freshProcess(fixture, ['outbox', 'flush'], { env: { AES_WORKTREE_BOARD_GH_COMMAND: ghFail } });
+    }
+    const cliNoReason = freshProcess(fixture, ['outbox', 'acknowledge', '--entry', cliEntry], { expectStatus: 'nonzero' });
+    assert.equal(cliNoReason.code, 'REASON_REQUIRED', 'CLI 缺 --reason 必须拒收，而不是 UNKNOWN_OPTION');
+    const cliAcked = freshProcess(fixture, [
+      'outbox', 'acknowledge', '--entry', cliEntry, '--reason', '目标不可达，交付已落地', '--actor', 'tester',
+    ]);
+    assert.equal(cliAcked.outcome, 'ACKNOWLEDGED', 'CLI 签收必须成功');
+    assert.equal(cliAcked.acknowledgedBy, 'tester', '--actor 必须被接受');
+    const cliStatus = freshProcess(fixture, ['outbox', 'status']);
+    assert.equal(cliStatus.acknowledged >= 1, true, 'status 必须能列出已签收条目');
   } finally { fixture.cleanup(); }
 }
 
