@@ -2387,6 +2387,39 @@ function duplicateBasenameAssessmentIsolation() {
   const index = previousWorktreeIndex(previous, current);
   assert.equal(index.find(current[0]), null, '旧快照单条 assessment 不得 fallback 到当前第一条同名新路径');
   assert.equal(index.find(current[1]), null, 'basename 大小写不同仍属同名，不得复制 assessment');
+
+  const moved = { name: 'PARKING-AGENTS', path: 'E:/moved/parking-agents' };
+  assert.equal(
+    previousWorktreeIndex(previous, [moved]).find(moved)?.assessment,
+    assessment,
+    '旧快照与当前集合双侧 basename 唯一时，路径变化后仍应 fallback 承接 assessment',
+  );
+
+  const duplicatePrevious = [
+    previous[0],
+    { name: 'PARKING-AGENTS', path: 'G:/another/parking-agents', assessment: { currentTask: 'also-ambiguous' } },
+  ];
+  assert.equal(
+    previousWorktreeIndex(duplicatePrevious, [moved]).find(moved),
+    null,
+    '旧快照 basename 多义时，即使当前集合唯一也不得猜测 assessment',
+  );
+
+  if (process.platform === 'win32') {
+    const windowsPrevious = [{
+      name: 'parking-agents', path: 'C:/Worktrees/Parking-Agents', assessment,
+    }];
+    const windowsCurrent = [
+      { name: 'parking-agents', path: 'c:/worktrees/parking-agents' },
+      { name: 'PARKING-AGENTS', path: 'D:/other/PARKING-AGENTS' },
+    ];
+    assert.equal(
+      previousWorktreeIndex(windowsPrevious, windowsCurrent).find(windowsCurrent[0])?.assessment,
+      assessment,
+      'Windows 完整路径仅大小写变化时，当前 basename 多义也必须按精确路径承接 assessment',
+    );
+  }
+
   assert.equal(
     previousWorktreeIndex(previous, [previous[0]]).find(previous[0]).assessment,
     assessment,
