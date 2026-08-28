@@ -2427,15 +2427,58 @@ function duplicateBasenameAssessmentIsolation() {
   );
 }
 
+function worktreePathKey(value) {
+  const key = resolve(String(value)).replaceAll('\\', '/');
+  return process.platform === 'win32' ? key.toLowerCase() : key;
+}
+
+function findWorktreeByPath(worktrees, targetPath) {
+  const targetKey = worktreePathKey(targetPath);
+  return worktrees.find((worker) => worktreePathKey(worker.path) === targetKey);
+}
+
+function storageFixtureSelectionRegression() {
+  const selected = { name: 'unique-worker', path: 'E:/codex/unique-worker' };
+  const initialLedger = [
+    { name: 'parking-agents', path: 'E:/codex/a/parking-agents' },
+    selected,
+    { name: 'PARKING-AGENTS', path: 'E:/codex/b/PARKING-AGENTS' },
+  ];
+  const available = uniquelyAddressableFromEntries('storage compatibility', initialLedger);
+  assert.equal(available.skipped, false);
+  assert.equal(available.entry, selected, '台账首项 basename 多义时必须选取可唯一寻址的 worktree');
+
+  const reorderedLedger = [
+    initialLedger[2],
+    { ...selected, assessment: { currentTask: 'path-bound-after-reorder' } },
+    initialLedger[0],
+  ];
+  assert.equal(
+    findWorktreeByPath(reorderedLedger, available.entry.path)?.assessment?.currentTask,
+    'path-bound-after-reorder',
+    '台账重排后必须按规范化完整 path 回找原目标',
+  );
+
+  const unavailable = uniquelyAddressableFromEntries('storage compatibility', [initialLedger[0], initialLedger[2]]);
+  assert.equal(unavailable.skipped, true, '全部 basename 多义时 storage fixture 必须 SKIP');
+  const skipped = [];
+  assert.equal(
+    recordOrchestrationOutcome(unavailable, { name: 'v2-compat-assessment-terminal' }, skipped),
+    false,
+    'storage fixture 无可唯一寻址目标时不得计入 passed',
+  );
+  assert.deepEqual(skipped, [{ scenario: 'v2-compat-assessment-terminal', reason: unavailable.reason }]);
+}
+
 async function orchestrationStorageCompatibility() {
   const runtimeDir = tempDirectory('orchestration-storage-compat');
   try {
     duplicateBasenameAssessmentIsolation();
+    storageFixtureSelectionRegression();
     const first = await collectStatus({ runtimeDir, issuesFixture: ISSUE_FIXTURE });
-    const worker = first.worktrees[0];
-    if (!worker) {
-      return { skipped: true, reason: 'storage fixture 需要至少一个本仓 worktree' };
-    }
+    const available = uniquelyAddressableFromEntries('storage compatibility', first.worktrees);
+    if (available.skipped) return available;
+    const worker = available.entry;
     first.schemaVersion = 2;
     worker.assessment = {
       currentTask: 'v2-assessment-preserved', done: null, merge: 'not-yet', reason: 'v2 seed',
@@ -2453,14 +2496,15 @@ async function orchestrationStorageCompatibility() {
     assert.ok(frozenAt, 'parked 必须冻结 worker 工作周期');
     const collected = await collectStatus({ runtimeDir, issuesFixture: ISSUE_FIXTURE });
     assert.equal(collected.schemaVersion, 3);
-    const persistedWorker = collected.worktrees.find((item) => item.name === worker.name);
+    const persistedWorker = findWorktreeByPath(collected.worktrees, worker.path);
+    assert.ok(persistedWorker, '采集后必须按规范化完整 path 找回 storage fixture 目标');
     assert.equal(persistedWorker.assessment.currentTask, 'v2-assessment-preserved');
     assert.equal(persistedWorker.task.state, 'parked');
     assert.equal(persistedWorker.task.finishedAt, frozenAt, 'collect 不得漂移已冻结的结束时间');
     assert.equal(readRegistry(runtimeDir).tasks[created.taskId].state, 'parked');
     const collectedAgain = await collectStatus({ runtimeDir, issuesFixture: ISSUE_FIXTURE });
     assert.equal(
-      collectedAgain.worktrees.find((item) => item.name === worker.name).task.finishedAt,
+      findWorktreeByPath(collectedAgain.worktrees, worker.path)?.task.finishedAt,
       frozenAt,
       '重复 collect 后终态耗时必须保持稳定',
     );
