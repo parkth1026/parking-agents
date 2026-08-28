@@ -23,6 +23,9 @@ import { assertContractComplete, buildWorkOrder, contractDigestOf } from './issu
 import { buildHumanRequest, validateHumanRequest, validateHumanResponse } from './human-request.mjs';
 import { decideMerge, evaluateMechanicalGate, resolveMergePolicy } from './merge-policy.mjs';
 import { disposeDiscovery, makeWayfinder } from './discovery.mjs';
+import {
+  acknowledgeEntry, enqueueIssueClose, flushOutbox, outboxStatus, outboxWarning,
+} from './outbox.mjs';
 
 export const TERMINAL_SCHEMA = 'aes.issue-worker.goal-terminal/v1';
 export const DELIVERY_SCHEMA = 'aes.worktree-board.delivery-receipt/v1';
@@ -759,6 +762,8 @@ export function evaluateGate(options = {}) {
   return {
     ok: true, jobId: job.jobId, policy, mechanical, decision,
     candidateCommit: attempt?.candidateCommit || null, integrationHead, changedPaths,
+    // 可观测性，不是第七道门：机械门恒为六项，mayMerge 不受它影响。
+    outboxWarning: outboxWarning(dir),
   };
 }
 
@@ -924,16 +929,31 @@ export async function masterClose(options = {}) {
   }
   const body = buildCloseComment(job, delivery);
   const commentDigest = digestOf(body);
-  if (delivery.issueClose?.commentDigest === commentDigest && delivery.issueClose.outcome === 'CLOSED') {
-    return { ok: true, outcome: 'ALREADY_SUCCEEDED', jobId: job.jobId, issue: job.issue, commentDigest };
+  if (delivery.issueClose?.commentDigest === commentDigest
+    && ['CLOSED', 'LOCAL_CLOSED'].includes(delivery.issueClose.outcome)) {
+    const existing = enqueueIssueClose(dir, {
+      jobId: job.jobId, issue: job.issue, repo: config.repoIdentity.issueRepo,
+      comment: body, commentDigest,
+    });
+    return {
+      ok: true, outcome: 'ALREADY_SUCCEEDED', jobId: job.jobId, issue: job.issue,
+      commentDigest, outbox: existing,
+    };
   }
-  const gh = options.gh || defaultGh(config.repoIdentity.issueRepo);
-  await gh(['issue', 'comment', String(job.issue), '--body', body]);
-  await gh(['issue', 'close', String(job.issue)]);
+  // #142：close 不联网。registry 落账即终局，GitHub 侧动作入出站队列。
+  // gh 在不在，这条命令的返回结构逐字段相同——「GitHub 挂了交付照样落地」
+  // 是拓扑保证的，不是靠 try/catch 兜的。
+  const enqueued = enqueueIssueClose(dir, {
+    jobId: job.jobId,
+    issue: job.issue,
+    repo: config.repoIdentity.issueRepo,
+    comment: body,
+    commentDigest,
+  });
 
-  return updateV4Registry(dir, (writable) => {
+  const result = updateV4Registry(dir, (writable) => {
     const target = writable.deliveries[job.jobId];
-    target.issueClose = { outcome: 'CLOSED', commentDigest, closedAt: nowIso() };
+    target.issueClose = { outcome: 'LOCAL_CLOSED', commentDigest, closedAt: nowIso() };
     const released = releaseSlot(writable, job.slotId, { reason: `job ${job.jobId} 已交付，等待 baseline 同步` });
     target.runnerRelease = {
       slotId: job.slotId,
@@ -944,6 +964,7 @@ export async function masterClose(options = {}) {
     appendReceipt(dir, { kind: 'delivery', jobId: job.jobId, delivery: target });
     return { ok: true, outcome: 'CLOSED', jobId: job.jobId, issue: job.issue, commentDigest, delivery: target };
   });
+  return { ...result, outbox: enqueued };
 }
 
 function buildCloseComment(job, delivery) {
@@ -1409,6 +1430,21 @@ async function main(argv = process.argv.slice(2)) {
     return postMergeVerify({ ...shared, jobId: options.job, commands: payloadFrom(options, 'commands') });
   }
   if (command === 'close') return masterClose({ ...shared, jobId: options.job });
+  if (command === 'outbox') {
+    // 走同一条 ctx() 解析链：dir 的 env override 与 slots 配置口径必须与其余子命令一致，
+    // 否则 outbox 会在另一个 registry 目录上自说自话（#131 偏差 4 的同族陷阱）。
+    const { dir, config } = ctx(shared);
+    if (action === 'flush') {
+      return flushOutbox(dir, { gh: options.gh || defaultGh(config.repoIdentity.issueRepo) });
+    }
+    if (action === 'status') return outboxStatus(dir);
+    if (action === 'acknowledge') {
+      return acknowledgeEntry(dir, {
+        entryId: options.entry, reason: options.reason, actor: options.actor || 'human',
+      });
+    }
+    throw storeError('BAD_REQUEST', '用法: outbox flush|outbox status|outbox acknowledge');
+  }
   if (command === 'release') return releaseAndSync({ ...shared, jobId: options.job, slotId: options.slot });
   if (command === 'discovery') return masterDiscovery({ ...shared, payload: payloadFrom(options) });
   if (command === 'attempt' && action === 'interrupt') {
@@ -1428,7 +1464,7 @@ async function main(argv = process.argv.slice(2)) {
   if (command === 'human' && action === 'respond') {
     return respondHumanRequest({ ...shared, resumeToken: options['resume-token'], response: payloadFrom(options, 'response') });
   }
-  throw storeError('BAD_REQUEST', '用法: master.mjs runner init|runner update|start|status|reconcile|next-step|stop eval|claim|candidate|stage review|stage qa|terminal|gate|merge|verify|close|release|discovery|attempt interrupt|attempt resume|attempt new|human open|human respond');
+  throw storeError('BAD_REQUEST', '用法: master.mjs runner init|runner update|start|status|reconcile|next-step|stop eval|claim|candidate|stage review|stage qa|terminal|gate|merge|verify|close|outbox flush|outbox status|outbox acknowledge|release|discovery|attempt interrupt|attempt resume|attempt new|human open|human respond');
 }
 
 if (resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url))) {

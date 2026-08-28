@@ -9,6 +9,7 @@ import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { HEADLESS_CHILD_OPTIONS } from './headless.mjs';
+import { acknowledgeEntry, enqueueIssueClose, flushOutbox, readOutbox } from './outbox.mjs';
 import { readV4Registry, readReceipts, readTransitions, updateV4Registry } from './job-store.mjs';
 import {
   defaultSlotsFromWorktrees, discoverWorktrees, initSlots, loadSlotsConfig, normalizePath,
@@ -558,12 +559,16 @@ async function masterRestartAfterMergeBeforeClose() {
     });
     assert.equal(verify.ok, true);
     const calls = [];
-    const closed = await master.masterClose({
-      ...base(fixture), jobId: job.jobId,
-      gh: async (args) => { calls.push(`${args[0]} ${args[1]}`); return { stdout: '' }; },
-    });
+    const record = async (args) => { calls.push(`${args[0]} ${args[1]}`); return { stdout: '' }; };
+    const closed = await master.masterClose({ ...base(fixture), jobId: job.jobId, gh: record });
     assert.equal(closed.outcome, 'CLOSED');
-    assert.deepEqual(calls, ['issue comment', 'issue close']);
+    // #142：close 不联网。「GitHub 侧动作确实发生且只发生一次」这条守卫没取消，
+    // 随出站动作一起挪到 flush 上——重启续跑的关注点是不重复，不是在哪一步发生。
+    assert.deepEqual(calls, [], 'close 不得联网');
+    await flushOutbox(fixture.v4Dir, { gh: record });
+    assert.deepEqual(calls, ['issue comment', 'issue close'], 'flush 必须恰好送出一组写入');
+    await flushOutbox(fixture.v4Dir, { gh: record });
+    assert.deepEqual(calls, ['issue comment', 'issue close'], '重复 flush 不得再写一组');
     assert.equal(countMergeCommits(fixture, job.candidate), 1);
 
     // 关闭后再 reconcile：不得把已完成的 job 重新排队（无假完成、无重复 merge）。
@@ -801,6 +806,231 @@ export async function discoveredWorkScenario() {
 
 // ============================================================ AC-005 delivery-merge
 
+// ───────────────────────── #142 出站队列与 close 解耦 ─────────────────────────
+//
+// 判据一句话：GitHub 在不在，交付路径都应逐字节相同。所以这里的断言不问
+// 「gh 失败时重试了几次」，只问「close 的成败是否与 gh 的死活无关」。
+
+// AC-001：close 落账即终局，命令内根本不联网。
+export async function outboxCloseScenario() {
+  const fixture = makeFixture('outbox-close', { workers: [{ id: 'worker-1' }] });
+  try {
+    writeSlots(fixture);
+    master.masterStart({ ...base(fixture) });
+    const job = driveToReadyToMerge(fixture, issuePayload({ number: 601 }));
+    assert.equal(master.masterMerge({ ...base(fixture), jobId: job.jobId }).ok, true);
+    assert.equal(master.postMergeVerify({
+      ...base(fixture), jobId: job.jobId,
+      commands: [{ command: process.execPath, args: ['-e', 'process.exit(0)'] }],
+    }).outcome, 'PASS');
+
+    // ① gh 全程抛错，close 依然落账、释放 lease、入队。
+    const closed = await master.masterClose({
+      ...base(fixture), jobId: job.jobId,
+      gh: async () => { throw new Error('GitHub 不可达'); },
+    });
+    assert.equal(closed.outcome, 'CLOSED', 'gh 不可达不得阻断 close');
+    assert.equal(closed.outbox.enqueued, true, 'close 必须把出站动作入队');
+    assert.equal(closed.outbox.state, 'pending');
+    const registry = readV4Registry(fixture.v4Dir);
+    assert.equal(registry.jobs[job.jobId].state, 'closed', 'job 必须推进到 closed');
+    assert.equal(registry.runners['worker-1'].lease, null, 'slot 必须被释放');
+    assert.equal(registry.deliveries[job.jobId].issueClose.outcome, 'LOCAL_CLOSED');
+
+    // ② 拓扑断言：close 全程 gh 调用次数为 0。
+    // 断的是行为不是源码——「拓扑保证而非 try/catch 兜」的意图照样钉死，
+    // 但函数怎么写、拆不拆模块，实现自己定。
+    const fresh = makeFixture('outbox-close-nocall', { workers: [{ id: 'worker-1' }] });
+    try {
+      writeSlots(fresh);
+      master.masterStart({ ...base(fresh) });
+      const job2 = driveToReadyToMerge(fresh, issuePayload({ number: 602 }));
+      master.masterMerge({ ...base(fresh), jobId: job2.jobId });
+      master.postMergeVerify({
+        ...base(fresh), jobId: job2.jobId,
+        commands: [{ command: process.execPath, args: ['-e', 'process.exit(0)'] }],
+      });
+      let ghCalls = 0;
+      const closed2 = await master.masterClose({
+        ...base(fresh), jobId: job2.jobId,
+        gh: async () => { ghCalls += 1; return { stdout: '' }; },
+      });
+      assert.equal(ghCalls, 0, 'close 命令内不得调用 gh —— 出站是 flush 的事');
+      // ③ gh 可用与不可用两次 close 的返回结构逐字段相同。
+      assert.deepEqual(Object.keys(closed2).sort(), Object.keys(closed).sort());
+      assert.equal(closed2.outcome, closed.outcome);
+    } finally { fresh.cleanup(); }
+  } finally { fixture.cleanup(); }
+}
+
+// AC-002：flush 的五种结局，退出码语义恒为「ok:true」——积压是待办不是失败。
+export async function outboxFlushScenario() {
+  const fixture = makeFixture('outbox-flush', { workers: [{ id: 'worker-1' }] });
+  try {
+    writeSlots(fixture);
+    master.masterStart({ ...base(fixture) });
+    const dir = fixture.v4Dir;
+
+    // 结局 5：空队列不报错。
+    const empty = await flushOutbox(dir, { gh: async () => ({ stdout: '' }) });
+    assert.equal(empty.ok, true);
+    assert.deepEqual(
+      [empty.flushed, empty.failed, empty.abandoned, empty.remaining], [0, 0, 0, 0],
+    );
+
+    const job = driveToReadyToMerge(fixture, issuePayload({ number: 611 }));
+    master.masterMerge({ ...base(fixture), jobId: job.jobId });
+    master.postMergeVerify({
+      ...base(fixture), jobId: job.jobId,
+      commands: [{ command: process.execPath, args: ['-e', 'process.exit(0)'] }],
+    });
+    await master.masterClose({ ...base(fixture), jobId: job.jobId, gh: async () => ({ stdout: '' }) });
+
+    // 结局 2：可重试失败——条目留 pending，ok 仍为 true。
+    const failing = async () => { throw new Error('HTTP 503'); };
+    const first = await flushOutbox(dir, { gh: failing });
+    assert.equal(first.ok, true, '积压不是失败');
+    assert.equal(first.failed, 1);
+    assert.equal(first.remaining, 1, '可重试失败必须留在队列里');
+    assert.equal(first.entries[0].attempt, 1);
+
+    // 结局 3：门槛尺子 = attempts 数组长度达 3（跨 flush 调用累计，不是单次内重试）。
+    await flushOutbox(dir, { gh: failing });
+    const third = await flushOutbox(dir, { gh: failing });
+    assert.equal(third.abandoned, 1, '累计第 3 次失败必须转 abandoned');
+    assert.equal(third.entries[0].abandonReason, 'ISSUE_UNREACHABLE');
+    assert.equal(third.remaining, 0);
+    const abandoned = readOutbox(dir).find((entry) => entry.state === 'abandoned');
+    assert.equal(abandoned.attempts.length, 3, '尺子是 attempts 长度，锁死在这里');
+
+    // 结局 1 + 4：直接入队一条走成功路径，再 flush 一次验幂等跳过。
+    // 这里不再跑第二轮完整 job —— 队列的行为与 job 怎么来的无关，
+    // 把无关的 slot baseline 同步牵扯进来只会让这条断言在别处红。
+    enqueueIssueClose(dir, {
+      jobId: 'job-612-synthetic', issue: 612, repo: 'owner/repo',
+      comment: '已交付：job-612-synthetic', commentDigest: 'sha256:612-synthetic',
+    });
+    const ok = await flushOutbox(dir, { gh: async () => ({ stdout: '' }) });
+    assert.equal(ok.flushed, 1, '成功送达');
+    const again = await flushOutbox(dir, { gh: async () => { throw new Error('幂等 flush 不得再调 gh'); } });
+    assert.equal(again.ok, true);
+    assert.equal(again.flushed, 0, '已 succeeded 的条目必须幂等跳过');
+  } finally { fixture.cleanup(); }
+}
+
+// AC-003：签收只对 abandoned 生效、必须带理由、幂等，且条目永不删除。
+export async function outboxAckScenario() {
+  const fixture = makeFixture('outbox-ack', { workers: [{ id: 'worker-1' }] });
+  try {
+    writeSlots(fixture);
+    master.masterStart({ ...base(fixture) });
+    const dir = fixture.v4Dir;
+    const job = driveToReadyToMerge(fixture, issuePayload({ number: 621 }));
+    master.masterMerge({ ...base(fixture), jobId: job.jobId });
+    master.postMergeVerify({
+      ...base(fixture), jobId: job.jobId,
+      commands: [{ command: process.execPath, args: ['-e', 'process.exit(0)'] }],
+    });
+    const closed = await master.masterClose({
+      ...base(fixture), jobId: job.jobId, gh: async () => ({ stdout: '' }),
+    });
+    const entryId = closed.outbox.entryId;
+
+    // 负向 1：pending 条目不得签收——签收只对「已放弃」有意义。
+    const tooEarly = acknowledgeEntry(dir, { entryId, reason: '试图提前签收' });
+    assert.equal(tooEarly.ok, false);
+    assert.equal(tooEarly.code, 'NOT_ABANDONED');
+
+    const failing = async () => { throw new Error('Could not resolve to an Issue'); };
+    for (let i = 0; i < 3; i += 1) await flushOutbox(dir, { gh: failing });
+    assert.equal(readOutbox(dir).find((e) => e.entryId === entryId).state, 'abandoned');
+
+    // 负向 2：缺理由拒收——无理由的签收等于静默删除，正是本设计要防的。
+    const noReason = acknowledgeEntry(dir, { entryId });
+    assert.equal(noReason.ok, false);
+    assert.equal(noReason.code, 'REASON_REQUIRED');
+
+    const acked = acknowledgeEntry(dir, { entryId, reason: '交付已落 dev abc1234；该 Issue 永久 404' });
+    assert.equal(acked.outcome, 'ACKNOWLEDGED');
+
+    // 幂等。
+    assert.equal(acknowledgeEntry(dir, { entryId, reason: '再签一次' }).outcome, 'ALREADY_ACKNOWLEDGED');
+
+    // 条目仍在，且理由可读——补偿审计不因签收而消失。
+    const still = readOutbox(dir).find((entry) => entry.entryId === entryId);
+    assert.equal(still.state, 'acknowledged');
+    assert.match(still.reason, /永久 404/);
+    assert.equal(still.abandonReason, 'ISSUE_UNREACHABLE', 'abandon 原因必须保留');
+  } finally { fixture.cleanup(); }
+}
+
+// AC-004：gate 的 outboxWarning 只是可观测性，八门与 mayMerge 一字不动。
+export async function outboxGateScenario() {
+  const fixture = makeFixture('outbox-gate', { workers: [{ id: 'worker-1' }] });
+  try {
+    writeSlots(fixture);
+    master.masterStart({ ...base(fixture) });
+    const dir = fixture.v4Dir;
+
+    // 同一个 job 前后对照：唯一的变量就是队列里有没有积压。
+    // 换成两个 job 会把 slot baseline、candidate 新鲜度一起搅进来，
+    // 那样即使断言绿了也说明不了「是队列没影响判定」。
+    const job = driveToReadyToMerge(fixture, issuePayload({ number: 631 }));
+    const clean = master.evaluateGate({ ...base(fixture), jobId: job.jobId });
+    assert.equal(clean.outboxWarning, null, '空队列时不得有警告');
+    const ids = clean.mechanical.checks.map((check) => check.id);
+    assert.deepEqual(ids, [
+      'GATE-slot', 'GATE-commit', 'GATE-integration', 'GATE-acceptance',
+      'GATE-review', 'GATE-review-base', 'GATE-qa', 'GATE-qa-base',
+    ], '机械门八项与顺序不得因出站队列改动');
+
+    enqueueIssueClose(dir, {
+      jobId: 'job-630-synthetic', issue: 630, repo: 'owner/repo',
+      comment: '已交付：job-630-synthetic', commentDigest: 'sha256:630-synthetic',
+    });
+
+    const warned = master.evaluateGate({ ...base(fixture), jobId: job.jobId });
+    assert.ok(warned.outboxWarning, '有 pending 时必须出警告');
+    assert.equal(warned.outboxWarning.pending, 1);
+    assert.ok(Number.isFinite(warned.outboxWarning.oldestAgeMs));
+
+    // 判定面逐字段不变：八门 ids/顺序、各门 outcome、mayMerge 都与无积压时一致。
+    assert.deepEqual(warned.mechanical.checks.map((check) => check.id), ids);
+    assert.deepEqual(
+      warned.mechanical.checks.map((check) => check.outcome),
+      clean.mechanical.checks.map((check) => check.outcome),
+      'outboxWarning 不得改变任何一门的判定',
+    );
+    assert.equal(warned.decision.mayMerge, clean.decision.mayMerge, '积压不得影响 mayMerge');
+    assert.equal(warned.mechanical.allGreen, clean.mechanical.allGreen);
+
+    // 送达后警告归零。
+    await flushOutbox(dir, { gh: async () => ({ stdout: '' }) });
+    assert.equal(
+      master.evaluateGate({ ...base(fixture), jobId: job.jobId }).outboxWarning, null,
+      '送达后不得残留警告',
+    );
+
+    // 已签收的 abandoned 同样不计入告警：补偿审计留档，但不占警告位。
+    enqueueIssueClose(dir, {
+      jobId: 'job-633-synthetic', issue: 633, repo: 'owner/repo',
+      comment: '已交付：job-633-synthetic', commentDigest: 'sha256:633-synthetic',
+    });
+    const failing = async () => { throw new Error('Could not resolve to an Issue'); };
+    for (let i = 0; i < 3; i += 1) await flushOutbox(dir, { gh: failing });
+    assert.ok(
+      master.evaluateGate({ ...base(fixture), jobId: job.jobId }).outboxWarning,
+      '未签收的 abandoned 必须仍在告警里',
+    );
+    const abandoned = readOutbox(dir).find((entry) => entry.state === 'abandoned');
+    acknowledgeEntry(dir, { entryId: abandoned.entryId, reason: '目标 Issue 永久不可达，交付已落地' });
+    assert.equal(
+      master.evaluateGate({ ...base(fixture), jobId: job.jobId }).outboxWarning, null,
+      '签收后不得再占警告位',
+    );
+  } finally { fixture.cleanup(); }
+}
+
 export async function deliveryMergeScenario() {
   await nextStepDriver();
   await mergePolicyTiers();
@@ -819,8 +1049,9 @@ async function nextStepDriver() {
   const fixture = makeFixture('next-step', { workers: [{ id: 'worker-1' }, { id: 'worker-2' }] });
   const commandsFile = join(fixture.root, 'verify-commands.json');
   writeFileSync(commandsFile, JSON.stringify([{ command: process.execPath, args: ['-e', 'process.exit(0)'] }]));
-  // close 会调用 gh。离线 scenario 绝不允许触达真实 GitHub，所以从既有注入点接管，
-  // 并把每次调用记到 trace 里，好断言「确实只发生了 comment + close」。
+  // #142 之后 close 不再调用 gh，出站动作改由 outbox flush 送达。离线 scenario 绝不允许
+  // 触达真实 GitHub，所以从既有注入点接管，并把每次调用记到 trace 里——原来「只允许
+  // comment + close 两次写入」这条守卫没有取消，只是随出站动作一起挪到了 flush 上。
   const ghTrace = join(fixture.root, 'gh-trace.jsonl');
   const ghScript = join(fixture.root, 'fake-gh.mjs');
   writeFileSync(ghScript, [
@@ -859,9 +1090,22 @@ async function nextStepDriver() {
     const closed = freshProcess(fixture, ['next-step', '--commands-file', commandsFile], { env: ghEnv });
     assert.equal(closed.kind, 'close');
     assert.equal(readV4Registry(fixture.v4Dir).jobs[job.jobId].state, 'closed');
+    // 拓扑断言：走完整条 CLI 交付链到 close，GitHub 侧一次都没被碰过。
+    assert.equal(existsSync(ghTrace), false, 'close 不得联网——出站是 flush 的事');
+
+    // 守卫挪到 flush：送达时仍然只允许 comment + close 两次写入。
+    const flushed = freshProcess(fixture, ['outbox', 'flush'], { env: ghEnv });
+    assert.equal(flushed.flushed, 1, 'flush 必须送出那条积压');
     const ghCalls = readFileSync(ghTrace, 'utf8').split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line));
     assert.deepEqual(ghCalls.map((call) => `${call[0]} ${call[1]}`), ['issue comment', 'issue close'],
-      'close 只允许 comment + close 两次写入');
+      'flush 只允许 comment + close 两次写入');
+
+    // 幂等：再 flush 一次不得产生第二组写入。
+    freshProcess(fixture, ['outbox', 'flush'], { env: ghEnv });
+    assert.equal(
+      readFileSync(ghTrace, 'utf8').split(/\r?\n/).filter(Boolean).length, 2,
+      '已送达的条目不得被重复送出',
+    );
 
     // AC-2: 全部终态后回到 NOOP，退出码 0，且不再改动 integration。
     const headAfter = gitOut(fixture.repoRoot, ['rev-parse', 'dev']);

@@ -28,6 +28,7 @@ import {
   deliveryMergeScenario, discoveredWorkScenario, integrationBaseAdvanceStaleEvidence, recoveryScenario, runnerLifecycleScenario,
   stageResultSchemaBackwardCompat, reviewerIndependenceScenario, missingReviewerSessionIdScenario,
   acceptanceInvalidationScenario, humanOpenEvidenceScenario, attemptReassignScenario,
+  outboxCloseScenario, outboxFlushScenario, outboxAckScenario, outboxGateScenario,
 } from './selftest-v4.mjs';
 import { trajectoryReplayScenario } from './selftest-trajectory.mjs';
 import { boardUiDomain } from './selftest-board-ui.mjs';
@@ -4520,6 +4521,11 @@ async function orchestrationDomain() {
     { group: 'trajectory-replay', name: 'historical-trajectory-replay', run: trajectoryReplayScenario },
     { group: 'discovered-work', name: 'discovery-reflow', run: discoveredWorkScenario },
     { group: 'delivery-merge', name: 'delivery-and-tiered-merge-gate', run: deliveryMergeScenario },
+    // #142：出站队列与 close/GitHub 解耦。一条 AC 一个场景——共用一条命令时红了分不出是哪条挂的。
+    { group: 'outbox-close', name: 'close-decoupled-from-github', run: outboxCloseScenario },
+    { group: 'outbox-flush', name: 'flush-five-outcomes', run: outboxFlushScenario },
+    { group: 'outbox-ack', name: 'acknowledge-abandoned-entry', run: outboxAckScenario },
+    { group: 'outbox-gate', name: 'gate-outbox-warning-is-not-a-gate', run: outboxGateScenario },
     // AC-007（#62）：integration 前进使旧 base 上取得的证据失效。
     { group: 'stale-base-evidence', name: 'integration-base-advance-stale-evidence', run: integrationBaseAdvanceStaleEvidence },
     { group: 'stale-base-evidence', name: 'stage-result-schema-backward-compat', run: stageResultSchemaBackwardCompat },

@@ -1,14 +1,15 @@
-# verify @ 2026-08-28T10:22:38Z
+# verify @ 2026-08-28T10:41:22Z
 # cwd: G:\GIT\AI_WorkFlow\parking-agents-manual
 
-[FAIL] AC-001  exit=1  $ node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration --scenario outbox-close
-         {"ok":false,"domain":"orchestration","error":"AssertionError [ERR_ASSERTION]: 未知 orchestration scenario: outbox-close; 可用 storage|lifecycle|governance|continuous|boundary|contract|runner-lifecycle|recovery|trajectory-replay|discovered-work|delivery-merge|stale-base-evidence|reviewer-independence\n    at Object.orchestrationDomain [as orchestration] (file:///G:/GIT/AI_WorkFlow/parking-agents-manual/.agents/skills/aes-worktree-board/scripts/selftest.mjs:4528:10)\n    at file:///G:/GIT/AI_WorkFlow/parking-agents-manual/.agents/skills/aes-worktree-board/scripts/selftest.mjs:4776:39"}
-[FAIL] AC-002  exit=1  $ node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration --scenario outbox-flush
-         {"ok":false,"domain":"orchestration","error":"AssertionError [ERR_ASSERTION]: 未知 orchestration scenario: outbox-flush; 可用 storage|lifecycle|governance|continuous|boundary|contract|runner-lifecycle|recovery|trajectory-replay|discovered-work|delivery-merge|stale-base-evidence|reviewer-independence\n    at Object.orchestrationDomain [as orchestration] (file:///G:/GIT/AI_WorkFlow/parking-agents-manual/.agents/skills/aes-worktree-board/scripts/selftest.mjs:4528:10)\n    at file:///G:/GIT/AI_WorkFlow/parking-agents-manual/.agents/skills/aes-worktree-board/scripts/selftest.mjs:4776:39"}
-[FAIL] AC-003  exit=1  $ node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration --scenario outbox-ack
-         {"ok":false,"domain":"orchestration","error":"AssertionError [ERR_ASSERTION]: 未知 orchestration scenario: outbox-ack; 可用 storage|lifecycle|governance|continuous|boundary|contract|runner-lifecycle|recovery|trajectory-replay|discovered-work|delivery-merge|stale-base-evidence|reviewer-independence\n    at Object.orchestrationDomain [as orchestration] (file:///G:/GIT/AI_WorkFlow/parking-agents-manual/.agents/skills/aes-worktree-board/scripts/selftest.mjs:4528:10)\n    at file:///G:/GIT/AI_WorkFlow/parking-agents-manual/.agents/skills/aes-worktree-board/scripts/selftest.mjs:4776:39"}
-[FAIL] AC-004  exit=1  $ node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration --scenario outbox-gate && node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration --scenario delivery-merge
-         {"ok":false,"domain":"orchestration","error":"AssertionError [ERR_ASSERTION]: 未知 orchestration scenario: outbox-gate; 可用 storage|lifecycle|governance|continuous|boundary|contract|runner-lifecycle|recovery|trajectory-replay|discovered-work|delivery-merge|stale-base-evidence|reviewer-independence\n    at Object.orchestrationDomain [as orchestration] (file:///G:/GIT/AI_WorkFlow/parking-agents-manual/.agents/skills/aes-worktree-board/scripts/selftest.mjs:4528:10)\n    at file:///G:/GIT/AI_WorkFlow/parking-agents-manual/.agents/skills/aes-worktree-board/scripts/selftest.mjs:4776:39"}
+[PASS] AC-001  exit=0  $ node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration --scenario outbox-close
+         {"ok":true,"domain":"orchestration","scenario":"outbox-close","scenarios":1,"passed":1,"scenarioIds":[]}
+[PASS] AC-002  exit=0  $ node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration --scenario outbox-flush
+         {"ok":true,"domain":"orchestration","scenario":"outbox-flush","scenarios":1,"passed":1,"scenarioIds":[]}
+[PASS] AC-003  exit=0  $ node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration --scenario outbox-ack
+         {"ok":true,"domain":"orchestration","scenario":"outbox-ack","scenarios":1,"passed":1,"scenarioIds":[]}
+[PASS] AC-004  exit=0  $ node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration --scenario outbox-gate && node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration --scenario delivery-merge
+         {"ok":true,"domain":"orchestration","scenario":"outbox-gate","scenarios":1,"passed":1,"scenarioIds":[]}
+         {"ok":true,"domain":"orchestration","scenario":"delivery-merge","scenarios":1,"passed":1,"scenarioIds":[]}
 
-绿 0 / 红 4 / 跑不起来 0
+绿 4 / 红 0 / 跑不起来 0
 另有 1 条非 [A] 档没跑：AC-005 [C]

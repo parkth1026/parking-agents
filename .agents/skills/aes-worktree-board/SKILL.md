@@ -408,11 +408,45 @@ node "$skillDir/scripts/master.mjs" release --job <jobId> --slot <slotId>
 | `high` | 机械门全绿**仍**停在 humanGate 等人工批准 |
 | `critical` | 拒绝直接 merge，只走 PR；waiver 也不能覆盖 |
 
-机械门六项固定顺序：slot → commit → integration → acceptance → review → QA。
+机械门八项固定顺序：slot → commit → integration → acceptance → review → review-base → qa → qa-base。
+其中 `-base` 两项校验证据取自的 integration base 仍等于当前 base，不等判 STALE
+（#62 交付；integration 前进会使旧 base 上取得的 review/QA 证据失效）。
 其中 review/QA receipt 的 `commitSha` 必须与当前 candidate commit **精确相等**——
 旧 commit 的证据不能给新 commit 背书；QA 含 `NOT_RUN` 或 `unexecuted` 非空一律判失败。
 commit 前进只能走 `candidate` 命令（那里作废旧证据）；terminal 报文里的
 `candidateCommit` 与 registry 不一致时拒收（`CANDIDATE_MISMATCH`），不推进状态。
+
+### 出站队列：close 不联网（#142）
+
+`close` 落账即终局：先写 registry（`issueClose.outcome: LOCAL_CLOSED`）并释放 slot，
+再把 GitHub 侧的 comment/close **入队**到 `<runtime-v4>/outbox.jsonl`。
+**这条命令内不调用 gh**——「GitHub 挂了交付照样落地」是拓扑保证的，不是靠 try/catch 兜的。
+
+判据来自控制面既有的二分：**registry 记意图、Git 记事实**。GitHub 在这个二分里
+没有位置，它只是把结果广播出去的副作用面，不该有权阻断交付并扣住 slot。
+
+```bash
+node "$skillDir/scripts/master.mjs" outbox flush         # 送达积压；轮起点与落盘时各跑一次
+node "$skillDir/scripts/master.mjs" outbox status        # 看积压与已签收留档
+node "$skillDir/scripts/master.mjs" outbox acknowledge --entry <id> --reason "<理由>"
+```
+
+条目状态闭集 `pending` / `succeeded` / `abandoned` / `acknowledged`，
+与 inbox 同款 append-only：状态推进靠追加新行，按 `entryId` 取最后一行为准。
+
+- **flush 退出码恒 0**：积压是待办不是失败。让 CI 因积压变红会逼人去清队列，
+  而不是去修真正的问题；积压的可见性单点归 `gate` 的 `outboxWarning`。
+- **跨 flush 调用累计 3 次**失败转 `abandoned`（尺子是 `attempts` 数组长度）。
+  按单次 flush 内重试计数会把网络抖动误判成永久失败。
+- **条目永不物理删除**。`acknowledge` 只把它移出告警计数，且**必须带 `--reason`**——
+  没有理由的签收就是静默删除，而静默删除正是这套补偿审计要防的东西。
+- `gate` 的 `outboxWarning` 只念**未签收**的积压，且**不参与 `mayMerge`**：
+  机械门恒为八项，可观测性不是第九道门。
+
+**环境边界（两个方向都要守）**：worker 侧调用 `master.mjs` 必须显式设置
+`AES_WORKTREE_BOARD_REPO_ROOT` 指向目标仓根，否则会在 worker worktree 里
+静默孵化一个平行 registry；反过来，跑 `selftest` / `run-tests` 时**不得**继承该变量，
+它会污染 fixture 场景。
 
 ### aes-merge-worker（合并验收 worker，待建）
 
@@ -426,7 +460,7 @@ merge-worker 消化 mergeQueue 的完整职责：
 2. 派独立 `code-review` subagent（Standards+Spec 双轴；深度按 `resolveMergePolicy`
    的 **effectiveRisk** 分档——含路径兜底，比工单自报档更准），review receipt 由
    merge-worker 侧 `stage review` 上报——**被审的 worker 无法自报 review PASS**；
-3. review PASS → gate 六项 → 串行 merge → **merge 后全量回归**（commands file 跑
+3. review PASS → gate 八项 → 串行 merge → **merge 后全量回归**（commands file 跑
    全量套件，非 targeted）→ 幂等 close → release slot；
 4. review MUST_FIX → 以 `aes.issue-worker.review-return/v1` 经总管打回原 owner
    session（原 thread 优先、新 attempt 兜底）：报文含 `jobId`/`attemptId`/

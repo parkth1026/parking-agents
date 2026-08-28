@@ -44,8 +44,10 @@ GitHub 不可达时交付照常落地、slot 照常释放，出站动作留在�
 
 ## 强约束
 
-- **机械门恒为六项**：ids 与顺序 `slot → commit → integration → acceptance → review → QA`
-  一字不改，判据不变；`outboxWarning` 只是可观测性字段。
+- **机械门恒为八项**：ids 与顺序 `slot → commit → integration → acceptance → review → review-base → qa → qa-base`
+  一字不改，判据不变；`outboxWarning` 只是可观测性字段，不进门。
+  （`GATE-review-base` / `GATE-qa-base` 是 #62 交付的 integration-base 新鲜度检查，
+  随 2026-08-27 恢复线回到代码里；SKILL.md 仍写「六项」是恢复未同步文档，本票顺手改正。）
 - **`masterClose` 函数体内不得出现任何 gh 调用**——这是本票的拓扑断言，不是靠 try/catch 兜。
 - **`options.gh` 注入点保留且可注入**（改由 flush 路径消费），既有 4 处 selftest 桩
   （`selftest-v4.mjs:563/1000/1006/1127`）不需重写调用形状。
@@ -113,10 +115,10 @@ GitHub 不可达时交付照常落地、slot 照常释放，出站动作留在�
     （四个断言：两个负向拒收 + 幂等 + 条目仍存在）
 
 - AC-004: `gate` 在有未签收 `pending` 条目时输出 `outboxWarning{pending, oldestAgeMs}`，
-  队列为空或只剩 `acknowledged` 时为 `null`；两种情形下六门的 ids、顺序、各门 outcome
+  队列为空或只剩 `acknowledged` 时为 `null`；两种情形下八门的 ids、顺序、各门 outcome
   与 `decision.mayMerge` 与改动前逐字段相同。
   - Verify: [A] `node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration --scenario outbox-gate && node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration --scenario delivery-merge` → 退出码 0
-    （outbox-gate 场景比对有/无积压两例的六门 ids 顺序与 mayMerge；delivery-merge 场景保持全绿证明四档语义未被触碰）
+    （outbox-gate 场景比对有/无积压两例的八门 ids 顺序与 mayMerge；delivery-merge 场景保持全绿证明四档语义未被触碰）
 
 - AC-005: 真实解卡轮——对现场卡死的 `job-69-111801` 跑通
   `close → 入队 → flush ×3 → abandoned → acknowledge`，结束时 job 为 `closed`、
@@ -134,11 +136,12 @@ GitHub 不可达时交付照常落地、slot 照常释放，出站动作留在�
 
 ## 挡着的事
 
-- None。**但有一条基线红需当面说清**：`orchestration` 域的 `storage` 与 `lifecycle`
-  两个场景在当前 dev（`8f0553a`）上已经是红的，红由 2026-08-27 的恢复线带入
-  （`d19b81e` 绿 27/27 → 恢复线全红，机械二分见 #143）。它与本票无关，因此本票的
-  `[A]` 档 Verify **收窄到 `--scenario` 粒度**绕开它，而不是等 #143 修完。
-  #143 落地后可把 Verify 放宽回整域。
+- None。**但有一条现场脆性需当面说清**：`orchestration` 域的 `storage` 与 `lifecycle`
+  两个场景**隐式依赖实时 worktree 台账**（取 `collectStatus(...).worktrees[0]`），
+  台账被并发增删时会随机红——同一份代码 09:51 红、10:5x 连跑三次绿，实证见 #143。
+  它与本票无关，因此本票的 `[A]` 档 Verify **收窄到 `--scenario` 粒度**：
+  这样每条 AC 的绿红只取决于自己的场景，不被别处的现场脆性带偏。
+  #143 修掉隐式选取后可把 Verify 放宽回整域。
 
 ## 残留风险
 
@@ -152,9 +155,12 @@ GitHub 不可达时交付照常落地、slot 照常释放，出站动作留在�
   退化成背景噪音；缓解手段是 `acknowledge` 必须带理由，逼人当面处理而不是静默清空。
 
 - **`[A]` 档 Verify 收窄到场景粒度而非整域**——错了会怎样：本票的新代码若破坏了
-  `storage` / `lifecycle` 之外的其它场景，四个 `outbox-*` 场景与 `--scenario delivery-merge`
-  未必抓得到；缓解手段是执行 Agent 在 commit 前额外跑一次整域并逐场景比对
-  红面是否仍只有 `storage` 与 `lifecycle` 两个（不得新增）。
+  自身场景之外的其它场景，四个 `outbox-*` 场景与 `--scenario delivery-merge`
+  未必抓得到；缓解手段是执行 Agent 在 commit 前额外逐场景跑一遍全域，
+  确认红面**没有新增**（注意 `storage` / `lifecycle` 的绿红本身就会随 worktree 台账
+  漂移，判「新增」时要把它们排除在外——见 #143）。
+  本轮该守则已实际生效：它抓到了 `recovery` 与 `delivery-merge` 两个场景因
+  「断言写在 close 上」而被本票改动打断，两处守卫已随出站动作迁移到 flush。
 
 ## 访谈记录
 

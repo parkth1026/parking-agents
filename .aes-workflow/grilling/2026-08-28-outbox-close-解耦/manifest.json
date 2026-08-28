@@ -2,12 +2,12 @@
   "schema_version": 1,
   "slug": "2026-08-28-outbox-close-解耦",
   "created_at": "2026-08-28T09:47:59Z",
-  "updated_at": "2026-08-28T10:22:43Z",
+  "updated_at": "2026-08-28T10:41:48Z",
   "original_request": null,
   "goal_oneline": null,
   "target": null,
   "stage": "3-contract",
-  "next_action": "交给执行 Agent：实现出站队列与 close 解耦；AC-005 解卡轮需人工在主检出跑",
+  "next_action": "契约已就绪，把交接指令发给执行 Agent。契约：G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\.aes-workflow\\grilling\\2026-08-28-outbox-close-解耦\\3-contract\\contract.md",
   "stage_gates": {
     "1-interview": {
       "status": "done",
@@ -39,7 +39,7 @@
     "status": "valid",
     "ac_count": 5,
     "warnings": [],
-    "ran_at": "2026-08-28T10:22:38Z",
+    "ran_at": "2026-08-28T10:41:22Z",
     "verify_tiers": {
       "A": 4,
       "B": 0,
