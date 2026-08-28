@@ -56,6 +56,8 @@ GitHub 不可达时交付照常落地、slot 照常释放，出站动作留在�
 - 未知 schemaVersion、缺字段、非闭集值一律 **fail closed**。
 - `2-prototype/` 下四份确认版对照物**不可修改**：执行 Agent 改的是产品，不是对照物。
 - 脚本一律 `.mjs`、Node 内置模块、零依赖（仓库既有约定）。
+- **新增子命令必须同步进 `master.mjs` 的用法串**（`outbox flush` / `outbox status` /
+  `outbox acknowledge` 三条），否则等于加了没人知道的命令。
 
 ## 自主边界
 
@@ -92,27 +94,29 @@ GitHub 不可达时交付照常落地、slot 照常释放，出站动作留在�
 
 - AC-001: `close` 在 gh 完全不可用时仍返回 `CLOSED`、把 job 推进到 `closed`、释放 slot，
   并产出一条 `pending` 出站条目；gh 可用与不可用两种情形下 `close` 的返回结构逐字段相同。
-  - Verify: [A] `node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration` → 退出码 0
-    （新场景须含：gh 桩抛错仍断言 slot released + job closed + 条目入队；以及断言 `masterClose`
-    函数体内无 gh 调用的源码级拓扑断言）
+  - Verify: [A] `node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration --scenario outbox-close` → 退出码 0
+    （三个断言：① 注入抛错 gh 桩，close 仍 CLOSED + slot released + job closed + 条目入队；
+    ② 注入「一旦被调用即抛」的 gh 桩，断言 close 全程**调用次数为 0**——钉死「拓扑保证而非
+    try/catch 兜」的意图，且不锁实现（同款先例见 `selftest-v4.mjs:1006`）；
+    ③ gh 可用与不可用两次 close 的返回结构逐字段相同）
 
 - AC-002: `outbox flush` 的五种结局各自正确——成功送达、可重试失败留 `pending`、
   **跨 flush 调用累计第 3 次失败**转 `abandoned`、已 `succeeded` 幂等跳过、空队列不报错；
-  五种结局**退出码一律 0**；且 `master.mjs` 用法串列出三个新子命令。
-  - Verify: [A] `node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration` → 退出码 0
-    （门槛尺子 = `attempts` 数组长度达 3，锁进断言；并断言用法串含 `outbox flush|outbox status|outbox acknowledge`）
+  五种结局**退出码一律 0**。
+  - Verify: [A] `node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration --scenario outbox-flush` → 退出码 0
+    （五个结局各一断言；门槛尺子 = `attempts` 数组长度达 3，锁进断言）
 
 - AC-003: `outbox acknowledge` 只对 `abandoned` 条目生效（否则 `NOT_ABANDONED`）、
   缺 `--reason` 拒收（`REASON_REQUIRED`）、重复签收幂等（`ALREADY_ACKNOWLEDGED`），
   且签收后条目仍在 `outbox.jsonl` 中可读。
-  - Verify: [A] `node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration` → 退出码 0
+  - Verify: [A] `node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration --scenario outbox-ack` → 退出码 0
     （四个断言：两个负向拒收 + 幂等 + 条目仍存在）
 
 - AC-004: `gate` 在有未签收 `pending` 条目时输出 `outboxWarning{pending, oldestAgeMs}`，
   队列为空或只剩 `acknowledged` 时为 `null`；两种情形下六门的 ids、顺序、各门 outcome
   与 `decision.mayMerge` 与改动前逐字段相同。
-  - Verify: [A] `node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration` → 退出码 0
-    （有/无积压两例，各自比对六门 ids 顺序与 mayMerge）
+  - Verify: [A] `node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration --scenario outbox-gate && node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration --scenario delivery-merge` → 退出码 0
+    （outbox-gate 场景比对有/无积压两例的六门 ids 顺序与 mayMerge；delivery-merge 场景保持全绿证明四档语义未被触碰）
 
 - AC-005: 真实解卡轮——对现场卡死的 `job-69-111801` 跑通
   `close → 入队 → flush ×3 → abandoned → acknowledge`，结束时 job 为 `closed`、
@@ -121,7 +125,8 @@ GitHub 不可达时交付照常落地、slot 照常释放，出站动作留在�
     ① `node .agents/skills/aes-worktree-board/scripts/master.mjs close --job job-69-111801`；
     ② `... outbox flush` 连跑三次；
     ③ `... outbox acknowledge --entry ` 加上第 ① 步返回的 `outbox.entryId`，
-    `--reason "原 #69 随 piaotonghu 账号封禁永久 404；交付已落 dev 9004b5f，重建票 #130 已单独关闭"`；
+    并给出 `--reason`——文案由签收人当场判断，但**须写明两件事**：交付已落地的 merge SHA，
+    以及该 Issue 不可达的原因；
     ④ `... master.mjs status`。
     可观察结果：`jobs["job-69-111801"].state` 为 `closed`、
     `runners["worker-1"].state` 不再是 `leased`、该条目 `state` 为 `acknowledged` 且仍可读；
@@ -129,7 +134,11 @@ GitHub 不可达时交付照常落地、slot 照常释放，出站动作留在�
 
 ## 挡着的事
 
-- None.
+- None。**但有一条基线红需当面说清**：`orchestration` 域的 `storage` 与 `lifecycle`
+  两个场景在当前 dev（`8f0553a`）上已经是红的，红由 2026-08-27 的恢复线带入
+  （`d19b81e` 绿 27/27 → 恢复线全红，机械二分见 #143）。它与本票无关，因此本票的
+  `[A]` 档 Verify **收窄到 `--scenario` 粒度**绕开它，而不是等 #143 修完。
+  #143 落地后可把 Verify 放宽回整域。
 
 ## 残留风险
 
@@ -141,6 +150,11 @@ GitHub 不可达时交付照常落地、slot 照常释放，出站动作留在�
   开工，depthTier 与血统校验会长期缺位，#114 的分档 live 验证面仍是残缺的。
 - **`outboxWarning` 不设上限告警升级**——错了会怎样：长期无人 flush 时警告常亮而无人处理，
   退化成背景噪音；缓解手段是 `acknowledge` 必须带理由，逼人当面处理而不是静默清空。
+
+- **`[A]` 档 Verify 收窄到场景粒度而非整域**——错了会怎样：本票的新代码若破坏了
+  `storage` / `lifecycle` 之外的其它场景，四个 `outbox-*` 场景与 `--scenario delivery-merge`
+  未必抓得到；缓解手段是执行 Agent 在 commit 前额外跑一次整域并逐场景比对
+  红面是否仍只有 `storage` 与 `lifecycle` 两个（不得新增）。
 
 ## 访谈记录
 
