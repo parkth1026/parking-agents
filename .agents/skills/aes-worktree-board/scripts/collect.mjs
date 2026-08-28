@@ -250,22 +250,36 @@ function loadPrevious(runtimeDir) {
   return readJson(runtimePaths(runtimeDir).statusJson, null);
 }
 
-function previousWorktreeIndex(worktrees = []) {
+function worktreeNameKey(value) {
+  return String(value || '').toLowerCase();
+}
+
+export function previousWorktreeIndex(worktrees = [], currentWorktrees = []) {
   const byPath = new Map();
   const byName = new Map();
+  const currentNameCounts = new Map();
   for (const worker of worktrees) {
     if (worker?.path) byPath.set(pathKey(worker.path), worker);
     if (!worker?.name) continue;
-    const matches = byName.get(worker.name) || [];
+    const nameKey = worktreeNameKey(worker.name);
+    const matches = byName.get(nameKey) || [];
     matches.push(worker);
-    byName.set(worker.name, matches);
+    byName.set(nameKey, matches);
+  }
+  for (const worker of currentWorktrees) {
+    if (!worker?.path) continue;
+    const nameKey = worktreeNameKey(worker.name || basename(worker.path));
+    currentNameCounts.set(nameKey, (currentNameCounts.get(nameKey) || 0) + 1);
   }
   return {
     find(entry) {
       const exact = byPath.get(pathKey(entry.path));
       if (exact) return exact;
-      const legacyMatches = byName.get(basename(entry.path)) || [];
-      return legacyMatches.length === 1 ? legacyMatches[0] : null;
+      const nameKey = worktreeNameKey(entry.name || basename(entry.path));
+      const legacyMatches = byName.get(nameKey) || [];
+      return legacyMatches.length === 1 && currentNameCounts.get(nameKey) === 1
+        ? legacyMatches[0]
+        : null;
     },
   };
 }
@@ -588,8 +602,9 @@ export async function collectStatus({
   assertRuntimeIdentity(runtimeDir, expectedIdentity, previous);
   const registry = readRegistry(runtimeDir);
   // basename 不是 worktree identity：Codex 的 detached worktree 常共享同一个目录名。
-  // v2/v3 快照已有 path，优先按规范化完整路径承接；只有旧快照名称唯一时才回退 basename。
-  const previousWorktrees = previousWorktreeIndex(previous?.worktrees);
+  // v2/v3 快照已有 path，优先按规范化完整路径承接；只有旧快照与当前集合两侧名称都唯一时
+  // 才回退 basename，避免新增同名 worktree 后把一条旧 assessment 复制到多条新路径。
+  const previousWorktrees = previousWorktreeIndex(previous?.worktrees, siblings);
   const tasks = readTasks(runtimeDir);
   const mainHead = await git(['rev-parse', '--short', config.mainBranch]);
 
@@ -709,7 +724,7 @@ export async function collectStatus({
     // collect 计算期间 assess/registry 可能已更新；临写前重新承接，避免旧快照复活。
     const latestSnapshot = readJson(paths.statusJson, null);
     assertRuntimeIdentity(runtimeDir, expectedIdentity, latestSnapshot);
-    const latestWorktrees = previousWorktreeIndex(latestSnapshot?.worktrees);
+    const latestWorktrees = previousWorktreeIndex(latestSnapshot?.worktrees, status.worktrees);
     const latestRegistry = readRegistry(runtimeDir);
     status.orchestration = latestRegistry.orchestration;
     status.transitions = readJsonLines(join(runtimeDir, 'transitions.jsonl'));
