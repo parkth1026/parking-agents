@@ -168,6 +168,22 @@ export async function outboxCloseScenario() {
   } finally {
     fixture.cleanup();
   }
+  const crashFixture = makeFixture('outbox-close-crash', { workers: [{ id: 'worker-1' }] });
+  try {
+    const job = driveToClosing(crashFixture, 607);
+    await assert.rejects(master.masterClose({
+      ...base(crashFixture), jobId: job.jobId,
+      enqueueOutbox: () => { throw new Error('crash after registry close'); },
+    }), /crash after registry close/);
+    const registry = readV4Registry(crashFixture.v4Dir);
+    assert.equal(registry.jobs[job.jobId].state, 'closed', '入队前崩溃也必须已完成 registry 终局');
+    assert.equal(registry.runners['worker-1'].lease, null, '入队前崩溃也必须释放 slot');
+    assert.equal(readOutbox(crashFixture.v4Dir).length, 0);
+    const reconcile = master.masterReconcile({ ...base(crashFixture) });
+    assert.ok(reconcile.actions.some((action) => action.jobId === job.jobId && action.action === 'RESUME_OUTBOX_ENQUEUE'));
+    const recovered = await master.masterNextStep({ ...base(crashFixture) });
+    assert.equal(recovered.result.outbox.state, 'pending', '无人值守重启必须补齐未落盘 outbox');
+  } finally { crashFixture.cleanup(); }
 }
 
 export async function outboxFlushScenario() {
@@ -202,7 +218,7 @@ export async function outboxFlushScenario() {
       ]);
       assert.deepEqual(concurrent.map((result) => result.flushed).sort(), [0, 1], '并发 flush 只能有一个领取 pending 条目');
       assert.equal(successCalls, 2, '同一 issue-close 只能发送一次 comment + close');
-      assert.equal(concurrent[0].remaining + concurrent[1].remaining, 0);
+      assert.equal(readOutbox(successFixture.v4Dir)[0].state, 'succeeded');
       const idempotent = await master.masterOutboxFlush({ ...base(successFixture), gh: async () => { throw new Error('succeeded 不得重送'); } });
       assert.equal(idempotent.flushed, 0); assert.equal(idempotent.skipped, 1);
       const emptyFixture = makeFixture('outbox-flush-empty', { workers: [{ id: 'worker-1' }] });
@@ -212,6 +228,26 @@ export async function outboxFlushScenario() {
         assert.deepEqual(empty, { ok: true, flushed: 0, skipped: 0, failed: 0, abandoned: 0, remaining: 0, entries: [] });
       } finally { emptyFixture.cleanup(); }
     } finally { successFixture.cleanup(); }
+
+    const recoveryFixture = makeFixture('outbox-flush-recovery', { workers: [{ id: 'worker-1' }] });
+    try {
+      const recoveryJob = driveToClosing(recoveryFixture, 608);
+      await master.masterClose({ ...base(recoveryFixture), jobId: recoveryJob.jobId });
+      const started = new Date('2026-08-28T12:00:00.000Z');
+      await assert.rejects(master.masterOutboxFlush({
+        ...base(recoveryFixture), owner: 'crashed-flush', leaseMs: 1000, now: () => started,
+        gh: async () => { throw new Error('network must not start before crash hook'); },
+        afterClaim: async () => { throw new Error('crash after claim'); },
+      }), /crash after claim/);
+      assert.equal(readOutbox(recoveryFixture.v4Dir)[0].inFlight.owner, 'crashed-flush');
+      const blocked = await master.masterOutboxFlush({ ...base(recoveryFixture), owner: 'early-retry', now: () => started, gh: async () => ({ stdout: '' }) });
+      assert.equal(blocked.flushed, 0, '未过期 lease 不得被抢占');
+      const recovered = await master.masterOutboxFlush({
+        ...base(recoveryFixture), owner: 'recovered-flush', now: () => new Date(started.getTime() + 1001),
+        isOwnerAlive: () => false, gh: async () => ({ stdout: '' }),
+      });
+      assert.equal(recovered.flushed, 1, '过期 inFlight 必须可回收并结算');
+    } finally { recoveryFixture.cleanup(); }
   } finally {
     fixture.cleanup();
   }
@@ -1730,7 +1766,7 @@ export async function humanOpenEvidenceScenario() {
       '--kind', 'risk_approval', '--prompt', '需要人工批准合并'];
 
     // #76 主缺陷复现路径：--required-evidence 曾被静默丢弃且 ok:true。现在必须报错退出。
-    const unknown = freshProcess(fixture, [...humanArgs, '--required-evidence', '机械门六项全绿'], { expectStatus: 'nonzero' });
+    const unknown = freshProcess(fixture, [...humanArgs, '--required-evidence', '机械门八项全绿'], { expectStatus: 'nonzero' });
     assert.equal(unknown.code, 'UNKNOWN_OPTION', '近似参数必须 fail closed，不得静默丢弃');
     assert.ok(/--evidence/.test(unknown.hint || ''), '报错必须指路到正确参数 --evidence');
     assert.equal(readV4Registry(fixture.v4Dir).jobs[claim.jobId].state, 'dispatched', '未知参数不得推进状态');
@@ -1750,10 +1786,10 @@ export async function humanOpenEvidenceScenario() {
 
     // 重复 --evidence 累积成数组，且历史 JSON 数组形态继续可用（两者可混用）。
     const opened = freshProcess(fixture, [...humanArgs,
-      '--evidence', '机械门六项全绿',
+      '--evidence', '机械门八项全绿',
       '--evidence', '["Master 独立复跑 10/10","被测代码零改动"]']);
     assert.deepEqual(opened.humanRequest.requiredEvidence,
-      ['机械门六项全绿', 'Master 独立复跑 10/10', '被测代码零改动'],
+      ['机械门八项全绿', 'Master 独立复跑 10/10', '被测代码零改动'],
       '重复 --evidence 与 JSON 数组形态必须都累积进 requiredEvidence');
     assert.equal(opened.state, 'awaiting-human');
 

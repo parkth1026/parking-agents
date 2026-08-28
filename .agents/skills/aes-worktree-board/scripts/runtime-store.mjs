@@ -73,42 +73,6 @@ export function withRuntimeLock(runtimeDir, operation, { timeoutMs = DEFAULT_LOC
   }
 }
 
-export async function withRuntimeLockAsync(runtimeDir, operation, { timeoutMs = DEFAULT_LOCK_TIMEOUT_MS } = {}) {
-  const root = resolve(runtimeDir);
-  const lock = lockPath(root);
-  mkdirSync(root, { recursive: true });
-  const deadline = Date.now() + timeoutMs;
-  while (true) {
-    try {
-      mkdirSync(lock);
-      writeFileSync(join(lock, 'owner.json'), `${JSON.stringify({ pid: process.pid, acquiredAt: new Date().toISOString() })}\n`);
-      break;
-    } catch (error) {
-      if (error.code !== 'EEXIST') throw error;
-      try {
-        if (Date.now() - statSync(lock).mtimeMs > STALE_LOCK_MS) {
-          rmSync(lock, { recursive: true, force: true });
-          continue;
-        }
-      } catch (statError) {
-        if (statError.code === 'ENOENT') continue;
-        throw statError;
-      }
-      if (Date.now() >= deadline) {
-        const busy = new Error(`runtime 互斥锁超时: ${lock}`);
-        busy.code = 'LOCK_TIMEOUT';
-        throw busy;
-      }
-      await new Promise((resolveWait) => setTimeout(resolveWait, 20));
-    }
-  }
-  try {
-    return await operation();
-  } finally {
-    rmSync(lock, { recursive: true, force: true });
-  }
-}
-
 export function readJson(path, fallback = null) {
   try {
     return JSON.parse(readFileSync(path, 'utf8'));

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { join, resolve } from 'node:path';
-import { appendJsonLineAtomic, readJsonLines, withRuntimeLock, withRuntimeLockAsync } from './runtime-store.mjs';
+import { appendJsonLineAtomic, readJsonLines, withRuntimeLock } from './runtime-store.mjs';
 import { nowIso, shortDigest, storeError } from './job-store.mjs';
 
 export const OUTBOX_SCHEMA = 'aes.worktree-board.outbox-entry/v1';
@@ -19,6 +19,15 @@ export function validateOutboxEntry(entry) {
   if (!Number.isInteger(entry.issue)) throw storeError('OUTBOX_ENTRY_INVALID', 'outbox issue 必须为整数');
   if (!OUTBOX_STATES.includes(entry.state)) throw storeError('OUTBOX_ENTRY_INVALID', `未知 outbox state: ${entry.state}`);
   if (!Array.isArray(entry.attempts)) throw storeError('OUTBOX_ENTRY_INVALID', 'outbox attempts 必须为数组');
+  if (entry.inFlight) {
+    assertString(entry.inFlight.owner, 'inFlight.owner');
+    if (!Number.isInteger(entry.inFlight.pid) || entry.inFlight.pid <= 0) throw storeError('OUTBOX_ENTRY_INVALID', 'inFlight.pid 必须为正整数');
+    const leasedAt = Date.parse(entry.inFlight.leasedAt);
+    const expiresAt = Date.parse(entry.inFlight.expiresAt);
+    if (!Number.isFinite(leasedAt) || !Number.isFinite(expiresAt) || expiresAt < leasedAt) {
+      throw storeError('OUTBOX_ENTRY_INVALID', 'inFlight 时间必须为合法且递增的 ISO 时间');
+    }
+  }
   if (entry.state === 'pending') {
     assertString(entry.repo, 'repo');
     assertString(entry.commentDigest, 'commentDigest');
@@ -67,43 +76,62 @@ export function enqueueIssueClose(dir, input) {
   return withRuntimeLock(dir, () => enqueueIssueCloseUnlocked(dir, input));
 }
 
-export function enqueueIssueCloseWithinRuntimeLock(dir, input) {
-  return enqueueIssueCloseUnlocked(dir, input);
-}
-
-export async function flushOutbox(dir, gh) {
-  return withRuntimeLockAsync(dir, async () => {
-    const pending = readOutbox(dir).filter((entry) => entry.state === 'pending');
-    const results = [];
-    for (const entry of pending) {
-      const at = nowIso();
-      try {
-        await gh(['issue', 'comment', String(entry.issue), '--body', entry.payload.comment]);
-        if (entry.payload.closeIssue) await gh(['issue', 'close', String(entry.issue)]);
-        append(dir, { ...entry, state: 'succeeded', attempts: [...entry.attempts, { at, outcome: 'SUCCEEDED', error: null }], settledAt: at });
-        results.push({ entryId: entry.entryId, issue: entry.issue, outcome: 'SUCCEEDED' });
-      } catch (error) {
-        const attempt = { at, outcome: 'FAILED', error: { code: error.code || 'GH_COMMAND_FAILED', stderr: String(error.details?.stderr || error.message || '').slice(0, 400) } };
-        const attempts = [...entry.attempts, attempt];
-        const abandoned = attempts.length >= 3;
-        append(dir, { ...entry, state: abandoned ? 'abandoned' : 'pending', attempts, ...(abandoned ? { abandonReason: 'ISSUE_UNREACHABLE', settledAt: at } : {}) });
-        results.push(abandoned
-          ? { entryId: entry.entryId, issue: entry.issue, outcome: 'ABANDONED', abandonReason: 'ISSUE_UNREACHABLE', attempts: attempts.length }
-          : { entryId: entry.entryId, issue: entry.issue, outcome: 'FAILED', attempt: attempts.length, error: attempt.error });
-      }
-    }
-    const entries = readOutbox(dir);
-    const counts = results.reduce((summary, entry) => {
-      summary[entry.outcome] += 1;
-      return summary;
-    }, { SUCCEEDED: 0, FAILED: 0, ABANDONED: 0 });
-    return {
-      ok: true, flushed: counts.SUCCEEDED,
-      skipped: entries.filter((entry) => entry.state === 'succeeded').length - counts.SUCCEEDED,
-      failed: counts.FAILED, abandoned: counts.ABANDONED,
-      remaining: entries.filter((entry) => entry.state === 'pending').length, entries: results,
-    };
+export async function flushOutbox(dir, gh, options = {}) {
+  const owner = options.owner || `flush-${process.pid}-${shortDigest(`${Date.now()}:${Math.random()}`)}`;
+  const leaseMs = options.leaseMs || 30_000;
+  const now = options.now || (() => new Date());
+  const isOwnerAlive = options.isOwnerAlive || ((pid) => {
+    try { process.kill(pid, 0); return true; } catch { return false; }
   });
+  const claimed = withRuntimeLock(dir, () => {
+    const at = now();
+    const entries = readOutbox(dir).filter((entry) => entry.state === 'pending' && (
+      !entry.inFlight || (Date.parse(entry.inFlight.expiresAt) <= at.getTime() && !isOwnerAlive(entry.inFlight.pid))
+    ));
+    for (const entry of entries) append(dir, {
+      ...entry, inFlight: { owner, pid: process.pid, leasedAt: at.toISOString(), expiresAt: new Date(at.getTime() + leaseMs).toISOString() },
+    });
+    return entries.map((entry) => entry.entryId);
+  });
+  if (options.afterClaim) await options.afterClaim(claimed);
+  const results = [];
+  for (const entryId of claimed) {
+    const entry = readOutbox(dir).find((candidate) => candidate.entryId === entryId);
+    const at = now().toISOString();
+    try {
+      await gh(['issue', 'comment', String(entry.issue), '--body', entry.payload.comment]);
+      if (entry.payload.closeIssue) await gh(['issue', 'close', String(entry.issue)]);
+      withRuntimeLock(dir, () => {
+        const current = readOutbox(dir).find((candidate) => candidate.entryId === entryId);
+        if (current.inFlight?.owner !== owner) return;
+        append(dir, { ...current, state: 'succeeded', inFlight: null, attempts: [...current.attempts, { at, outcome: 'SUCCEEDED', error: null }], settledAt: at });
+      });
+      results.push({ entryId: entry.entryId, issue: entry.issue, outcome: 'SUCCEEDED' });
+    } catch (error) {
+      const attempt = { at, outcome: 'FAILED', error: { code: error.code || 'GH_COMMAND_FAILED', stderr: String(error.details?.stderr || error.message || '').slice(0, 400) } };
+      const attempts = [...entry.attempts, attempt];
+      const abandoned = attempts.length >= 3;
+      withRuntimeLock(dir, () => {
+        const current = readOutbox(dir).find((candidate) => candidate.entryId === entryId);
+        if (current.inFlight?.owner !== owner) return;
+        append(dir, { ...current, state: abandoned ? 'abandoned' : 'pending', inFlight: null, attempts, ...(abandoned ? { abandonReason: 'ISSUE_UNREACHABLE', settledAt: at } : {}) });
+      });
+      results.push(abandoned
+        ? { entryId: entry.entryId, issue: entry.issue, outcome: 'ABANDONED', abandonReason: 'ISSUE_UNREACHABLE', attempts: attempts.length }
+        : { entryId: entry.entryId, issue: entry.issue, outcome: 'FAILED', attempt: attempts.length, error: attempt.error });
+    }
+  }
+  const entries = readOutbox(dir);
+  const counts = results.reduce((summary, entry) => {
+    summary[entry.outcome] += 1;
+    return summary;
+  }, { SUCCEEDED: 0, FAILED: 0, ABANDONED: 0 });
+  return {
+    ok: true, flushed: counts.SUCCEEDED,
+    skipped: entries.filter((entry) => entry.state === 'succeeded').length - counts.SUCCEEDED,
+    failed: counts.FAILED, abandoned: counts.ABANDONED,
+    remaining: entries.filter((entry) => entry.state === 'pending').length, entries: results,
+  };
 }
 
 export function acknowledgeOutbox(dir, entryId, reason, actor = 'operator') {

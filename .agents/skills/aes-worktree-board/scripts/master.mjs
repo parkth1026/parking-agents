@@ -24,7 +24,7 @@ import { buildHumanRequest, validateHumanRequest, validateHumanResponse } from '
 import { decideMerge, evaluateMechanicalGate, resolveMergePolicy } from './merge-policy.mjs';
 import { disposeDiscovery, makeWayfinder } from './discovery.mjs';
 import {
-  acknowledgeOutbox, enqueueIssueClose, enqueueIssueCloseWithinRuntimeLock, flushOutbox, outboxStatus, outboxWarning,
+  acknowledgeOutbox, enqueueIssueClose, flushOutbox, outboxStatus, outboxWarning, readOutbox,
 } from './outbox-store.mjs';
 
 export const TERMINAL_SCHEMA = 'aes.issue-worker.goal-terminal/v1';
@@ -942,12 +942,8 @@ export async function masterClose(options = {}) {
     };
   }
 
-  return updateV4Registry(dir, (writable) => {
+  const closed = updateV4Registry(dir, (writable) => {
     const target = writable.deliveries[job.jobId];
-    const queued = enqueueIssueCloseWithinRuntimeLock(dir, {
-      jobId: job.jobId, issue: job.issue, repo: config.repoIdentity.issueRepo,
-      commentDigest, comment: body,
-    });
     target.issueClose = { outcome: 'LOCAL_CLOSED', commentDigest, closedAt: nowIso() };
     const released = releaseSlot(writable, job.slotId, { reason: `job ${job.jobId} 已交付，等待 baseline 同步` });
     target.runnerRelease = {
@@ -957,11 +953,14 @@ export async function masterClose(options = {}) {
     };
     setJobState(writable, job.jobId, 'closed', { reason: 'Issue 幂等关闭', dir });
     appendReceipt(dir, { kind: 'delivery', jobId: job.jobId, delivery: target });
-    return {
-      ok: true, outcome: 'CLOSED', jobId: job.jobId, issue: job.issue, commentDigest, delivery: target,
-      outbox: { entryId: queued.entry.entryId, state: queued.entry.state, enqueued: queued.enqueued },
-    };
+    return { ok: true, outcome: 'CLOSED', jobId: job.jobId, issue: job.issue, commentDigest, delivery: target };
   });
+  const enqueue = options.enqueueOutbox || enqueueIssueClose;
+  const queued = enqueue(dir, {
+    jobId: job.jobId, issue: job.issue, repo: config.repoIdentity.issueRepo,
+    commentDigest, comment: body,
+  });
+  return { ...closed, outbox: { entryId: queued.entry.entryId, state: queued.entry.state, enqueued: queued.enqueued } };
 }
 
 export function masterOutboxStatus(options = {}) {
@@ -976,7 +975,7 @@ export function masterOutboxAcknowledge(options = {}) {
 
 export async function masterOutboxFlush(options = {}) {
   const { dir, config } = ctx(options);
-  return flushOutbox(dir, options.gh || defaultGh(config.repoIdentity.issueRepo));
+  return flushOutbox(dir, options.gh || defaultGh(config.repoIdentity.issueRepo), options);
 }
 
 function buildCloseComment(job, delivery) {
@@ -1116,6 +1115,13 @@ export function masterReconcile(options = {}) {
         } else if (delivery.postMergeVerification.outcome === 'FAIL') {
           actions.push({ jobId: job.jobId, action: 'HOLD_FAILED_VERIFICATION' });
         }
+      } else if (job.state === 'closed') {
+        const delivery = registry.deliveries[job.jobId];
+        const persisted = delivery?.issueClose?.commentDigest
+          && readOutbox(dir).some((entry) => entry.commentDigest === delivery.issueClose.commentDigest);
+        if (delivery?.issueClose?.outcome === 'LOCAL_CLOSED' && !persisted) {
+          actions.push({ jobId: job.jobId, action: 'RESUME_OUTBOX_ENQUEUE' });
+        }
       } else if (job.state === 'dispatched') {
         // 中断点 1：owner thread 状态未知。优先恢复原 thread，不直接新建 attempt。
         const runner = registry.runners[job.slotId];
@@ -1210,6 +1216,7 @@ const MACHINE_ACTIONABLE = Object.freeze({
   REQUEUE_FOR_MERGE: 'merge',
   RESUME_POST_MERGE_VERIFY: 'verify',
   RESUME_CLOSE: 'close',
+  RESUME_OUTBOX_ENQUEUE: 'close',
 });
 
 // 把 reconcile 的结论直接执行掉一步。无人值守循环因此不需要调用方自己解析
