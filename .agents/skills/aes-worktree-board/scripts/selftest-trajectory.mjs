@@ -52,20 +52,59 @@ async function runStep(world, step) {
     }
     case 'review': {
       const job = world.jobs[step.job];
-      return master.recordStageResult({
+      let registry = readV4Registry(fixture.v4Dir);
+      let attempt = registry.attempts[registry.jobs[job.jobId].currentAttemptId];
+      if (registry.jobs[job.jobId].state !== 'ready-to-merge' || !registry.mergeQueue.includes(job.jobId)) {
+        if (!attempt.qa) {
+          master.recordStageResult({
+            ...shared, jobId: job.jobId, stage: 'qa',
+            payload: {
+              schemaVersion: 'aes.qa.receipt/v1', jobId: job.jobId,
+              commitSha: world.commits[step.job], outcome: 'PASS',
+              environment: { kind: 'fixture', identityDigest: 'sha256:trajectory-review-preflight' },
+              checks: [{ id: 'QA-review-preflight', kind: 'automated', outcome: 'PASS' }], unexecuted: [],
+            },
+          });
+        }
+        master.masterTerminal({
+          ...shared,
+          payload: {
+            schemaVersion: 'aes.issue-worker.goal-terminal/v1', jobId: job.jobId,
+            attemptId: attempt.attemptId, outcome: 'READY_TO_MERGE', issue: job.workOrder.issue.number,
+            contractDigest: job.workOrder.issue.contractDigest, baseCommit: job.workOrder.runner.baseCommit,
+            candidateCommit: world.commits[step.job],
+            acceptance: [{ id: 'AC-1', outcome: 'PASS', evidenceRefs: ['qa:QA-review-preflight'] }],
+          },
+        });
+      }
+      const lifecycle = master.claimMergeReview({ ...shared, jobId: job.jobId });
+      const findings = (step.findings || []).map((finding, index) => ({
+        id: finding.id || `RF-${index + 1}`,
+        axis: String(finding.axis || 'spec').toLowerCase() === 'standards' ? 'standards' : 'spec',
+        severity: 'must-fix',
+        location: finding.location || 'trajectory-fixture:1',
+        finding: finding.finding || finding.summary || 'trajectory finding',
+        requiredAction: finding.requiredAction || finding.recoveryCondition || '修复 finding',
+      }));
+      const result = master.recordStageResult({
         ...shared, jobId: job.jobId, stage: 'review',
         payload: {
-          schemaVersion: step.schemaVersion || 'aes.issue-worker.stage-result/v1',
+          schemaVersion: step.schemaVersion || master.STAGE_RESULT_SCHEMA_V2,
           jobId: step.forgeJobId || job.jobId,
-          attemptId: step.forgeAttemptId || undefined,
+          attemptId: step.forgeAttemptId || attempt.attemptId,
           stage: 'code-review',
           commitSha: step.commitOverride ? world.commits[step.commitOverride] : world.commits[step.job],
+          baseCommit: lifecycle.baseCommit,
+          reviewerSessionId: 'trajectory-merge-worker',
           outcome: step.outcome,
           failureClass: step.failureClass,
-          findings: step.findings || [],
+          findings,
+          depthTier: lifecycle.depthTier,
+          effectiveRisk: lifecycle.effectiveRisk,
           mayAdvance: step.outcome === 'PASS',
         },
       });
+      return step.outcome === 'MUST_FIX' ? { ...result, failureClass: 'must-fix' } : result;
     }
     case 'qa': {
       const job = world.jobs[step.job];
@@ -201,7 +240,8 @@ function checkExpectation(world, expectation) {
     case 'budget-usage': {
       const job = registry.jobs[world.jobs[expectation.job].jobId];
       const attempt = registry.attempts[job.currentAttemptId];
-      assert.equal(attempt.budgetUsage?.[expectation.key] ?? 0, expectation.equals, `${label}: ${expectation.why}`);
+      const usage = expectation.key === 'reviewLoops' ? job.budgetUsage : attempt.budgetUsage;
+      assert.equal(usage?.[expectation.key] ?? 0, expectation.equals, `${label}: ${expectation.why}`);
       return;
     }
     case 'human-requests-open': {

@@ -6,6 +6,7 @@ import { storeError } from './job-store.mjs';
 
 export const RISK_PROFILES = Object.freeze(['low', 'medium', 'high', 'critical']);
 export const MERGE_POLICIES = Object.freeze(['AUTO_MERGE', 'HUMAN_GATE', 'PR_ONLY']);
+export const REVIEW_DEPTH_TIERS = Object.freeze(['light', 'deep']);
 
 const RISK_ORDER = Object.freeze(Object.fromEntries(RISK_PROFILES.map((value, index) => [value, index])));
 
@@ -17,6 +18,15 @@ const POLICY_BY_RISK = Object.freeze({
   high: 'HUMAN_GATE',
   critical: 'PR_ONLY',
 });
+
+const REVIEW_DEPTH_BY_RISK = Object.freeze({
+  low: 'light', medium: 'light', high: 'deep', critical: 'deep',
+});
+
+export function reviewDepthForRisk(effectiveRisk) {
+  assertRiskProfile(effectiveRisk);
+  return REVIEW_DEPTH_BY_RISK[effectiveRisk];
+}
 
 // 触及权限、identity、数据格式迁移、安全边界、公共 API 的改动不得自报低于 high。
 // 每条规则都必须能指名它兜住的是哪一类风险，否则就是无法解释的黑箱升级。
