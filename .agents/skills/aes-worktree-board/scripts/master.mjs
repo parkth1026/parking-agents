@@ -6,7 +6,7 @@
 // 重启后 reconcile 用 `git merge-base --is-ancestor` 去问 Git 到底 merge 没 merge，
 // 而不是相信可能在崩溃前没写完的状态位。这是「无重复 merge / 无假完成」的真正依据。
 import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { HEADLESS_CHILD_OPTIONS } from './headless.mjs';
@@ -16,7 +16,7 @@ import {
   setJobState, storeError, updateV4Registry, V4_DIR,
 } from './job-store.mjs';
 import {
-  assertStartable, defaultSlotsFromWorktrees, initSlots, loadSlotsConfig, projectRunners,
+  assertStartable, defaultSlotsFromWorktrees, initSlots, loadSlotsConfig, normalizePath, projectRunners,
   slotById, SLOTS_PATH, syncSlotBaseline, updateSlots,
 } from './runner-slots.mjs';
 import { assertContractComplete, buildWorkOrder, contractDigestOf } from './issue-contract.mjs';
@@ -65,6 +65,94 @@ export function isAncestor(repoRoot, candidate, branch) {
 function changedPathsBetween(repoRoot, base, candidate) {
   const out = gitOut(repoRoot, ['diff', '--name-only', `${base}...${candidate}`]);
   return out ? out.split(/\r?\n/).filter(Boolean) : [];
+}
+
+function mergeGateSnapshot(job, attempt, runner) {
+  return {
+    jobState: job.state,
+    slotId: job.slotId,
+    currentAttemptId: job.currentAttemptId,
+    declaredRisk: job.declaredRisk,
+    humanGateApprovalDigest: digestOf(job.humanGateApproval || null),
+    runnerDigest: digestOf(runner ? {
+      slotId: runner.slotId, state: runner.state, lease: runner.lease || null,
+    } : null),
+    candidateCommit: attempt?.candidateCommit || null,
+    terminalCandidateCommit: job.terminal?.candidateCommit || null,
+    terminalDigest: digestOf(job.terminal || null),
+    reviewDigest: digestOf(attempt?.review || null),
+    qaDigest: digestOf(attempt?.qa || null),
+    acceptanceDigest: digestOf(job.acceptance || null),
+    acceptanceCommit: job.acceptanceCommit || null,
+    baseCommit: job.baseCommit || null,
+  };
+}
+
+function gitPath(cwd, name) {
+  const path = gitOut(cwd, ['rev-parse', '--git-path', name]);
+  return path ? resolve(cwd, path) : null;
+}
+
+function activeGitOperation(hostRoot) {
+  for (const [operation, markers] of [
+    ['merge', ['MERGE_HEAD']],
+    ['rebase', ['rebase-merge', 'rebase-apply', 'REBASE_HEAD']],
+    ['cherry-pick', ['CHERRY_PICK_HEAD']],
+  ]) {
+    if (markers.some((marker) => {
+      const path = gitPath(hostRoot, marker);
+      return path && existsSync(path);
+    })) return operation;
+  }
+  return null;
+}
+
+function inspectHostCheckout(options = {}) {
+  const { config, hostRoot } = ctx(options);
+  const integrationBranch = config.repoIdentity.integrationBranch;
+  const commonDir = gitOut(hostRoot, ['rev-parse', '--git-common-dir']);
+  const commonRoot = commonDir ? resolve(hostRoot, commonDir, '..') : null;
+  if (!commonRoot || normalizePath(commonRoot) !== normalizePath(config.repoIdentity.root)) {
+    return {
+      ok: false, code: 'HOST_REPO_MISMATCH', disposition: 'REJECTED_MECHANICAL',
+      expectedRepoRoot: resolve(config.repoIdentity.root), actualRepoRoot: commonRoot,
+    };
+  }
+  const operation = activeGitOperation(hostRoot);
+  if (operation) {
+    return {
+      ok: false, code: 'HOST_GIT_OPERATION_IN_PROGRESS', disposition: 'REJECTED_MECHANICAL', operation,
+    };
+  }
+  const branch = gitOut(hostRoot, ['symbolic-ref', '--quiet', '--short', 'HEAD']);
+  if (branch !== integrationBranch) {
+    return {
+      ok: false, code: 'HOST_CHECKOUT_MISMATCH', disposition: 'REJECTED_MECHANICAL',
+      expectedBranch: integrationBranch, actualBranch: branch,
+    };
+  }
+  const head = gitOut(hostRoot, ['rev-parse', 'HEAD']);
+  if (head !== options.integrationHead) {
+    return {
+      ok: false, code: 'INTEGRATION_HEAD_MOVED', disposition: 'REJECTED_MECHANICAL',
+      expectedIntegrationHead: options.integrationHead, integrationHead: head,
+    };
+  }
+  const statusResult = git(hostRoot, ['status', '--porcelain=v1', '--untracked-files=all']);
+  if (statusResult.status !== 0) {
+    return {
+      ok: false, code: 'HOST_STATUS_UNRESOLVED', disposition: 'REJECTED_MECHANICAL',
+      detail: String(statusResult.error?.message || statusResult.stderr || '').slice(0, 600),
+    };
+  }
+  const status = String(statusResult.stdout || '').trim();
+  if (status) {
+    return {
+      ok: false, code: 'HOST_WORKTREE_DIRTY', disposition: 'REJECTED_MECHANICAL',
+      dirtyEntries: status.split(/\r?\n/).filter(Boolean).slice(0, 10),
+    };
+  }
+  return { ok: true, integrationBranch, integrationHead: head };
 }
 
 function commitSummaryBetween(repoRoot, base, candidate) {
@@ -808,6 +896,7 @@ export function evaluateGate(options = {}) {
   return {
     ok: true, jobId: job.jobId, policy, mechanical, decision,
     candidateCommit: attempt?.candidateCommit || null, integrationHead, changedPaths,
+    snapshot: mergeGateSnapshot(job, attempt, runner),
   };
 }
 
@@ -826,9 +915,20 @@ export function openMergeIntent(options = {}) {
     }
     const job = jobOf(registry, options.jobId);
     const attempt = currentAttempt(registry, options.jobId);
+    const runner = registry.runners[job.slotId] || null;
+    const actualSnapshot = mergeGateSnapshot(job, attempt, runner);
+    if (!gate.snapshot || digestOf(gate.snapshot) !== digestOf(actualSnapshot)) {
+      throw storeError('GATE_SNAPSHOT_STALE', `job ${job.jobId} 的 gate snapshot 已失效，必须重新 gate`, {
+        jobId: job.jobId,
+        expectedCandidate: gate.snapshot?.candidateCommit || gate.candidateCommit || null,
+        actualCandidate: actualSnapshot.candidateCommit,
+        expectedSnapshot: gate.snapshot || null,
+        actualSnapshot,
+      });
+    }
     const record = {
       jobId: job.jobId,
-      candidateCommit: attempt.candidateCommit,
+      candidateCommit: options.canonicalCandidateCommit || gate.snapshot.candidateCommit,
       integrationBranch: config.repoIdentity.integrationBranch,
       integrationHeadBefore: gate.integrationHead,
       decision: gate.decision.decision,
@@ -846,25 +946,27 @@ export function openMergeIntent(options = {}) {
 export function runIntegrationMerge(options = {}) {
   const { hostRoot } = ctx(options);
   const intent = options.intent;
-  const liveIntegrationHead = gitOut(hostRoot, ['rev-parse', intent.integrationBranch]);
-  if (liveIntegrationHead !== intent.integrationHeadBefore) {
-    return {
-      merged: false, code: 'INTEGRATION_HEAD_MOVED', disposition: 'REJECTED_MECHANICAL',
-      mergeCommit: null, integrationHead: liveIntegrationHead, candidateCommit: intent.candidateCommit,
-      detail: `integration HEAD 已从 ${intent.integrationHeadBefore} 前进到 ${liveIntegrationHead || 'UNRESOLVED'}，必须重新 gate`,
-    };
-  }
+  const host = inspectHostCheckout({ ...options, integrationHead: intent.integrationHeadBefore });
+  if (!host.ok) return { merged: false, mergeCommit: null, candidateCommit: intent.candidateCommit, ...host };
   const inspected = inspectMergeCandidate({
-    ...options, integrationHead: liveIntegrationHead, candidateCommit: intent.candidateCommit,
+    ...options, integrationHead: host.integrationHead, candidateCommit: intent.candidateCommit,
   });
   if (!inspected.ok) return { merged: false, mergeCommit: null, ...inspected };
+  const finalHost = inspectHostCheckout({ ...options, integrationHead: intent.integrationHeadBefore });
+  if (!finalHost.ok) {
+    return { merged: false, mergeCommit: null, candidateCommit: inspected.candidateCommit, ...finalHost };
+  }
+  const mergeHeadBefore = gitOut(hostRoot, ['rev-parse', '-q', '--verify', 'MERGE_HEAD']);
   const merge = git(hostRoot, ['merge', '--no-ff', '-m',
-    `merge(${intent.integrationBranch}): job ${intent.jobId} candidate ${String(intent.candidateCommit).slice(0, 8)}`,
-    intent.candidateCommit]);
+    `merge(${intent.integrationBranch}): job ${intent.jobId} candidate ${String(inspected.candidateCommit).slice(0, 8)}`,
+    inspected.candidateCommit]);
+  const mergeHeadAfter = gitOut(hostRoot, ['rev-parse', '-q', '--verify', 'MERGE_HEAD']);
   return {
     merged: merge.status === 0,
     mergeCommit: merge.status === 0 ? gitOut(hostRoot, ['rev-parse', 'HEAD']) : null,
     detail: merge.status === 0 ? null : String(merge.stderr || merge.stdout || '').slice(0, 600),
+    candidateCommit: inspected.candidateCommit,
+    ownedMergeHead: !mergeHeadBefore && mergeHeadAfter === inspected.candidateCommit ? mergeHeadAfter : null,
   };
 }
 
@@ -878,14 +980,32 @@ export function finalizeMerge(options = {}) {
   return updateV4Registry(dir, (registry) => {
     const job = jobOf(registry, intent.jobId);
     if (!merged) {
-      // merge conflict：不 close、不释放 slot、保留失败证据进 typed disposition。
-      git(hostRoot, ['merge', '--abort']);
+      // 只清理由本次 git merge 创建且仍绑定同一 candidate 的 MERGE_HEAD。
+      // 预存在 merge/rebase/cherry-pick 现场不属于本调用，绝不能借失败清理破坏。
+      const liveMergeHead = gitOut(hostRoot, ['rev-parse', '-q', '--verify', 'MERGE_HEAD']);
+      if (options.result.ownedMergeHead && liveMergeHead === options.result.ownedMergeHead) {
+        git(hostRoot, ['merge', '--abort']);
+      }
       const code = options.result.code || 'MERGE_CONFLICT';
       const disposition = options.result.disposition || 'AWAITING_FIX';
+      const failureDetails = {
+        operation: options.result.operation || null,
+        expectedRepoRoot: options.result.expectedRepoRoot || null,
+        actualRepoRoot: options.result.actualRepoRoot || null,
+        expectedBranch: options.result.expectedBranch || null,
+        actualBranch: options.result.actualBranch || null,
+        expectedIntegrationHead: options.result.expectedIntegrationHead || null,
+        integrationHead: options.result.integrationHead || null,
+        dirtyEntries: options.result.dirtyEntries || [],
+      };
       job.mergeIntent = { ...intent, closedAt: nowIso(), outcome: code };
       setJobState(registry, job.jobId, 'ready-to-merge', { reason: code, dir });
-      appendReceipt(dir, { kind: 'merge-failed', jobId: job.jobId, reason: code, disposition, detail });
-      return { ok: false, code, jobId: job.jobId, disposition, detail };
+      appendReceipt(dir, {
+        kind: 'merge-failed', jobId: job.jobId, reason: code, disposition, detail, ...failureDetails,
+      });
+      return {
+        ok: false, code, jobId: job.jobId, disposition, detail, ...failureDetails,
+      };
     }
     job.mergeIntent = { ...intent, closedAt: nowIso(), outcome: 'MERGED', mergeCommit };
     registry.deliveries[job.jobId] = {
@@ -936,6 +1056,16 @@ export function masterMerge(options = {}) {
     }
     return { ok: false, jobId: options.jobId, ...gate.decision, policy: gate.policy, mechanical: gate.mechanical };
   }
+  const host = inspectHostCheckout({ ...options, integrationHead: gate.integrationHead });
+  if (!host.ok) {
+    appendReceipt(dir, {
+      kind: 'merge-failed', jobId: options.jobId, reason: host.code,
+      disposition: host.disposition, integrationHead: host.integrationHead || gate.integrationHead,
+      candidateCommit: gate.candidateCommit, operation: host.operation || null,
+      expectedBranch: host.expectedBranch, actualBranch: host.actualBranch,
+    });
+    return { ...host, jobId: options.jobId, candidateCommit: gate.candidateCommit };
+  }
   const inspected = inspectMergeCandidate({
     ...options, integrationHead: gate.integrationHead, candidateCommit: gate.candidateCommit,
   });
@@ -949,7 +1079,7 @@ export function masterMerge(options = {}) {
     });
     return { ...inspected, jobId: options.jobId };
   }
-  const intent = openMergeIntent({ ...options, gate });
+  const intent = openMergeIntent({ ...options, gate, canonicalCandidateCommit: inspected.candidateCommit });
   const result = runIntegrationMerge({ ...options, intent });
   return finalizeMerge({ ...options, result: { intent, ...result } });
 }

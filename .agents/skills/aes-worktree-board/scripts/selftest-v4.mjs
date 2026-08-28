@@ -810,9 +810,282 @@ export async function deliveryMergeScenario() {
   await mergeConflictDisposition();
   await candidateAncestryDivergenceDisposition();
   await unrelatedChangesDisposition();
+  await gateSnapshotStaleDisposition();
+  await shortCandidateIsCanonicalized();
+  await hostCheckoutBindingDisposition();
+  await preexistingGitOperationsArePreserved();
   await mergeRefreshesRunnerTopology();
   await serialMergeEnforcement();
   await legacyArchiveStable();
+}
+
+async function gateSnapshotStaleDisposition() {
+  const mutations = {
+    candidate(fixture, job) {
+      const candidateB = makeCandidate(fixture, job.slotId, { file: 'candidate-b.txt' });
+      updateV4Registry(fixture.v4Dir, (registry) => {
+        registry.attempts[job.attemptId].candidateCommit = candidateB;
+        return { ok: true };
+      });
+    },
+    terminal(fixture, job) {
+      updateV4Registry(fixture.v4Dir, (registry) => {
+        registry.jobs[job.jobId].terminal = { ...registry.jobs[job.jobId].terminal, qaReceipt: 'changed-after-gate' };
+        return { ok: true };
+      });
+    },
+    review(fixture, job) {
+      updateV4Registry(fixture.v4Dir, (registry) => {
+        const attempt = registry.attempts[job.attemptId];
+        attempt.review = { ...attempt.review, evidence: [...attempt.review.evidence, { kind: 'late', result: 'PASS' }] };
+        return { ok: true };
+      });
+    },
+    qa(fixture, job) {
+      updateV4Registry(fixture.v4Dir, (registry) => {
+        const attempt = registry.attempts[job.attemptId];
+        attempt.qa = { ...attempt.qa, checks: [...attempt.qa.checks, { id: 'QA-late', kind: 'automated', outcome: 'PASS' }] };
+        return { ok: true };
+      });
+    },
+    acceptance(fixture, job) {
+      updateV4Registry(fixture.v4Dir, (registry) => {
+        registry.jobs[job.jobId].acceptance = registry.jobs[job.jobId].acceptance.map((entry) => ({
+          ...entry, evidenceRefs: [...entry.evidenceRefs, 'late:evidence'],
+        }));
+        return { ok: true };
+      });
+    },
+    risk(fixture, job) {
+      updateV4Registry(fixture.v4Dir, (registry) => {
+        registry.jobs[job.jobId].declaredRisk = 'critical';
+        return { ok: true };
+      });
+    },
+    humanApproval(fixture, job) {
+      updateV4Registry(fixture.v4Dir, (registry) => {
+        registry.jobs[job.jobId].humanGateApproval = { outcome: 'PASS', resumeToken: 'late-approval' };
+        return { ok: true };
+      });
+    },
+    runnerLease(fixture, job) {
+      updateV4Registry(fixture.v4Dir, (registry) => {
+        registry.runners[job.slotId].lease = { ...registry.runners[job.slotId].lease, attemptId: 'reassigned-after-gate' };
+        return { ok: true };
+      });
+    },
+    runnerState(fixture, job) {
+      updateV4Registry(fixture.v4Dir, (registry) => {
+        registry.runners[job.slotId].state = 'QUARANTINED_DIRTY';
+        return { ok: true };
+      });
+    },
+  };
+  for (const [kind, mutate] of Object.entries(mutations)) {
+    const fixture = makeFixture(`delivery-stale-${kind}`, { workers: [{ id: 'worker-1' }] });
+    try {
+      writeSlots(fixture);
+      master.masterStart({ ...base(fixture) });
+      const job = driveToReadyToMerge(fixture, issuePayload({ number: 535 }));
+      const gateA = master.evaluateGate({ ...base(fixture), jobId: job.jobId });
+      mutate(fixture, job);
+
+      assert.throws(
+        () => master.openMergeIntent({ ...base(fixture), jobId: job.jobId, gate: gateA }),
+        (error) => error.code === 'GATE_SNAPSHOT_STALE',
+        `${kind} gate snapshot 变化必须 fail closed`,
+      );
+      const registry = readV4Registry(fixture.v4Dir);
+      assert.equal(registry.jobs[job.jobId].mergeIntent, undefined, `${kind} stale gate 不得建立 intent`);
+      assert.notEqual(registry.jobs[job.jobId].state, 'merging', `${kind} stale gate 不得推进 merging`);
+      assert.equal(gitOut(fixture.repoRoot, ['rev-parse', 'dev']), job.baseCommit, `${kind} stale gate 不得触碰 integration`);
+    } finally {
+      fixture.cleanup();
+    }
+  }
+}
+
+async function shortCandidateIsCanonicalized() {
+  const fixture = makeFixture('delivery-short-candidate', { workers: [{ id: 'worker-1' }] });
+  try {
+    writeSlots(fixture);
+    master.masterStart({ ...base(fixture) });
+    const issue = issuePayload({ number: 538 });
+    const claim = master.masterClaim({ ...base(fixture), issue });
+    const fullCandidate = makeCandidate(fixture, claim.slotId, { file: 'short-candidate.txt' });
+    const shortCandidate = fullCandidate.slice(0, 12);
+    master.setAttemptOwnerThreadId({ ...base(fixture), jobId: claim.jobId, ownerThreadId: 'owner-short' });
+    master.recordCandidate({ ...base(fixture), jobId: claim.jobId, commitSha: shortCandidate });
+    master.recordStageResult({
+      ...base(fixture), jobId: claim.jobId, stage: 'review',
+      payload: passingReview(claim.jobId, shortCandidate, claim.workOrder.runner.baseCommit, 'reviewer-short'),
+    });
+    master.recordStageResult({
+      ...base(fixture), jobId: claim.jobId, stage: 'qa',
+      payload: passingQa(claim.jobId, shortCandidate, claim.workOrder.runner.baseCommit),
+    });
+    master.masterTerminal({
+      ...base(fixture),
+      payload: readyTerminal(
+        { jobId: claim.jobId, attemptId: claim.attemptId, issue: issue.number, baseCommit: claim.workOrder.runner.baseCommit },
+        shortCandidate, claim.workOrder.issue.contractDigest,
+      ),
+    });
+
+    const result = master.masterMerge({ ...base(fixture), jobId: claim.jobId });
+    assert.equal(result.ok, true);
+    assert.equal(result.candidateCommit, fullCandidate, 'merge result 必须写 canonical full SHA');
+    const registry = readV4Registry(fixture.v4Dir);
+    assert.equal(registry.jobs[claim.jobId].mergeIntent.candidateCommit, fullCandidate);
+    assert.equal(registry.deliveries[claim.jobId].candidateCommit, fullCandidate);
+  } finally {
+    fixture.cleanup();
+  }
+}
+
+async function hostCheckoutBindingDisposition() {
+  const fixture = makeFixture('delivery-host-binding', { workers: [{ id: 'worker-1' }] });
+  try {
+    writeSlots(fixture);
+    master.masterStart({ ...base(fixture) });
+    const job = driveToReadyToMerge(fixture, issuePayload({ number: 536 }));
+    const devBefore = gitOut(fixture.repoRoot, ['rev-parse', 'dev']);
+    git(fixture.repoRoot, ['checkout', '-b', 'wrong-host-branch']);
+    const wrongBefore = gitOut(fixture.repoRoot, ['rev-parse', 'HEAD']);
+
+    const result = freshProcess(fixture, ['merge', '--job', job.jobId], { expectStatus: 'nonzero' });
+    assert.equal(result.code, 'HOST_CHECKOUT_MISMATCH');
+    assert.equal(gitOut(fixture.repoRoot, ['symbolic-ref', '--short', 'HEAD']), 'wrong-host-branch');
+    assert.equal(gitOut(fixture.repoRoot, ['rev-parse', 'HEAD']), wrongBefore, '错误 checkout 不得被写入');
+    assert.equal(gitOut(fixture.repoRoot, ['rev-parse', 'dev']), devBefore, 'integration branch 不得被写入');
+    assert.equal(readV4Registry(fixture.v4Dir).jobs[job.jobId].mergeIntent, undefined);
+  } finally {
+    fixture.cleanup();
+  }
+
+  const detachedFixture = makeFixture('delivery-host-detached', { workers: [{ id: 'worker-1' }] });
+  try {
+    writeSlots(detachedFixture);
+    master.masterStart({ ...base(detachedFixture) });
+    const job = driveToReadyToMerge(detachedFixture, issuePayload({ number: 536 }));
+    const devBefore = gitOut(detachedFixture.repoRoot, ['rev-parse', 'dev']);
+    git(detachedFixture.repoRoot, ['checkout', '--detach', devBefore]);
+    const result = master.masterMerge({ ...base(detachedFixture), jobId: job.jobId });
+    assert.equal(result.code, 'HOST_CHECKOUT_MISMATCH');
+    assert.equal(result.actualBranch, null);
+    assert.equal(gitOut(detachedFixture.repoRoot, ['rev-parse', 'HEAD']), devBefore);
+    assert.equal(gitOut(detachedFixture.repoRoot, ['rev-parse', 'dev']), devBefore);
+    assert.equal(readV4Registry(detachedFixture.v4Dir).jobs[job.jobId].mergeIntent, undefined);
+  } finally {
+    detachedFixture.cleanup();
+  }
+
+  const dirtyFixture = makeFixture('delivery-host-dirty', { workers: [{ id: 'worker-1' }] });
+  try {
+    writeSlots(dirtyFixture);
+    master.masterStart({ ...base(dirtyFixture) });
+    const job = driveToReadyToMerge(dirtyFixture, issuePayload({ number: 536 }));
+    writeFileSync(join(dirtyFixture.repoRoot, 'host-user-scratch.txt'), 'do not touch\n');
+    const statusBefore = gitOut(dirtyFixture.repoRoot, ['status', '--porcelain=v1', '--untracked-files=all']);
+    const result = master.masterMerge({ ...base(dirtyFixture), jobId: job.jobId });
+    assert.equal(result.code, 'HOST_WORKTREE_DIRTY');
+    assert.equal(gitOut(dirtyFixture.repoRoot, ['status', '--porcelain=v1', '--untracked-files=all']), statusBefore);
+    assert.equal(readV4Registry(dirtyFixture.v4Dir).jobs[job.jobId].mergeIntent, undefined);
+  } finally {
+    dirtyFixture.cleanup();
+  }
+
+  const movedFixture = makeFixture('delivery-host-moved', { workers: [{ id: 'worker-1' }] });
+  try {
+    writeSlots(movedFixture);
+    master.masterStart({ ...base(movedFixture) });
+    const job = driveToReadyToMerge(movedFixture, issuePayload({ number: 536 }));
+    const intent = master.openMergeIntent({ ...base(movedFixture), jobId: job.jobId });
+    writeFileSync(join(movedFixture.repoRoot, 'integration-moved.txt'), 'moved after gate\n');
+    git(movedFixture.repoRoot, ['add', '.']);
+    git(movedFixture.repoRoot, ['commit', '-m', 'integration moved after gate']);
+    const movedHead = gitOut(movedFixture.repoRoot, ['rev-parse', 'HEAD']);
+    const result = master.runIntegrationMerge({ ...base(movedFixture), intent });
+    assert.equal(result.code, 'INTEGRATION_HEAD_MOVED');
+    assert.equal(gitOut(movedFixture.repoRoot, ['rev-parse', 'HEAD']), movedHead);
+    assert.notEqual(
+      git(movedFixture.repoRoot, ['merge-base', '--is-ancestor', job.candidate, 'dev'], { allowFailure: true }).status,
+      0,
+      'HEAD 前进后不得偷偷合入 candidate',
+    );
+  } finally {
+    movedFixture.cleanup();
+  }
+
+  const repoFixture = makeFixture('delivery-host-repo', {
+    workers: [{ id: 'worker-1' }, { id: 'foreign-host', foreignRepo: true }],
+  });
+  try {
+    initSlots({
+      path: repoFixture.slotsPath, repoIdentity: repoFixture.repoIdentity,
+      slots: repoFixture.slots, hostWorktree: repoFixture.worktreeOf('foreign-host'), force: true,
+    });
+    master.masterStart({ ...base(repoFixture) });
+    const job = driveToReadyToMerge(repoFixture, issuePayload({ number: 536 }), { slotId: 'worker-1' });
+    const foreignBefore = gitOut(repoFixture.worktreeOf('foreign-host'), ['rev-parse', 'HEAD']);
+    const result = master.masterMerge({ ...base(repoFixture), jobId: job.jobId });
+    assert.equal(result.code, 'HOST_REPO_MISMATCH');
+    assert.equal(gitOut(repoFixture.worktreeOf('foreign-host'), ['rev-parse', 'HEAD']), foreignBefore);
+    assert.equal(readV4Registry(repoFixture.v4Dir).jobs[job.jobId].mergeIntent, undefined);
+  } finally {
+    repoFixture.cleanup();
+  }
+}
+
+function gitOperationFingerprint(fixture) {
+  const optionalRef = (name) => {
+    const result = git(fixture.repoRoot, ['rev-parse', '-q', '--verify', name], { allowFailure: true });
+    return result.status === 0 ? String(result.stdout || '').trim() : null;
+  };
+  return {
+    head: gitOut(fixture.repoRoot, ['rev-parse', 'HEAD']),
+    branch: optionalRef('HEAD') ? String(git(fixture.repoRoot, ['symbolic-ref', '--quiet', '--short', 'HEAD'], { allowFailure: true }).stdout || '').trim() : null,
+    status: gitOut(fixture.repoRoot, ['status', '--porcelain=v2', '--branch']),
+    mergeHead: optionalRef('MERGE_HEAD'),
+    cherryPickHead: optionalRef('CHERRY_PICK_HEAD'),
+    rebaseHead: optionalRef('REBASE_HEAD'),
+  };
+}
+
+function createConflictingGitOperation(fixture, kind) {
+  const opCommit = makeConflict(fixture, 'op-worker', 'operation-conflict.txt');
+  const commands = {
+    merge: ['merge', opCommit],
+    rebase: ['rebase', opCommit],
+    'cherry-pick': ['cherry-pick', opCommit],
+  };
+  const operation = commands[kind];
+  const started = git(fixture.repoRoot, operation, { allowFailure: true });
+  assert.notEqual(started.status, 0, `${kind} fixture 必须进入冲突现场`);
+}
+
+async function preexistingGitOperationsArePreserved() {
+  for (const kind of ['merge', 'rebase', 'cherry-pick']) {
+    const fixture = makeFixture(`delivery-existing-${kind}`, {
+      workers: [{ id: 'worker-1' }, { id: 'op-worker' }],
+    });
+    try {
+      writeSlots(fixture);
+      master.masterStart({ ...base(fixture) });
+      const job = driveToReadyToMerge(fixture, issuePayload({ number: 537 }), { slotId: 'worker-1' });
+      const intent = master.openMergeIntent({ ...base(fixture), jobId: job.jobId });
+      createConflictingGitOperation(fixture, kind);
+      const before = gitOperationFingerprint(fixture);
+
+      const result = master.runIntegrationMerge({ ...base(fixture), intent });
+      const finalized = master.finalizeMerge({ ...base(fixture), result: { intent, ...result } });
+      assert.equal(finalized.code, 'HOST_GIT_OPERATION_IN_PROGRESS');
+      assert.equal(finalized.operation, kind);
+      assert.deepEqual(gitOperationFingerprint(fixture), before, `${kind} 现场不得被 abort 或改写`);
+    } finally {
+      fixture.cleanup();
+    }
+  }
 }
 
 async function candidateAncestryDivergenceDisposition() {
