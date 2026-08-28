@@ -2427,6 +2427,21 @@ async function orchestrationStorageCompatibility() {
   }
 }
 
+async function uniquelyAddressableWorktree(context) {
+  const siblings = (await listWorktrees()).siblings;
+  const basenameCounts = new Map();
+  for (const entry of siblings) {
+    const name = basename(entry.path);
+    basenameCounts.set(name, (basenameCounts.get(name) || 0) + 1);
+  }
+  const entry = siblings.find((candidate) => basenameCounts.get(basename(candidate.path)) === 1);
+  assert.ok(
+    entry,
+    `${context} fixture 需要至少一个 basename 唯一的本仓 worktree；多义短名应由独立场景验证`,
+  );
+  return entry;
+}
+
 async function orchestrationMergeBehindRefresh() {
   const mergeFixture = repositoryFixture('orchestration-storage-behind');
   const mergeRuntime = join(mergeFixture.root, 'runtime');
@@ -2509,7 +2524,7 @@ for (let index = 0; index < count; index += 1) {
 async function orchestrationLockCompetition() {
   const runtimeDir = tempDirectory('orchestration-storage-lock-competition');
   try {
-    const worker = basename((await listWorktrees()).siblings[0].path);
+    const worker = basename((await uniquelyAddressableWorktree('lock competition')).path);
     const args = (thread) => [
       join(SCRIPT_DIR, 'orchestrate.mjs'), 'task', 'create', '--issue', '18', '--worktree', worker,
       '--role', 'executor', '--thread-id', thread, '--model', 'sol-high', '--routing-reason', 'P2.3 lock competition',
@@ -2534,7 +2549,8 @@ async function orchestrationPreflightLeaseAndState() {
   try {
     assert.equal(canonicalWorktreeId('dev1'), 'dev1');
     assert.equal(canonicalWorktreeId('aes-agent-worker-1'), 'dev1', 'dev1 与完整 worker basename 必须是同一 canonical identity');
-    const availableWorker = basename((await listWorktrees()).siblings[0].path);
+    const availableEntry = await uniquelyAddressableWorktree('lifecycle');
+    const availableWorker = basename(availableEntry.path);
     let result = orchestrateSync([
       'task', 'create', '--issue', '17', '--worktree', 'dev4', '--role', 'executor', '--agent', 'claude',
     ], runtimeDir);
