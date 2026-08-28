@@ -45,6 +45,10 @@ node <this-skill>/scripts/wait-submit.mjs --issue-dir <issue> --mark-consumed <r
 node <this-skill>/scripts/export-static.mjs --issue-dir <issue> --output <report.html>
 ```
 
+投影实现随家族分发（`workflow-interview/scripts/lib/dossier.mjs`）：本命令与 `GET /export` 都复用
+同一投影库；纯对话载体走同源的 `workflow-interview/scripts/export-dossier.mjs`，两种载体产出的
+档案同构（家族侧多 web 提交证据，少则少一行账本）。
+
 运行中的页面也提供 `GET /export`。两种导出都把任务原文、全部轮次、所有候选及其优劣势、
 已选答案、Goal Contract、来源/附件索引、事件账本和追溯关系写入同一个 HTML；不依赖 server、
 localStorage 或外部资源才能阅读。
@@ -134,6 +138,10 @@ localStorage 或外部资源才能阅读。
 和落在 100±2；其他响应类型不要求概率。默认项未显式翻掉时提交为 `accept`；ask 与 confirm
 是必答，除非 ask 明写 `required:false`。
 
+这套 response schema 与家族 `rounds.jsonl` 同源（字段表在 aes-interview 的 SKILL.md）：
+映射时 `response` 原样带回家族行，非 `single_select` 的选项不带 `pct` 也能落进家族真源——
+不需要再编百分比过校验。
+
 契约视图把 `round.view` 设成 `"contract"`，并增加 `final`。`final.round` 指向该 round：
 
 ```json
@@ -163,7 +171,8 @@ agent 必须用当时发布的 item 补齐家族 line。服务端返回的 `GET 
   options。若用户选的不是推荐项，设置 `overturned_recommendation:true`。
 - `ask + custom`：`user_choice:"custom"`，`user_verbatim` 原样写截断后的 text。
 - `ask + multi_select`：`choices` 保留有序 key 数组，`custom` 可选；映射时逐项保留候选文本、
-  covers/pros/cons，不能压缩成一句摘要。
+  covers/pros/cons，不能压缩成一句摘要。家族行用 `response` + `choices` 落盘（类型约束与结果
+  集），选项不带 `pct`。
 - `ask + boolean/number/date_time/ranking/evidence/text`：使用对应的结构字段；保留单位、顺序、
   空值语义与用户原文。
 - `default + accept`：家族 `item/why/cost/user` 中 `user` 写「未反对」。

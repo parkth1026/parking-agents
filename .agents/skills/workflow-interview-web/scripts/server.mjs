@@ -20,7 +20,9 @@ import { basename, dirname, extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
-import { appendLedgerEvent, buildDossier, renderDossierHtml, sha256Json } from './lib/dossier.mjs';
+import { appendLedgerEvent, sha256Json } from './lib/ledger.mjs';
+// 只读投影库随家族分发，是「runtime 不 import 家族代码」的唯一例外（见 SKILL.md 真源与安全边界）。
+import { buildDossier, renderDossierHtml } from '../../workflow-interview/scripts/lib/dossier.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const WEB_ASSETS = join(HERE, 'web');

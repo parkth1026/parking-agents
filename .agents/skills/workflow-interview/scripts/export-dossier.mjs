@@ -1,11 +1,16 @@
 #!/usr/bin/env node
+// export-dossier.mjs — 从家族真源生成自包含决策档案 HTML（两载体共用同一投影库）
+//
+//   node export-dossier.mjs --issue-dir <issue> [--output <html>]
+//
+// 纯对话载体（无 web/ 目录）从 rounds.jsonl/manifest/contract 投影；web 载体
+// 追加 state/submissions/ledger 证据。输出 JSON 与 web 版 export-static 同构。
 import { existsSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
-// 投影实现随家族分发（决策档案是核心逻辑，两载体共用同一份）；本脚本只是 web 侧 CLI 壳。
-import { exportDossier } from '../../workflow-interview/scripts/lib/dossier.mjs';
+import { exportDossier } from './lib/dossier.mjs';
 
 function fail(message, code = 1) {
-  console.error(`export-static: ${message}`);
+  console.error(`export-dossier: ${message}`);
   process.exit(code);
 }
 
@@ -26,7 +31,7 @@ function parseArgs(argv) {
 }
 
 const flags = parseArgs(process.argv.slice(2));
-if (!flags['issue-dir']) fail('用法：export-static.mjs --issue-dir <issue> [--output <html>]', 2);
+if (!flags['issue-dir']) fail('用法：export-dossier.mjs --issue-dir <issue> [--output <html>]', 2);
 const issueDir = resolve(String(flags['issue-dir']));
 if (!existsSync(issueDir) || !statSync(issueDir).isDirectory()) fail(`issue 目录不存在：${issueDir}`, 2);
 const output = flags.output === undefined ? undefined : resolve(String(flags.output));

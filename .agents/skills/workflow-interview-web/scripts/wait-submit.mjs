@@ -12,7 +12,7 @@ import {
 } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { basename, dirname, join, resolve } from 'node:path';
-import { appendLedgerEvent, sha256Json } from './lib/dossier.mjs';
+import { appendLedgerEvent, sha256Json } from './lib/ledger.mjs';
 
 function die(message, code = 1) {
   console.error(`wait-submit: ${message}`);

@@ -377,7 +377,12 @@ try {
   check('文档契约形态（无 pct 多选 + true_label 布尔）可发布，min/max 正规化且服务端强制');
 
   const runtimeSources = ['server.mjs', 'publish.mjs', 'wait-submit.mjs', 'export-static.mjs'].map((name) => readFileSync(join(HERE, name), 'utf8'));
-  assert(runtimeSources.every((source) => !/from\s+['"][^'"]*workflow-interview/.test(source)), 'runtime import 了 workflow-interview 家族');
+  // 家族边界保护的是真源写入权：写入器（session/校验器）绝不能进 runtime；
+  // 只读决策档案投影库是两载体共用例外，钉死它的路径防例外扩大。
+  assert(runtimeSources.every((source) => !/from\s+['"][^'"]*workflow-interview[^'"]*(session|validate-goal-contract)/.test(source)), 'runtime import 了家族写入器（session/校验器）');
+  for (const name of ['server.mjs', 'export-static.mjs']) {
+    assert(/from\s+['"][^'"]*workflow-interview\/scripts\/lib\/dossier\.mjs['"]/.test(readFileSync(join(HERE, name), 'utf8')), `${name} 没有复用家族决策档案投影库`);
+  }
   assert(!runtimeSources[0].includes('.aes-workflow') && !runtimeSources[0].includes('repoRootFrom'), 'server 仍向 issue 目录外写 .aes-workflow 或保留 repoRootFrom');
   const skill = readFileSync(join(SKILL_ROOT, 'SKILL.md'), 'utf8');
   assert(skill.includes('宿主无后台任务能力 → 回合模式') && skill.includes('Node 不可用 → 纯文本') && skill.includes('浏览器不可用 → 纯文本'), 'SKILL.md 三级降级不完整');

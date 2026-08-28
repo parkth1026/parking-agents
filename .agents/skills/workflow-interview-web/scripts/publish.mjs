@@ -12,7 +12,7 @@ import {
 } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { basename, dirname, extname, join, resolve } from 'node:path';
-import { appendLedgerEvent, sha256Json } from './lib/dossier.mjs';
+import { appendLedgerEvent, sha256Json } from './lib/ledger.mjs';
 
 const STAGES = ['1-interview', '2-prototype', '3-contract'];
 const TIERS = ['ask', 'default', 'confirm'];

@@ -47,7 +47,9 @@ submission、consumed marker、Goal Contract、来源/附件与 append-only ledg
 ## 真源与安全边界
 
 - `manifest.json` 只由家族 `session.mjs` 写；`rounds.jsonl` 只经 `session.mjs round` 追加。
-- runtime 脚本不 import 家族代码；浏览器不直接读写家族过程文件。
+- runtime 脚本不 import 家族的写入器（`session.mjs`、校验器），不写家族过程文件；只读的决策档案
+  投影库（`workflow-interview/scripts/lib/dossier.mjs`）随家族分发，是两载体共用的唯一例外——
+  单一投影实现保证纯对话与 Web 产出同构档案。浏览器不直接读写家族过程文件。
 - 每个 issue 独立 `web/` 目录。服务只绑定 loopback，所有 HTTP/WS 请求都经会话 key；key
   只存在于 owner-only 会话文件和首次 URL，不写日志或 git。
 - 确认版对照物保持只读。发布附件是复制到 `web/assets/`，不改源文件。

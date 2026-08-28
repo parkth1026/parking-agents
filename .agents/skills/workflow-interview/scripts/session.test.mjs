@@ -118,6 +118,47 @@ const askRow = (pcts) => JSON.stringify({
   expect('round/pct 加和 103 超容差拒收', run('round', dir, askRow([60, 43])), 1, '100±2');
 }
 
+// ─────────────────────── round：response 结构化应答 ───────────────────────
+
+{
+  const dir = mkIssue();
+  const multiRow = (response, options) => JSON.stringify({
+    stage: '1-interview', round: 1, tier: 'ask', question: '覆盖哪些范围？',
+    response, options,
+  });
+  const noPctOptions = [
+    { key: 'A', text: '任务原文', covers: '保留目标语境' },
+    { key: 'B', text: '全部决策', pros: ['可复盘'] },
+    { key: 'C', text: '只留摘要', cons: ['无法解释为什么'] },
+  ];
+  // 多选选项是候选集合不是互斥概率：不带 pct 必须能落进家族真源（与 web 发布 schema 同口径）。
+  expect('round/multi_select 无 pct 放行',
+    run('round', dir, multiRow({ type: 'multi_select', min: 1, max: 2 }, noPctOptions)), 0, 'appended');
+  {
+    const line = readFileSync(join(dir, '1-interview', 'rounds.jsonl'), 'utf8').trim().split(/\r?\n/).pop();
+    const obj = JSON.parse(line);
+    check('round/min/max 别名正规化为 min_selections/max_selections',
+      obj.response.min_selections === 1 && obj.response.max_selections === 2
+      && obj.response.min === undefined && obj.response.max === undefined,
+      JSON.stringify(obj.response));
+  }
+  expect('round/min 与 min_selections 冲突拒收',
+    run('round', dir, multiRow({ type: 'multi_select', min: 1, min_selections: 2, max_selections: 2 }, noPctOptions)), 1, '不一致');
+  expect('round/response.type 未知拒收',
+    run('round', dir, multiRow({ type: 'dropdown' }, noPctOptions)), 1, 'response.type');
+  expect('round/response 非对象拒收',
+    run('round', dir, multiRow('multi_select', noPctOptions)), 1, 'response 要是对象');
+  expect('round/single_select 显式声明仍强制 pct',
+    run('round', dir, multiRow({ type: 'single_select' }, noPctOptions)), 1, 'pct');
+  expect('round/multi_select 选项缺 key 拒收',
+    run('round', dir, multiRow({ type: 'multi_select' }, [{ text: '没 key' }])), 1, 'key');
+  expect('round/multi_select 选项 pct 非数字拒收',
+    run('round', dir, multiRow({ type: 'multi_select' }, [{ key: 'A', text: 'x', pct: '高' }])), 1, 'pct');
+  // 无 response 缺省 single_select：老规则原样生效，防止本次放宽把单选闸门一起放掉。
+  expect('round/无 response 缺省单选仍强制 pct',
+    run('round', dir, JSON.stringify({ stage: '1-interview', round: 1, tier: 'ask', question: 'q', options: noPctOptions })), 1, 'pct');
+}
+
 // ─────────────────────────────── stage：参数校验 ───────────────────────────────
 
 {

@@ -170,16 +170,19 @@ node <workflow-interview>/scripts/session.mjs round <issue-dir> '<一行 JSON>'
 | `stage` / `round` / `tier` | 都有 | `tier` ∈ `default` / `confirm` / `ask` |
 | `item` / `why` / `cost` / `user` | `default`、`confirm` | 定了什么、为什么、代价、用户反应 |
 | `q_id` / `question` / `known_facts` | `ask` | 问题本身与已知事实 |
-| `options[]` | `ask` | 每项含 `key` `text` `pct`，可选 `recommended` `covers` `pros` `cons` |
+| `options[]` | `ask` | 每项含 `key` `text`；`pct` 仅单选语义（缺省或 `single_select`）必填；可选 `recommended` `covers` `pros` `cons` |
+| `response` / `choices` | `ask` | 结构化应答：`response.type` ∈ 九种（缺省 `single_select`）；`multi_select` 用 `min_selections`/`max_selections`/`exclusive_keys`（`min`/`max` 为别名，写入时正规化）；`choices` 记多选结果集 |
+| `irreversible` / `allow_custom` / `required` | `ask` 可选 | 难逆（分诊表「难逆」列落盘）、允许自定义答案、必答（缺省必答） |
 | `user_choice` / `user_verbatim` | `ask` | 选了哪个，原话照录 |
 | `overturned_recommendation` | 都可有 | 你给低了却被用户选中时为 `true` |
 | `cross_repo_boundary` | 都可有 | 这一项跨出仓库边界时为 `true` |
 | `triggered_by` | 回流的问题 | 由哪份草稿或哪个阶段撞出来 |
 
-同一轮内 `ask` 行的 `pct` 加和 100（校验留 ±2 容差——pct 是主观估计，卡整不卡准）。
-`round` 命令会按这张表当场校验：`stage`、`round`、`tier` 必填，`ask` 行要带
-`question` 且 `options` 的 `pct` 加和落在 100±2，`default` / `confirm` 行要带
-`item`。不合 schema 的行拒收，不落盘。
+同一轮内单选语义 `ask` 行的 `pct` 加和 100（校验留 ±2 容差——pct 是主观估计，卡整不
+卡准）；多选的选项是候选集合不是概率分布，不带 `pct`（与 Web 载体的发布 schema 同一套，
+见 workflow-interview-web 的 web-protocol.md）。`round` 命令会按这张表当场校验：`stage`、
+`round`、`tier` 必填，`ask` 行要带 `question` 且单选语义下 `options` 的 `pct` 加和落在
+100±2，`default` / `confirm` 行要带 `item`。不合 schema 的行拒收，不落盘。
 
 `overturned_recommendation` 做成可 grep 的字段而不是靠人眼在表格里找，因为它是整份
 记录里唯一能看出「当时判断偏在哪」的信号。下一个改这份契约的人靠它知道该重新验证

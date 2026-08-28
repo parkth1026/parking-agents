@@ -147,6 +147,8 @@ const ROUND_TIERS = ['default', 'confirm', 'ask'];
 const ASSESS_DIMS = ['意图', '结果', '边界', '约束', '现状'];
 const CONTEXT_SECTIONS = ['任务陈述', '用户提出的方案', '意图假设', '已查事实', '验证基建候选池', '四分类'];
 const IMPACT_SURFACES = ['用户可见界面', '可观察行为', '可运行输出', '对外接口报文', '用户配置', '历史兼容性', '架构与依赖'];
+/** 结构化应答类型，与 workflow-interview-web 的发布 schema 同源（web-protocol.md）。 */
+const RESPONSE_TYPES = ['single_select', 'multi_select', 'boolean', 'short_text', 'long_text', 'number', 'date_time', 'ranking', 'evidence'];
 
 function validateRoundObj(obj) {
   const errs = [];
@@ -160,22 +162,45 @@ function validateRoundObj(obj) {
     errs.push(`tier 要是 ${ROUND_TIERS.join(' / ')} 之一，现在是 ${JSON.stringify(obj.tier ?? null)}。`);
   } else if (obj.tier === 'ask') {
     if (typeof obj.question !== 'string' || !obj.question.trim()) errs.push('ask 行要带 question。');
+    const responseType = obj.response?.type ?? 'single_select';
+    if (obj.response !== undefined) {
+      if (!obj.response || typeof obj.response !== 'object' || Array.isArray(obj.response)) {
+        errs.push('response 要是对象。');
+      } else if (!RESPONSE_TYPES.includes(responseType)) {
+        errs.push(`response.type 要是 ${RESPONSE_TYPES.join(' / ')} 之一，现在是 ${JSON.stringify(responseType)}。`);
+      }
+    }
     if (obj.options !== undefined) {
       if (!Array.isArray(obj.options) || obj.options.length === 0) {
         errs.push('options 要是非空数组。');
       } else {
+        // pct 是互斥概率，只在 single_select 语义下必填并卡加和——多选/排序的选项是
+        // 候选集合不是概率分布，硬要加和只会逼人编数字（web 版发布 schema 同口径）。
+        const pctRequired = responseType === 'single_select';
         let sum = 0;
         let shapeOk = true;
         obj.options.forEach((o, i) => {
-          if (!o || typeof o !== 'object' || !o.key || !o.text || typeof o.pct !== 'number') {
+          if (!o || typeof o !== 'object' || !o.key || !o.text) {
             shapeOk = false;
-            errs.push(`options[${i}] 每项要有 key、text 和数字 pct。`);
-          } else {
-            sum += o.pct;
+            errs.push(`options[${i}] 每项要有 key、text${pctRequired ? ' 和数字 pct' : ''}。`);
+            return;
           }
+          if (o.pct === undefined) {
+            if (pctRequired) {
+              shapeOk = false;
+              errs.push(`options[${i}] 每项要有数字 pct。`);
+            }
+            return;
+          }
+          if (typeof o.pct !== 'number') {
+            shapeOk = false;
+            errs.push(`options[${i}] 的 pct 要是数字。`);
+            return;
+          }
+          sum += o.pct;
         });
         // pct 是主观估计，卡整不卡准：±2 容差消掉凑整摩擦，整体给虚照样挡。
-        if (shapeOk && Math.abs(sum - 100) > 2) {
+        if (shapeOk && pctRequired && Math.abs(sum - 100) > 2) {
           errs.push(`options 的 pct 加和是 ${sum}，要落在 100±2 内——百分比先决定分诊档位，给虚了会把该问的误分进默认区。`);
         }
       }
@@ -367,6 +392,18 @@ function cmdRound(argv) {
     die(`round 的参数不是合法 JSON：${e.message}`);
   }
   if (!obj.ts) obj.ts = iso();
+  // min/max 是文档写法，落盘统一成 min_selections/max_selections（与 web publish 同规则），
+  // 两名并存且不一致直接拒——静默取其一等于替用户改了约束。
+  if (obj.response?.type === 'multi_select') {
+    for (const [documented, canonical] of [['min', 'min_selections'], ['max', 'max_selections']]) {
+      if (obj.response[documented] === undefined) continue;
+      if (obj.response[canonical] === undefined) obj.response[canonical] = obj.response[documented];
+      else if (obj.response[canonical] !== obj.response[documented]) {
+        die(`response.${documented} 与 ${canonical} 同时存在且不一致，没有写入。`, 1);
+      }
+      delete obj.response[documented];
+    }
+  }
   const schemaErrs = validateRoundObj(obj);
   if (schemaErrs.length > 0) {
     for (const e of schemaErrs) console.error(`round: ${e}`);
