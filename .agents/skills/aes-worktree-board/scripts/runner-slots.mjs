@@ -153,6 +153,8 @@ export function probeSlot(slot, { integrationBranch, expectedRoot }) {
     branch: null,
     dirtyEntries: [],
     integrationHead: null,
+    ahead: null,
+    behind: null,
     syncedToIntegration: false,
   };
   if (!facts.exists) return facts;
@@ -167,6 +169,17 @@ export function probeSlot(slot, { integrationBranch, expectedRoot }) {
   facts.dirtyEntries = status ? status.split(/\r?\n/).filter(Boolean) : [];
   facts.integrationHead = gitOut(worktreePath, ['rev-parse', integrationBranch])
     || gitOut(resolve(expectedRoot), ['rev-parse', integrationBranch]);
+  const topology = facts.head && facts.integrationHead && facts.head !== facts.integrationHead
+    ? gitOut(worktreePath, ['rev-list', '--left-right', '--count', `${facts.integrationHead}...${facts.head}`])
+    : null;
+  if (facts.head && facts.head === facts.integrationHead) {
+    facts.ahead = 0;
+    facts.behind = 0;
+  } else if (topology) {
+    const [behind, ahead] = topology.split(/\s+/).map(Number);
+    facts.ahead = ahead;
+    facts.behind = behind;
+  }
   facts.syncedToIntegration = Boolean(facts.head && facts.integrationHead && facts.head === facts.integrationHead);
   return facts;
 }
@@ -267,6 +280,8 @@ export function projectRunners(config, registry, { probe = probeSlot } = {}) {
         lease,
         head: previous?.head || null,
         integrationHead: previous?.integrationHead || null,
+        ahead: previous?.ahead ?? null,
+        behind: previous?.behind ?? null,
         dirtyCount: previous?.dirtyCount ?? 0,
         evaluatedAt: nowIso(),
       };
@@ -289,6 +304,8 @@ export function projectRunners(config, registry, { probe = probeSlot } = {}) {
       lease,
       head: facts.head,
       integrationHead: facts.integrationHead,
+      ahead: facts.ahead,
+      behind: facts.behind,
       dirtyCount: facts.dirtyEntries.length,
       evaluatedAt: nowIso(),
     };
