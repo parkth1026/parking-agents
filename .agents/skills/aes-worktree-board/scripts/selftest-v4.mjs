@@ -15,7 +15,7 @@ import {
   projectRunners, validateSlotsConfig,
 } from './runner-slots.mjs';
 import { HUMAN_REQUEST_SCHEMA } from './human-request.mjs';
-import { decideMerge, evaluateMechanicalGate, resolveMergePolicy } from './merge-policy.mjs';
+import { decideMerge, evaluateMechanicalGate, resolveMergePolicy, reviewDepthForRisk } from './merge-policy.mjs';
 import * as master from './master.mjs';
 import {
   git, gitOut, issuePayload, makeCandidate, makeConflict, makeFixture, SCRIPT_DIR,
@@ -804,12 +804,124 @@ export async function discoveredWorkScenario() {
 export async function deliveryMergeScenario() {
   await nextStepDriver();
   await mergePolicyTiers();
+  await mergeWorkerReviewLifecycle();
   await deliveryHappyPath();
   await evidenceBindingBypass();
   await postMergeVerificationFailure();
   await mergeConflictDisposition();
   await serialMergeEnforcement();
   await legacyArchiveStable();
+}
+
+async function mergeWorkerReviewLifecycle() {
+  const fixture = makeFixture('merge-review-lifecycle', { workers: [{ id: 'worker-1' }, { id: 'worker-2' }] });
+  try {
+    writeSlots(fixture);
+    master.masterStart({ ...base(fixture) });
+    const job = driveToReadyToMerge(fixture, issuePayload({ number: 513, riskProfile: 'medium' }));
+
+    const claimed = freshProcess(fixture, ['review', 'claim', '--job', job.jobId]);
+    assert.equal(claimed.effectiveRisk, 'medium');
+    assert.equal(claimed.depthTier, 'light');
+    let registry = readV4Registry(fixture.v4Dir);
+    assert.equal(registry.jobs[job.jobId].reviewLifecycle.depthTier, 'light', 'review 分档必须落 registry');
+    const registryBytes = readFileSync(join(fixture.v4Dir, 'registry.json'), 'utf8');
+    const receiptBytes = readFileSync(join(fixture.v4Dir, 'receipts.jsonl'), 'utf8');
+    assert.deepEqual(freshProcess(fixture, ['review', 'claim', '--job', job.jobId]), claimed,
+      '同一 base/candidate 的 review claim 必须幂等');
+    assert.equal(readFileSync(join(fixture.v4Dir, 'registry.json'), 'utf8'), registryBytes);
+    assert.equal(readFileSync(join(fixture.v4Dir, 'receipts.jsonl'), 'utf8'), receiptBytes);
+
+    let finding = {
+      schemaVersion: master.STAGE_RESULT_SCHEMA_V2,
+      jobId: job.jobId,
+      attemptId: job.attemptId,
+      commitSha: job.candidate,
+      baseCommit: job.baseCommit,
+      reviewerSessionId: 'merge-worker-reviewer',
+      outcome: 'MUST_FIX',
+      findings: [{
+        id: 'RF-1', axis: 'standards', severity: 'must-fix', location: 'scripts/foo.mjs:42',
+        finding: '重复实现了 runtime-store 已有的原子写', requiredAction: '改用 writeJsonAtomic',
+      }],
+      depthTier: 'light',
+      effectiveRisk: 'medium',
+    };
+
+    for (const [field, code] of [
+      ['baseCommit', 'MISSING_BASE_COMMIT'],
+      ['reviewerSessionId', 'MISSING_REVIEWER_SESSION_ID'],
+    ]) {
+      const invalid = { ...finding };
+      delete invalid[field];
+      const rejected = freshProcess(fixture, ['stage', 'review', '--job', job.jobId, '--payload', JSON.stringify(invalid)], {
+        expectStatus: 'nonzero',
+      });
+      assert.equal(rejected.code, code);
+      assert.equal(readV4Registry(fixture.v4Dir).attempts[job.attemptId].budgetUsage?.reviewLoops ?? 0, 0,
+        `缺 ${field} 的报文不得消费 reviewLoops`);
+    }
+
+    for (let used = 1; used <= 2; used += 1) {
+      const returned = freshProcess(fixture, ['stage', 'review', '--job', job.jobId, '--payload', JSON.stringify(finding)]);
+      assert.equal(returned.schemaVersion, master.REVIEW_RETURN_SCHEMA);
+      assert.deepEqual(returned.budget, { reviewLoops: { used, limit: 3 } });
+      assert.deepEqual(returned.findings, finding.findings, '打回 findings 必须逐字段保真');
+      assert.equal(returned.commitSha, finding.commitSha);
+      const duplicate = freshProcess(fixture, ['stage', 'review', '--job', job.jobId, '--payload', JSON.stringify(finding)]);
+      assert.deepEqual(duplicate, returned, '同一 candidate 的同一打回不得重复消费 reviewLoops');
+
+      const nextCandidate = makeCandidate(fixture, job.slotId, { file: `review-fix-${used}.txt` });
+      master.recordCandidate({ ...base(fixture), jobId: job.jobId, commitSha: nextCandidate });
+      master.recordStageResult({
+        ...base(fixture), jobId: job.jobId, stage: 'qa',
+        payload: passingQa(job.jobId, nextCandidate, job.baseCommit),
+      });
+      master.masterTerminal({
+        ...base(fixture),
+        payload: readyTerminal(
+          { jobId: job.jobId, attemptId: job.attemptId, issue: 513, baseCommit: job.baseCommit },
+          nextCandidate, job.claim.workOrder.issue.contractDigest,
+        ),
+      });
+      const reclaimed = freshProcess(fixture, ['review', 'claim', '--job', job.jobId]);
+      finding = { ...finding, commitSha: nextCandidate, depthTier: reclaimed.depthTier, effectiveRisk: reclaimed.effectiveRisk };
+    }
+
+    const exhausted = freshProcess(fixture, ['stage', 'review', '--job', job.jobId, '--payload', JSON.stringify(finding)], {
+      expectStatus: 'nonzero',
+    });
+    assert.deepEqual(exhausted, {
+      ok: false,
+      code: 'REVIEW_BUDGET_EXHAUSTED',
+      jobId: job.jobId,
+      budget: { kind: 'reviewLoops', limit: 3, used: 3 },
+      recommendedMasterActions: ['NEW_ATTEMPT_FRONTIER_MODEL', 'AWAITING_HUMAN'],
+    });
+    registry = readV4Registry(fixture.v4Dir);
+    assert.equal(registry.attempts[job.attemptId].budgetUsage.reviewLoops, 3);
+    assert.equal(registry.jobs[job.jobId].state, 'awaiting-human');
+    assert.ok(registry.jobs[job.jobId].humanRequestId, '预算熔断必须留下可恢复的 humanRequest');
+
+    const passJob = driveToReadyToMerge(
+      fixture,
+      issuePayload({ number: 514, riskProfile: 'high' }),
+      { slotId: 'worker-2' },
+    );
+    const deepClaim = freshProcess(fixture, ['review', 'claim', '--job', passJob.jobId]);
+    assert.equal(deepClaim.depthTier, 'deep');
+    const pass = {
+      ...passingReview(passJob.jobId, passJob.candidate, passJob.baseCommit, 'merge-worker-reviewer'),
+      attemptId: passJob.attemptId,
+      depthTier: 'deep',
+      effectiveRisk: 'high',
+    };
+    const passed = freshProcess(fixture, ['stage', 'review', '--job', passJob.jobId, '--payload', JSON.stringify(pass)]);
+    assert.equal(passed.outcome, 'PASS');
+    assert.equal(readV4Registry(fixture.v4Dir).attempts[passJob.attemptId].review.depthTier, 'deep');
+  } finally {
+    fixture.cleanup();
+  }
 }
 
 // #53: next-step 把 reconcile 已经算出的动作直接执行掉一步。
@@ -893,6 +1005,10 @@ async function nextStepDriver() {
 
 // 四档 mergePolicy + riskProfile 自报按路径兜底。
 async function mergePolicyTiers() {
+  assert.deepEqual(
+    ['low', 'medium', 'high', 'critical'].map(reviewDepthForRisk),
+    ['light', 'light', 'deep', 'deep'],
+  );
   assert.equal(resolveMergePolicy({ declaredRisk: 'low', changedPaths: ['docs/readme.md'] }).mergePolicy, 'AUTO_MERGE');
   assert.equal(resolveMergePolicy({ declaredRisk: 'medium', changedPaths: ['src/ui.mjs'] }).mergePolicy, 'AUTO_MERGE');
   assert.equal(resolveMergePolicy({ declaredRisk: 'high', changedPaths: ['docs/readme.md'] }).mergePolicy, 'HUMAN_GATE');

@@ -13,6 +13,15 @@ export const SIDE_EFFECTS = Object.freeze([
   'edit-worktree', 'run-tests', 'create-commit', 'read-github', 'write-github', 'network', 'install-deps',
 ]);
 export const MODEL_TIERS = Object.freeze(['economy', 'standard', 'frontier']);
+export const WORK_ORDER_BUDGET_DEFAULTS = Object.freeze({
+  wallClockSeconds: 7200, reviewLoops: 3, qaLoops: 3, environmentRetries: 2, modelUpgrades: 1,
+});
+
+export function resolveWorkOrderBudgets(budgets = {}) {
+  return Object.fromEntries(Object.entries(WORK_ORDER_BUDGET_DEFAULTS).map(
+    ([key, fallback]) => [key, budgets[key] ?? fallback],
+  ));
+}
 
 // 契约要求的六个必填域。顺序即报错时 missing[] 的顺序，便于回流报文稳定可断言。
 const REQUIRED_SECTIONS = Object.freeze([
@@ -284,12 +293,6 @@ export function buildWorkOrder({
       baseCommit: runner.baseCommit,
     },
     routing: { modelTier, reason, upgradeAllowed: modelTier !== 'frontier' },
-    budgets: {
-      wallClockSeconds: budgets.wallClockSeconds ?? 7200,
-      reviewLoops: budgets.reviewLoops ?? 3,
-      qaLoops: budgets.qaLoops ?? 3,
-      environmentRetries: budgets.environmentRetries ?? 2,
-      modelUpgrades: budgets.modelUpgrades ?? 1,
-    },
+    budgets: resolveWorkOrderBudgets(budgets),
   };
 }

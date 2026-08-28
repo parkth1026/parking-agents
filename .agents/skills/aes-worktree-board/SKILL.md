@@ -414,7 +414,7 @@ node "$skillDir/scripts/master.mjs" release --job <jobId> --slot <slotId>
 commit 前进只能走 `candidate` 命令（那里作废旧证据）；terminal 报文里的
 `candidateCommit` 与 registry 不一致时拒收（`CANDIDATE_MISMATCH`），不推进状态。
 
-### aes-merge-worker（合并验收 worker，待建）
+### aes-merge-worker（合并验收 worker）
 
 v4 的角色分工是 **hub-and-spoke**：总管只管 claim / 派单 / slot / queue / 打回与
 人工态路由，**不亲自执行合并**；合并验收是挂在总管之下的专职 worker lane
@@ -438,9 +438,10 @@ merge-worker 消化 mergeQueue 的完整职责：
    `AWAITING_HUMAN`）。普通 finding（非 must-fix）merge-worker 侧自行记录，
    不打回、不烦扰 worker。
 
-本节先锁协议，实现另票（载体形态——独立 session 占 host worktree 还是总管兼任——
-依宿主能力定）。机械上 merge-worker 与总管调用同一套 `master.mjs` CLI 操作同一
-registry，零 schema 改动。
+机械入口先用 `review claim --job <jobId>` 领取 review：它按 candidate 的实际改动路径
+推导 `effectiveRisk`，并固定 `low|medium → light`、`high|critical → deep` 后落 registry。
+review subagent 的结果只由 merge-worker 用 `stage review` 上报；MUST_FIX 会生成 typed
+打回，PASS 才能进入后续 gate。载体形态不改变这条 provenance 边界。
 
 ### 中断恢复
 
