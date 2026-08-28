@@ -31,7 +31,7 @@ function lockPath(runtimeDir) {
   return join(resolve(runtimeDir), LOCK_NAME);
 }
 
-export function withRuntimeLock(runtimeDir, operation, { timeoutMs = DEFAULT_LOCK_TIMEOUT_MS } = {}) {
+function acquireRuntimeLock(runtimeDir, timeoutMs) {
   const root = resolve(runtimeDir);
   const lock = lockPath(root);
   mkdirSync(root, { recursive: true });
@@ -61,6 +61,11 @@ export function withRuntimeLock(runtimeDir, operation, { timeoutMs = DEFAULT_LOC
       pause(20);
     }
   }
+  return lock;
+}
+
+export function withRuntimeLock(runtimeDir, operation, { timeoutMs = DEFAULT_LOCK_TIMEOUT_MS } = {}) {
+  const lock = acquireRuntimeLock(runtimeDir, timeoutMs);
   try {
     return operation();
   } finally {

@@ -23,6 +23,11 @@ import { assertContractComplete, buildWorkOrder, contractDigestOf } from './issu
 import { buildHumanRequest, validateHumanRequest, validateHumanResponse } from './human-request.mjs';
 import { decideMerge, evaluateMechanicalGate, resolveMergePolicy } from './merge-policy.mjs';
 import { disposeDiscovery, makeWayfinder } from './discovery.mjs';
+import { prepareGithubAccess, runGithubCommand } from './github-identity.mjs';
+import { loadConfig as loadBoardConfig } from './collect.mjs';
+import {
+  acknowledgeOutbox, enqueueIssueClose, flushOutbox, outboxStatus, outboxWarning, preflightOutbox, readOutbox,
+} from './outbox-store.mjs';
 
 export const TERMINAL_SCHEMA = 'aes.issue-worker.goal-terminal/v1';
 export const DELIVERY_SCHEMA = 'aes.worktree-board.delivery-receipt/v1';
@@ -759,6 +764,7 @@ export function evaluateGate(options = {}) {
   return {
     ok: true, jobId: job.jobId, policy, mechanical, decision,
     candidateCommit: attempt?.candidateCommit || null, integrationHead, changedPaths,
+    outboxWarning: outboxWarning(dir),
   };
 }
 
@@ -927,13 +933,20 @@ export async function masterClose(options = {}) {
   if (delivery.issueClose?.commentDigest === commentDigest && delivery.issueClose.outcome === 'CLOSED') {
     return { ok: true, outcome: 'ALREADY_SUCCEEDED', jobId: job.jobId, issue: job.issue, commentDigest };
   }
-  const gh = options.gh || defaultGh(config.repoIdentity.issueRepo);
-  await gh(['issue', 'comment', String(job.issue), '--body', body]);
-  await gh(['issue', 'close', String(job.issue)]);
+  if (delivery.issueClose?.commentDigest === commentDigest && delivery.issueClose.outcome === 'LOCAL_CLOSED') {
+    const queued = enqueueIssueClose(dir, {
+      jobId: job.jobId, issue: job.issue, repo: config.repoIdentity.issueRepo,
+      commentDigest, comment: body,
+    });
+    return {
+      ok: true, outcome: 'ALREADY_SUCCEEDED', jobId: job.jobId, issue: job.issue, commentDigest,
+      outbox: { entryId: queued.entry.entryId, state: queued.entry.state, enqueued: false },
+    };
+  }
 
-  return updateV4Registry(dir, (writable) => {
+  const closed = updateV4Registry(dir, (writable) => {
     const target = writable.deliveries[job.jobId];
-    target.issueClose = { outcome: 'CLOSED', commentDigest, closedAt: nowIso() };
+    target.issueClose = { outcome: 'LOCAL_CLOSED', commentDigest, closedAt: nowIso() };
     const released = releaseSlot(writable, job.slotId, { reason: `job ${job.jobId} 已交付，等待 baseline 同步` });
     target.runnerRelease = {
       slotId: job.slotId,
@@ -944,6 +957,40 @@ export async function masterClose(options = {}) {
     appendReceipt(dir, { kind: 'delivery', jobId: job.jobId, delivery: target });
     return { ok: true, outcome: 'CLOSED', jobId: job.jobId, issue: job.issue, commentDigest, delivery: target };
   });
+  const enqueue = options.enqueueOutbox || enqueueIssueClose;
+  const queued = enqueue(dir, {
+    jobId: job.jobId, issue: job.issue, repo: config.repoIdentity.issueRepo,
+    commentDigest, comment: body,
+  });
+  return { ...closed, outbox: { entryId: queued.entry.entryId, state: queued.entry.state, enqueued: queued.enqueued } };
+}
+
+export function masterOutboxStatus(options = {}) {
+  const { dir } = ctx(options);
+  return outboxStatus(dir);
+}
+
+export function masterOutboxAcknowledge(options = {}) {
+  const { dir } = ctx(options);
+  return acknowledgeOutbox(dir, options.entryId, options.reason, options.actor || process.env.GITHUB_ACTOR || 'operator');
+}
+
+export async function masterOutboxFlush(options = {}) {
+  const { dir, config, repoRoot } = ctx(options);
+  const pending = preflightOutbox(dir);
+  if (!pending.length) return { ok: true, flushed: 0, skipped: readOutbox(dir).filter((entry) => entry.state === 'succeeded').length, failed: 0, abandoned: 0, remaining: 0, entries: [] };
+  let gh = options.gh;
+  let auth = null;
+  if (!gh) {
+    auth = await prepareGithubAccess({
+      config: options.githubConfig || loadBoardConfig(), issueRepo: config.repoIdentity.issueRepo,
+      account: options.account, host: options.host, cwd: repoRoot,
+      requiredPermission: 'write', env: options.env || process.env,
+    });
+    gh = (args) => runGithubCommand([...args, '--repo', auth.issueRepo], { auth, cwd: repoRoot });
+  }
+  preflightOutbox(dir, auth?.issueRepo || config.repoIdentity.issueRepo);
+  return flushOutbox(dir, gh, { ...options, expectedRepo: auth?.issueRepo || config.repoIdentity.issueRepo });
 }
 
 function buildCloseComment(job, delivery) {
@@ -1028,6 +1075,7 @@ export function masterReconcile(options = {}) {
     registry.runners = projectRunners(config, registry, options.probeOverride ? { probe: options.probeOverride } : {});
     const actions = [];
     const jobExplanations = [];
+    const outboxDigests = new Set(readOutbox(dir).map((entry) => entry.commentDigest).filter(Boolean));
 
     for (const job of Object.values(registry.jobs)) {
       const attempt = job.currentAttemptId ? registry.attempts[job.currentAttemptId] : null;
@@ -1082,6 +1130,13 @@ export function masterReconcile(options = {}) {
           actions.push({ jobId: job.jobId, action: 'RESUME_POST_MERGE_VERIFY' });
         } else if (delivery.postMergeVerification.outcome === 'FAIL') {
           actions.push({ jobId: job.jobId, action: 'HOLD_FAILED_VERIFICATION' });
+        }
+      } else if (job.state === 'closed') {
+        const delivery = registry.deliveries[job.jobId];
+        const persisted = delivery?.issueClose?.commentDigest
+          && outboxDigests.has(delivery.issueClose.commentDigest);
+        if (delivery?.issueClose?.outcome === 'LOCAL_CLOSED' && !persisted) {
+          actions.push({ jobId: job.jobId, action: 'RESUME_OUTBOX_ENQUEUE' });
         }
       } else if (job.state === 'dispatched') {
         // 中断点 1：owner thread 状态未知。优先恢复原 thread，不直接新建 attempt。
@@ -1177,6 +1232,7 @@ const MACHINE_ACTIONABLE = Object.freeze({
   REQUEUE_FOR_MERGE: 'merge',
   RESUME_POST_MERGE_VERIFY: 'verify',
   RESUME_CLOSE: 'close',
+  RESUME_OUTBOX_ENQUEUE: 'close',
 });
 
 // 把 reconcile 的结论直接执行掉一步。无人值守循环因此不需要调用方自己解析
@@ -1270,6 +1326,7 @@ const KNOWN_OPTIONS = Object.freeze(new Set([
   'job', 'commit', 'payload', 'payload-file', 'commands',
   'resume-token', 'response', 'response-file',
   'state', 'kind', 'prompt', 'reason',
+  'entry', 'account', 'hostname',
 ]));
 
 function parseArguments(argv) {
@@ -1409,6 +1466,13 @@ async function main(argv = process.argv.slice(2)) {
     return postMergeVerify({ ...shared, jobId: options.job, commands: payloadFrom(options, 'commands') });
   }
   if (command === 'close') return masterClose({ ...shared, jobId: options.job });
+  if (command === 'outbox' && action === 'flush') {
+    return masterOutboxFlush({ ...shared, account: options.account, host: options.hostname });
+  }
+  if (command === 'outbox' && action === 'status') return masterOutboxStatus(shared);
+  if (command === 'outbox' && action === 'acknowledge') {
+    return masterOutboxAcknowledge({ ...shared, entryId: options.entry, reason: options.reason });
+  }
   if (command === 'release') return releaseAndSync({ ...shared, jobId: options.job, slotId: options.slot });
   if (command === 'discovery') return masterDiscovery({ ...shared, payload: payloadFrom(options) });
   if (command === 'attempt' && action === 'interrupt') {
@@ -1428,7 +1492,7 @@ async function main(argv = process.argv.slice(2)) {
   if (command === 'human' && action === 'respond') {
     return respondHumanRequest({ ...shared, resumeToken: options['resume-token'], response: payloadFrom(options, 'response') });
   }
-  throw storeError('BAD_REQUEST', '用法: master.mjs runner init|runner update|start|status|reconcile|next-step|stop eval|claim|candidate|stage review|stage qa|terminal|gate|merge|verify|close|release|discovery|attempt interrupt|attempt resume|attempt new|human open|human respond');
+  throw storeError('BAD_REQUEST', '用法: master.mjs runner init|runner update|start|status|reconcile|next-step|stop eval|claim|candidate|stage review|stage qa|terminal|gate|merge|verify|close|outbox flush|outbox status|outbox acknowledge|release|discovery|attempt interrupt|attempt resume|attempt new|human open|human respond');
 }
 
 if (resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url))) {
