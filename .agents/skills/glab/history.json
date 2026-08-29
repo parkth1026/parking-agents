@@ -1,0 +1,25 @@
+{
+  "skill": "glab",
+  "runs": [
+    {
+      "date": "2026-08-29T17:33:22+08:00",
+      "iteration_ref": "C:\\Users\\Administrator\\.agents\\evals\\glab-workflow\\iteration-1",
+      "gates": {
+        "with_skill": {
+          "pass_rate": 1,
+          "mean_ms": 324817,
+          "mean_tokens": 230129
+        },
+        "without_skill": {
+          "pass_rate": 0.6667,
+          "mean_ms": 756067,
+          "mean_tokens": 332227
+        }
+      },
+      "vs_previous": null,
+      "bank_epoch": 1,
+      "current_best": true
+    }
+  ],
+  "current_best": "runs[0]"
+}

@@ -1,0 +1,36 @@
+{
+  "skill": "glab",
+  "source_iteration": "iteration-1",
+  "evals": [
+    {
+      "name": "eval-glab零基础安装指引",
+      "prompt": "我的一台 Windows 10 机器上从未安装过 glab。请给我一份从零开始的操作指引：安装 glab、配置连接自建 GitLab 实例 http://git.51vr.local（注意该实例纯 http、443 不服务）、完成登录认证、并验证全部就绪。要求每一步给出具体命令或页面路径，以及每步的预期结果/成功标志。不要执行任何安装或写系统操作——只产出指引文档。",
+      "assertions": [
+        {
+          "name": "指引含官方安装渠道与可执行命令（winget/scoop/choco/官方 release 任一）",
+          "type": "manual"
+        },
+        {
+          "name": "指引含安装验证（版本或路径查询）与 PATH 生效说明（新开终端等）",
+          "type": "manual"
+        },
+        {
+          "name": "登录命令带 --hostname git.51vr.local 且带 --api-protocol http --git-protocol http",
+          "type": "manual"
+        },
+        {
+          "name": "含 PAT 创建步骤（personal_access_tokens 页面路径、权限最小化只勾 api）",
+          "type": "manual"
+        },
+        {
+          "name": "含交互提示避坑（SSH hostname 留空回车）或等效说明",
+          "type": "manual"
+        },
+        {
+          "name": "含最终验证步骤与期望输出（glab auth status / issue list）",
+          "type": "manual"
+        }
+      ]
+    }
+  ]
+}
