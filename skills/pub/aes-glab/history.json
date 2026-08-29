@@ -1,0 +1,106 @@
+{
+  "skill": "glab",
+  "runs": [
+    {
+      "date": "2026-08-29T17:33:22+08:00",
+      "iteration_ref": "C:\\Users\\Administrator\\.agents\\evals\\glab-workflow\\iteration-1",
+      "gates": {
+        "with_skill": {
+          "pass_rate": 1,
+          "mean_ms": 324817,
+          "mean_tokens": 230129
+        },
+        "without_skill": {
+          "pass_rate": 0.6667,
+          "mean_ms": 756067,
+          "mean_tokens": 332227
+        }
+      },
+      "vs_previous": null,
+      "bank_epoch": 1,
+      "current_best": true
+    },
+    {
+      "date": "2026-08-29T23:54:29+08:00",
+      "iteration_ref": "D:\\GIT_dev\\parking-agents\\.agents\\evals\\aes-glab-workspace\\iteration-2",
+      "gates": {
+        "old_skill": {
+          "pass_rate": 0,
+          "mean_ms": 377116,
+          "mean_tokens": 137275
+        },
+        "with_skill": {
+          "pass_rate": 0,
+          "mean_ms": 173994,
+          "mean_tokens": 117135
+        },
+        "without_skill": {
+          "pass_rate": 0,
+          "mean_ms": 460334,
+          "mean_tokens": 283337
+        }
+      },
+      "vs_previous": null,
+      "bank_epoch": 1
+    },
+    {
+      "date": "2026-08-29T23:54:44+08:00",
+      "iteration_ref": "D:\\GIT_dev\\parking-agents\\.agents\\evals\\aes-glab-workspace\\iteration-2",
+      "gates": {
+        "old_skill": {
+          "pass_rate": 1,
+          "mean_ms": 377116,
+          "mean_tokens": 137275
+        },
+        "with_skill": {
+          "pass_rate": 1,
+          "mean_ms": 173994,
+          "mean_tokens": 117135
+        },
+        "without_skill": {
+          "pass_rate": 1,
+          "mean_ms": 460334,
+          "mean_tokens": 283337
+        }
+      },
+      "vs_previous": null,
+      "bank_epoch": 1,
+      "supersedes": "runs[1]"
+    },
+    {
+      "date": "2026-08-30T00:18:09+08:00",
+      "iteration_ref": "D:\\GIT_dev\\parking-agents\\.agents\\evals\\aes-glab-workspace\\iteration-3",
+      "gates": {
+        "old_skill": {
+          "pass_rate": 1,
+          "mean_ms": 258518,
+          "mean_tokens": 169226
+        },
+        "with_skill": {
+          "pass_rate": 1,
+          "mean_ms": 107647,
+          "mean_tokens": 98781
+        },
+        "without_skill": {
+          "pass_rate": 0.8333,
+          "mean_ms": 436091,
+          "mean_tokens": 215181
+        }
+      },
+      "vs_previous": {
+        "evals_total": 1,
+        "won": 0,
+        "lost": 0,
+        "tie": 1,
+        "detail": [
+          {
+            "eval": "eval-glab零基础安装指引",
+            "result": "tie"
+          }
+        ]
+      },
+      "bank_epoch": 1
+    }
+  ],
+  "current_best": "runs[0]"
+}
