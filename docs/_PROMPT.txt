@@ -1,0 +1,13 @@
+你使用 parking-agent-creator ，参考 C:\Users\Administrator\AppData\Roaming\Code\User\globalStorage\github.copilot-chat\debugCommand 这里debug command ，还有 D:\GIT\superpowers\skills\systematic-debugging 帮我制作完整强大功能的 debug.agent.md
+
+
+
+我需要再次仓库 完整实现 vscode copilot 所有 用户历史对话的  快速展示与  分析能力 。请你 先去网上深度调研 有没有类似这样的 项目。可以作为参考依据
+
+我们更新以下 CLAUDE.md
+
+定义下 SuperPower.agent.md 的开发规范。
+1.这个主Agent 在能调用SubAgent干活时候需要尽可能调用 Subagent 干活。
+2.对应的SuperPowerSub.agent.md 他能根据特定情况读取特定skill或者 prompt 定义自己干活规范。
+3.主Agent 应当能合理的分配分几次 Subagent干活，不能全丢给一个Subagent。
+4.原来D:\GIT\superpowers\skills 里的内容搬过来后尽量不要改成中文，尽量使用原文， 如果我们搬过来后有修改尽量不要改变原来格式。要考虑到 未来superpower仓库更新时候我们要一起迭代更新。
