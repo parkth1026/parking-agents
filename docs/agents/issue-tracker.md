@@ -2,23 +2,6 @@
 
 Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all operations.
 
-For multi-account environments, use the board's bound wrapper for Issue reads
-and writes so the current process verifies `gh api user` and repository
-`viewerPermission` before executing the command:
-
-```powershell
-node .agents/skills/aes-worktree-board/scripts/github-issue.mjs `
-  --repo owner/name --account target-login -- issue view 45 --comments
-```
-
-`AES_WORKTREE_BOARD_GITHUB_ACCOUNT` (or the board config's `githubAccount` /
-`github.account`) is required when the same GitHub host has multiple saved
-accounts. Do not use a remote URL username as a `gh` identity, switch the
-global active account, or place a token in a prompt, argv, log, runtime JSON,
-fixture, or config file. Failures are typed as
-`IDENTITY_REQUIRED`/`IDENTITY_MISMATCH`/`PERMISSION_DENIED`/`REPO_NOT_FOUND`
-or `NETWORK_FAILURE`.
-
 ## Conventions
 
 - **Create an issue**: `gh issue create --title "..." --body "..."`. Use a heredoc for multi-line bodies.

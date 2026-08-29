@@ -1,18 +1,27 @@
 # AGENTS.md — 本仓库 Agent 约定
-> 你是我的 **CTO**：结论一律挂在明确证据上（文件行号、命令输出、issue 链接），工作量不参与决策；给出方案或否决方案前先做双向 steelman，把关键问题带回给我。
+> > 你是我的 **CTO**，擅长使用**第一性原理**与**行业最佳实践**来制定方案。所有结论必须是**明确证据**支持，不能是臆想；工作量不参与决策。向我提问前先做双向 steelman 反思，并至少提出 3 个可能推翻当前方案的关键问题。
 
-> git commit message 用中文，写给用户看：说清关键参数的修正与行业知识的变更，不写改动流水账。执行 issue 时把编号写进 message，例：`fix(aes-worktree-board): 出站签收在真实 CLI 上被参数白名单拒收 - #142`
+## Commit 规范
+
+- commit message 必须中文，写面向用户的解释：关键参数的修正、针对行业知识的修改；不能写成改动代码的流水账。
+- 正在执行 issue 时，必须把 issue 编号加入 commit message。例：`fix(workflow): 通过通用能力标志保留历史交互草稿 - #48`
 
 ## 仓库约定
 
 - 本仓库以技能开发为主，不走常规开发的 worktree 流程：以用户指定的开发文件夹为唯一工作目录；除用户明确要求外，不切换也不新建 worktree。
-- 仓库脚本一律 `.mjs`（Node 内置模块、零依赖）。
-- `.agents/skills/` 是开发侧平铺真源，`skills/` 是生成的发布树：自研技能只改开发侧，生成物不手改；上游移植技能仍在发布侧按其来源维护。新增或晋级自研技能（加 `category`）时，按 `docs/agents/skill-release.md` 走五步，全程 `npm test` 保持绿。
+- 仓库`skill`里内置脚本避免写`ps1`、`cmd`、`python`跟用户环境有关的脚本，可以假定用户有`node`，写`mjs`（Node 内置模块、零依赖）。
+- `.agents/skills/` 是新技能孵化位（项目级加载即可用，不参与安装）；`skills/` 是唯一安装源，分类=顶层目录，deprecated/in-progress 默认不装。晋级按 `docs/agents/skill-release.md`。
 
 ## Agent skills
 
-（Matt Pocock engineering 技能族的 per-repo 配置入口，操作细节在 `docs/agents/`）
+### Issue tracker
 
-- Issue 走 GitHub Issues（`parkth1026/parking-agents`），用 `gh` CLI 操作。见 `docs/agents/issue-tracker.md`。
-- Triage 五标签 `needs-triage` / `needs-info` / `ready-for-agent` / `ready-for-human` / `wontfix`，字符串与角色名一致。见 `docs/agents/triage-labels.md`。
-- 领域文档单一上下文：根目录 `CONTEXT.md` + `docs/adr/`，由 `domain-modeling` 惰性创建。见 `docs/agents/domain.md`。
+Issues and specs are tracked in GitHub Issues. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five canonical triage roles use their default label names. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+This repository uses a single-context domain documentation layout. See `docs/agents/domain.md`.
