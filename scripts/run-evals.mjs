@@ -1,10 +1,24 @@
 #!/usr/bin/env node
+/**
+ * Eval-gate runner (npm run evals). Resolves skills BY NAME across the whole
+ * skills/ tree (skills/<category>/<name>/), plus the flat .agents/skills/
+ * incubation side, and reports the five-piece eval-gate completeness plus the
+ * latest run-tests.mjs result per skill.
+ */
 
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { EVAL_GATE_FILES } from "./build-release.mjs";
+import { discoverSkills } from "./skill-links.mjs";
+
+export const EVAL_GATE_FILES = [
+  "trigger-evals.json",
+  "output-evals.json",
+  "run-tests.mjs",
+  "trigger-benchmark.json",
+  "history.json",
+];
 
 const SCRIPT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -26,15 +40,20 @@ function parseArgs(argv) {
 }
 
 function discoverRows(root, skillName) {
-  const skillRoot = join(root, ".agents", "skills");
-  if (!existsSync(skillRoot)) return [];
-  const all = readdirSync(skillRoot, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && existsSync(join(skillRoot, entry.name, "SKILL.md")))
-    .map((entry) => {
-      const dir = join(skillRoot, entry.name);
-      const present = EVAL_GATE_FILES.filter((file) => existsSync(join(dir, file)));
-      return { name: entry.name, dir, present };
-    });
+  // Incubation side first so a mid-promotion edit wins over the tree copy.
+  const sources = [join(root, ".agents", "skills"), join(root, "skills")];
+  const byName = new Map();
+  for (const source of sources) {
+    for (const skill of discoverSkills(source)) {
+      if (!byName.has(skill.name)) byName.set(skill.name, skill);
+    }
+  }
+  const all = [...byName.values()].map((skill) => ({
+    name: skill.name,
+    dir: skill.dir,
+    category: skill.category,
+    present: EVAL_GATE_FILES.filter((file) => existsSync(join(skill.dir, file))),
+  }));
 
   if (skillName) {
     const selected = all.filter((row) => row.name === skillName);

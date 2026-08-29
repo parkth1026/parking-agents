@@ -24,7 +24,7 @@
 
 `skills/` 有两条不可违背的约束（两条都有 `npm test` / `check:repo` 兜底）：
 
-- **分类根下一层扁平**：`skills/<组>/<name>/SKILL.md`（组 = `engineering` / `productivity` / `pub`），组内禁止更深嵌套。嵌套会让技能在所有平台**静默消失**。开发侧真源 `.agents/skills/` 则是不分组的一层扁平
+- **分类下递归到 SKILL.md 为止**：`skills/<分类>/<名字>/SKILL.md`（matt-skills 例外地多一层子组 `skills/matt-skills/<组>/<名字>/`）。嵌套过深会让技能在所有平台**静默消失**；本机 junction 安装器按名扁平化，所以树内分类不影响已装目标。`.agents/skills/` 孵化位是不分组的一层扁平
 - **正文只写动作，不写工具名**：一句 "use the Agent tool" 在一个平台上对，在另外八个平台上静默出错
 
 ---
@@ -134,12 +134,12 @@ Claude Code 会**同时**读 `additional_context` 和 `hookSpecificOutput`。多
 
 ```
 仓库根
-├── skills/                          ★ 共享 · 9 平台逐字复用 · 发布侧分类布局 · 正文禁工具名
-│   ├── engineering/<name>/SKILL.md
-│   ├── productivity/<name>/SKILL.md
-│   └── pub/<name>/SKILL.md
+├── skills/                          ★ 共享 · 9 平台逐字复用 · 唯一安装源 · 分类=顶层目录 · 正文禁工具名
+│   ├── deprecated/ in-progress/     生命周期分类（默认不安装）
+│   ├── life/ matt-skills/ pub/ ue/ workflow/
+│   └── <分类>/<名字>/SKILL.md        （matt-skills 下再分 engineering/productivity 子组）
 │
-├── .agents/skills/                  开发侧活跃真源（一层扁平，与 skills/ 经移植流程同步）
+├── .agents/skills/                  新技能孵化位（一层扁平，项目级加载即可用，不参与安装）
 ├── AGENTS.md                        ★ 共享 · session-start 注入 + GEMINI.md @-include
 │
 ├── hooks/

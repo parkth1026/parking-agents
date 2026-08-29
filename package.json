@@ -5,13 +5,11 @@
   "type": "module",
   "main": ".opencode/plugins/parking-skills.js",
   "scripts": {
-    "check:repo": "node .agents/skills/making-skills-cross-platform/scripts/check-skill-repo.mjs . --skills skills/engineering --bootstrap none && node .agents/skills/making-skills-cross-platform/scripts/check-skill-repo.mjs . --skills skills/productivity --bootstrap none && node .agents/skills/making-skills-cross-platform/scripts/check-skill-repo.mjs . --skills skills/pub --bootstrap none",
-    "install:skills:agents": "node scripts/install-skills-agents.mjs",
-    "install:skills:claude": "node scripts/install-skills-claude.mjs",
-    "uninstall:skills:agents": "node scripts/uninstall-skills-agents.mjs",
-    "uninstall:skills:claude": "node scripts/uninstall-skills-claude.mjs",
+    "check:repo": "node skills/in-progress/making-skills-cross-platform/scripts/check-skill-repo.mjs . --skills skills/matt-skills/engineering --bootstrap none --allow skills/matt-skills/ && node skills/in-progress/making-skills-cross-platform/scripts/check-skill-repo.mjs . --skills skills/matt-skills/productivity --bootstrap none --allow skills/matt-skills/ && node skills/in-progress/making-skills-cross-platform/scripts/check-skill-repo.mjs . --skills skills/pub --bootstrap none",
+    "install:skills": "node scripts/install-skills.mjs --target both",
+    "uninstall:skills": "node scripts/uninstall-skills.mjs --target both",
     "evals": "node scripts/run-evals.mjs",
-    "test": "node tests/skills/test-skill-discovery.mjs && node tests/skills/test-install-skills.mjs && node tests/skills/test-no-tool-names.mjs && node tests/hooks/test-session-start.mjs && node --test tests/pi/test-pi-extension.mjs && node --test tests/harnesses/test-harness-manifests.mjs && node scripts/bump-version.mjs --check && node scripts/bump-version.mjs --audit && npm run check:repo && node scripts/build-release.mjs --check"
+    "test": "node tests/skills/test-skill-discovery.mjs && node tests/skills/test-install-skills.mjs && node tests/skills/test-no-tool-names.mjs && node tests/hooks/test-session-start.mjs && node --test tests/pi/test-pi-extension.mjs && node --test tests/harnesses/test-harness-manifests.mjs && node scripts/bump-version.mjs --check && node scripts/bump-version.mjs --audit && npm run check:repo"
   },
   "license": "MIT",
   "author": "piaotonghu <pb763396199@gmail.com>",

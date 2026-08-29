@@ -1,63 +1,36 @@
-# 自研技能晋级标准
+# 自研技能晋级约定
 
-`.agents/skills/` 是平铺开发真源，`skills/` 是分类发布树。日常开发和无参数 junction 安装不需要改变；只有准备让某个自研技能进入发布树时，才走下面五步。
+新技能在 `.agents/skills/` 孵化（项目级加载即可用，不参与安装）；`skills/` 是唯一安装源，分类即顶层目录（`deprecated`、`in-progress` 是生命周期分类，默认不被安装）。晋级就是一次 `git mv`，没有生成器、没有索引、没有清单。
 
 ## 门槛
 
-晋级门槛是：**评测五件套齐全 + 最新一轮 `run-tests.mjs` 退出码为 0（绿）**。
+晋级门槛不变：**评测五件套齐全 + 最新一轮 `run-tests.mjs` 退出码为 0（绿）**。
 
-五件套固定为：`trigger-evals.json`、`output-evals.json`、`run-tests.mjs`、`trigger-benchmark.json`、`history.json`。仓库不另设通过率数字门槛；每个技能自己的 `run-tests.mjs` 是唯一判定尺子。可先运行：
+五件套固定为：`trigger-evals.json`、`output-evals.json`、`run-tests.mjs`、`trigger-benchmark.json`、`history.json`。仓库不设通过率数字门槛；每个技能自己的 `run-tests.mjs` 是唯一判定尺子。
 
-```bash
-npm run evals -- --skill <技能名>
-```
+## 步骤
 
-## 第 1 步：写 category
+1. **孵化**：技能目录建在 `.agents/skills/<技能名>/`，项目级加载即可试用。
+2. **过门槛**：确认五件套齐全，并真实跑一轮：
 
-只改开发真源 `.agents/skills/<技能名>/SKILL.md`，在 frontmatter 加一个分类：
+   ```bash
+   npm run evals -- --skill <技能名>
+   ```
 
-```yaml
-category: engineering
-```
+   `run-tests.mjs` 退出码不是 0 就先修技能或评测。
+3. **晋级**：选一个分类（`skills/` 顶层目录名），移动整个技能目录：
 
-允许值是 `engineering`、`productivity`、`pub`。不写 `category` 表示不晋级；非法值会让生成器非零退出并点名技能。
+   ```bash
+   git mv .agents/skills/<技能名> skills/<分类>/
+   ```
 
-## 第 2 步：确认 run-tests 绿
+4. **验证安装**：用新安装器干跑确认目标侧可见：
 
-确认五件套在技能根目录齐全，并真实运行最新一轮：
+   ```bash
+   node scripts/install-skills.mjs --target both --only <分类> --dry-run
+   node scripts/install-skills.mjs --target both --skills <技能名> --dry-run
+   ```
 
-```bash
-node .agents/skills/<技能名>/run-tests.mjs
-```
+   确认无误后去掉 `--dry-run` 真跑也安全：`--only` / `--skills` 是外科手术式选择，只动选中的技能，**不做套装外清除**，目标里其余本仓链接原样保留。
 
-退出码不是 0 就先修技能或评测，不能生成。生成器还会再次执行这条门槛，避免绕过。
-
-## 第 3 步：跑生成器
-
-```bash
-node scripts/build-release.mjs
-node scripts/build-release.mjs --check
-```
-
-生成器复制整个技能目录到 `skills/<category>/<技能名>/`。它是自研发布副本的唯一写入者；不要手改发布副本，任何额外、缺失或不同内容都会被 `--check` 和 `npm test` 判红。若名称与任一既有发布技能重名，生成器会拒绝，而不是依赖 junction 的静默覆盖。
-
-## 第 4 步：核对索引自动登记
-
-确认生成器已经更新：
-
-- `skills/<category>/README.md` 的自研生成段；
-- 根 `README.md` 的 `BEGIN/END GENERATED SELF-DEVELOPED SKILLS` 索引段；
-- `skills/.generated-by-build-release.json` 生成清单。
-
-这些内容同样只能由生成器维护。无自研技能晋级时，生成器不创建空分类桶。
-
-## 第 5 步：重装或干跑验证
-
-按目标范围验证 junction：
-
-```bash
-node scripts/install-skills-agents.mjs --only <category> --dry-run
-node scripts/install-skills-agents.mjs --skills <技能名> --dry-run
-```
-
-确认无误后去掉 `--dry-run` 重装。最后运行 `npm test`；无参数安装的全量、扁平合并、重名开发侧赢语义必须保持不变。
+5. **收尾**：`npm test` 全绿后提交。`in-progress` 与 `deprecated` 之间的移动同理，都是 `git mv`。

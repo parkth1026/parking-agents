@@ -29,7 +29,7 @@
 
 一句"use the Agent tool"在一个平台上正确，在另外七个平台上**静默出错** —— 模型要么伪造一个不存在的工具调用，要么因为找不到该工具而拒绝执行。两种失败在那个平台被实际跑起来之前都看不见。
 
-`tests/skills/test-no-tool-names.mjs` 是这条铁律的自动防线。豁免名单当前为空（工具名转换类技能都住在开发侧 `.agents/skills/`，不在发布侧扫描范围内）；新增豁免必须在测试文件的 `ALLOWLIST` 注明理由，并同步 `package.json` `check:repo` 的 `--allow`。
+`tests/skills/test-no-tool-names.mjs` 是这条铁律的自动防线。豁免名单见该文件 `ALLOWLIST`（上游 Matt 技能保持正文原文、工具名转换类技能的主题就是工具名对照表等）；新增豁免必须在测试文件的 `ALLOWLIST` 注明理由，并同步 `package.json` `check:repo` 的 `--allow`。
 
 ### 子代理派发的伪调用块
 

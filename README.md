@@ -1,6 +1,6 @@
 # parking-agents
 
-> 个人自用的跨平台 skill 开发与发布仓库 + VS Code Copilot agent 工具箱。开发侧保持平铺与 junction 即时生效，发布侧由生成器稳定地产出分类树。
+> 个人自用的跨平台 skill 开发与发布仓库 + VS Code Copilot agent 工具箱。`skills/` 单树分类、junction 即时生效，`.agents/skills/` 是新技能孵化位。
 
 ## 这个仓库有两半
 
@@ -16,20 +16,20 @@
 ## 目录结构
 
 ```
-skills/                  # ★ 跨平台分类发布树（Matt 移植技能 + 自研生成副本）
-├── engineering/<name>/SKILL.md
-├── productivity/<name>/SKILL.md
-└── pub/<name>/SKILL.md
+skills/                  # ★ 唯一安装源：分类=顶层目录，63 个技能
+├── deprecated/ in-progress/    # 生命周期分类，默认不安装
+├── life/ matt-skills/ pub/ ue/ workflow/
+│   └── <分类>/<名字>/SKILL.md  （matt-skills 下再分 engineering/productivity 子组）
 
-.agents/skills/          # ★ 开发侧平铺活跃真源（自研技能在此编辑，可用 category 晋级）
+.agents/skills/          # ★ 新技能孵化位（项目级加载即可用，不参与安装）
 
-AGENTS.md                # ★ 仓库 Agent 约定（.mjs 脚本规则、双侧目录约定、issue/标签/领域文档入口）
+AGENTS.md                # ★ 仓库 Agent 约定（.mjs 脚本规则、目录约定、issue/标签/领域文档入口）
 CLAUDE.md / GEMINI.md    # 指令文件（@-include AGENTS.md；hooks/session-start 每会话注入它）
 CONTEXT.md               # 领域术语表（单一上下文，决策记录在 docs/adr/，见 docs/agents/domain.md）
 
-install-skills-*.cmd     # 双击一键安装/卸载（junction 本机技能目录，见下节）
-uninstall-skills-*.cmd
-scripts/                 # build-release.mjs 生成发布树 + 版本锁步 + install/uninstall 安装器
+install-skills.cmd       # 双击进安装菜单（junction 本机技能目录，见下节）
+uninstall-skills.cmd     # 双击进卸载菜单（全清指向本仓 skills/ 的链接）
+scripts/                 # skill-links.mjs 安装核心库 + install/uninstall 入口 + 版本锁步 + evals
 hooks/                   # SessionStart 注入器（注入 AGENTS.md；Claude Code / Cursor / Copilot CLI 共用）
 tests/                   # 结构断言 + 工具名 lint + 安装器测试 + 各平台契约测试
 
@@ -57,16 +57,20 @@ gemini-extension.json    # Gemini CLI 扩展清单
 
 ### 本机一键安装（junction 安装器）
 
-给**自己机器上的 agent** 用：双击仓库根的
+给**自己机器上的 agent** 用：双击仓库根的 `install-skills.cmd` 进菜单（选目标 `~/.agents/skills` / `~/.claude/skills` / 两者，选套档，确认执行）。命令行等价：
 
-- `install-skills-agents.cmd` → junction 到 `~/.agents/skills`
-- `install-skills-claude.cmd` → junction 到 `~/.claude/skills`
+```bash
+node scripts/install-skills.mjs --target both --set default
+```
 
-（或 `npm run install:skills:agents` / `install:skills:claude`，卸载对应 `uninstall-*`。）
+- `--target agents|claude|both`（默认 both）
+- `--set default|progress|all` —— 三档套装：**default** 排除 deprecated + in-progress；**progress** 排除 deprecated；**all** 全装
+- `--only <分类>` / `--skills a,b,c` —— 显式选择，**绕过套档排除**（如 `--only deprecated`、`--skills cpu-monitor` 能选中 in-progress 里的技能）
+- `--dry-run` 只报告；`--list` 按分类列出技能与各套档是否包含
 
-两侧源按名扁平合并进目标目录（重名时开发侧 `.agents/skills/` 赢），每个技能一条 junction，agent 直读工作区、永不漂移。已存在的真实目录会先挪进 `skills-backup-<ts>/`；每次安装附带体检：清死链、报告异常项。POSIX 下退化为普通 symlink。
+每个技能一条 junction 指向 `skills/<分类>/<名字>/`，agent 直读工作区、永不漂移；**整档安装**（菜单或 `--set`）会把套装外的本仓旧链接一并收走（从 all 档切回 default 档时 deprecated/in-progress 链接自动清除），`--only` / `--skills` 则是外科手术式选择、只动选中项。已存在的真实目录先挪进 `skills-backup-<ts>/`；每次安装附带体检：清死链、报告异常项，lark-* 等外来链接不动。POSIX 下退化为普通 symlink。
 
-需要选装时把参数传给 cmd 或 npm 脚本：`--only engineering` / `--only productivity` / `--only pub` 按大类安装，`--skills skill-a,skill-b` 按名称安装。**不带参数的行为保持全量安装、两侧按名合并、重名开发侧赢。**
+卸载：双击 `uninstall-skills.cmd` 或 `npm run uninstall:skills`，删除目标里**所有**指向本仓 `skills/` 的链接（含历史上装的 deprecated/in-progress），外来项与真实目录不动。
 
 ### 平台插件安装
 
@@ -143,17 +147,23 @@ marketplace 安装，或 `/plugins install` 加 GitHub URL。工具映射由 `.k
 
 ⚠️ **技能正文里不允许出现任何 harness 的工具名。** 一句 "use the Agent tool" 在一个平台上正确，在另外八个平台上静默出错。`npm test` 里的 `tests/skills/test-no-tool-names.mjs` 会拦下来。缺能力的修法永远是**改该平台的内联映射**，不是改技能正文。
 
-## Skills（发布侧 `skills/`）
+## Skills（`skills/` 单树）
 
-三分类，每类 README（`skills/engineering/README.md` 等）记录 Matt 移植技能；自研技能在 `.agents/skills/` 开发，通过 `category` + 评测门槛 + `build-release` 生成到相同分类树。尚未晋级的自研技能仍可通过本机 junction 全量安装使用。晋级步骤见 [自研技能晋级标准](./docs/agents/skill-release.md)。
+`skills/` 是唯一安装源，分类=顶层目录。deprecated、in-progress 是生命周期分类，默认不被安装（default 档排除两者，progress 档排除 deprecated）；新技能在 `.agents/skills/` 孵化，五件套评测门槛过了 `git mv` 晋级进树，见 [自研技能晋级约定](./docs/agents/skill-release.md)。
 
-<!-- BEGIN GENERATED SELF-DEVELOPED SKILLS -->
-_当前没有自研晋级技能。_
-<!-- END GENERATED SELF-DEVELOPED SKILLS -->
+| 分类 | 数量 | 内容 | default 档 |
+|---|---|---|---|
+| deprecated | 5 | 已废弃技能 | ✗ |
+| in-progress | 6 | 开发中技能 | ✗ |
+| life | 1 | 生活类（shopping-deep-research） | ✓ |
+| matt-skills | 25 | Matt Pocock 移植（下分 engineering/productivity 子组） | ✓ |
+| pub | 5 | 对外发布参考 | ✓ |
+| ue | 7 | Unreal Engine 与 Jenkins 相关 | ✓ |
+| workflow | 14 | aes-* 访谈/工作流家族与通用流程 | ✓ |
 
 **仅用户可调用** = frontmatter 标 `disable-model-invocation: true`，只能由人显式调用；其余模型按 `description` 自行匹配触发。
 
-### engineering/ —— 日常写码
+### matt-skills/engineering/ —— 日常写码
 
 | Skill | 说明 | 触发 |
 |---|---|---|
@@ -176,7 +186,7 @@ _当前没有自研晋级技能。_
 | triage | 用状态机推进 issue 与外部 PR 的分诊 | 仅用户 |
 | wayfinder | 把超大工作量规划成决策工单地图 | 仅用户 |
 
-### productivity/ —— 通用工作流
+### matt-skills/productivity/ —— 通用工作流
 
 | Skill | 说明 | 触发 |
 |---|---|---|
@@ -193,10 +203,12 @@ _当前没有自研晋级技能。_
 | Skill | 说明 | 触发 |
 |---|---|---|
 | gh | GitHub CLI 调用模式（[cli/cli](https://github.com/cli/cli)） | 模型 |
+| glab | GitLab CLI（自建实例）认证与 issue/MR 使用范式 | 模型 |
 | playwright-cli | 浏览器自动化 | 模型 |
 | shadcn | shadcn/ui 组件管理 | 模型 |
+| simplify | 审查当前 diff 的复用/质量/效率，按需窄幅修复 | 模型 |
 
-> engineering/ 与 productivity/ 技能出自 [Matt Pocock 的 skills](https://github.com/mattpocock/skills)，迁移时**保持正文原文**便于将来同步上游。
+> matt-skills/ 的 engineering 与 productivity 子组出自 [Matt Pocock 的 skills](https://github.com/mattpocock/skills)，迁移时**保持正文原文**便于将来同步上游。ue/、workflow/、life/ 的技能说明见各自 SKILL.md。
 
 ## Agents（VS Code Copilot 专用）
 
@@ -235,7 +247,7 @@ _当前没有自研晋级技能。_
 npm test
 ```
 
-零依赖纯 Node。跑：技能发现与结构断言、安装/选装及生成发布树夹具、**工具名 lint**、session-start hook 的三种 JSON 形状、Pi 扩展注入与去重、各平台 manifest 契约、跨 manifest 版本一致性（`--check` / `--audit`）、`check:repo` 跨平台结构检查器，以及末段 `build-release --check` 防生成物漂移。
+零依赖纯 Node。跑：技能发现与结构断言、安装器夹具（套装排除/套装外清除/选装/卸载全清）、**工具名 lint**、session-start hook 的三种 JSON 形状、Pi 扩展注入与去重、各平台 manifest 契约、跨 manifest 版本一致性（`--check` / `--audit`）、`check:repo` 跨平台结构检查器。
 
 **这些测试的价值在于把静默失败变成响亮失败** —— 技能加载在所有平台上都无报错、无警告，出错时技能只是不出现。详见 [docs/testing.md](./docs/testing.md)。
 

@@ -72,15 +72,31 @@ const DENIED = {
 
 // Paths (repo-relative, forward slashes) exempt from the rule, and why.
 //
-// The dev-side checker (.agents/skills/making-skills-cross-platform/scripts/
-// check-skill-repo.mjs) applies the same invariant via its --allow flag. Every
-// exemption added here must also be passed as --allow in package.json's
-// check:repo script — keep both in sync.
-//
-// Currently empty: the skills whose subject matter IS tool names
-// (claude-to-vscode-skill-converter, making-skills-cross-platform) live only on
-// the dev side (.agents/skills/), outside this scan.
-const ALLOWLIST = [];
+// skills/in-progress/making-skills-cross-platform/scripts/check-skill-repo.mjs
+// applies the same invariant via its --allow flag. Every exemption whose
+// category falls inside a check:repo scan root must also be passed as --allow
+// in package.json's check:repo script — keep both in sync.
+const ALLOWLIST = [
+	// Upstream Matt Pocock skills are kept byte-identical for future syncs
+	// (README: 迁移时保持正文原文). Their own wording says "Skill tool";
+	// rewording would fork the upstream text. Synced in check:repo via
+	// --allow skills/matt-skills/.
+	"skills/matt-skills/",
+	// Subject matter IS the tool-name vocabulary: this deprecated skill
+	// converts between harness tool tables. Exempt by location (dev side)
+	// before the reorg moved it into the tree; check:repo does not scan
+	// deprecated/.
+	"skills/deprecated/claude-to-vscode-skill-converter/",
+	// The cross-platform authoring guide documents each harness's tool
+	// vocabulary in references/harness-blueprint.md — the table of tool
+	// names is the content. Same subject-matter class; check:repo does not
+	// scan in-progress/.
+	"skills/in-progress/making-skills-cross-platform/",
+	// Deliberate tool-capability note with an explicit no-tool fallback
+	// ("宿主没有该工具时退化为编号文本") — naming the tool is the information.
+	// check:repo does not scan workflow/.
+	"skills/workflow/workflow-interview/references/asking.md",
+];
 
 const failures = [];
 

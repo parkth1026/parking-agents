@@ -1,354 +1,241 @@
 #!/usr/bin/env node
 /**
- * Link every skill in this repo into a user-level skills directory.
+ * Unified installer entry: junction skills from this repo's skills/ tree into
+ * user-level skill directories.
  *
- * One discovery rule covers both sources — any directory holding a SKILL.md
- * is a skill — and results are flattened by name into the target root,
- * because Claude Code / Codex scan skills/ only one level deep:
+ *   node scripts/install-skills.mjs                              interactive menu
+ *   node scripts/install-skills.mjs --target both --set default  non-interactive
+ *   node scripts/install-skills.mjs --target agents --set progress --dry-run
+ *   node scripts/install-skills.mjs --target claude --only deprecated --dry-run
+ *   node scripts/install-skills.mjs --skills cpu-monitor --dry-run
+ *   node scripts/install-skills.mjs --list
  *
- *   <repo>/.agents/skills/<name>/SKILL.md           dev side (wins clashes)
- *   <repo>/skills/<category>/<name>/SKILL.md        release side, flattened
+ * Any argument switches to pure non-interactive mode (CI/agent safe) with
+ * defaults target=both, set=default. Zero arguments opens an interactive
+ * menu (readline). Exit codes: 0 ok, 1 failure, 2 usage error.
  *
- * Each skill becomes a directory junction (Windows, no admin rights needed;
- * POSIX degrades to a plain symlink). The agent then reads the working tree
- * directly, so installed copies can never drift from the repo.
- *
- * Per-name decision at the target:
- *   missing                      -> create junction (target dir itself is
- *                                   created too if it does not exist)
- *   link to the desired source   -> keep (idempotent)
- *   link anywhere else           -> repoint to the desired source
- *   real directory/file          -> moved into a sibling skills-backup-<ts>/
- *                                   folder (same volume, instant rename),
- *                                   then junctioned
- *
- * Health pass over entries NOT owned by this repo — the target doubles as a
- * checkup that clears illegal content and reports the rest:
- *   link whose target is gone    -> removed (dead junction: the skill would
- *                                   silently never load in any agent)
- *   dir without SKILL.md, loose
- *   file, link to a file         -> reported as an anomaly, left untouched
- *   healthy foreign skill/link   -> untouched (e.g. lark-* installed elsewhere)
- *
- * Every path is derived from this file's location and os.homedir(); nothing
- * is hardcoded, so the repo stays portable across machines and drives.
- *
- * The reverse operation, uninstallSkills(), removes exactly what
- * installSkills() put in: links whose target lives under one of the source
- * roots. Real directories, loose files, and links pointing anywhere else
- * (lark-* chains, other repos) are never touched, and skills-backup-* folders
- * are only reported, never deleted.
- *
- * Usage: see the install-skills-{agents,claude}.mjs and
- * uninstall-skills-{agents,claude}.mjs entry scripts. Install entry scripts
- * accept --only <category> or --skills <comma-separated-names>; with neither,
- * discovery and first-source-wins behavior are unchanged.
+ * --only <category> / --skills a,b,c are explicit selections that BYPASS the
+ * set exclusion (--only deprecated installs deprecated; --skills can reach
+ * skills inside in-progress).
  */
 
+import { homedir } from "node:os";
+import { join } from "node:path";
+import readline from "node:readline/promises";
 import {
-  existsSync,
-  lstatSync,
-  mkdirSync,
-  readdirSync,
-  readlinkSync,
-  renameSync,
-  rmSync,
-  statSync,
-  symlinkSync,
-} from "node:fs";
-import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import { fileURLToPath } from "node:url";
+  SETS,
+  discoverRepoSkills,
+  installSkills,
+  repoRoot,
+  repoSources,
+} from "./skill-links.mjs";
 
-export const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-export const repoSources = [
-  join(repoRoot, ".agents", "skills"),
-  join(repoRoot, "skills"),
-];
+const TARGETS = {
+  agents: () => join(homedir(), ".agents", "skills"),
+  claude: () => join(homedir(), ".claude", "skills"),
+};
 
-/** A directory holding SKILL.md is a skill; never descend past one. */
-export function discoverSkills(root) {
-  const skills = [];
-  const walk = (dir) => {
-    for (const entry of readdirSync(dir, { withFileTypes: true })) {
-      if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
-      const dirPath = join(dir, entry.name);
-      if (existsSync(join(dirPath, "SKILL.md"))) {
-        const fromRoot = relative(root, dirPath).split(sep);
-        skills.push({
-          name: entry.name,
-          dir: dirPath,
-          category: fromRoot.length > 1 ? fromRoot[0] : null,
-        });
-      } else {
-        walk(dirPath);
-      }
-    }
-  };
-  if (existsSync(root)) walk(root);
-  return skills;
+function usage() {
+  console.log(`用法: node scripts/install-skills.mjs [选项]
+
+不带参数进入交互菜单；带任意参数则纯非交互（默认 target=both, set=default）。
+
+  --target agents|claude|both   安装目标（默认 both）
+  --set default|progress|all    套档（默认 default；deprecated/in-progress 默认不装；
+                                 整档安装会收走套装外的本仓旧链接）
+  --only <分类>                 只装某个分类（绕过套档排除，如 --only deprecated；
+                                 外科手术式：只动选中项，不做套装外清除，真跑安全）
+  --skills a,b,c                只装指定技能（绕过套档排除，可跨分类；
+                                 同上，只动选中项，不做套装外清除）
+  --dry-run                     只报告，不改任何东西
+  --list                        按分类列出技能与各套档是否包含，然后退出`);
 }
 
-/** Compare junction targets across Windows/POSIX spelling differences. */
-export function normalizeLinkTarget(p) {
-  return p
-    .replace(/^\\\\\?\\/, "") // \\?\ prefix
-    .replace(/^\\\?\?\\/, "") // \??\ prefix used by some mklink junctions
-    .replace(/\//g, "\\")
-    .replace(/\\+$/, "")
-    .toLowerCase();
+function parseArgs(argv) {
+  const options = { target: null, set: null, dryRun: false, only: null, skillNames: null, list: false };
+  for (let index = 0; index < argv.length; index++) {
+    const arg = argv[index];
+    const value = () => {
+      const v = argv[++index];
+      if (v === undefined) throw new Error(`缺少参数值: ${arg}`);
+      return v;
+    };
+    if (arg === "--dry-run") options.dryRun = true;
+    else if (arg === "--list") options.list = true;
+    else if (arg === "--target") options.target = value();
+    else if (arg === "--set") options.set = value();
+    else if (arg === "--only") options.only = value();
+    else if (arg === "--skills") {
+      options.skillNames = value()
+        .split(",")
+        .map((name) => name.trim())
+        .filter(Boolean);
+      if (options.skillNames.length === 0) throw new Error("--skills 名单不能为空");
+    } else if (arg === "--help" || arg === "-h") {
+      options.help = true;
+    } else {
+      throw new Error(`未知参数: ${arg}`);
+    }
+  }
+  if (options.target !== null && !["agents", "claude", "both"].includes(options.target)) {
+    throw new Error(`非法 --target '${options.target}'（可选: agents, claude, both）`);
+  }
+  if (options.set !== null && !(options.set in SETS)) {
+    throw new Error(`非法 --set '${options.set}'（可选: ${Object.keys(SETS).join(", ")}）`);
+  }
+  if (options.only && options.skillNames) throw new Error("--only 与 --skills 不能同时使用");
+  return options;
 }
 
-function timestamp() {
-  const t = new Date().toISOString().slice(0, 19).replace(/[-:T]/g, "");
-  return `${t.slice(0, 8)}-${t.slice(8)}`;
+/** Per-category counts plus which named sets include each category. */
+function categoryTable(skills) {
+  const categories = new Map();
+  for (const skill of skills) {
+    const key = skill.category ?? "(无分类)";
+    categories.set(key, (categories.get(key) ?? 0) + 1);
+  }
+  const rows = [...categories.entries()].sort(([a], [b]) => a.localeCompare(b));
+  const inSet = (set, category) =>
+    category !== "(无分类)" && !SETS[set].includes(category);
+  return { rows, inSet };
 }
 
-/**
- * Install every discovered skill into `target` (created if missing), then run
- * a health pass that clears dead links and reports anomalies.
- * Returns { created, kept, repointed, converted, removed, anomalies, foreign, failures }.
- */
-export function installSkills({
-  sources,
-  target,
-  labelBase,
-  dryRun = false,
-  only,
-  skillNames,
-}) {
-  const discovered = sources.map((source) => discoverSkills(source));
-  const availableNames = new Set(discovered.flat().map((skill) => skill.name));
-  let selectedNames = null;
-
-  if (only) {
-    const releaseCategories = new Set(
-      discovered.flat().map((skill) => skill.category).filter(Boolean)
-    );
-    if (!releaseCategories.has(only)) {
-      const available = [...releaseCategories].sort().join(", ") || "none";
-      return selectionFailure(`未知分类 '${only}'（可选: ${available}）`);
-    }
-    selectedNames = new Set(
-      discovered.flat().filter((skill) => skill.category === only).map((skill) => skill.name)
-    );
-  } else if (skillNames) {
-    selectedNames = new Set(skillNames);
-    const unknown = [...selectedNames].filter((name) => !availableNames.has(name));
-    if (unknown.length > 0) return selectionFailure(`未知技能: ${unknown.join(", ")}`);
-  }
-
-  const byName = new Map();
-  const clashes = [];
-  for (const skills of discovered) {
-    for (const skill of skills) {
-      if (selectedNames && !selectedNames.has(skill.name)) continue;
-      if (byName.has(skill.name)) {
-        clashes.push(`${skill.name}: ${skill.dir} skipped, first source wins`);
-      } else {
-        byName.set(skill.name, skill);
-      }
-    }
-  }
-
-  mkdirSync(target, { recursive: true });
-
-  const display = (dir) => (labelBase ? relative(labelBase, dir) : dir);
-  const created = [];
-  const kept = [];
-  const repointed = [];
-  const converted = [];
-  const failures = [];
-  let backupDir = null;
-
-  for (const [name, skill] of [...byName.entries()].sort()) {
-    const link = join(target, name);
-    const desired = skill.dir;
-    try {
-      let st = null;
-      try {
-        st = lstatSync(link);
-      } catch {
-        // missing entry — created below
-      }
-
-      if (!st) {
-        if (!dryRun) symlinkSync(desired, link, "junction");
-        created.push(`${name}  <-  ${display(desired)}`);
-      } else if (st.isSymbolicLink()) {
-        const current = readlinkSync(link);
-        if (normalizeLinkTarget(current) === normalizeLinkTarget(desired)) {
-          kept.push(name);
-        } else {
-          if (!dryRun) {
-            rmSync(link);
-            symlinkSync(desired, link, "junction");
-          }
-          repointed.push(`${name}\n    旧: ${current}\n    新: ${desired}`);
-        }
-      } else {
-        // Real copy shadowing a repo skill: move it aside, then junction.
-        if (!dryRun) {
-          backupDir ??= join(dirname(target), `skills-backup-${timestamp()}`);
-          mkdirSync(backupDir, { recursive: true });
-          let dest = join(backupDir, name);
-          for (let i = 2; existsSync(dest); i++) dest = join(backupDir, `${name}-${i}`);
-          renameSync(link, dest);
-          symlinkSync(desired, link, "junction");
-        }
-        converted.push(`${name}  (real copy backed up, now <-  ${display(desired)})`);
-      }
-    } catch (err) {
-      failures.push(`${name}: ${err.message}`);
-    }
-  }
-
-  // --- health pass over foreign entries --------------------------------------
-  // A dead link is unambiguous garbage: the skill silently never loads. Real
-  // directories and files are never deleted here — only reported.
-  const removed = [];
-  const removedNames = new Set();
-  const anomalies = [];
-  for (const entry of readdirSync(target, { withFileTypes: true })) {
-    if (byName.has(entry.name)) continue; // managed above
-    const entryPath = join(target, entry.name);
-    try {
-      const st = lstatSync(entryPath);
-      if (st.isSymbolicLink()) {
-        const current = readlinkSync(entryPath);
-        const abs = isAbsolute(current) ? current : resolve(dirname(entryPath), current);
-        if (!existsSync(abs)) {
-          if (!dryRun) rmSync(entryPath);
-          removedNames.add(entry.name);
-          removed.push(`${entry.name}  ->  ${current}  (target missing)`);
-        } else if (!statSync(abs).isDirectory()) {
-          anomalies.push(`${entry.name}: link target is a file, not a directory (${current})`);
-        }
-      } else if (st.isDirectory()) {
-        if (!existsSync(join(entryPath, "SKILL.md"))) {
-          anomalies.push(`${entry.name}: directory has no SKILL.md — will never load as a skill`);
-        }
-      } else {
-        anomalies.push(`${entry.name}: loose file in skills directory`);
-      }
-    } catch (err) {
-      anomalies.push(`${entry.name}: could not inspect (${err.message})`);
-    }
-  }
-
-  const foreign = readdirSync(target, { withFileTypes: true })
-    .filter((e) => !byName.has(e.name) && !removedNames.has(e.name))
-    .map((e) => e.name);
-
-  const section = (title, rows) => {
-    if (rows.length === 0) return;
-    console.log(`\n${title} (${rows.length}):`);
-    for (const row of rows) console.log(`  ${row}`);
-  };
-
-  if (dryRun) console.log("DRY RUN — nothing was changed\n");
-  console.log(`Target: ${target}`);
-  console.log(`Sources: ${sources.join(", ")}`);
-  section("created", created);
-  section("kept (already correct)", kept);
-  section("repointed", repointed);
-  section("converted (real copy -> backup + junction)", converted);
-  section("removed (dead links)", removed);
-  section("anomalies (reported, not touched)", anomalies);
-  console.log(`\nForeign entries left untouched (${foreign.length}): ${foreign.join(", ") || "none"}`);
-  for (const c of clashes) console.warn(`warning: name clash — ${c}`);
-  console.log(
-    `\nSummary: ${created.length} created, ${kept.length} kept, ${repointed.length} repointed, ` +
-      `${converted.length} converted, ${removed.length} dead links removed, ${foreign.length} untouched` +
-      (anomalies.length ? `, ${anomalies.length} anomalies reported` : "") +
-      (failures.length ? `, ${failures.length} FAILED` : "")
-  );
-  for (const f of failures) console.error(`  ✗ ${f}`);
-
-  return { created, kept, repointed, converted, removed, anomalies, foreign, failures };
-}
-
-function selectionFailure(message) {
-  console.error(`ERROR: ${message}`);
-  return {
-    created: [],
-    kept: [],
-    repointed: [],
-    converted: [],
-    removed: [],
-    anomalies: [],
-    foreign: [],
-    failures: [message],
-  };
-}
-
-/**
- * Remove exactly what installSkills() put into `target`: links whose target
- * lives under one of `sources`. Real directories, loose files, and links
- * pointing anywhere else (lark-* chains, other repos) are never touched, and
- * skills-backup-* folders next to the target are reported but kept.
- * Returns { removed, remaining, backups, failures }.
- */
-export function uninstallSkills({ sources, target, dryRun = false }) {
-  const removed = [];
-  const removedNames = new Set();
-  const failures = [];
-
-  if (!existsSync(target)) {
-    console.log(`Target: ${target}\nNothing to uninstall — target does not exist.`);
-    return { removed, remaining: [], backups: [], failures };
-  }
-
-  const ownedRoots = sources.map((s) => normalizeLinkTarget(s));
-
-  for (const entry of readdirSync(target, { withFileTypes: true })) {
-    const entryPath = join(target, entry.name);
-    try {
-      if (!lstatSync(entryPath).isSymbolicLink()) continue; // never touch real entries
-      const current = readlinkSync(entryPath);
-      const abs = isAbsolute(current) ? current : resolve(dirname(entryPath), current);
-      const normalized = normalizeLinkTarget(abs);
-      if (!ownedRoots.some((r) => normalized.startsWith(r + "\\"))) continue; // not ours
-      if (!dryRun) rmSync(entryPath);
-      removedNames.add(entry.name);
-      removed.push(`${entry.name}  ->  ${current}`);
-    } catch (err) {
-      failures.push(`${entry.name}: ${err.message}`);
-    }
-  }
-
-  const remaining = readdirSync(target, { withFileTypes: true })
-    .filter((e) => !removedNames.has(e.name))
-    .map((e) => e.name);
-
-  const backups = readdirSync(dirname(target)).filter((n) => /^skills-backup-/.test(n));
-
-  const section = (title, rows) => {
-    if (rows.length === 0) return;
-    console.log(`\n${title} (${rows.length}):`);
-    for (const row of rows) console.log(`  ${row}`);
-  };
-
-  if (dryRun) console.log("DRY RUN — nothing was changed\n");
-  console.log(`Target: ${target}`);
-  console.log(`Sources: ${sources.join(", ")}`);
-  if (removed.length > 0) {
-    section("removed", removed);
-  } else {
-    console.log("\nNothing owned by this repo found — no links point into the sources.");
-  }
-  console.log(`\nEntries left untouched (${remaining.length}): ${remaining.join(", ") || "none"}`);
-  if (backups.length > 0) {
+function listMode(skills) {
+  const { rows, inSet } = categoryTable(skills);
+  console.log("分类      数量  default  progress  all");
+  for (const [category, count] of rows) {
+    const mark = (set) => (inSet(set, category) ? "  ✓   " : "  ✗   ");
     console.log(
-      `\nBackup folders kept (restore from or delete them manually): ` +
-        backups.map((b) => join(dirname(target), b)).join(", ")
+      `${category.padEnd(10)}${String(count).padStart(3)}   ${mark("default")}    ${mark("progress")}  ✓`
     );
   }
-  console.log(
-    `\nSummary: ${removed.length} removed, ${remaining.length} untouched` +
-      (backups.length ? `, ${backups.length} backup folder(s) kept` : "") +
-      (failures.length ? `, ${failures.length} FAILED` : "")
-  );
-  for (const f of failures) console.error(`  ✗ ${f}`);
+  const count = (set) =>
+    skills.filter((skill) => !skill.category || !SETS[set].includes(skill.category)).length;
+  console.log(`\n共 ${skills.length} 个技能: default ${count("default")} / progress ${count("progress")} / all ${count("all")}`);
+}
 
-  return { removed, remaining, backups, failures };
+function runInstall({ target, set, dryRun, only, skillNames }) {
+  const targets = target === "both" ? ["agents", "claude"] : [target];
+  let failed = false;
+  for (const key of targets) {
+    if (targets.length > 1) console.log(`\n=== ${key} ===`);
+    const result = installSkills({
+      sources: repoSources,
+      target: TARGETS[key](),
+      labelBase: repoRoot,
+      dryRun,
+      only,
+      skillNames,
+      excludeCategories: only || skillNames ? [] : SETS[set],
+    });
+    if (result.failures.length > 0) failed = true;
+  }
+  return failed;
+}
+
+async function interactive() {
+  const skills = discoverRepoSkills();
+  const { rows, inSet } = categoryTable(skills);
+  const setCount = (set) =>
+    skills.filter((skill) => !skill.category || !SETS[set].includes(skill.category)).length;
+
+  console.log("parking-agents 技能安装器\n");
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  // Queue every line, even ones arriving before a prompt is shown (piped
+  // stdin delivers all lines at once; rl.question would drop them).
+  const lineQueue = [];
+  let lineWaiter = null;
+  rl.on("line", (line) => {
+    if (lineWaiter) {
+      const waiter = lineWaiter;
+      lineWaiter = null;
+      waiter(line);
+    } else {
+      lineQueue.push(line);
+    }
+  });
+  const nextLine = () =>
+    lineQueue.length > 0
+      ? Promise.resolve(lineQueue.shift())
+      : new Promise((res) => {
+          lineWaiter = res;
+        });
+  const ask = async (prompt, valid) => {
+    for (;;) {
+      process.stdout.write(prompt);
+      const answer = (await nextLine()).trim();
+      if (valid.includes(answer)) return answer;
+      console.log(`无效选择: ${answer || "(空)"}，请输入 ${valid.join(" / ")}`);
+    }
+  };
+
+  try {
+    console.log("① 安装目标:");
+    console.log("  [1] ~/.agents/skills");
+    console.log("  [2] ~/.claude/skills");
+    console.log("  [3] 两个都装");
+    const targetAnswer = await ask("选择 [1-3]: ", ["1", "2", "3"]);
+
+    console.log("\n② 套档:");
+    console.log(`  [1] 默认       (${setCount("default")} 个，排除 deprecated + in-progress)`);
+    console.log(`  [2] 含 in-progress (${setCount("progress")} 个，排除 deprecated)`);
+    console.log(`  [3] 全部       (${setCount("all")} 个)`);
+    const setAnswer = await ask("选择 [1-3]: ", ["1", "2", "3"]);
+
+    const target = { "1": "agents", "2": "claude", "3": "both" }[targetAnswer];
+    const set = { "1": "default", "2": "progress", "3": "all" }[setAnswer];
+    const targetLabel = { agents: "~/.agents/skills", claude: "~/.claude/skills", both: "~/.agents/skills + ~/.claude/skills" }[target];
+
+    console.log(`\n即将把 ${setCount(set)} 个技能（${set} 档）junction 到 ${targetLabel}。`);
+    process.stdout.write("确认执行? [Y/n]: ");
+    const confirm = (await nextLine()).trim().toLowerCase();
+    if (confirm === "n" || confirm === "no") {
+      console.log("已取消，未做任何改动。");
+      return 0;
+    }
+    console.log();
+    return runInstall({ target, set, dryRun: false, only: null, skillNames: null }) ? 1 : 0;
+  } finally {
+    rl.close();
+  }
+}
+
+const hasArgs = process.argv.length > 2;
+
+if (!hasArgs) {
+  try {
+    process.exit(await interactive());
+  } catch (error) {
+    console.error(`ERROR: ${error.message}`);
+    process.exit(1);
+  }
+}
+
+try {
+  const options = parseArgs(process.argv.slice(2));
+  if (options.help) {
+    usage();
+    process.exit(0);
+  }
+  if (options.list) {
+    listMode(discoverRepoSkills());
+    process.exit(0);
+  }
+  const target = options.target ?? "both";
+  const set = options.set ?? "default";
+  if (set !== "default" && (options.only || options.skillNames)) {
+    console.warn("warning: --only / --skills 为显式选择，忽略 --set 套档排除（只动选中项，不做套装外清除）");
+  }
+  const failed = runInstall({
+    target,
+    set,
+    dryRun: options.dryRun,
+    only: options.only,
+    skillNames: options.skillNames,
+  });
+  process.exit(failed ? 1 : 0);
+} catch (error) {
+  console.error(`ERROR: ${error.message}`);
+  usage();
+  process.exit(2);
 }
