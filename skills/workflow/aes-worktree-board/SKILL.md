@@ -53,6 +53,7 @@ runtime 选址链保持不变：`AES_WORKTREE_BOARD_RUNTIME_DIR` 优先，否则
 - 正常派发只用 Desktop `create_thread`。真实 CLI fallback（`cli-fallback`）必须保留用户授权原话；`test` 假 agent 仅供 selftest 豁免。
 - 新建 executor、reviewer 与 master/subagent Task 统一使用 `luna-max`；每个 TaskRecord 必须记录 `modelTier` 与 `routingReason`。历史 registry 中已有的 `sol-high` 只作为不可篡改的审计事实保留，不得复用或新建。
 - 不把 `runtime=NOT_RUN` 改写为 `PASS`；不把 handoff/park/stop 伪装成 BLOCK；不重复消费同一 eventId。
+- AES QA 只有实际执行 screenshot check、或截图参与规格/verdict/Finding 时才进入内部 GitLab 截图证据分支；无截图不写空 note。该分支不改变本技能的 GitHub Issue 控制面，也不扩为通用 artifact gate。
 - 不清理、reset、强杀或覆盖用户现场。连续三次有效 BLOCK 后停止该线路的 Task/reviewer 自动创建，等待人工交接。
 - 星图设计语言保持 `docs/design/design_handoff_issue_starmap/` 的颜色、半径、光晕、名牌旗、图例与交互；控制面只占六个确认挂点，双视图文案为 `Map / List`。
 
@@ -408,7 +409,14 @@ node "$skillDir/scripts/master.mjs" release --job <jobId> --slot <slotId>
 | `high` | 机械门全绿**仍**停在 humanGate 等人工批准 |
 | `critical` | 拒绝直接 merge，只走 PR；waiver 也不能覆盖 |
 
-机械门八项固定顺序：slot → commit → integration → acceptance → review → review-base → QA → qa-base。
+顶层机械门仍按八类事实求值：slot → commit → integration → acceptance → review → review-base
+→ QA → qa-base。QA 内含一个条件 screenshot-evidence 子门：若 QaReceipt 的
+`screenshotEvidence.required=true`，或任一 `checks[].kind=screenshot|live-screenshot`，则顶层
+wrapper `screenshotEvidence:{required:true,aggregateMarker}` 必须存在且 marker 为 VERIFIED；
+漏填、冲突或 candidate 不一致都 fail closed。详细字段与成本/恢复规则只读
+[aes-qa GitLab 截图证据协议](../aes-qa/references/screenshot-evidence.md)，不在总管复制 schema。
+无实际截图时不新增 gate、upload 或 note，旧无截图 QaReceipt 保持兼容。
+
 `gate` 另返回 `outboxWarning` 提醒未送达的 GitHub 出站条目；该字段只提供可观测性，
 不改变八门 outcome，也不参与 `decision.mayMerge`。
 其中 `-base` 两项校验证据取自的 integration base 仍等于当前 base，不等判 STALE

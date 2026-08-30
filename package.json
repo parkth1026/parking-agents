@@ -9,7 +9,8 @@
     "install:skills": "node scripts/install-skills.mjs --target both",
     "uninstall:skills": "node scripts/uninstall-skills.mjs --target both",
     "evals": "node scripts/run-evals.mjs",
-    "test": "node tests/skills/test-skill-discovery.mjs && node tests/skills/test-install-skills.mjs && node tests/skills/test-no-tool-names.mjs && node tests/hooks/test-session-start.mjs && node --test tests/pi/test-pi-extension.mjs && node --test tests/harnesses/test-harness-manifests.mjs && node scripts/bump-version.mjs --check && node scripts/bump-version.mjs --audit && npm run check:repo"
+    "test:aes-qa-screenshot-evidence": "node skills/workflow/aes-qa/run-tests.mjs --contract screenshot-evidence --json",
+    "test": "npm run test:aes-qa-screenshot-evidence && node tests/skills/test-skill-discovery.mjs && node tests/skills/test-install-skills.mjs && node tests/skills/test-no-tool-names.mjs && node tests/hooks/test-session-start.mjs && node --test tests/pi/test-pi-extension.mjs && node --test tests/harnesses/test-harness-manifests.mjs && node scripts/bump-version.mjs --check && node scripts/bump-version.mjs --audit && npm run check:repo"
   },
   "license": "MIT",
   "author": "piaotonghu <pb763396199@gmail.com>",
