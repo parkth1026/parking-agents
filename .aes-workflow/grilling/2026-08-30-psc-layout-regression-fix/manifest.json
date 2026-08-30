@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "slug": "2026-08-30-psc-layout-regression-fix",
+  "created_at": "2026-08-30T16:00:24Z",
+  "updated_at": "2026-08-30T17:29:36Z",
+  "original_request": "上面问题 解决方案 讨论一下（指 parking-skill-creator 严格测试发现的 2 个大搬移布局回归：snapshot-skill.mjs 缺省 workspace 落进扫描根内、check-shadow-skills.mjs 对分类布局全判影子）",
+  "goal_oneline": "creator 工具链在分类布局+link 挂载下恢复两条不变量：评测产物缺省落扫描根外（任意嵌套深度）、影子检测按产物特征真实区分真技能与冒充产物",
+  "target": null,
+  "stage": "3-contract",
+  "next_action": "交接执行 Agent：按 contract.md 实现两脚本修复+夹具+配套，先提交 #160 WIP 再落本修复",
+  "stage_gates": {
+    "1-interview": {
+      "status": "done",
+      "closed_at": "2026-08-30T16:23:12Z",
+      "self_assessment": {
+        "意图": "已定",
+        "结果": "已定",
+        "边界": "已定",
+        "约束": "已定",
+        "现状": "已定"
+      }
+    },
+    "2-prototype": {
+      "status": "done",
+      "closed_at": "2026-08-30T16:59:52Z",
+      "artifacts_confirmed": [
+        "behavior",
+        "example-run"
+      ]
+    },
+    "3-contract": {
+      "status": "done",
+      "closed_at": "2026-08-30T17:29:36Z"
+    }
+  },
+  "validation": {
+    "status": "valid",
+    "ac_count": 6,
+    "warnings": [],
+    "ran_at": "2026-08-30T17:28:29Z",
+    "verify_tiers": {
+      "A": 6,
+      "B": 0,
+      "C": 0,
+      "D": 0
+    }
+  },
+  "blocked": [],
+  "residual_risk": null,
+  "status": "ready"
+}

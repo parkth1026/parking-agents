@@ -6,7 +6,7 @@ This document defines the JSON schemas used by skill-creator.
 
 ## evals.json
 
-Defines the evals for a skill. Located at `<skill-dir>/../../evals/<skill-name>-workspace/evals/evals.json` in the default workspace.
+Defines the evals for a skill. Located at `<skills-ancestor-parent>/evals/<skill-name>-workspace/evals/evals.json` in the default workspace (skills ancestor = nearest ancestor named `skills`, any nesting depth).
 
 ```json
 {
@@ -128,7 +128,7 @@ Append-only eval score ledger. Located at `<skill-dir>/history.json`, distribute
   "runs": [
     {
       "date": "2026-08-17T14:00:00+08:00",
-      "iteration_ref": "<skill-dir>/../../evals/feishu-doc-qa-workspace/iteration-1",
+      "iteration_ref": "<skills-ancestor-parent>/evals/feishu-doc-qa-workspace/iteration-1",
       "gates": {
         "with_skill":     { "pass_rate": 1.00, "mean_ms": 137000, "mean_tokens": 48213 },
         "without_skill":  { "pass_rate": 0.50, "mean_ms": 155000, "mean_tokens": 62000 }
@@ -137,7 +137,7 @@ Append-only eval score ledger. Located at `<skill-dir>/history.json`, distribute
     },
     {
       "date": "2026-08-17T18:00:00+08:00",
-      "iteration_ref": "<skill-dir>/../../evals/feishu-doc-qa-workspace/iteration-2",
+      "iteration_ref": "<skills-ancestor-parent>/evals/feishu-doc-qa-workspace/iteration-2",
       "gates": {
         "with_skill":     { "pass_rate": 1.00, "mean_ms": 121000, "mean_tokens": 44100 },
         "without_skill":  { "pass_rate": 0.50, "mean_ms": 158000, "mean_tokens": 63500 }

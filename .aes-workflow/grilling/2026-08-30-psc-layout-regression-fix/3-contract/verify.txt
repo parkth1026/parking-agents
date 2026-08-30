@@ -1,0 +1,26 @@
+# verify @ 2026-08-30T17:28:29Z
+# cwd: G:\GIT\AI_WorkFlow\parking-agents-manual
+
+[FAIL] AC-001  exit=1  $ node skills/workflow/parking-skill-creator/run-tests.mjs | grep -c "ok  快照缺省: 分类"
+         拒绝：C:\Users\parking\AppData\Local\Temp\advtest-45RzY6\sk2\bad\SKILL.md 不存在或不是文件，不是技能目录
+         拒绝打包：C:\Users\parking\AppData\Local\Temp\fm54-Xp0mlO\flow-desc 的 frontmatter 含解析器支持子集外的构造，校验无法判定
+           - description: flow 集合 → [a, b, c]
+[FAIL] AC-002  exit=1  $ node skills/workflow/parking-skill-creator/run-tests.mjs | grep -c "ok  快照回退"
+         拒绝：C:\Users\parking\AppData\Local\Temp\advtest-SsvS37\sk2\bad\SKILL.md 不存在或不是文件，不是技能目录
+         拒绝打包：C:\Users\parking\AppData\Local\Temp\fm54-HLqqFT\flow-desc 的 frontmatter 含解析器支持子集外的构造，校验无法判定
+           - description: flow 集合 → [a, b, c]
+[FAIL] AC-003  exit=1  $ node skills/workflow/parking-skill-creator/run-tests.mjs | grep -c "ok  影子判据"
+         拒绝：C:\Users\parking\AppData\Local\Temp\advtest-fDJgVS\sk2\bad\SKILL.md 不存在或不是文件，不是技能目录
+         拒绝打包：C:\Users\parking\AppData\Local\Temp\fm54-qVms6t\flow-desc 的 frontmatter 含解析器支持子集外的构造，校验无法判定
+           - description: flow 集合 → [a, b, c]
+[FAIL] AC-004  exit=1  $ node skills/workflow/parking-skill-creator/run-tests.mjs | grep -c "ok  影子派生"
+         拒绝：C:\Users\parking\AppData\Local\Temp\advtest-YZigT6\sk2\bad\SKILL.md 不存在或不是文件，不是技能目录
+         拒绝打包：C:\Users\parking\AppData\Local\Temp\fm54-oK2ePS\flow-desc 的 frontmatter 含解析器支持子集外的构造，校验无法判定
+           - description: flow 集合 → [a, b, c]
+[PASS] AC-005  exit=0  $ node skills/workflow/parking-skill-creator/run-tests.mjs
+         拒绝：C:\Users\parking\AppData\Local\Temp\advtest-smcHnD\sk2\bad\SKILL.md 不存在或不是文件，不是技能目录
+         拒绝打包：C:\Users\parking\AppData\Local\Temp\fm54-myYNjt\flow-desc 的 frontmatter 含解析器支持子集外的构造，校验无法判定
+           - description: flow 集合 → [a, b, c]
+[FAIL] AC-006  exit=1  $ grep -qE "^/evals/?$" .gitignore && grep -q "skills 祖先" skills/workflow/parking-skill-creator/SKILL.md && grep -q "skills 祖先" skills/workflow/parking-skill-creator/references/repo-conventions.md
+
+绿 1 / 红 5 / 跑不起来 0

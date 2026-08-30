@@ -35,7 +35,7 @@ description: 本机技能生产流水线：创建、校验、评测、迭代和�
 - 读取、扫描和生成评测计划默认只读；报告写入 `docs/reports/` 或显式指定的 workspace。
 - `init-skill`、评测运行、viewer 启动、快照、history 追加和打包都会写文件；
   执行前先列出绝对输出路径、将创建的文件和预计覆盖项，取得用户确认后再运行。
-- 评测产物默认落在 `<skill-dir>/../../evals/<技能名>-workspace/` 或用户指定目录，不得写入技能扫描根；
+- 评测产物默认落在 skills 祖先父级的 `evals/<技能名>-workspace/` 或用户指定目录，不得写入技能扫描根；
   发现路径冲突、已有文件或 `SKILL.md` 影子文件时停止并报告，不覆盖、不自动清理。
 - 本技能可调用 subagent，但必须把技能路径、输入工件和产物目录显式传入；
   不把评测结论预先注入探针上下文，也不把未完成评测标成通过。
@@ -125,7 +125,7 @@ PASS 但缺 `run-tests.mjs` 或 `references/design.md` 时给警告、SKILL.md �
 
 题目依赖 Web、外部 API、快照或实时数据时，先读 `references/evidence.md`，再做 evidence preflight/materialize；创建或改进 skill 时，把文档风险写成质量假设并用相关 gate/runs 验证，静态审查不直接给质量 PASS。
 
-评测结果默认放 `<skill-dir>/../../evals/<技能名>-workspace/`——其中 `<skill-dir>` 指本技能目录，`evals/` 与 `skills/` 平行；workspace 在技能扫描根之外，评测产物/夹具里出现再多的 `SKILL.md` 也不会被宿主识别成技能。workspace 是 scratch、不入库（.gitignore 已忽略）——持久评测依据住技能目录，clean 前先把成绩沉淀进去（见「迭代依据的发现约定」）。若显式沿用扫描根内的旧 workspace，跑完 iteration 要用 `check-shadow-skills` 复查产物有没有冒充技能。按迭代组织（`iteration-1/`、`iteration-2/`…），每个测试用例一个 `eval-<描述性名>/` 目录。目录随用随建，不要预先全铺。
+评测结果默认放 skills 祖先父级的 `evals/<技能名>-workspace/`（与 skills 根平行，向上找 skills 祖先，任意嵌套深度）；workspace 在技能扫描根之外，评测产物/夹具里出现再多的 `SKILL.md` 也不会被宿主识别成技能。workspace 是 scratch、不入库（.gitignore 已忽略）——持久评测依据住技能目录，clean 前先把成绩沉淀进去（见「迭代依据的发现约定」）。若显式沿用扫描根内的旧 workspace，跑完 iteration 要用 `check-shadow-skills` 复查产物有没有冒充技能。按迭代组织（`iteration-1/`、`iteration-2/`…），每个测试用例一个 `eval-<描述性名>/` 目录。目录随用随建，不要预先全铺。
 
 ### 6.1 起跑前问 gate 集，分批并行 spawn run
 
@@ -155,7 +155,7 @@ PASS 但缺 `run-tests.mjs` 或 `references/design.md` 时给警告、SKILL.md �
 
 目录布局对齐聚合器口径：`<config>/run-<K>/outputs/`（run 序号从 1 起，同一 eval 重跑多个 run 时递增）——聚合器只认 `run-<数字>` 子目录，产物直接放 `<config>/outputs/` 会收不到。重要轮次（发版验收、疑似 flaky 的 eval）可在同一 eval 下同轮追加 `run-2` 再跑一臂，聚合器自动池化多 run 统计——同轮方差不用等跨轮才看见。
 
-不带技能的 gate（如 `without_skill`）：同 prompt 去掉「技能路径」一行，产物存对应 gate 目录。改进既有技能的 `old_skill` gate 用改动前快照：`node scripts/snapshot-skill.mjs <技能目录> [<workspace>]`（workspace 缺省为 `<skill-dir>/../../evals/<技能名>-workspace`；快照目录 `skill-snapshot`，已占用自动递增 `-v2`、`-v3`）。脚本会把快照里的 `SKILL.md` 改名 `SKILL.md.bak`——技能扫描器按 `SKILL.md` 文件名认技能，若 workspace 沿用扫描根内的旧同级位置，快照里留活的 `SKILL.md` 会冒出同名双技能、污染触发评测的技能清单；新缺省位置虽在扫描根外，改名仍是双保险。别徒手复制目录造快照。old_skill run 的「技能路径」填快照目录，prompt 注明技能文档读 `SKILL.md.bak`，产物存 `old_skill/run-1/outputs/`。怀疑技能清单混进了快照/评测产物冒充的技能时，运行 `node scripts/check-shadow-skills.mjs <扫描根>` 复查。
+不带技能的 gate（如 `without_skill`）：同 prompt 去掉「技能路径」一行，产物存对应 gate 目录。改进既有技能的 `old_skill` gate 用改动前快照：`node scripts/snapshot-skill.mjs <技能目录> [<workspace>]`（workspace 缺省为 skills 祖先父级的 `evals/<技能名>-workspace`；快照目录 `skill-snapshot`，已占用自动递增 `-v2`、`-v3`）。脚本会把快照里的 `SKILL.md` 改名 `SKILL.md.bak`——技能扫描器按 `SKILL.md` 文件名认技能，若 workspace 沿用扫描根内的旧同级位置，快照里留活的 `SKILL.md` 会冒出同名双技能、污染触发评测的技能清单；新缺省位置虽在扫描根外，改名仍是双保险。别徒手复制目录造快照。old_skill run 的「技能路径」填快照目录，prompt 注明技能文档读 `SKILL.md.bak`，产物存 `old_skill/run-1/outputs/`。怀疑技能清单混进了快照/评测产物冒充的技能时，运行 `node scripts/check-shadow-skills.mjs <扫描根>` 复查。
 
 每个 eval 目录写 `eval_metadata.json`（断言可先空，见 6.2）：
 

@@ -4,7 +4,7 @@
 //       夹具全部建在系统临时目录——本测试自身不能在技能扫描根下留下任何 SKILL.md。
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -375,29 +375,114 @@ try {
 
   const clean = runFile("check-shadow-skills.mjs", [skills]);
   check("干净根(快照仅 .bak)退出码 0", clean.code === 0);
-  check("干净根报告一级技能 1 个", clean.stdout.includes("一级技能 1 个"));
+  check("干净根报告技能 1 个(递归)", clean.stdout.includes("技能 1 个（递归）"));
 
   mk(join(skills, "real-skill-workspace", "iteration-1", "outputs", "fake"), "fake-skill");
   const dirty = runFile("check-shadow-skills.mjs", [skills]);
   check("出现影子后退出码 1", dirty.code === 1);
-  check("报出影子技能名 fake-skill", dirty.stdout.includes('"fake-skill"'));
-  check("标注 workspace 内", dirty.stdout.includes("(workspace 内)"));
+  check("点名产物内活 SKILL.md 相对路径", dirty.stdout.includes(join("real-skill-workspace", "iteration-1", "outputs", "fake", "SKILL.md")));
+  check("标注位于评测产物目录", dirty.stdout.includes("位于评测产物目录"));
 
   check("不存在的根退出码 2", runFile("check-shadow-skills.mjs", [join(root2, "no-such")]).code === 2);
 
-  // 无参数：从脚本自身位置推导同级扫描根，不依赖宿主目录名
+  // 无参数：从脚本自身位置推导 skills 祖先扫描根（扁平挂载=技能父目录），不依赖宿主目录名
   const host = join(root2, "skill-host");
   const hostSkills = join(host, "skills");
   const copiedChecker = join(hostSkills, "creator", "scripts", "check-shadow-skills.mjs");
-  mkdirSync(join(hostSkills, "creator", "scripts", "lib"), { recursive: true });
+  mkdirSync(join(hostSkills, "creator", "scripts"), { recursive: true });
   cpSync(join(SCRIPTS, "check-shadow-skills.mjs"), copiedChecker);
-  cpSync(join(SCRIPTS, "lib", "frontmatter.mjs"), join(hostSkills, "creator", "scripts", "lib", "frontmatter.mjs"));
   mkdirSync(join(hostSkills, "only-skill"), { recursive: true });
   writeFileSync(join(hostSkills, "only-skill", "SKILL.md"), "---\nname: only-skill\ndescription: d\n---\n");
   const auto = runNode(copiedChecker, [], { cwd: root2 });
   check("无参数从自身位置推导干净根退出码 0", auto.code === 0 && auto.stdout.includes(hostSkills));
 } finally {
   rmSync(root2, { recursive: true, force: true });
+}
+
+// ---- 分类布局与缺省解析回归（2026-08-30 布局大搬移后两条不变量恢复） ----
+console.log("分类布局·快照落点：");
+const rootCat = mkdtempSync(join(tmpdir(), "cattest-"));
+try {
+  const mk = (p, name) => {
+    mkdirSync(p, { recursive: true });
+    writeFileSync(join(p, "SKILL.md"), `---\nname: ${name}\ndescription: d\n---\n`);
+  };
+  const repo = join(rootCat, "repo");
+  const skillsCat = join(repo, "skills");
+  mk(join(skillsCat, "workflow", "two-layer"), "two-layer");
+  mk(join(skillsCat, "matt-skills", "engineering", "three-layer"), "three-layer");
+
+  const snap2 = run([join(skillsCat, "workflow", "two-layer")]);
+  check("快照缺省: 分类 2 层技能落 skills 祖先父级的 evals/(扫描根外)",
+    snap2.code === 0 && snap2.stdout.includes(`SNAPSHOT ${join(repo, "evals", "two-layer-workspace", "skill-snapshot")}`));
+  const snap3 = run([join(skillsCat, "matt-skills", "engineering", "three-layer")]);
+  check("快照缺省: 分类 3 层技能落同一公式(与嵌套深度无关)",
+    snap3.code === 0 && snap3.stdout.includes(`SNAPSHOT ${join(repo, "evals", "three-layer-workspace", "skill-snapshot")}`));
+  check("快照缺省: 分类布局快照同样去识别化",
+    exists(join(repo, "evals", "two-layer-workspace", "skill-snapshot", "SKILL.md.bak"))
+    && !exists(join(repo, "evals", "two-layer-workspace", "skill-snapshot", "SKILL.md")));
+
+  console.log("分类布局·快照回退：");
+  const lonely = join(rootCat, "mytools", "foo-skill");
+  mk(lonely, "foo-skill");
+  const fallbackSnap = run([lonely]);
+  check("快照回退: 无 skills 祖先时回退上两级公式且落点不变",
+    fallbackSnap.code === 0
+    && fallbackSnap.stdout.includes(`SNAPSHOT ${join(rootCat, "evals", "foo-skill-workspace", "skill-snapshot")}`));
+  check("快照回退: stdout 多一行回退提示且退出码不变",
+    fallbackSnap.code === 0 && fallbackSnap.stdout.includes("回退上两级")
+    && fallbackSnap.stdout.includes("SNAPSHOT "));
+
+  console.log("分类布局·影子判据：");
+  const catClean = runFile("check-shadow-skills.mjs", [skillsCat]);
+  check("影子判据: 分类根 2~3 层真技能全合法不误报",
+    catClean.code === 0 && catClean.stdout.includes("技能 2 个（递归）")
+    && catClean.stdout.includes("✓ 无影子技能"));
+
+  // 无参数派生：从 3 层分类技能跑，应覆盖全 skills 根而不是 skills/<分类>
+  const catCreator = join(skillsCat, "matt-skills", "engineering", "creator");
+  mkdirSync(join(catCreator, "scripts"), { recursive: true });
+  cpSync(join(SCRIPTS, "check-shadow-skills.mjs"), join(catCreator, "scripts", "check-shadow-skills.mjs"));
+  const derived = runNode(join(catCreator, "scripts", "check-shadow-skills.mjs"), [], { cwd: rootCat });
+  check("影子派生: 无参数从 3 层分类技能覆盖全 skills 根",
+    derived.code === 0 && derived.stdout.includes(skillsCat));
+
+  mk(join(skillsCat, "evals", "demo-workspace", "skill-snapshot"), "demo");
+  mk(join(skillsCat, "life", "shopping-deep-research"), "shopping-deep-research");
+  mk(join(skillsCat, "life", "shopping-deep-research", "eval-fixtures", "case-a"), "fixture-fake");
+  const catDirty = runFile("check-shadow-skills.mjs", [skillsCat]);
+  check("影子判据: 扫描根内产物名单目录的活 SKILL.md 点名判影子",
+    catDirty.code === 1
+    && catDirty.stdout.includes(join("evals", "demo-workspace", "skill-snapshot", "SKILL.md"))
+    && catDirty.stdout.includes("位于评测产物目录"));
+  check("影子判据: 真技能族内 eval-fixtures 产物同判不豁免",
+    catDirty.code === 1
+    && catDirty.stdout.includes(join("life", "shopping-deep-research", "eval-fixtures", "case-a", "SKILL.md")));
+
+  console.log("link 挂载快照：");
+  const realSkill = join(rootCat, "repo", "skills", "workflow", "two-layer");
+  const flatHost = join(rootCat, "flat-host");
+  const flatSkills = join(flatHost, "skills");
+  mkdirSync(flatSkills, { recursive: true });
+  let linkMade = true;
+  try {
+    symlinkSync(realSkill, join(flatSkills, "two-layer"), "junction");
+  } catch {
+    linkMade = false; // 无链接权限的环境按设计跳过
+  }
+  if (linkMade) {
+    const viaLink = run([join(flatSkills, "two-layer")]);
+    const linkSnap = join(flatHost, "evals", "two-layer-workspace", "skill-snapshot");
+    check("快照缺省: link 挂载落调用侧 skills 祖先父级 evals/",
+      viaLink.code === 0 && viaLink.stdout.includes(`SNAPSHOT ${linkSnap}`));
+    check("link 挂载: 复制实体而非链接，源 SKILL.md 原样保留",
+      exists(join(linkSnap, "SKILL.md.bak")) && !exists(join(linkSnap, "SKILL.md"))
+      && readFileSync(join(realSkill, "SKILL.md"), "utf8").includes("name: two-layer"));
+  } else {
+    check("link 挂载: 无法建链接夹具时按设计跳过", true);
+  }
+} finally {
+  rmSync(rootCat, { recursive: true, force: true });
 }
 
 // ---- 对抗回归：路径占用/参数护栏/空必填键（2026-08-17 对抗测试修复） ----

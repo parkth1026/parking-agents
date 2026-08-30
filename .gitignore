@@ -11,6 +11,7 @@ node_modules/
 /.claude/launch.json
 
 # Eval workspaces are scratch; durable records live in each skill dir
+/evals/
 /.agents/evals/
 /.playwright-cli
 

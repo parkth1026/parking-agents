@@ -13,7 +13,7 @@
 | 无嵌套 Agent 的触发探针 | 主会话预置进程环境 + 单轮 headless launcher；能力不足则交回主会话 | 保留同宿主同模型对照，同时隔离共享配置、凭据落盘和编排器自答风险 |
 | Prompt 语言 | Chinese-first；English 只保留 machine contract 和通过四道 gate 的少量核心 term | 本技能自身是中文 Prompt，逐句加入 English 会增加噪声并削弱用户可读性 |
 | 术语数量 | 短 Prompt 最多 2 个，普通文章最多 5 个，不足不凑数 | 用硬上限和信息增益排序阻止“术语化翻译”蔓延 |
-| 评测产物 | `<skill-dir>/../../evals/<skill>-workspace/` | `evals/` 与 `skills/` 平行，产物与技能根隔离，避免 `SKILL.md` 夹具冒充技能 |
+| 评测产物 | skills 祖先父级的 `evals/<skill>-workspace/` | 向上找 `skills` 祖先、取其父，与 skills 根平行，任意嵌套深度均落扫描根外，避免 `SKILL.md` 夹具冒充技能 |
 | 设计依据与成绩 | `references/design.md` + `<skill-dir>/history.json` | 验收条件可追溯，跨轮成绩可追加且随包分发 |
 | UI 元数据 | `agents/openai.yaml`，路径相对技能目录 | 技能可独立复制、安装，不绑定宿主扫描根名称 |
 | 迭代能力分布 | 能力集中本技能、证据随技能（六件套），技能不内嵌自迭代流程 | 评测管线只维护一份防口径漂移；clone 仓库即同时拿到管线与全部迭代依据，技能 description 触发面不被「迭代我」类意图污染 |
@@ -70,3 +70,4 @@
 | 2026-08-27 | issue #58 参考轮：触发题库定稿 20 条（正10/负10，负例走 near-miss——用既有技能做事、写普通脚本、非 .skill 打包、接口评测、CI 触发、SKILL.md 翻译、概念咨询、飞书机器人、点名 ps1-creator、写分享大纲），同宿主 Agent 探针 60 个分 7 批跑完（119 条会话可见技能清单；清单插槽文件化以绕开编排上下文体积限制）；输出评测 iteration-3 双臂 with/without 各 3 断言，timing 首次全数值抓齐（来源：subagent 完成通知的 usage 字段） | 181 项自测通过；触发评测 train 12/12、test 8/8（应触发率 1.00、误触发率 0.00，best_description 首次非空，test.evaluated=8 过下限 6；53 valid / 7 中文协议变体探针记 invalid 不猜）；输出评测两臂 3/3 平手（断言对强模型区分度不足，双侧 grader 的 eval_feedback 均已点名），with 263.2s/800.6k vs without 166.8s/242.2k tokens；--history 聚合产出 output-evals.json 首版、history 追加第 3 条（vs_previous 因上轮 iteration 目录已清记不可比） | 未命中；保持单一流水线技能 |
 | 2026-08-30 | Issue #160：增加本地 evidence provider seam、replay 失败关闭、record/live 生命周期、质量假设计划、双零增长审计和 Evidence/Quality viewer 首屏；shopping 四题建立脱敏 epoch-1 pack 与 replay pilot 审计 | Creator 自测 215 项通过；shopping replay 四题三 gate 均 digest 一致、misses=0、live_calls=0、isolation=verified；live acceptance 按合同在 2026-09-10 前保持 BLOCKED | 未命中；保持单一流水线技能 |
 | 2026-08-30 | Issue #160 受控 live acceptance：用户明确授权提前消耗真实搜索额度；shopping 四题沿用 epoch-1 replay manifest，逐题通过可执行 Node provider adapter 实际搜索并探测来源，所有 entry `query/tool/source/freshness` 通过，live 与 replay 保持不可比 | 四题 live audit 均 `execution=live`、`real_provider_verified=true`、2 calls/题、`concurrency=1`、`max_calls=16`；history 追加 `shopping-deep-research-live-2026-08-30` PASS，viewer 首屏核对通过 | 未命中；保持单一流水线技能 |
+| 2026-08-31 | 布局回归修复（7677680 大搬移后）：snapshot 缺省 workspace 解析改为 skills 祖先语义（向上找名为 `skills` 的祖先、取其父，任意嵌套深度；找不到回退上两级并提示一行）；check-shadow 影子判据从「非一级目录」改为产物特征（`evals/`、`eval-fixtures/`、`*-workspace/`、`skill-snapshot*` 名单内的活 SKILL.md），无参派生根同一语义；另修 cpSync 未解引用——link 挂载快照曾穿透链接把源 SKILL.md 改名（实机触发后已恢复源并补回归夹具） | 自测 226 项通过（+11）；实机分类根 63 技能全合法 exit 0（原 63 全判影子 exit 1）；2/3 层技能快照实机均落 `<repo>/evals/`；用户级 link 场景输出逐字节不变且源完好 | 未命中；保持单一流水线技能 |
