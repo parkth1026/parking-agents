@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "slug": "2026-08-29-aes-glab-skill改进",
+  "created_at": "2026-08-29T11:49:34Z",
+  "updated_at": "2026-08-29T14:01:43Z",
+  "original_request": null,
+  "goal_oneline": "把 aes-glab 扩成安装+配置+使用全覆盖的教程型技能：新增安装节与一次性配置事实、使用面逐条实测后扩到 gh 级广度，经完整输出评测循环验收并沉淀 history",
+  "target": null,
+  "stage": "3-contract",
+  "next_action": "契约已 finalize 通过，可交接执行 Agent 开始实现",
+  "stage_gates": {
+    "1-interview": {
+      "status": "done",
+      "closed_at": "2026-08-29T11:56:00Z",
+      "self_assessment": {
+        "意图": "已定",
+        "结果": "已定",
+        "边界": "已定",
+        "约束": "已定",
+        "现状": "已定"
+      }
+    },
+    "2-prototype": {
+      "status": "done",
+      "closed_at": "2026-08-29T13:56:10Z",
+      "artifacts_confirmed": [
+        "behavior",
+        "example-run",
+        "diagram"
+      ]
+    },
+    "3-contract": {
+      "status": "done",
+      "closed_at": "2026-08-29T14:01:43Z"
+    }
+  },
+  "validation": {
+    "status": "valid",
+    "ac_count": 5,
+    "warnings": [],
+    "ran_at": "2026-08-29T14:01:35Z",
+    "verify_tiers": {
+      "A": 3,
+      "B": 1,
+      "C": 0,
+      "D": 1
+    }
+  },
+  "blocked": [],
+  "residual_risk": null,
+  "status": "ready"
+}
