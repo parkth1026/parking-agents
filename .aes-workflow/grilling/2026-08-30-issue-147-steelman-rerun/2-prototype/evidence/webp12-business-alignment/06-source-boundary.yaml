@@ -1,0 +1,194 @@
+- generic [ref=e1] [box=0,0,768,1512]:
+  - banner [ref=e2] [box=0,0,768,46]:
+    - button "打开来源导航" [ref=e3] [cursor=pointer] [box=14,7,46,31]: 导航
+    - generic [ref=e4] [box=70,12,90,22]: Story Atlas
+    - generic [ref=e6] [box=170,10,252,25]: "parkth1026/parking-agents · Story #147"
+    - button "查看来源" [ref=e7] [cursor=pointer] [box=432,7,70,31]
+  - main [ref=e8] [box=0,46,768,1466]:
+    - region [ref=e9] [box=10,64,748,241]:
+      - generic [ref=e10] [box=10,64,450,224]:
+        - generic [ref=e11] [box=10,64,450,12]: StoryRoot · current projection · read only
+        - heading "#147 · story 级全链条工作流整合设计" [level=1] [ref=e12] [box=10,81,450,28]
+        - generic [ref=e13] [box=10,120,450,53]:
+          - generic [ref=e14] [box=10,120,93,23]: TRACKER CLOSED
+          - generic [ref=e15] [box=110,120,98,23]: DISCOVERY 12/12
+          - generic [ref=e16] [box=215,120,120,23]: DELIVERY 0 VERIFIED
+          - generic [ref=e17] [box=10,150,153,23]: LOCAL 2-PROTOTYPE PENDING
+        - paragraph [ref=e18] [box=10,186,371,69]:
+          - strong [ref=e19] [box=23,196,147,12]: CURRENT ACTION SCOPE
+          - text: · 历史 tracker Story 已关闭；当前操作者正在核对本地 v5 对照物。Web 只读，领域事实由 Workflow / Skill 写入。
+      - complementary "数据真值边界" [ref=e20] [box=478,64,280,224]:
+        - generic [ref=e21] [box=491,75,254,12]: TRUTH BOUNDARY
+        - generic [ref=e22] [box=491,93,254,89]:
+          - strong [ref=e23] [box=491,93,105,12]: ISSUE FACT
+          - paragraph [ref=e24] [box=605,93,140,89]: "#147 + 12 native members + 7 descendant dependency；root 自身 blockedBy / blocking 为 0 / 0。"
+        - generic [ref=e25] [box=491,188,254,89]:
+          - strong [ref=e26] [box=491,188,105,12]: SIMULATED GAP
+          - paragraph [ref=e27] [box=605,188,140,89]: Delivery runtime 不存在；下方 Lane、Receipt、Gate、owner 与 wave 均由 spec / ADR / dossier 推演。
+    - region [ref=e242] [box=10,321,748,87]:
+      - generic [ref=e29] [box=25,334,581,61]:
+        - generic [ref=e30] [box=25,334,581,12]: STORY PULSE · DISCOVERY TRUTH
+        - 'heading "真实 #147 设计图已闭合；当前本地 prototype 仍待确认。" [level=2] [ref=e243] [box=25,349,581,25]'
+        - paragraph [ref=e32] [box=25,377,581,19]: 12 个子 Issue 全部 CLOSED；真实子图包含 7 条 native dependency。Delivery runtime 仍未连接。
+      - 'button "定位 #159 定稿" [ref=e244] [cursor=pointer] [box=620,347,123,36]'
+    - tablist "Story 两大阶段" [ref=e36] [box=10,423,748,62]:
+      - 'tab "Discovery Graph ISSUE FACT 12/12 closed · 7 native deps · real #148–#159" [selected] [ref=e37] [cursor=pointer] [box=10,423,370,62]':
+        - generic [ref=e38] [box=25,434,340,23]:
+          - text: Discovery Graph
+          - generic [ref=e39] [box=159,434,71,23]: ISSUE FACT
+        - generic [ref=e40] [box=25,460,340,13]: "12/12 closed · 7 native deps · real #148–#159"
+      - tab "Delivery Graph SIMULATED active · wave-2 · 2 required RepoLanes" [ref=e41] [cursor=pointer] [box=388,423,370,62]:
+        - generic [ref=e42] [box=403,434,340,23]:
+          - text: Delivery Graph
+          - generic [ref=e43] [box=525,434,67,23]: SIMULATED
+        - generic [ref=e44] [box=403,460,340,13]: active · wave-2 · 2 required RepoLanes
+    - region "跨图闭环" [ref=e45] [box=10,485,748,88]:
+      - generic [ref=e46] [box=23,501,344,53]:
+        - strong [ref=e245] [box=33,509,324,19]: 真实 Discovery terminal
+        - text: "#159 spec + ADR · ISSUE COMMENT says delivered"
+      - generic [ref=e48] [box=377,517,14,22]: →
+      - generic [ref=e49] [box=401,495,344,67]:
+        - strong [ref=e246] [box=411,503,324,19]: SIM Delivery projection
+        - button "查看 requires-decision 回流说明" [ref=e247] [cursor=pointer] [box=542,521,193,32]
+    - 'tabpanel "Discovery Graph ISSUE FACT 12/12 closed · 7 native deps · real #148–#159" [ref=e248] [box=10,572,748,902]':
+      - generic [ref=e249] [box=11,573,746,52]:
+        - generic [ref=e251] [box=39,581,381,35]:
+          - 'heading "Discovery Graph · 真实 #147 决策图" [level=2] [ref=e252] [box=39,581,381,22]'
+          - paragraph [ref=e253] [box=39,604,381,12]: 12 native members · 7 native dependencies · author progression is an optional comment overlay
+        - generic [ref=e254] [box=429,581,316,34]:
+          - searchbox "搜索 Discovery 节点" [ref=e255] [box=429,581,215,34]
+          - button "Map" [pressed] [ref=e256] [cursor=pointer] [box=650,583,46,31]
+          - button "List" [ref=e257] [cursor=pointer] [box=702,583,43,31]
+      - generic "Discovery 过滤" [ref=e258] [box=11,625,746,48]:
+        - button "全部 12" [pressed] [ref=e259] [cursor=pointer] [box=23,633,59,31]
+        - button "调研 4" [ref=e260] [cursor=pointer] [box=88,633,53,31]
+        - button "裁决 7" [ref=e261] [cursor=pointer] [box=147,633,53,31]
+        - button "成员边 12" [pressed] [ref=e262] [cursor=pointer] [box=207,633,70,31]
+        - button "作者演进线" [ref=e263] [cursor=pointer] [box=283,633,77,31]
+        - button "一跳聚焦" [ref=e264] [cursor=pointer] [box=366,633,66,31]
+      - generic [ref=e266] [box=24,673,720,690]:
+        - generic [box=34,685,700,12]:
+          - generic [box=34,685,226,12]:
+            - strong [box=34,685,77,12]: "StoryRoot #147"
+            - text: · root 0/0 只描述 root 自身
+          - generic [box=580,685,154,12]: 12 membership · 7 dependency
+        - button "#147 closed story 级全链条工作流整合设计 StoryRoot · wayfinder:map" [ref=e366] [cursor=pointer] [box=309,723,150,96]:
+          - generic [ref=e367] [box=323,733,125,11]:
+            - generic [ref=e368] [box=323,733,21,11]: "#147"
+            - generic [ref=e369] [box=417,733,31,11]: closed
+          - generic [ref=e370] [box=323,749,125,30]: story 级全链条工作流整合设计
+          - generic [ref=e371] [box=323,783,125,26]: StoryRoot · wayfinder:map
+        - button "#148 closed workflow-interview-web 能力盘点 research · 1 comment" [ref=e372] [cursor=pointer] [box=44,843,150,98]:
+          - generic [ref=e373] [box=58,853,125,11]:
+            - generic [ref=e374] [box=58,853,21,11]: "#148"
+            - generic [ref=e375] [box=152,853,31,11]: closed
+          - generic [ref=e376] [box=58,869,125,45]: workflow-interview-web 能力盘点
+          - generic [ref=e377] [box=58,918,125,13]: research · 1 comment
+        - button "#149 closed wayfinder 双变体与票协议 research · 1 comment" [ref=e378] [cursor=pointer] [box=219,843,150,83]:
+          - generic [ref=e379] [box=233,853,125,11]:
+            - generic [ref=e380] [box=233,853,21,11]: "#149"
+            - generic [ref=e381] [box=327,853,31,11]: closed
+          - generic [ref=e382] [box=233,869,125,30]: wayfinder 双变体与票协议
+          - generic [ref=e383] [box=233,903,125,13]: research · 1 comment
+        - button "#150 closed board 星图与关系数据面 research · 1 comment" [ref=e384] [cursor=pointer] [box=394,843,150,83]:
+          - generic [ref=e385] [box=408,853,125,11]:
+            - generic [ref=e386] [box=408,853,21,11]: "#150"
+            - generic [ref=e387] [box=502,853,31,11]: closed
+          - generic [ref=e388] [box=408,869,125,30]: board 星图与关系数据面
+          - generic [ref=e389] [box=408,903,125,13]: research · 1 comment
+        - button "#151 closed engineering 路由与门禁 research · 1 comment" [ref=e390] [cursor=pointer] [box=569,843,150,83]:
+          - generic [ref=e391] [box=583,853,125,11]:
+            - generic [ref=e392] [box=583,853,21,11]: "#151"
+            - generic [ref=e393] [box=677,853,31,11]: closed
+          - generic [ref=e394] [box=583,869,125,30]: engineering 路由与门禁
+          - generic [ref=e395] [box=583,903,125,13]: research · 1 comment
+        - button "#152 closed 裁决：独立组合层技能 decision · blockedBy 148,149" [ref=e396] [cursor=pointer] [box=44,1018,150,81]:
+          - generic [ref=e397] [box=58,1028,125,11]:
+            - generic [ref=e398] [box=58,1028,21,11]: "#152"
+            - generic [ref=e399] [box=152,1028,31,11]: closed
+          - generic [ref=e400] [box=58,1044,125,15]: 裁决：独立组合层技能
+          - generic [ref=e401] [box=58,1063,125,26]: decision · blockedBy 148,149
+        - button "#153 closed 裁决：执行与验收挂载 decision · NOT implementation" [pressed] [ref=e402] [cursor=pointer] [box=219,1018,150,81]:
+          - generic [ref=e403] [box=233,1028,125,11]:
+            - generic [ref=e404] [box=233,1028,21,11]: "#153"
+            - generic [ref=e405] [box=327,1028,31,11]: closed
+          - generic [ref=e406] [box=233,1044,125,15]: 裁决：执行与验收挂载
+          - generic [ref=e407] [box=233,1063,125,26]: decision · NOT implementation
+        - button "#154 closed 裁决：票载体与 claim decision · blockedBy 149" [ref=e408] [cursor=pointer] [box=394,1018,150,81]:
+          - generic [ref=e409] [box=408,1028,125,11]:
+            - generic [ref=e410] [box=408,1028,21,11]: "#154"
+            - generic [ref=e411] [box=502,1028,31,11]: closed
+          - generic [ref=e412] [box=408,1044,125,15]: 裁决：票载体与 claim
+          - generic [ref=e413] [box=408,1063,125,26]: decision · blockedBy 149
+        - button "#155 closed 裁决：门禁与 map 票流 decision · blockedBy 148" [ref=e414] [cursor=pointer] [box=569,1018,150,96]:
+          - generic [ref=e415] [box=583,1028,125,11]:
+            - generic [ref=e416] [box=583,1028,21,11]: "#155"
+            - generic [ref=e417] [box=677,1028,31,11]: closed
+          - generic [ref=e418] [box=583,1044,125,30]: 裁决：门禁与 map 票流
+          - generic [ref=e419] [box=583,1078,125,26]: decision · blockedBy 148
+        - button "#156 closed 裁决：决策档案分层 decision · 2 comments" [ref=e420] [cursor=pointer] [box=44,1193,150,76]:
+          - generic [ref=e421] [box=58,1207,125,11]:
+            - generic [ref=e422] [box=58,1207,21,11]: "#156"
+            - generic [ref=e423] [box=152,1207,31,11]: closed
+          - generic [ref=e424] [box=58,1223,125,15]: 裁决：决策档案分层
+          - generic [ref=e425] [box=58,1242,125,13]: decision · 2 comments
+        - button "#157 closed 裁决：命名与发布路径 decision · 2 comments" [ref=e426] [cursor=pointer] [box=219,1193,150,76]:
+          - generic [ref=e427] [box=233,1207,125,11]:
+            - generic [ref=e428] [box=233,1207,21,11]: "#157"
+            - generic [ref=e429] [box=327,1207,31,11]: closed
+          - generic [ref=e430] [box=233,1223,125,15]: 裁决：命名与发布路径
+          - generic [ref=e431] [box=233,1242,125,13]: decision · 2 comments
+        - 'button "#158 closed 裁决：Web 投影与星图 decision · blocks #159" [ref=e432] [cursor=pointer] [box=394,1193,150,83]':
+          - generic [ref=e433] [box=408,1203,125,11]:
+            - generic [ref=e434] [box=408,1203,21,11]: "#158"
+            - generic [ref=e435] [box=502,1203,31,11]: closed
+          - generic [ref=e436] [box=408,1219,125,30]: 裁决：Web 投影与星图
+          - generic [ref=e437] [box=408,1253,125,13]: "decision · blocks #159"
+        - button "#159 closed 定稿：spec + ADR contract-finalization · blockedBy 158" [ref=e438] [cursor=pointer] [box=569,1193,150,81]:
+          - generic [ref=e439] [box=583,1203,125,11]:
+            - generic [ref=e440] [box=583,1203,21,11]: "#159"
+            - generic [ref=e441] [box=677,1203,31,11]: closed
+          - generic [ref=e442] [box=583,1219,125,15]: 定稿：spec + ADR
+          - generic [ref=e443] [box=583,1238,125,26]: contract-finalization · blockedBy 158
+      - generic [ref=e345] [box=11,1363,746,110]:
+        - generic [ref=e444] [box=11,1364,161,109]:
+          - generic [ref=e445] [box=23,1374,136,10]: NOW
+          - strong [ref=e446] [box=23,1388,136,37]: "#153 · 裁决：执行与验收挂载"
+          - generic [ref=e447] [box=23,1429,136,34]: 架构裁决完成，不是代码实现。
+        - generic [ref=e448] [box=172,1364,176,109]:
+          - generic [ref=e449] [box=184,1374,151,10]: WHY
+          - strong [ref=e450] [box=184,1388,151,19]: ISSUE FACT
+          - generic [ref=e451] [box=184,1410,151,34]: 定义可插拔执行层与 Story 收口。
+        - generic [ref=e452] [box=347,1364,117,109]:
+          - generic [ref=e453] [box=359,1374,92,10]: OWNER
+          - strong [ref=e454] [box=359,1388,92,19]: parkth1026
+          - generic [ref=e455] [box=359,1410,92,34]: decision · NOT implementation
+        - generic [ref=e456] [box=464,1364,146,109]:
+          - generic [ref=e457] [box=476,1374,121,10]: NEXT
+          - strong [ref=e458] [box=476,1388,121,19]: 历史终态。
+          - generic [ref=e459] [box=476,1410,121,34]: Web projection is read only
+        - generic [ref=e460] [box=611,1364,146,109]:
+          - generic [ref=e461] [box=623,1374,122,10]: UNLOCKS / SOURCE
+          - strong [ref=e462] [box=623,1388,122,19]: "作者演进 #154"
+          - generic [ref=e463] [box=623,1410,122,34]: https://github.com/parkth1026/parking-agents/issues/153
+    - generic [ref=e224] [box=10,1474,1,1]: "已选择 #153 裁决：执行与验收挂载"
+  - dialog [ref=e464] [box=44,310,680,461]:
+    - banner [ref=e226] [box=45,311,678,58]:
+      - heading "Story Work Graph · 数据来源与边界" [active] [level=2] [ref=e465] [box=60,327,263,25]
+      - button "关闭" [ref=e228] [cursor=pointer] [box=662,324,46,31]
+    - generic [ref=e229] [box=45,369,678,401]:
+      - generic [ref=e466] [box=60,384,648,121]:
+        - strong [ref=e467] [box=73,396,622,22]: ISSUE FACT · real tracker data
+        - paragraph [ref=e468] [box=73,422,622,22]:
+          - code [ref=e469] [box=73,428,302,12]: https://github.com/parkth1026/parking-agents/issues/147
+        - paragraph [ref=e470] [box=73,449,622,43]: "Root #147；12 native sub-issues；12 membership；7 descendant dependency；1 closure comment。root 0/0 不能外推为整个 descendant graph 0 edge。"
+      - generic [ref=e471] [box=60,514,648,99]:
+        - strong [ref=e472] [box=73,526,622,22]: DOSSIER FACT · current design workflow
+        - paragraph [ref=e473] [box=73,553,622,22]:
+          - code [ref=e474] [box=73,559,291,12]: 1-interview/context.md · rounds.jsonl · manifest.json
+        - paragraph [ref=e475] [box=73,580,622,22]: 2-prototype pending；WEB-P9 Map-first；WEB-P10 two tabs；P12 Runtime→Web 单向只读投影。
+      - generic [ref=e476] [box=60,624,648,121]:
+        - strong [ref=e477] [box=73,636,622,22]: SIMULATED GAP · delivery coverage
+        - paragraph [ref=e478] [box=73,662,622,22]:
+          - code [ref=e479] [box=73,668,368,12]: "design basis: spec §10 · ADR 0002–0004 · Q23–Q35 · P12 · WEB-P9–P11"
+        - paragraph [ref=e480] [box=73,689,622,43]: 所有 SIM-*、RepoLane、candidate、Receipt、Gate、owner、wave 和 next action 都是演练；真实 Delivery runtime 为 NOT_CONNECTED。

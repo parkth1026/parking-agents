@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "slug": "2026-08-30-issue-147-steelman-rerun",
+  "created_at": "2026-08-29T16:43:52Z",
+  "updated_at": "2026-08-30T16:38:10Z",
+  "original_request": "基于 https://github.com/parkth1026/parking-agents/issues/147 重新走一遍 workflow-interview 流程，并且每个问题都要双向 steelman 进行反思。",
+  "goal_oneline": "重新定稿一个可跨 GitHub/GitLab 与多 RepoLane、以持久事实重建全局掌控并按 Discovery/Delivery 双图编排至精确集成交付的薄 workflow-story-map 设计。",
+  "target": null,
+  "stage": "2-prototype",
+  "next_action": "P14 业务基线已确认；v6 Web 草稿已构建。先完成真实浏览器与可视化核对，再询问 Web 独立确认；不得进入 Contract 或实现。",
+  "stage_gates": {
+    "1-interview": {
+      "status": "done",
+      "closed_at": "2026-08-29T20:55:18Z",
+      "self_assessment": {
+        "意图": "已定",
+        "结果": "已定",
+        "边界": "已定",
+        "约束": "已定",
+        "现状": "已定"
+      }
+    },
+    "2-prototype": {
+      "status": "pending",
+      "artifacts_confirmed": [
+        "behavior",
+        "api-mock",
+        "example-run",
+        "diagram",
+        "diagram-detail"
+      ]
+    },
+    "3-contract": {
+      "status": "pending"
+    }
+  },
+  "validation": null,
+  "blocked": [],
+  "residual_risk": null,
+  "status": "in_progress"
+}

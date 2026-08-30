@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Role-first Accountability 与 Runtime 调用图</title>
+  <style>
+    :root { --paper:#f5f5f5; --ink:#2d3142; --muted:#4f5d75; --soft:#7a8399; --accent:#eb6c36; --tint:#fdf1ec; --chip:#eef1f6; --chip2:#f7dfd3; --ui:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif; --mono:ui-monospace,"Cascadia Mono",Consolas,monospace; }
+    *{box-sizing:border-box} body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--ui)} main{width:min(1080px,calc(100% - 32px));margin:28px auto 48px}
+    header,section,footer{background:#fff;border:1px solid #d8dce5;border-radius:8px} header{padding:22px 26px} section{margin-top:18px;padding:22px;overflow-x:auto} footer{margin-top:18px;padding:18px 22px;color:var(--muted);font-size:12px}
+    h1{margin:0 0 8px;font-size:24px} h2{margin:0 0 6px;font-size:19px} p{margin:6px 0;line-height:1.55}.eyebrow{color:var(--soft);font-size:12px;letter-spacing:.08em;text-transform:uppercase}
+    .legend{display:flex;gap:20px;color:var(--muted);font-size:12px}.legend span::before{content:"";display:inline-block;width:12px;height:12px;margin-right:7px;vertical-align:-2px;border:2px solid var(--muted);border-radius:2px;background:#fff}.legend .changed::before{border-color:var(--accent);background:var(--tint)}
+    svg{display:block;width:100%;min-width:940px;height:auto;margin-top:14px;background:var(--paper);border-radius:8px}.node{fill:#fff;stroke:var(--muted);stroke-width:1.25}.node.changed{fill:var(--tint);stroke:var(--accent);stroke-width:2}.chip{fill:var(--chip)}.chip.changed{fill:var(--chip2)}
+    .edge{fill:none;stroke:var(--muted);stroke-width:1.5}.edge.changed{stroke:var(--accent);stroke-width:1.75}.edge.dashed{stroke-dasharray:6 4}.title{fill:var(--ink);font:600 12px var(--ui)}.sub{fill:var(--muted);font:9px var(--mono)}.type{fill:var(--muted);font:8px var(--mono);letter-spacing:1px}.type.changed{fill:var(--accent)}.label{fill:var(--muted);font:8px var(--mono)}.mask{fill:var(--paper)}
+    .ledger{margin-top:14px;padding:14px;background:#f8f9fb;border-left:4px solid var(--muted);font-size:12px;line-height:1.5}
+  </style>
+</head>
+<body>
+<main>
+  <header><div class="eyebrow">draft v3 detail · P5/P6 retained · top-level host view moved to v4</div><h1>Role-first：责任 DAG 与运行调用图分离</h1><p>第一张图决定必须有哪些责任和 Gate；第二张图解释某个 Role 这一次由谁执行、调用什么 Skill。共享 Workflow Module、双 Host 与 Web Shell 的顶层归属见 v4 图。橙 = 本轮新增的分离边界。</p><div class="legend"><span class="changed">新增责任/绑定边界</span><span>复用既有 workflow 或能力</span></div></header>
+
+  <section>
+    <h2>Domain / Accountability DAG</h2>
+    <p>它是 Story/Web 默认展示的权威责任图；不出现 subagent、模型或 Skill 名。</p>
+    <svg viewBox="0 0 1000 440" role="img" aria-labelledby="ad-title ad-desc">
+      <title id="ad-title">workflow-story-map 责任 DAG</title><desc id="ad-desc">StoryOrchestrator 调度 Discovery、TicketExecutor、QAValidator、Reviewer、IntegrationOwner、Acceptance、ScopeClassifier 与 StoryReducer；每个角色对固定 subject 和 receipt 负责。</desc>
+      <defs><marker id="ad-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4f5d75"/></marker><marker id="ad-ac" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#eb6c36"/></marker></defs>
+      <path class="edge" d="M 184,100 H 228" marker-end="url(#ad-a)"/><path class="edge" d="M 372,100 H 416" marker-end="url(#ad-a)"/><path class="edge" d="M 560,100 H 604" marker-end="url(#ad-a)"/><path class="edge" d="M 748,100 H 792" marker-end="url(#ad-a)"/>
+      <path class="edge" d="M 864,136 V 228" marker-end="url(#ad-a)"/><path class="edge" d="M 792,264 H 748" marker-end="url(#ad-a)"/><path class="edge" d="M 604,264 H 560" marker-end="url(#ad-a)"/>
+      <path class="edge" d="M 420,120 H 400 Q 392,120 392,128 V 196 Q 392,204 384,204 H 310 Q 302,204 302,212 V 228" marker-end="url(#ad-a)"/>
+      <path class="edge" d="M 302,228 V 140" marker-end="url(#ad-a)"/>
+      <path class="edge" d="M 372,264 H 392 Q 400,264 400,256 V 128 Q 400,120 408,120 H 416" marker-end="url(#ad-a)"/>
+      <g><rect class="node changed" x="40" y="64" width="144" height="72" rx="6"/><rect class="chip changed" x="48" y="72" width="48" height="12" rx="2"/><text class="type changed" x="72" y="81" text-anchor="middle">ROLE</text><text class="title" x="112" y="104" text-anchor="middle">StoryOrchestrator</text><text class="sub" x="112" y="120" text-anchor="middle">route · fan-in · human</text></g>
+      <g><rect class="node" x="232" y="64" width="140" height="72" rx="6"/><text class="title" x="302" y="104" text-anchor="middle">DiscoveryCoordinator</text><text class="sub" x="302" y="120" text-anchor="middle">Contract / RolePlan</text></g>
+      <g><rect class="node" x="420" y="64" width="140" height="72" rx="6"/><text class="title" x="490" y="104" text-anchor="middle">TicketExecutor</text><text class="sub" x="490" y="120" text-anchor="middle">produces Candidate</text></g>
+      <g><rect class="node" x="608" y="64" width="140" height="72" rx="6"/><text class="title" x="678" y="104" text-anchor="middle">QAValidator</text><text class="sub" x="678" y="120" text-anchor="middle">verifies Candidate</text></g>
+      <g><rect class="node" x="796" y="64" width="140" height="72" rx="6"/><text class="title" x="866" y="104" text-anchor="middle">Reviewer</text><text class="sub" x="866" y="120" text-anchor="middle">verifies Spec + Candidate</text></g>
+      <g><rect class="node" x="796" y="228" width="140" height="72" rx="6"/><text class="title" x="866" y="268" text-anchor="middle">IntegrationOwner</text><text class="sub" x="866" y="284" text-anchor="middle">merge + full suite</text></g>
+      <g><rect class="node" x="608" y="228" width="140" height="72" rx="6"/><text class="title" x="678" y="268" text-anchor="middle">Acceptance Roles</text><text class="sub" x="678" y="284" text-anchor="middle">observer · human · risk</text></g>
+      <g><rect class="node" x="420" y="228" width="140" height="72" rx="6"/><text class="title" x="490" y="268" text-anchor="middle">StoryReducer</text><text class="sub" x="490" y="284" text-anchor="middle">done / waiver</text></g>
+      <g><rect class="node changed" x="232" y="228" width="140" height="72" rx="6"/><rect class="chip changed" x="240" y="236" width="48" height="12" rx="2"/><text class="type changed" x="264" y="245" text-anchor="middle">ROLE</text><text class="title" x="302" y="268" text-anchor="middle">ScopeClassifier</text><text class="sub" x="302" y="284" text-anchor="middle">next wave / decision</text></g>
+      <rect class="mask" x="320" y="188" width="68" height="12"/><text class="label" x="354" y="197" text-anchor="middle">new finding</text><rect class="mask" x="244" y="176" width="112" height="12"/><text class="label" x="300" y="185" text-anchor="middle">requires-decision</text><rect class="mask" x="372" y="176" width="52" height="12"/><text class="label" x="398" y="185" text-anchor="middle">next wave</text>
+    </svg>
+    <div class="ledger"><b>Fidelity ledger</b><br>Detail: balanced · 源 = 9 类业务责任 → 9 节点 / 10 边<br>Merged: HumanTester、BusinessAcceptor、RiskApprover 与自动 AcceptanceObserver 合入 Acceptance Roles，权限差异保留在 sub 行和 Role Profile<br>Collapsed: FactInvestigator、ContractAuthor、TicketPlanner 收进 DiscoveryCoordinator 的内部 Role DAG<br>Dropped: Skill、host role、carrier、session 与模型，全部属于运行图<br>Kept in full: executor/QA/review/integration separation、ScopeClassifier 的 next-wave/requires-decision 回流、StoryReducer 独占终态</div>
+  </section>
+
+  <section>
+    <h2>Runtime / Invocation Graph：一次 QA RoleAssignment</h2>
+    <p>它只解释这一次怎么跑；换 carrier 或 Skill 不改变 Accountability DAG 与 Gate 语义。</p>
+    <svg viewBox="0 0 1000 440" role="img" aria-labelledby="rt-title rt-desc">
+      <title id="rt-title">QA RoleAssignment 的运行调用图</title><desc id="rt-desc">QA RoleAssignment 先由 Router 匹配 Carrier，再由 Adapter 创建 AgentInstance 或 harness/human step。AgentInstance 加载受允许的 aes-qa Skill，输出 finding 或 QaReceipt；所有输出经过 ReceiptValidator 和 GateProjector。</desc>
+      <defs><marker id="rt-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4f5d75"/></marker><marker id="rt-ac" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#eb6c36"/></marker></defs>
+      <path class="edge" d="M 184,100 H 228" marker-end="url(#rt-a)"/><path class="edge" d="M 372,100 H 416" marker-end="url(#rt-a)"/><path class="edge" d="M 560,100 H 604" marker-end="url(#rt-a)"/><path class="edge" d="M 748,100 H 792" marker-end="url(#rt-a)"/>
+      <path class="edge" d="M 864,136 V 228" marker-end="url(#rt-a)"/><path class="edge" d="M 792,264 H 748" marker-end="url(#rt-a)"/><path class="edge" d="M 604,264 H 560" marker-end="url(#rt-a)"/>
+      <path class="edge dashed" d="M 678,136 V 196 Q 678,204 670,204 H 498 Q 490,204 490,212 V 228" marker-end="url(#rt-a)"/>
+      <g><rect class="node changed" x="40" y="64" width="144" height="72" rx="6"/><rect class="chip changed" x="48" y="72" width="76" height="12" rx="2"/><text class="type changed" x="86" y="81" text-anchor="middle">ASSIGNMENT</text><text class="title" x="112" y="104" text-anchor="middle">QAValidator</text><text class="sub" x="112" y="120" text-anchor="middle">subject c3 · read-only</text></g>
+      <g><rect class="node" x="232" y="64" width="140" height="72" rx="6"/><text class="title" x="302" y="104" text-anchor="middle">Capability Router</text><text class="sub" x="302" y="120" text-anchor="middle">requirements ↔ proof</text></g>
+      <g><rect class="node changed" x="420" y="64" width="140" height="72" rx="6"/><rect class="chip changed" x="428" y="72" width="64" height="12" rx="2"/><text class="type changed" x="460" y="81" text-anchor="middle">BINDING</text><text class="title" x="490" y="104" text-anchor="middle">CarrierBinding</text><text class="sub" x="490" y="120" text-anchor="middle">subagent | Task | harness</text></g>
+      <g><rect class="node" x="608" y="64" width="140" height="72" rx="6"/><text class="title" x="678" y="104" text-anchor="middle">CarrierAdapter</text><text class="sub" x="678" y="120" text-anchor="middle">create / resume / execute</text></g>
+      <g><rect class="node" x="796" y="64" width="140" height="72" rx="6"/><text class="title" x="866" y="104" text-anchor="middle">AgentInstance</text><text class="sub" x="866" y="120" text-anchor="middle">actor · attempt · context</text></g>
+      <g><rect class="node" x="796" y="228" width="140" height="72" rx="6"/><text class="title" x="866" y="268" text-anchor="middle">SkillBinding</text><text class="sub" x="866" y="284" text-anchor="middle">aes-qa@digest</text></g>
+      <g><rect class="node" x="608" y="228" width="140" height="72" rx="6"/><text class="title" x="678" y="268" text-anchor="middle">Finding / QaReceipt</text><text class="sub" x="678" y="284" text-anchor="middle">mode + authority 决定</text></g>
+      <g><rect class="node" x="420" y="228" width="140" height="72" rx="6"/><text class="title" x="490" y="268" text-anchor="middle">ReceiptValidator</text><text class="sub" x="490" y="284" text-anchor="middle">actor · subject · policy</text></g>
+      <g><rect class="node" x="232" y="228" width="140" height="72" rx="6"/><text class="title" x="302" y="268" text-anchor="middle">GateProjector</text><text class="sub" x="302" y="284" text-anchor="middle">pending / passed / failed</text></g>
+      <rect class="mask" x="544" y="184" width="136" height="12"/><text class="label" x="612" y="193" text-anchor="middle">human/harness bypass Agent + Skill</text>
+    </svg>
+    <div class="ledger"><b>Fidelity ledger</b><br>Detail: balanced · 源 = RoleAssignment、route、carrier、Agent/Skill、Receipt/Gate 9 类运行对象 → 9 节点 / 8 边<br>Merged: main/subagent/Desktop Task 合为 Agent CarrierBinding；具体差异由 capability proof 表达<br>Collapsed: host agent role、ContextProjection、allowed tools 与 delegation budget 收进 AgentInstance/SkillBinding<br>Dropped: tracker 与 RepoLane，QA invocation 不改变它们的领域身份<br>Kept in full: RoleAssignment 先于 Carrier、Agent 内才调用 Skill、human/harness 不必经 Skill、Receipt 回 Core</div>
+  </section>
+
+  <footer>删除清单：一张混合的“Skill 调用链”、一个 Skill 一个 Agent、subagent 名称即独立性、Agent 或 Skill 直接写 Gate。详细矩阵见 <code>v3-role-skill-carrier-model.md</code>。</footer>
+</main>
+</body>
+</html>

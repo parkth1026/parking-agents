@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>共享 Workflow Module：双 Host 与晋级架构</title>
+  <style>
+    :root{--paper:#f5f5f5;--ink:#2d3142;--muted:#4f5d75;--soft:#7a8399;--accent:#eb6c36;--tint:#fdf1ec;--chip:#eef1f6;--chip2:#f7dfd3;--ui:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;--mono:ui-monospace,"Cascadia Mono",Consolas,monospace}
+    *{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--ui)}main{width:min(1080px,calc(100% - 32px));margin:28px auto 48px}
+    header,section,footer{background:#fff;border:1px solid #d8dce5;border-radius:8px}header{padding:24px 28px}section{margin-top:20px;padding:24px;overflow-x:auto}footer{margin-top:20px;padding:18px 22px;color:var(--muted);font-size:12px;line-height:1.55}
+    h1{margin:0 0 8px;font-size:24px}h2{margin:0 0 8px;font-size:20px}p{margin:6px 0;line-height:1.55}.eyebrow{color:var(--soft);font-size:12px;letter-spacing:.08em;text-transform:uppercase}.legend{display:flex;gap:20px;margin-top:12px;color:var(--muted);font-size:12px}.legend span::before{content:"";display:inline-block;width:12px;height:12px;margin-right:7px;vertical-align:-2px;border:2px solid var(--muted);border-radius:2px;background:#fff}.legend .changed::before{border-color:var(--accent);background:var(--tint)}
+    svg{display:block;width:100%;min-width:940px;height:auto;margin-top:16px;background:var(--paper);border-radius:8px}.node{fill:#fff;stroke:var(--muted);stroke-width:1.25}.node.changed{fill:var(--tint);stroke:var(--accent);stroke-width:2}.chip{fill:var(--chip)}.chip.changed{fill:var(--chip2)}.edge{fill:none;stroke:var(--muted);stroke-width:1.5}.edge.changed{stroke:var(--accent);stroke-width:1.75}.title{fill:var(--ink);font:600 12px var(--ui)}.sub{fill:var(--muted);font:9px var(--mono)}.type{fill:var(--muted);font:8px var(--mono);letter-spacing:1px}.type.changed{fill:var(--accent)}.label{fill:var(--muted);font:8px var(--mono)}.mask{fill:var(--paper)}
+    .ledger{margin-top:16px;padding:14px;background:#f8f9fb;border-left:4px solid var(--muted);font-size:12px;line-height:1.5}.open{border-left-color:var(--accent)}.superseded{margin:0 0 16px;padding:12px 14px;border:2px solid var(--accent);border-radius:6px;background:var(--tint);font-weight:700}code{font-family:var(--mono)}
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="superseded">SUPERSEDED BY P10：当前 v1 已改为独立 Skill + Web + Local Runtime；AesAgent 双 Host 与 Extension 晋级不再是当前方向。</div>
+    <div class="eyebrow">historical draft v4 · do not promote to contract</div>
+    <h1>一份业务规则，两个 Host，一个 Web Shell</h1>
+    <p>图一锁定业务规则、Host 和页面说明书的归属。图二把“晋级”画成同一不可变 artifact 的安装，而不是把业务源码复制进 AesAgent。</p>
+    <div class="legend"><span class="changed">P8/P9 新锁定的 Module / Web 归属</span><span>Host 或外部能力 Adapter</span></div>
+  </header>
+
+  <section>
+    <h2>架构视图：共享 Workflow Module 与双 Host</h2>
+    <p>SkillDevHost 和 AesAgentHost 绑定同一个 <code>Workflow Module@digest</code>。两边可以使用不同存储与 Carrier，但不得各自实现 Router、Gate、Reducer 或 Surface projector。</p>
+    <svg viewBox="0 0 1000 520" role="img" aria-labelledby="dh-title dh-desc">
+      <title id="dh-title">共享 Workflow Module 的双 Host 架构</title>
+      <desc id="dh-desc">唯一 WorkflowReleaseSource 生成一个 Workflow Module。SkillDevHostAdapter 与 AesAgentHostAdapter 都装载同一 Module，并分别连接本地运行能力和 AesAgent 产品运行能力。两个 Host 共同服务同一个 Web Shell 页面说明书。Tracker 与 Repo 仍是外部事实真源。</desc>
+      <defs>
+        <marker id="dh-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4f5d75"/></marker>
+        <marker id="dh-arrow-accent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#eb6c36"/></marker>
+      </defs>
+
+      <!-- 连线先画 -->
+      <path class="edge" d="M 500,96 V 140" marker-end="url(#dh-arrow)"/>
+      <path class="edge" d="M 400,180 H 224 Q 216,180 216,188 V 276" marker-end="url(#dh-arrow)"/>
+      <path class="edge" d="M 600,180 H 776 Q 784,180 784,188 V 276" marker-end="url(#dh-arrow)"/>
+      <path class="edge" d="M 312,316 H 396" marker-end="url(#dh-arrow)"/>
+      <path class="edge" d="M 688,316 H 604" marker-end="url(#dh-arrow)"/>
+      <path class="edge" d="M 216,352 V 396" marker-end="url(#dh-arrow)"/>
+      <path class="edge" d="M 784,352 V 396" marker-end="url(#dh-arrow)"/>
+      <path class="edge" d="M 312,336 H 352 Q 360,336 360,344 V 428 Q 360,436 368,436 H 400" marker-end="url(#dh-arrow)"/>
+      <path class="edge" d="M 688,336 H 648 Q 640,336 640,344 V 428 Q 640,436 632,436 H 600" marker-end="url(#dh-arrow)"/>
+
+      <rect class="mask" x="432" y="112" width="136" height="12"/><text class="label" x="500" y="121" text-anchor="middle">same semantic material</text>
+      <rect class="mask" x="428" y="368" width="144" height="12"/><text class="label" x="500" y="377" text-anchor="middle">SurfaceDocument + typed action</text>
+
+      <!-- 节点后画 -->
+      <g><rect class="node" x="400" y="32" width="200" height="64" rx="6"/><rect class="chip" x="408" y="40" width="72" height="12" rx="2"/><text class="type" x="444" y="49" text-anchor="middle">SOURCE</text><text class="title" x="500" y="68" text-anchor="middle">WorkflowReleaseSource</text><text class="sub" x="500" y="84" text-anchor="middle">schemas · prompts · fixtures</text></g>
+      <g><rect class="node changed" x="400" y="144" width="200" height="72" rx="6"/><rect class="chip changed" x="408" y="152" width="68" height="12" rx="2"/><text class="type changed" x="442" y="161" text-anchor="middle">MODULE</text><text class="title" x="500" y="184" text-anchor="middle">Workflow Module@digest</text><text class="sub" x="500" y="200" text-anchor="middle">Role · Router · Receipt/Gate · Reducer</text></g>
+      <g><rect class="node" x="120" y="280" width="192" height="72" rx="6"/><rect class="chip" x="128" y="288" width="76" height="12" rx="2"/><text class="type" x="166" y="297" text-anchor="middle">ADAPTER</text><text class="title" x="216" y="320" text-anchor="middle">SkillDevHostAdapter</text><text class="sub" x="216" y="336" text-anchor="middle">source-mode · loopback</text></g>
+      <g><rect class="node" x="400" y="280" width="200" height="72" rx="6"/><rect class="chip" x="408" y="288" width="72" height="12" rx="2"/><text class="type" x="444" y="297" text-anchor="middle">TRUTH</text><text class="title" x="500" y="320" text-anchor="middle">Tracker / Repo Facts</text><text class="sub" x="500" y="336" text-anchor="middle">external authority · typed adapters</text></g>
+      <g><rect class="node" x="688" y="280" width="192" height="72" rx="6"/><rect class="chip" x="696" y="288" width="76" height="12" rx="2"/><text class="type" x="734" y="297" text-anchor="middle">ADAPTER</text><text class="title" x="784" y="320" text-anchor="middle">AesAgentHostAdapter</text><text class="sub" x="784" y="336" text-anchor="middle">Extension · RPC/WS</text></g>
+      <g><rect class="node" x="16" y="400" width="216" height="72" rx="6"/><text class="title" x="124" y="432" text-anchor="middle">File Journal + Current Agent</text><text class="sub" x="124" y="448" text-anchor="middle">subagent · harness · manual resume</text></g>
+      <g><rect class="node changed" x="400" y="400" width="200" height="72" rx="6"/><rect class="chip changed" x="408" y="408" width="64" height="12" rx="2"/><text class="type changed" x="440" y="417" text-anchor="middle">SHELL</text><text class="title" x="500" y="440" text-anchor="middle">Shared Web Shell</text><text class="sub" x="500" y="456" text-anchor="middle">renders SurfaceDocument · no arbitrary JS</text></g>
+      <g><rect class="node" x="768" y="400" width="216" height="72" rx="6"/><text class="title" x="876" y="432" text-anchor="middle">SQLite Events + Provider/Task</text><text class="sub" x="876" y="448" text-anchor="middle">plugin · artifact · durable recovery</text></g>
+    </svg>
+    <div class="ledger"><b>Fidelity ledger</b><br>Detail: balanced · 源 = release、业务 Module、双 Host、两套运行能力、Web Shell、外部事实 8 类对象 → 8 节点 / 9 边<br>Merged: SkillDev 的 journal/current Agent/subagent/harness 合为一个运行节点；AesAgent 的 SQLite/Provider/Task/Plugin/Artifact 合为一个产品运行节点<br>Collapsed: <code>WorkflowSurfaceHost</code> Interface 以 Module→Host 连线标签表达；Host 内部 store/transport seams 不逐项展开<br>Dropped: Role DAG 内部 9 类责任与单次 CarrierBinding 细节——保留在 v3 详细图<br>Kept in full: 唯一 Module、两个 Host、同一 Web Shell、Tracker/Repo 外部真源，以及两个 Host 均连接页面与事实的方向</div>
+  </section>
+
+  <section>
+    <h2>流程视图：候选晋级不是源码复制</h2>
+    <p>当前推荐靶子是由 manual repo 的唯一源码直接生成不可变 Extension artifact。此流程尚待 P10 确认。</p>
+    <svg viewBox="0 0 1000 280" role="img" aria-labelledby="pm-title pm-desc">
+      <title id="pm-title">Workflow Module 从 SkillDev 晋级到 AesAgent 的候选流程</title>
+      <desc id="pm-desc">唯一 WorkflowReleaseSource 先通过 SkillDev live 与 conformance，再由官方 plugin builder 生成不可变 plugin tgz。AesAgent 安装精确版本与摘要，最后生成绑定双宿主证据的 PromotionReceipt。</desc>
+      <defs>
+        <marker id="pm-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4f5d75"/></marker>
+        <marker id="pm-arrow-accent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#eb6c36"/></marker>
+      </defs>
+      <path class="edge" d="M 184,132 H 220" marker-end="url(#pm-arrow)"/>
+      <path class="edge" d="M 376,132 H 412" marker-end="url(#pm-arrow)"/>
+      <path class="edge" d="M 568,132 H 604" marker-end="url(#pm-arrow)"/>
+      <path class="edge" d="M 760,132 H 796" marker-end="url(#pm-arrow)"/>
+      <g><rect class="node" x="28" y="96" width="156" height="72" rx="6"/><text class="title" x="106" y="128" text-anchor="middle">WorkflowReleaseSource</text><text class="sub" x="106" y="144" text-anchor="middle">manual · unique source</text></g>
+      <g><rect class="node" x="220" y="96" width="156" height="72" rx="6"/><text class="title" x="298" y="128" text-anchor="middle">SkillDev Verification</text><text class="sub" x="298" y="144" text-anchor="middle">live + canonical trace</text></g>
+      <g><rect class="node changed" x="412" y="96" width="156" height="72" rx="6"/><rect class="chip changed" x="420" y="104" width="64" height="12" rx="2"/><text class="type changed" x="452" y="113" text-anchor="middle">ARTIFACT</text><text class="title" x="490" y="136" text-anchor="middle">immutable .plugin.tgz</text><text class="sub" x="490" y="152" text-anchor="middle">official builder · exact digest</text></g>
+      <g><rect class="node" x="604" y="96" width="156" height="72" rx="6"/><text class="title" x="682" y="128" text-anchor="middle">AesAgent Install</text><text class="sub" x="682" y="144" text-anchor="middle">exact binding · no source copy</text></g>
+      <g><rect class="node changed" x="796" y="96" width="176" height="72" rx="6"/><rect class="chip changed" x="804" y="104" width="64" height="12" rx="2"/><text class="type changed" x="836" y="113" text-anchor="middle">RECEIPT</text><text class="title" x="884" y="136" text-anchor="middle">PromotionReceipt</text><text class="sub" x="884" y="152" text-anchor="middle">dual-host evidence · rollback identity</text></g>
+    </svg>
+    <div class="ledger open"><b>Fidelity ledger</b><br>Detail: focused · 源 = 推荐 promotion 五步 → 5 节点 / 4 边<br>Merged: Module unit/golden、Dev Web smoke、Adapter parity 合入 SkillDev Verification；install/enable/product smoke 合入 AesAgent Install<br>Collapsed: CI 命令、Plugin store、SemVer 与 rollback 操作收进 artifact/install/receipt 节点<br>Dropped: 源码复制与中立 repo 两个反方候选——它们保留在 v4-shared-workflow-module-model.md 的取舍节<br>Kept in full: 唯一源码、官方不可变 artifact、产品安装、双宿主证据四个不可省略的晋级事实</div>
+  </section>
+
+  <footer>
+    删除清单：每个 Skill 自建完整 Web server；AesAgent 内复制第二份业务 reducer；Host 根据 Workflow 名直接写 Gate；HTTP 200 冒充 consumed；Extension 注入任意 React/JavaScript。<br>
+    待确认：源码是否继续留在 manual repo 并直接构建 immutable artifact；旧 SkillDev Run 的迁移策略另行裁决。
+  </footer>
+</main>
+</body>
+</html>

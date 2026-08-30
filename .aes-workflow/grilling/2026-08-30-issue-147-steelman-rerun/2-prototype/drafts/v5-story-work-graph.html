@@ -1,0 +1,299 @@
+<!-- draft v5 | published 2026-08-30
+     用户意见：采用第三个 Product Design 方向，但 Discovery / Delivery 分为两个一级 Tab；每个阶段拥有自己的完整 Graph
+     状态：awaiting user confirmation; supersedes v4 for Web direction -->
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Story Atlas · Story Work Graph v5</title>
+<style>
+:root{
+  --bg:#f5f4ed;--surface:#faf9f5;--surface-warm:#e8e6dc;--surface-blue:#edf5fb;--surface-red:#fbefec;
+  --fg:#141413;--fg-2:#3d3d3a;--muted:#5e5d59;--meta:#87867f;
+  --border:#f0eee6;--border-soft:#e8e6dc;--accent:#c96442;--accent-on:#faf9f5;--accent-ink:#8f3f24;
+  --success:#17a34a;--success-ink:#0b6b30;--warn:#eab308;--warn-ink:#6b5304;--danger:#b53333;--danger-ink:#8f2626;--focus:#3898ec;
+  --font-display:"Anthropic Serif",Georgia,"Times New Roman",serif;
+  --font-body:"Anthropic Sans",Arial,system-ui,-apple-system,sans-serif;
+  --font-mono:"Anthropic Mono",ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;
+  --r-sm:8px;--r-md:12px;--r-lg:16px;--pill:999px;--ring:0 0 0 3px rgba(56,152,236,.28);
+  --shadow:rgba(0,0,0,.05) 0 4px 24px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--fg)}
+body{font:14px/1.55 var(--font-body);-webkit-font-smoothing:antialiased;overflow-x:hidden}
+button,input{font:inherit}
+button{cursor:pointer}
+button:focus-visible,input:focus-visible{outline:none;box-shadow:var(--ring)}
+[hidden]{display:none!important}
+.mono{font-family:var(--font-mono)}
+.shell{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:10px;min-height:46px;padding:0 14px;background:rgba(250,249,245,.96);border-bottom:1px solid var(--border-soft);backdrop-filter:blur(12px)}
+.brand{display:flex;align-items:center;gap:8px;font-weight:700;white-space:nowrap}.brand-dot{width:9px;height:9px;border-radius:50%;background:var(--accent)}
+.repo{min-width:0;max-width:340px;padding:5px 10px;border:1px solid var(--border-soft);border-radius:var(--pill);background:var(--bg);color:var(--muted);font:11px var(--font-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.shell-meta{margin-left:auto;color:var(--meta);font:10px var(--font-mono);white-space:nowrap}
+.btn{min-height:36px;padding:0 13px;border:1px solid var(--border-soft);border-radius:var(--r-sm);background:var(--surface);color:var(--fg);font-weight:600}
+.btn:hover{border-color:var(--meta);background:white}.btn.primary{color:var(--accent-on);border-color:var(--accent);background:var(--accent)}.btn.primary:hover{background:#b95737}
+.btn.compact{min-height:31px;padding:0 10px;font-size:12px}.btn[aria-pressed="true"],.btn.active{border-color:var(--accent);color:var(--accent-ink);background:#fff7f2}
+.page{max-width:1180px;margin:auto;padding:18px 18px 38px}
+.story-kicker{display:flex;align-items:center;gap:8px;color:var(--meta);font:10px var(--font-mono);letter-spacing:.08em;text-transform:uppercase}
+.story-head{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(280px,.65fr);gap:18px;padding-bottom:16px;border-bottom:1px solid var(--border-soft)}
+h1,h2,h3{margin:0}h1{font:500 28px/1.18 var(--font-display);margin-top:5px;text-wrap:balance}h2{font-size:15px}h3{font-size:13px}
+.facts{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-top:11px}.badge{display:inline-flex;align-items:center;min-height:23px;padding:0 8px;border-radius:var(--pill);font:700 10px var(--font-mono);white-space:nowrap}
+.badge.ok{background:#e3f4e7;color:var(--success-ink)}.badge.warn{background:#fbf0c9;color:var(--warn-ink)}.badge.bad{background:#f8e3df;color:var(--danger-ink)}.badge.info{background:#e3f0fb;color:#1f5f91}.badge.neutral{background:var(--surface-warm);color:var(--muted)}.badge.sim{border:1px solid #e5a894;background:#fff5f1;color:var(--danger-ink)}
+.story-context{max-width:58ch;margin:13px 0 0;padding:8px 10px;border-left:3px solid var(--focus);background:var(--surface-blue);color:var(--muted);font-size:11.5px}.story-context strong{color:var(--fg)}
+.truth{display:grid;gap:6px;padding:10px 12px;border:1px solid var(--border-soft);border-radius:var(--r-md);background:var(--surface)}
+.truth-title{font:700 10px var(--font-mono);letter-spacing:.08em;color:var(--meta)}.truth-row{display:grid;grid-template-columns:105px minmax(0,1fr);gap:9px;align-items:start}.truth-row strong{font:700 10px var(--font-mono)}.truth-row p{margin:0;color:var(--muted);font-size:11.5px}.truth-row.issue strong{color:#1f5f91}.truth-row.sim strong{color:var(--danger-ink)}
+.pulse{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:center;margin:16px 0 14px;padding:12px 14px;border:1px solid #ead7a4;border-radius:var(--r-md);background:#fbf3dd}
+.pulse-kicker{font:700 10px var(--font-mono);color:var(--warn-ink);letter-spacing:.07em}.pulse h2{margin-top:3px;font-size:16px}.pulse p{margin:3px 0 0;color:var(--muted);font-size:12px}.pulse-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.phase-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px}.phase-tab{position:relative;min-height:62px;padding:10px 14px;border:1px solid var(--border-soft);border-radius:var(--r-md) var(--r-md) 0 0;background:var(--surface);text-align:left;color:var(--fg)}
+.phase-tab::after{content:"";position:absolute;left:12px;right:12px;bottom:-1px;height:3px;background:transparent}.phase-tab[aria-selected="true"]{border-color:var(--accent);background:#fff}.phase-tab[aria-selected="true"]::after{background:var(--accent)}
+.phase-title{display:flex;gap:8px;align-items:center;font-weight:800}.phase-sub{display:block;margin-top:3px;color:var(--muted);font:11px var(--font-mono)}
+.bridge{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center;padding:10px 12px;border:1px solid var(--border-soft);border-top:0;background:var(--surface)}
+.bridge-step{padding:7px 9px;border:1px solid var(--border-soft);border-radius:var(--r-sm);background:var(--bg);font-size:12px}.bridge-step strong{display:block;font-size:12px}.bridge-arrow{color:var(--accent);font-weight:800}.bridge-return{text-align:right}.bridge-return button{min-height:32px;border:1px dashed #dc7860;border-radius:var(--r-sm);background:#fff8f5;color:var(--danger-ink);font-weight:700}
+.workspace{border:1px solid var(--border-soft);border-radius:0 0 var(--r-lg) var(--r-lg);background:var(--surface);overflow:hidden}
+.workspace-head{display:flex;align-items:center;gap:9px;min-height:50px;padding:8px 12px;border-bottom:1px solid var(--border-soft);background:var(--surface)}
+.phase-mark{width:9px;height:34px;border-radius:var(--pill);background:var(--focus)}.phase-mark.delivery{background:var(--accent)}
+.workspace-title{min-width:0}.workspace-title h2{font-size:14px}.workspace-title p{margin:1px 0 0;color:var(--muted);font:10px var(--font-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.workspace-tools{margin-left:auto;display:flex;align-items:center;gap:6px}.search{width:min(230px,28vw);min-height:34px;padding:0 10px;border:1px solid var(--border-soft);border-radius:var(--r-sm);background:var(--bg);color:var(--fg)}
+.filters{display:flex;align-items:center;gap:6px;padding:8px 12px;border-bottom:1px solid var(--border-soft);background:var(--bg);overflow:auto}.filter{min-height:31px;padding:0 10px;border:1px solid var(--border-soft);border-radius:var(--pill);background:var(--surface);color:var(--muted);white-space:nowrap;font-size:11px}.filter[aria-pressed="true"]{border-color:var(--accent);background:#fff7f2;color:var(--accent-ink)}
+.graph-scroll{overflow:auto;background:var(--bg);scrollbar-color:var(--surface-warm) transparent}.graph-canvas{position:relative;width:720px;min-width:720px;margin:auto;background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);background-size:24px 24px}
+.graph-canvas.discovery{height:690px}.graph-canvas.delivery{height:660px}
+.edges{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}.edge{fill:none;stroke:#8f8e88;stroke-width:1.5;opacity:.85}.edge.membership{stroke:#a6b9c6;stroke-width:1;opacity:.34}.edge.dependency{stroke:#3b6f97;stroke-width:2}.edge.progression{stroke:#8c6aa2;stroke-dasharray:5 5;opacity:.8}.edge.blocks,.edge.return{stroke:var(--danger);stroke-width:2;stroke-dasharray:6 5}.edge.produces{stroke:var(--accent);stroke-width:2}.edge.gate{stroke:#8b6a08;stroke-width:2}.edge.dim{opacity:.08}.edge[hidden]{display:none}
+.graph-node{position:absolute;width:150px;min-height:76px;padding:9px 10px;border:1px solid #bdb9ae;border-left:4px solid var(--meta);border-radius:var(--r-sm);background:var(--surface);color:var(--fg);text-align:left;box-shadow:0 2px 9px rgba(25,24,21,.04);transition:opacity .15s,border-color .15s,transform .15s}.graph-node:hover{border-color:var(--accent);transform:translateY(-1px)}.graph-node[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 0 0 2px rgba(201,100,66,.18)}.graph-node.dim{opacity:.18}.graph-node.match{box-shadow:0 0 0 3px rgba(56,152,236,.25)}
+.graph-node.research{border-left-color:var(--focus)}.graph-node.decision{border-left-color:#7653a6}.graph-node.contract{border-left-color:#a57800}.graph-node.work{border-left-color:var(--success)}.graph-node.qa{border-left-color:var(--accent)}.graph-node.review{border-left-color:#7653a6}.graph-node.gate{border-left-color:#a57800}.graph-node.story{border-left-color:var(--accent);background:#fff6f1}.graph-node.blocked{border-color:var(--danger)}.graph-node.running{border-color:var(--accent);background:#fff8f4}.graph-node.ready{border-color:#b58d1f}.graph-node.locked{border-color:#a57800}
+.node-top{display:flex;gap:6px;align-items:center;color:var(--meta);font:9.5px var(--font-mono)}.node-state{margin-left:auto;font-weight:700}.node-state.closed,.node-state.passed{color:var(--success-ink)}.node-state.running{color:var(--accent-ink)}.node-state.blocked,.node-state.locked{color:var(--danger-ink)}.node-state.ready,.node-state.pending{color:var(--warn-ink)}.node-title{display:block;margin-top:5px;font-weight:800;font-size:12px;line-height:1.25}.node-meta{display:block;margin-top:4px;color:var(--muted);font:9.5px/1.35 var(--font-mono)}
+.lane-label{position:absolute;left:8px;width:704px;height:128px;border:1px dashed #d4cfc2;border-radius:var(--r-md);pointer-events:none}.lane-label.web{top:230px;background:rgba(201,100,66,.025)}.lane-label.core{top:382px;background:rgba(56,152,236,.025)}.lane-copy{position:absolute;top:7px;left:10px;font:700 10px var(--font-mono);color:var(--muted)}
+.graph-note{position:absolute;left:10px;right:10px;top:12px;display:flex;justify-content:space-between;gap:10px;color:var(--muted);font:10px var(--font-mono);pointer-events:none}.graph-note strong{color:var(--fg)}
+.selection{display:grid;grid-template-columns:1.1fr 1.2fr .8fr 1fr 1fr;border-top:1px solid var(--border-soft);background:var(--surface)}.selection>div{min-width:0;padding:10px 12px;border-right:1px solid var(--border-soft)}.selection>div:last-child{border-right:0}.selection label{display:block;color:var(--meta);font:700 9px var(--font-mono);letter-spacing:.06em}.selection strong,.selection span{display:block;margin-top:4px}.selection strong{font-size:12px}.selection span{color:var(--muted);font-size:11px;white-space:normal}
+.list-view{padding:10px 12px;background:var(--bg)}.list-table{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--border-soft)}.list-table th,.list-table td{padding:9px 10px;border-bottom:1px solid var(--border-soft);text-align:left;font-size:12px}.list-table th{color:var(--meta);font:700 9px var(--font-mono);letter-spacing:.06em}.list-table tr[data-selected="true"]{background:#fff7f2}.list-table button{border:0;background:transparent;color:var(--accent-ink);font-weight:700;text-align:left}
+.lane-summary{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}.lane-card{border:1px solid var(--border-soft);border-radius:var(--r-md);background:var(--surface);overflow:hidden}.lane-head{display:flex;align-items:center;gap:8px;padding:9px 11px;border-bottom:1px solid var(--border-soft)}.lane-head strong{font-size:12px}.lane-grid{display:grid;grid-template-columns:repeat(4,1fr)}.lane-grid div{padding:9px 10px;border-right:1px solid var(--border-soft)}.lane-grid div:last-child{border-right:0}.lane-grid label{display:block;color:var(--meta);font:700 8.5px var(--font-mono)}.lane-grid span{display:block;margin-top:3px;font-size:10.5px}
+.evidence-strip{display:grid;grid-template-columns:repeat(3,1fr) auto;gap:0;margin-top:12px;border:1px solid var(--border-soft);border-radius:var(--r-md);background:var(--surface);overflow:hidden}.evidence-item{padding:11px 12px;border-right:1px solid var(--border-soft)}.evidence-item strong{display:block;font-size:11px}.evidence-item span{display:block;margin-top:4px;color:var(--muted);font:9.5px var(--font-mono)}.evidence-action{display:grid;place-items:center;padding:10px 12px}
+.return-banner{display:flex;align-items:center;gap:12px;margin-top:12px;padding:11px 12px;border:1px dashed #d98470;border-radius:var(--r-md);background:#fff7f4}.return-banner strong{font-size:12px}.return-banner p{margin:2px 0 0;color:var(--muted);font-size:11px}.return-banner .btn{margin-left:auto;white-space:nowrap}
+.modal-backdrop{position:fixed;inset:0;z-index:80;display:none;place-items:center;padding:18px;background:rgba(20,20,19,.28)}.modal-backdrop.open{display:grid}.modal{width:min(680px,100%);max-height:min(84vh,760px);overflow:auto;border:1px solid var(--border-soft);border-radius:var(--r-lg);background:var(--surface);box-shadow:var(--shadow)}.modal-head{position:sticky;top:0;display:flex;align-items:center;gap:10px;padding:13px 15px;border-bottom:1px solid var(--border-soft);background:var(--surface);z-index:2}.modal-head h2{font-size:16px}.modal-head .btn{margin-left:auto}.modal-body{padding:15px}.source-block{padding:11px 12px;margin-bottom:10px;border:1px solid var(--border-soft);border-radius:var(--r-sm);background:var(--bg)}.source-block strong{display:block}.source-block p{margin:5px 0 0;color:var(--muted)}.source-block code{font:10px/1.5 var(--font-mono);overflow-wrap:anywhere}.live{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+@media(max-width:820px){
+  .shell-meta{display:none}.repo{max-width:260px}.page{padding-left:10px;padding-right:10px}h1{font-size:24px}
+}
+@media(max-width:640px){
+  .page{padding:14px 10px 30px}.story-head{grid-template-columns:1fr}.truth{grid-template-columns:1fr 1fr}.truth-title{grid-column:1/-1}.pulse{grid-template-columns:1fr}.pulse-actions{justify-content:flex-start}.workspace-head{align-items:flex-start;flex-wrap:wrap}.workspace-tools{width:100%;margin-left:0}.search{flex:1;width:auto}.selection{grid-template-columns:repeat(2,1fr)}.selection>div{border-bottom:1px solid var(--border-soft)}.selection>div:last-child{grid-column:1/-1}.lane-summary{grid-template-columns:1fr}.graph-canvas{margin-left:0}.evidence-strip{grid-template-columns:1fr 1fr}.evidence-item:nth-child(2){border-right:0}.evidence-action{border-top:1px solid var(--border-soft)}
+}
+@media(max-width:520px){
+  body{font-size:13px}.shell{padding:0 8px}.repo{display:none}.page{padding:10px 7px 24px}h1{font-size:22px}.truth{grid-template-columns:1fr}.truth-title{grid-column:auto}.phase-tab{padding:9px;min-height:68px}.phase-title{font-size:12px}.phase-sub{font-size:9px}.bridge{grid-template-columns:1fr}.bridge-arrow{display:none}.bridge-return{text-align:left}.pulse-actions .btn{flex:1}.workspace-tools{display:grid;grid-template-columns:1fr auto auto}.selection{grid-template-columns:1fr}.selection>div:last-child{grid-column:auto}.lane-grid{grid-template-columns:1fr 1fr}.lane-grid div{border-bottom:1px solid var(--border-soft)}.return-banner{align-items:flex-start;flex-wrap:wrap}.return-banner .btn{margin-left:0}.evidence-strip{grid-template-columns:1fr}.evidence-item{border-right:0;border-bottom:1px solid var(--border-soft)}
+}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition-duration:0s!important}}
+</style>
+</head>
+<body>
+<header class="shell">
+  <button class="btn compact" id="navButton" aria-label="打开来源导航">导航</button>
+  <div class="brand"><span class="brand-dot" aria-hidden="true"></span>Story Atlas</div>
+  <div class="repo">parkth1026/parking-agents · Story #147</div>
+  <div class="shell-meta">CAPTURED ISSUE + DOSSIER · 2026-08-30</div>
+  <button class="btn compact" id="sourceButton">查看来源</button>
+</header>
+
+<main class="page" id="app">
+  <section class="story-head" aria-labelledby="storyTitle">
+    <div>
+      <div class="story-kicker">StoryRoot · current projection · read only</div>
+      <h1 id="storyTitle">#147 · story 级全链条工作流整合设计</h1>
+      <div class="facts">
+        <span class="badge ok">TRACKER CLOSED</span>
+        <span class="badge info">DISCOVERY 12/12</span>
+        <span class="badge neutral">DELIVERY 0 VERIFIED</span>
+        <span class="badge info">LOCAL 2-PROTOTYPE PENDING</span>
+      </div>
+      <p class="story-context"><strong>CURRENT ACTION SCOPE</strong> · 历史 tracker Story 已关闭；当前操作者正在核对本地 v5 对照物。Web 只读，领域事实由 Workflow / Skill 写入。</p>
+    </div>
+    <aside class="truth" aria-label="数据真值边界">
+      <div class="truth-title">TRUTH BOUNDARY</div>
+      <div class="truth-row issue"><strong>ISSUE FACT</strong><p>#147 + 12 native members + 7 descendant dependency；root 自身 blockedBy / blocking 为 0 / 0。</p></div>
+      <div class="truth-row sim"><strong>SIMULATED GAP</strong><p>Delivery runtime 不存在；下方 Lane、Receipt、Gate、owner 与 wave 均由 spec / ADR / dossier 推演。</p></div>
+    </aside>
+  </section>
+
+  <section class="pulse" aria-labelledby="pulseTitle">
+    <div>
+      <div class="pulse-kicker" id="pulseKicker">STORY PULSE · DELIVERY PROJECTION</div>
+      <h2 id="pulseTitle">WEB QA 是当前必需 Lane 的最长剩余路径。</h2>
+      <p id="pulseCopy">完成模拟 WEB QA 会解锁 WEB Review；模拟 CORE Review 可安全并行。Web 只读，不直接改变 Story。</p>
+    </div>
+    <div class="pulse-actions">
+      <button class="btn primary" id="primaryAction">定位 WEB QA</button>
+      <button class="btn" id="parallelAction">定位 CORE Review</button>
+    </div>
+  </section>
+
+  <div class="phase-tabs" role="tablist" aria-label="Story 两大阶段">
+    <button class="phase-tab" role="tab" id="tab-discovery" aria-selected="false" aria-controls="panel-discovery" data-phase="discovery">
+      <span class="phase-title">Discovery Graph <span class="badge info">ISSUE FACT</span></span>
+      <span class="phase-sub">12/12 closed · 7 native deps · real #148–#159</span>
+    </button>
+    <button class="phase-tab" role="tab" id="tab-delivery" aria-selected="true" aria-controls="panel-delivery" data-phase="delivery">
+      <span class="phase-title">Delivery Graph <span class="badge sim">SIMULATED</span></span>
+      <span class="phase-sub">active · wave-2 · 2 required RepoLanes</span>
+    </button>
+  </div>
+
+  <section class="bridge" aria-label="跨图闭环">
+    <div class="bridge-step" id="bridgeFrom"><strong>真实设计依据</strong>#159 spec / ADR + 当前 dossier</div>
+    <div class="bridge-arrow" aria-hidden="true">→</div>
+    <div class="bridge-step bridge-return" id="bridgeTo"><strong>SIM contract@2 → Delivery wave-2</strong><button id="returnLink">1 requires-decision return → Discovery</button></div>
+  </section>
+
+  <section class="workspace" id="panel-discovery" role="tabpanel" aria-labelledby="tab-discovery" hidden>
+    <header class="workspace-head">
+      <span class="phase-mark" aria-hidden="true"></span>
+      <div class="workspace-title"><h2>Discovery Graph · 真实 #147 决策图</h2><p>12 native members · 7 native dependencies · author progression is an optional comment overlay</p></div>
+      <div class="workspace-tools">
+        <input class="search" id="searchDiscovery" type="search" placeholder="搜索 Issue、标题、owner…" aria-label="搜索 Discovery 节点">
+        <button class="btn compact" data-view-toggle="discovery" data-view="map" aria-pressed="true">Map</button>
+        <button class="btn compact" data-view-toggle="discovery" data-view="list" aria-pressed="false">List</button>
+      </div>
+    </header>
+    <div class="filters" aria-label="Discovery 过滤">
+      <button class="filter" data-filter="discovery" data-value="all" aria-pressed="true">全部 12</button>
+      <button class="filter" data-filter="discovery" data-value="research" aria-pressed="false">调研 4</button>
+      <button class="filter" data-filter="discovery" data-value="decision" aria-pressed="false">裁决 7</button>
+      <button class="filter" id="membershipToggle" aria-pressed="true">成员边 12</button>
+      <button class="filter" id="progressionToggle" aria-pressed="false">作者演进线</button>
+      <button class="filter" id="discoveryFocus" aria-pressed="false">一跳聚焦</button>
+    </div>
+    <div class="graph-scroll" id="discoveryMapWrap">
+      <div class="graph-canvas discovery" id="discoveryCanvas"><svg class="edges" id="discoveryEdges" aria-hidden="true"></svg><div class="graph-note"><span><strong>StoryRoot #147</strong> · root 0/0 只描述 root 自身</span><span>12 membership · 7 dependency</span></div></div>
+    </div>
+    <div class="list-view" id="discoveryList" hidden></div>
+    <div class="selection" id="discoverySelection" aria-live="polite"></div>
+  </section>
+
+  <section class="workspace" id="panel-delivery" role="tabpanel" aria-labelledby="tab-delivery">
+    <header class="workspace-head">
+      <span class="phase-mark delivery" aria-hidden="true"></span>
+      <div class="workspace-title"><h2>Delivery Graph · 推演交付闭环</h2><p>SIMULATED GAP · design basis: spec §10, ADR 0002–0004, Q23–Q35, P12, WEB-P9–P11 · runtime NOT_CONNECTED</p></div>
+      <div class="workspace-tools">
+        <input class="search" id="searchDelivery" type="search" placeholder="搜索 node、Lane、owner…" aria-label="搜索 Delivery 节点">
+        <button class="btn compact" data-view-toggle="delivery" data-view="map" aria-pressed="true">Map</button>
+        <button class="btn compact" data-view-toggle="delivery" data-view="list" aria-pressed="false">List</button>
+      </div>
+    </header>
+    <div class="filters" aria-label="Delivery 过滤">
+      <button class="filter" data-filter="delivery" data-value="all" aria-pressed="true">全部 13</button>
+      <button class="filter" data-filter="delivery" data-value="frontier" aria-pressed="false">Frontier 2</button>
+      <button class="filter" data-filter="delivery" data-value="blocked" aria-pressed="false">阻塞 / Gate 4</button>
+      <button class="filter" data-filter="delivery" data-value="web" aria-pressed="false">WEB Lane</button>
+      <button class="filter" data-filter="delivery" data-value="core" aria-pressed="false">CORE Lane</button>
+      <button class="filter" id="deliveryFocus" aria-pressed="false">一跳聚焦</button>
+    </div>
+    <div class="graph-scroll" id="deliveryMapWrap">
+      <div class="graph-canvas delivery" id="deliveryCanvas"><svg class="edges" id="deliveryEdges" aria-hidden="true"></svg><div class="graph-note"><span><strong>SIM contract@2 · wave-2</strong> · projection only</span><span>2 required RepoLanes · acceptance locked</span></div><div class="lane-label web"><span class="lane-copy">SIM-LANE-WEB · required · owner SIM-WEB-Q</span></div><div class="lane-label core"><span class="lane-copy">SIM-LANE-CORE · required · owner SIM-C3</span></div></div>
+    </div>
+    <div class="list-view" id="deliveryList" hidden></div>
+    <div class="selection" id="deliverySelection" aria-live="polite"></div>
+  </section>
+
+  <section class="lane-summary" id="laneSummary" aria-label="RepoLane 摘要">
+    <article class="lane-card"><div class="lane-head"><span class="badge sim">SIM-WEB</span><strong>WEB Lane · required</strong><span class="badge bad" style="margin-left:auto">BLOCKED</span></div><div class="lane-grid"><div><label>OWNER</label><span>SIM-WEB-Q</span></div><div><label>SUBJECT</label><span>SIM-WEB-C2</span></div><div><label>WORST GATE</label><span>WEB Gate pending</span></div><div><label>NEXT</label><span>Finish WEB QA</span></div></div></article>
+    <article class="lane-card"><div class="lane-head"><span class="badge sim">SIM-CORE</span><strong>CORE Lane · required</strong><span class="badge warn" style="margin-left:auto">READY</span></div><div class="lane-grid"><div><label>OWNER</label><span>SIM-C3</span></div><div><label>SUBJECT</label><span>SIM-CORE-C2</span></div><div><label>WORST GATE</label><span>CORE Gate pending</span></div><div><label>NEXT</label><span>Start CORE Review</span></div></div></article>
+  </section>
+
+  <section class="return-banner" id="returnBanner">
+    <div><strong>REQUIRES-DECISION RETURN · 1 simulated finding</strong><p>若 WEB QA 发现会改变公共承诺的差异，Delivery 停止推进并回到 Discovery 生成 decision ticket；contract revision 后旧 Receipt 变 stale。</p></div>
+    <button class="btn" id="goDiscovery">去 Discovery Graph 查看回流</button>
+  </section>
+
+  <section class="evidence-strip" id="evidenceStrip" aria-label="当前证据与 Gate">
+    <div class="evidence-item"><strong>FRESH · CORE QA Receipt</strong><span>SIM-RCPT-W2-CORE-QA · contributes to CORE Gate</span></div>
+    <div class="evidence-item"><strong>STALE · wave-1 WEB Receipt</strong><span>SIM-RCPT-W1-WEB-QA · audit only · Gate contribution none</span></div>
+    <div class="evidence-item"><strong>MISSING · WEB QA Receipt</strong><span>current subject SIM-WEB-C2 · WEB Gate stays pending</span></div>
+    <div class="evidence-action"><button class="btn" id="evidenceButton">打开证据对照</button></div>
+  </section>
+  <div class="live" id="liveRegion" aria-live="polite"></div>
+</main>
+
+<div class="modal-backdrop" id="modalBackdrop" role="presentation">
+  <section class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <header class="modal-head"><h2 id="modalTitle" tabindex="-1">数据来源</h2><button class="btn compact" id="modalClose">关闭</button></header>
+    <div class="modal-body" id="modalBody"></div>
+  </section>
+</div>
+
+<script>
+const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const issueBase='https://github.com/parkth1026/parking-agents/issues/';
+const discoveryNodes=[
+  {id:'ISSUE-147',n:'#147',title:'story 级全链条工作流整合设计',kind:'story',state:'closed',meta:'StoryRoot · wayfinder:map',x:285,y:50,truth:'ISSUE FACT',owner:'unassigned',now:'Tracker Story 已完成设计定稿；当前本地 dossier 仍在 2-prototype。',why:'root 只证明自身 CLOSED 与 12/12，不证明后续 Delivery runtime。',next:'核对 #159 与当前原型差异。',unlocks:'为模拟 Delivery 提供设计依据，不提供运行证据。',source:issueBase+'147'},
+  {id:'ISSUE-148',n:'#148',title:'workflow-interview-web 能力盘点',kind:'research',state:'closed',meta:'research · 1 comment',x:20,y:170,truth:'ISSUE FACT',owner:'parkth1026',now:'调研完成。',why:'识别单会话上下文爆炸和可继承 Web 能力。',next:'历史终态，无运行动作。',unlocks:'#152、#153、#155',source:issueBase+'148'},
+  {id:'ISSUE-149',n:'#149',title:'wayfinder 双变体与票协议',kind:'research',state:'closed',meta:'research · 1 comment',x:195,y:170,truth:'ISSUE FACT',owner:'parkth1026',now:'调研完成。',why:'比较 tracker/file 载体与 claim/frontier/fog。',next:'历史终态。',unlocks:'#152、#154',source:issueBase+'149'},
+  {id:'ISSUE-150',n:'#150',title:'board 星图与关系数据面',kind:'research',state:'closed',meta:'research · 1 comment',x:370,y:170,truth:'ISSUE FACT',owner:'parkth1026',now:'调研完成。',why:'确认 native dependency 与三维 verdict 数据面。',next:'历史终态。',unlocks:'#153',source:issueBase+'150'},
+  {id:'ISSUE-151',n:'#151',title:'engineering 路由与门禁',kind:'research',state:'closed',meta:'research · 1 comment',x:545,y:170,truth:'ISSUE FACT',owner:'parkth1026',now:'调研完成。',why:'提炼 route/review/validate/finish 的门禁思想。',next:'历史终态。',unlocks:'作者评论声明参与后续裁决；无 native blocker edge。',source:issueBase+'151'},
+  {id:'ISSUE-152',n:'#152',title:'裁决：独立组合层技能',kind:'decision',state:'closed',meta:'decision · blockedBy 148,149',x:20,y:345,truth:'ISSUE FACT',owner:'parkth1026',now:'裁决完成。',why:'整合能力落点为独立 workflow-story-map。',next:'历史终态。',unlocks:'作者演进 #153',source:issueBase+'152'},
+  {id:'ISSUE-153',n:'#153',title:'裁决：执行与验收挂载',kind:'decision',state:'closed',meta:'decision · NOT implementation',x:195,y:345,truth:'ISSUE FACT',owner:'parkth1026',now:'架构裁决完成，不是代码实现。',why:'定义可插拔执行层与 Story 收口。',next:'历史终态。',unlocks:'作者演进 #154',source:issueBase+'153'},
+  {id:'ISSUE-154',n:'#154',title:'裁决：票载体与 claim',kind:'decision',state:'closed',meta:'decision · blockedBy 149',x:370,y:345,truth:'ISSUE FACT',owner:'parkth1026',now:'载体裁决完成。',why:'tracker Issue 单真源、弱 claim、投影重算。',next:'历史终态。',unlocks:'作者演进 #155',source:issueBase+'154'},
+  {id:'ISSUE-155',n:'#155',title:'裁决：门禁与 map 票流',kind:'decision',state:'closed',meta:'decision · blockedBy 148',x:545,y:345,truth:'ISSUE FACT',owner:'parkth1026',now:'票流裁决完成。',why:'story grill、出口融合、ticket finalize 与回退。',next:'历史终态。',unlocks:'作者演进 #156',source:issueBase+'155'},
+  {id:'ISSUE-156',n:'#156',title:'裁决：决策档案分层',kind:'decision',state:'closed',meta:'decision · 2 comments',x:20,y:520,truth:'ISSUE FACT',owner:'parkth1026',now:'档案裁决完成。',why:'map index + ticket dossier 两级同构。',next:'历史终态。',unlocks:'作者演进 #157',source:issueBase+'156'},
+  {id:'ISSUE-157',n:'#157',title:'裁决：命名与发布路径',kind:'decision',state:'closed',meta:'decision · 2 comments',x:195,y:520,truth:'ISSUE FACT',owner:'parkth1026',now:'workflow-story-map 命名裁决完成。',why:'定义组合层边界与发布方向。',next:'历史终态。',unlocks:'作者演进 #158',source:issueBase+'157'},
+  {id:'ISSUE-158',n:'#158',title:'裁决：Web 投影与星图',kind:'decision',state:'closed',meta:'decision · blocks #159',x:370,y:520,truth:'ISSUE FACT',owner:'parkth1026',now:'Web 投影归属裁决完成。',why:'真实 native edge 指向 #159。',next:'历史终态。',unlocks:'#159',source:issueBase+'158'},
+  {id:'ISSUE-159',n:'#159',title:'定稿：spec + ADR',kind:'contract',state:'closed',meta:'contract-finalization · blockedBy 158',x:545,y:520,truth:'ISSUE FACT',owner:'parkth1026',now:'spec v1.0 与 ADR 0001–0004 已由作者声明交付。',why:'这是设计契约定稿，不是代码交付。',next:'当前 v5 原型必须与新 dossier 裁决对照。',unlocks:'只作为 SIM Delivery 的 design basis。',source:issueBase+'159'}
+];
+const discoveryEdges=[
+  ...discoveryNodes.filter(n=>n.id!=='ISSUE-147').map(n=>({a:'ISSUE-147',b:n.id,kind:'membership'})),
+  {a:'ISSUE-148',b:'ISSUE-152',kind:'dependency'},{a:'ISSUE-148',b:'ISSUE-153',kind:'dependency'},{a:'ISSUE-148',b:'ISSUE-155',kind:'dependency'},
+  {a:'ISSUE-149',b:'ISSUE-152',kind:'dependency'},{a:'ISSUE-149',b:'ISSUE-154',kind:'dependency'},{a:'ISSUE-150',b:'ISSUE-153',kind:'dependency'},{a:'ISSUE-158',b:'ISSUE-159',kind:'dependency'}
+];
+const progressionPairs=[['ISSUE-151','ISSUE-152'],['ISSUE-152','ISSUE-153'],['ISSUE-153','ISSUE-154'],['ISSUE-154','ISSUE-155'],['ISSUE-155','ISSUE-156'],['ISSUE-156','ISSUE-157'],['ISSUE-157','ISSUE-158']];
+const deliveryNodes=[
+  {id:'SIM-I01',n:'SIM-I01',title:'Tracker Story index',kind:'work',state:'passed',meta:'CORE · foundation',x:20,y:82,truth:'SIMULATED GAP',lane:'core',owner:'SIM-C1',now:'模拟 tracker-neutral dependency reader 已完成。',why:'design basis: spec §10.1 + ADR-0002。',next:'无当前动作。',unlocks:'Story reducer、Gate projector',source:'DERIVED: spec §10.1'},
+  {id:'SIM-I02',n:'SIM-I02',title:'双图 Story reducer',kind:'work',state:'passed',meta:'CORE · contract@2',x:195,y:82,truth:'SIMULATED GAP',lane:'core',owner:'SIM-C2',now:'模拟 StoryRoot / Discovery / Delivery reducer 已完成。',why:'design basis: Q23 + WEB-P9/P10。',next:'无当前动作。',unlocks:'Projection Runtime、RepoLane reducer、Web Graph',source:'DOSSIER FACT: Q23, WEB-P9, WEB-P10'},
+  {id:'SIM-I05',n:'SIM-I05',title:'Profile / Receipt / Gate',kind:'work',state:'passed',meta:'CORE · deterministic projection',x:370,y:82,truth:'SIMULATED GAP',lane:'core',owner:'SIM-C3',now:'模拟 Gate projector 已完成。',why:'design basis: Q24/Q25/Q29/Q35。',next:'提供 current Receipt freshness。',unlocks:'RepoLane Gate、Evidence view',source:'DOSSIER FACT: Q24,Q25,Q29,Q35'},
+  {id:'SIM-I04',n:'SIM-I04',title:'Projection Runtime',kind:'work',state:'passed',meta:'CORE · one-way sync · read only',x:545,y:82,truth:'SIMULATED GAP',lane:'core',owner:'SIM-C4',now:'模拟单向 Projection Runtime 已完成。',why:'P12：Workflow/Skill → facts → Runtime → Web；不拥有 Agent lifecycle。',next:'只广播可重建投影。',unlocks:'只读 Story Atlas',source:'DOSSIER FACT: P11/P12'},
+  {id:'SIM-W01R',n:'SIM-W01R',title:'双 Tab Story Work Graph',kind:'work',state:'passed',meta:'WEB · candidate SIM-WEB-C2',x:20,y:258,truth:'SIMULATED GAP',lane:'web',owner:'SIM-W1',now:'模拟 v5 实现已进入 QA subject。',why:'design basis: WEB-P9/P10/P11。',next:'等待当前 WEB QA。',unlocks:'SIM-W2-WEB-Q',source:'DOSSIER FACT: WEB-P9/P10/P11'},
+  {id:'SIM-W2-WEB-Q',n:'SIM-W2-WEB-Q',title:'WEB QA',kind:'qa',state:'running',meta:'WEB · frontier · current subject',x:195,y:258,truth:'SIMULATED GAP',lane:'web',owner:'SIM-WEB-Q',now:'模拟 WEB QA 正在运行。',why:'它是 WEB required Lane 的最长剩余路径。',next:'完成当前 subject 的可视化与交互核对。',unlocks:'WEB Review',source:'DERIVED simulation from Profile rules'},
+  {id:'SIM-W2-WEB-R',n:'SIM-W2-WEB-R',title:'WEB Review',kind:'review',state:'blocked',meta:'WEB · blocked by QA',x:370,y:258,truth:'SIMULATED GAP',lane:'web',owner:'SIM-WEB-R',now:'等待 WEB QA current Receipt。',why:'Review 不得消费 missing 或 stale Receipt。',next:'等待 SIM-W2-WEB-Q。',unlocks:'WEB Lane Gate',source:'DERIVED simulation from Gate rules'},
+  {id:'SIM-G-WEB',n:'SIM-G-WEB',title:'WEB Lane Gate',kind:'gate',state:'pending',meta:'WEB · integration Gate',x:545,y:258,truth:'SIMULATED GAP',lane:'web',owner:'CORE',now:'WEB Lane Gate pending。',why:'current WEB QA Receipt missing，Review 未完成。',next:'等待 QA + Review。',unlocks:'Story acceptance reducer',source:'DERIVED simulation: Q28/Q33'},
+  {id:'SIM-I06',n:'SIM-I06',title:'RepoLane reducer',kind:'work',state:'passed',meta:'CORE · integration target',x:20,y:410,truth:'SIMULATED GAP',lane:'core',owner:'SIM-C3',now:'模拟 RepoLane reducer 已完成。',why:'design basis: Q28/Q33。',next:'无当前动作。',unlocks:'CORE QA',source:'DOSSIER FACT: Q28/Q33'},
+  {id:'SIM-W2-CORE-Q',n:'SIM-W2-CORE-Q',title:'CORE QA',kind:'qa',state:'passed',meta:'CORE · fresh Receipt',x:195,y:410,truth:'SIMULATED GAP',lane:'core',owner:'SIM-CORE-Q',now:'模拟 CORE QA PASS，Receipt fresh。',why:'Receipt 绑定 SIM-CORE-C2 / contract@2。',next:'允许 CORE Review。',unlocks:'CORE Review',source:'DERIVED simulation from Receipt rules'},
+  {id:'SIM-W2-CORE-R',n:'SIM-W2-CORE-R',title:'CORE Review',kind:'review',state:'ready',meta:'CORE · safe parallel frontier',x:370,y:410,truth:'SIMULATED GAP',lane:'core',owner:'SIM-C3',now:'模拟 CORE Review 已 ready。',why:'与 WEB QA 无写冲突，可安全并行。',next:'开始 independent review。',unlocks:'CORE Lane Gate',source:'DERIVED simulation from Carrier/Gate rules'},
+  {id:'SIM-G-CORE',n:'SIM-G-CORE',title:'CORE Lane Gate',kind:'gate',state:'pending',meta:'CORE · integration Gate',x:545,y:410,truth:'SIMULATED GAP',lane:'core',owner:'CORE',now:'CORE Lane Gate pending。',why:'等待 CORE Review。',next:'完成 SIM-W2-CORE-R。',unlocks:'Story acceptance reducer',source:'DERIVED simulation: Q28/Q33'},
+  {id:'SIM-A-ROOT',n:'SIM-A-ROOT',title:'Story acceptance reducer',kind:'story',state:'locked',meta:'required Lane terminal',x:285,y:555,truth:'SIMULATED GAP',lane:'story',owner:'CORE',now:'模拟 Story acceptance locked。',why:'WEB/CORE 两条 required Lane Gate 尚未同时满足。',next:'先完成 WEB QA；CORE Review 可并行。',unlocks:'SIM Story terminal',source:'DERIVED simulation: Q30/Q33'}
+];
+const deliveryEdges=[
+  {a:'SIM-I01',b:'SIM-I02',kind:'dependency'},{a:'SIM-I01',b:'SIM-I05',kind:'dependency'},{a:'SIM-I02',b:'SIM-I04',kind:'dependency'},
+  {a:'SIM-I02',b:'SIM-W01R',kind:'produces'},{a:'SIM-I02',b:'SIM-I06',kind:'produces'},{a:'SIM-I05',b:'SIM-I06',kind:'dependency'},
+  {a:'SIM-W01R',b:'SIM-W2-WEB-Q',kind:'dependency'},{a:'SIM-W2-WEB-Q',b:'SIM-W2-WEB-R',kind:'blocks'},{a:'SIM-W2-WEB-R',b:'SIM-G-WEB',kind:'gate'},
+  {a:'SIM-I06',b:'SIM-W2-CORE-Q',kind:'dependency'},{a:'SIM-W2-CORE-Q',b:'SIM-W2-CORE-R',kind:'dependency'},{a:'SIM-W2-CORE-R',b:'SIM-G-CORE',kind:'gate'},
+  {a:'SIM-G-WEB',b:'SIM-A-ROOT',kind:'gate'},{a:'SIM-G-CORE',b:'SIM-A-ROOT',kind:'gate'}
+];
+const phases={discovery:{nodes:discoveryNodes,edges:discoveryEdges,selected:'ISSUE-159',filter:'all',view:'map',focus:false,query:''},delivery:{nodes:deliveryNodes,edges:deliveryEdges,selected:'SIM-W2-WEB-Q',filter:'all',view:'map',focus:false,query:''}};
+let activePhase='delivery',showMembership=true,showProgression=false,lastFocus=null;
+function nodeBy(phase,id){return phases[phase].nodes.find(n=>n.id===id)}
+function visibleNode(phase,n){const s=phases[phase];if(s.query&&!`${n.id} ${n.n} ${n.title} ${n.owner||''} ${n.lane||''}`.toLowerCase().includes(s.query.toLowerCase()))return false;if(s.filter==='all')return true;if(phase==='discovery')return n.kind===s.filter||n.id==='ISSUE-147';if(s.filter==='frontier')return ['SIM-W2-WEB-Q','SIM-W2-CORE-R','SIM-A-ROOT'].includes(n.id);if(s.filter==='blocked')return ['blocked','pending','locked'].includes(n.state);if(s.filter==='web')return n.lane==='web'||n.lane==='story';if(s.filter==='core')return n.lane==='core'||n.lane==='story';return true}
+function renderNode(n,phase){const b=document.createElement('button');b.className=`graph-node ${n.kind} ${n.state}`;b.dataset.node=n.id;b.style.left=`${n.x}px`;b.style.top=`${n.y}px`;b.setAttribute('aria-pressed',String(phases[phase].selected===n.id));b.innerHTML=`<span class="node-top"><span>${n.n}</span><span class="node-state ${n.state}">${n.state}</span></span><span class="node-title">${n.title}</span><span class="node-meta">${n.meta}</span>`;b.addEventListener('click',()=>selectNode(phase,n.id,true));return b}
+function point(n,side){const w=150,h=76;if(side==='top')return[n.x+w/2,n.y];if(side==='bottom')return[n.x+w/2,n.y+h];if(side==='left')return[n.x,n.y+h/2];return[n.x+w,n.y+h/2]}
+function edgePath(a,b){const down=b.y>a.y+40;const up=b.y+40<a.y;if(down){const p1=point(a,'bottom'),p2=point(b,'top'),m=(p1[1]+p2[1])/2;return`M${p1[0]} ${p1[1]} C${p1[0]} ${m},${p2[0]} ${m},${p2[0]} ${p2[1]}`}if(up){const p1=point(a,'top'),p2=point(b,'bottom'),m=(p1[1]+p2[1])/2;return`M${p1[0]} ${p1[1]} C${p1[0]} ${m},${p2[0]} ${m},${p2[0]} ${p2[1]}`}const p1=point(a,'right'),p2=point(b,'left'),m=(p1[0]+p2[0])/2;return`M${p1[0]} ${p1[1]} C${m} ${p1[1]},${m} ${p2[1]},${p2[0]} ${p2[1]}`}
+function renderGraph(phase){const canvas=$(`#${phase}Canvas`),svg=$(`#${phase}Edges`);$$('.graph-node',canvas).forEach(n=>n.remove());svg.innerHTML=`<defs><marker id="arrow-${phase}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10Z" fill="#77756f"></path></marker></defs>`;const s=phases[phase],vis=new Set(s.nodes.filter(n=>visibleNode(phase,n)).map(n=>n.id)),selected=nodeBy(phase,s.selected);const neighbors=new Set([s.selected]);s.edges.forEach(e=>{if(e.a===s.selected)neighbors.add(e.b);if(e.b===s.selected)neighbors.add(e.a)});s.nodes.forEach(n=>{const b=renderNode(n,phase);if(!vis.has(n.id))b.hidden=true;if(s.focus&&selected&&!neighbors.has(n.id))b.classList.add('dim');if(s.query&&vis.has(n.id))b.classList.add('match');canvas.appendChild(b)});const allEdges=[...s.edges,...(phase==='discovery'&&showProgression?progressionPairs.map(([a,b])=>({a,b,kind:'progression'})):[])];allEdges.forEach((e,i)=>{if(e.kind==='membership'&&!showMembership)return;const a=nodeBy(phase,e.a),b=nodeBy(phase,e.b);if(!a||!b)return;const p=document.createElementNS('http://www.w3.org/2000/svg','path');p.setAttribute('d',edgePath(a,b));p.setAttribute('class',`edge ${e.kind}${s.focus&&selected&&!(neighbors.has(e.a)&&neighbors.has(e.b))?' dim':''}`);p.dataset.edge=`${e.a}:${e.b}`;if(!vis.has(e.a)||!vis.has(e.b))p.hidden=true;p.setAttribute('marker-end',`url(#arrow-${phase})`);svg.appendChild(p)});renderSelection(phase);renderList(phase)}
+function renderSelection(phase){const n=nodeBy(phase,phases[phase].selected)||phases[phase].nodes[0],box=$(`#${phase}Selection`);box.innerHTML=`<div><label>NOW</label><strong>${n.n} · ${n.title}</strong><span>${n.now}</span></div><div><label>WHY</label><strong>${n.truth}</strong><span>${n.why}</span></div><div><label>OWNER</label><strong>${n.owner||'—'}</strong><span>${n.lane?`${n.lane.toUpperCase()} Lane`:n.meta}</span></div><div><label>NEXT</label><strong>${n.next}</strong><span>Web projection is read only</span></div><div><label>UNLOCKS / SOURCE</label><strong>${n.unlocks}</strong><span>${n.source}</span></div>`}
+function renderList(phase){const target=$(`#${phase}List`),s=phases[phase],nodes=s.nodes.filter(n=>visibleNode(phase,n));target.innerHTML=`<table class="list-table"><thead><tr><th>ID</th><th>TYPE</th><th>STATE</th><th>TITLE</th><th>OWNER / SOURCE</th></tr></thead><tbody>${nodes.map(n=>`<tr data-selected="${String(n.id===s.selected)}"><td><button data-list-node="${n.id}">${n.n}</button></td><td>${n.kind}</td><td>${n.state}</td><td>${n.title}</td><td>${n.owner||'—'} · ${n.truth}</td></tr>`).join('')}</tbody></table>`;$$('[data-list-node]',target).forEach(b=>b.addEventListener('click',()=>selectNode(phase,b.dataset.listNode,true)))}
+function selectNode(phase,id,announce=false){phases[phase].selected=id;renderGraph(phase);if(announce){const n=nodeBy(phase,id);$('#liveRegion').textContent=`已选择 ${n.n} ${n.title}`}}
+function switchPhase(phase,{focus=true,selectReturn=false}={}){activePhase=phase;$$('[data-phase]').forEach(t=>{const on=t.dataset.phase===phase;t.setAttribute('aria-selected',String(on));t.tabIndex=on?0:-1});$('#panel-discovery').hidden=phase!=='discovery';$('#panel-delivery').hidden=phase!=='delivery';$('#laneSummary').hidden=phase!=='delivery';$('#returnBanner').hidden=phase!=='delivery';$('#evidenceStrip').hidden=phase!=='delivery';if(phase==='delivery'){$('#pulseKicker').textContent='STORY PULSE · DELIVERY PROJECTION';$('#pulseTitle').textContent='WEB QA 是当前必需 Lane 的最长剩余路径。';$('#pulseCopy').textContent='完成模拟 WEB QA 会解锁 WEB Review；模拟 CORE Review 可安全并行。Web 只读，不直接改变 Story。';$('#primaryAction').textContent='定位 WEB QA';$('#parallelAction').hidden=false;$('#bridgeFrom').innerHTML='<strong>真实设计依据</strong>#159 spec / ADR + 当前 dossier';$('#bridgeTo').innerHTML='<strong>SIM contract@2 → Delivery wave-2</strong><button id="returnLink">1 requires-decision return → Discovery</button>';$('#returnLink').addEventListener('click',()=>switchPhase('discovery',{selectReturn:true}))}else{$('#pulseKicker').textContent='STORY PULSE · DISCOVERY TRUTH';$('#pulseTitle').textContent='真实 #147 设计图已闭合；当前本地 prototype 仍待确认。';$('#pulseCopy').textContent='12 个子 Issue 全部 CLOSED；真实子图包含 7 条 native dependency。Delivery runtime 仍未连接。';$('#primaryAction').textContent='定位 #159 定稿';$('#parallelAction').hidden=true;$('#bridgeFrom').innerHTML='<strong>真实 Discovery terminal</strong>#159 spec + ADR · ISSUE COMMENT says delivered';$('#bridgeTo').innerHTML='<strong>SIM Delivery projection</strong><button id="returnLink">查看 requires-decision 回流说明</button>';$('#returnLink').addEventListener('click',showReturnExplanation);if(selectReturn){phases.discovery.selected='ISSUE-159';renderGraph('discovery');showReturnExplanation()}}if(focus)$(`#tab-${phase}`).focus();$('#liveRegion').textContent=`已切换到 ${phase==='discovery'?'Discovery Graph':'Delivery Graph'}`}
+function setView(phase,view){phases[phase].view=view;$(`#${phase}MapWrap`).hidden=view!=='map';$(`#${phase}List`).hidden=view!=='list';$$(`[data-view-toggle="${phase}"]`).forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.view===view)));if(view==='list')renderList(phase)}
+function openModal(kind){lastFocus=document.activeElement;const title=$('#modalTitle'),body=$('#modalBody');if(kind==='source'){title.textContent='Story Work Graph · 数据来源与边界';body.innerHTML=`<div class="source-block"><strong>ISSUE FACT · real tracker data</strong><p><code>https://github.com/parkth1026/parking-agents/issues/147</code></p><p>Root #147；12 native sub-issues；12 membership；7 descendant dependency；1 closure comment。root 0/0 不能外推为整个 descendant graph 0 edge。</p></div><div class="source-block"><strong>DOSSIER FACT · current design workflow</strong><p><code>1-interview/context.md · rounds.jsonl · manifest.json</code></p><p>2-prototype pending；WEB-P9 Map-first；WEB-P10 two tabs；P12 Runtime→Web 单向只读投影。</p></div><div class="source-block"><strong>SIMULATED GAP · delivery coverage</strong><p><code>design basis: spec §10 · ADR 0002–0004 · Q23–Q35 · P12 · WEB-P9–P11</code></p><p>所有 SIM-*、RepoLane、candidate、Receipt、Gate、owner、wave 和 next action 都是演练；真实 Delivery runtime 为 NOT_CONNECTED。</p></div>`}else if(kind==='evidence'){title.textContent='Evidence / Gate 对照 · 只读演练';body.innerHTML=`<div class="source-block"><strong>SIM-RCPT-W2-CORE-QA · FRESH</strong><p>subject: contract@2 + SIM-CORE-C2；profile digest match；可贡献 CORE QA Gate。</p></div><div class="source-block"><strong>SIM-RCPT-W1-WEB-QA · STALE</strong><p>subject: contract@1 + SIM-WEB-C1；contract 与 candidate 已变化；audit only；Gate contribution none。</p></div><div class="source-block"><strong>SIM-W2-WEB-QA · MISSING</strong><p>当前 WEB QA 仍 running；未生成 current Receipt；WEB Review blocked，WEB Lane Gate pending。</p></div><div class="source-block"><strong>Story acceptance · LOCKED</strong><p>WEB / CORE 两条 required RepoLane Gate 尚未全部 terminal；不得合成 Story done。</p></div>`}else{title.textContent='Delivery → Discovery 回流';body.innerHTML=`<div class="source-block"><strong>SIM-FINDING-01 · requires-decision</strong><p>演练：WEB QA 发现固定阶段表达会改变公共 Story 语义，因此 Delivery 不自动继续。</p></div><div class="source-block"><strong>SIM-D-REVISION-01 · Discovery decision</strong><p>返回 Discovery 重新裁决双 Tab Graph；修订 contract@2。</p></div><div class="source-block"><strong>Receipt freshness</strong><p>contract revision 后 wave-1 Receipt 全部 stale，保留审计但不能满足 wave-2 Gate。</p></div>`}$('#modalBackdrop').classList.add('open');title.focus()}
+function closeModal(){$('#modalBackdrop').classList.remove('open');lastFocus?.focus?.()}
+function showReturnExplanation(){openModal('return')}
+$$('[data-phase]').forEach(t=>{t.addEventListener('click',()=>switchPhase(t.dataset.phase));t.addEventListener('keydown',e=>{if(!['ArrowLeft','ArrowRight'].includes(e.key))return;e.preventDefault();switchPhase(t.dataset.phase==='discovery'?'delivery':'discovery')})});
+$$('[data-view-toggle]').forEach(b=>b.addEventListener('click',()=>setView(b.dataset.viewToggle,b.dataset.view)));
+$$('[data-filter]').forEach(b=>b.addEventListener('click',()=>{const p=b.dataset.filter;phases[p].filter=b.dataset.value;$$(`[data-filter="${p}"]`).forEach(x=>x.setAttribute('aria-pressed',String(x===b)));renderGraph(p)}));
+$('#membershipToggle').addEventListener('click',e=>{showMembership=!showMembership;e.currentTarget.setAttribute('aria-pressed',String(showMembership));renderGraph('discovery')});
+$('#progressionToggle').addEventListener('click',e=>{showProgression=!showProgression;e.currentTarget.setAttribute('aria-pressed',String(showProgression));renderGraph('discovery')});
+$('#discoveryFocus').addEventListener('click',e=>{phases.discovery.focus=!phases.discovery.focus;e.currentTarget.setAttribute('aria-pressed',String(phases.discovery.focus));renderGraph('discovery')});
+$('#deliveryFocus').addEventListener('click',e=>{phases.delivery.focus=!phases.delivery.focus;e.currentTarget.setAttribute('aria-pressed',String(phases.delivery.focus));renderGraph('delivery')});
+$('#searchDiscovery').addEventListener('input',e=>{phases.discovery.query=e.target.value;renderGraph('discovery')});$('#searchDelivery').addEventListener('input',e=>{phases.delivery.query=e.target.value;renderGraph('delivery')});
+$('#primaryAction').addEventListener('click',()=>{if(activePhase==='delivery'){phases.delivery.selected='SIM-W2-WEB-Q';renderGraph('delivery');$('#deliveryCanvas').scrollIntoView({block:'center'})}else{phases.discovery.selected='ISSUE-159';renderGraph('discovery');$('#discoveryCanvas').scrollIntoView({block:'center'})}});
+$('#parallelAction').addEventListener('click',()=>{switchPhase('delivery',{focus:false});phases.delivery.selected='SIM-W2-CORE-R';renderGraph('delivery')});
+$('#goDiscovery').addEventListener('click',()=>switchPhase('discovery',{selectReturn:true}));$('#sourceButton').addEventListener('click',()=>openModal('source'));$('#navButton').addEventListener('click',()=>openModal('source'));$('#evidenceButton').addEventListener('click',()=>openModal('evidence'));$('#modalClose').addEventListener('click',closeModal);$('#modalBackdrop').addEventListener('mousedown',e=>{if(e.target===$('#modalBackdrop'))closeModal()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('#modalBackdrop').classList.contains('open'))closeModal();if(e.key==='Tab'&&$('#modalBackdrop').classList.contains('open')){const f=$$('#modalBackdrop button:not([disabled]),#modalBackdrop [tabindex="-1"]');if(!f.length)return;const first=f[0],last=f.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}}});
+renderGraph('discovery');renderGraph('delivery');switchPhase('delivery',{focus:false});setView('discovery','map');setView('delivery','map');
+</script>
+<!-- v5 changed: two primary Graph tabs; real descendant dependencies; AES Console tokens; Map/List/selection share one read model; Web remains read-only.
+     unchanged: StoryRoot identity, truth provenance, stale Receipt semantics, fail-closed Gates, RepoLane reducer, Review/Evidence as second-level surfaces.
+     intentionally simulated: all Delivery runtime data because no implementation StoryRoot/RepoLane/Receipt/Gate is connected. -->
+</body>
+</html>

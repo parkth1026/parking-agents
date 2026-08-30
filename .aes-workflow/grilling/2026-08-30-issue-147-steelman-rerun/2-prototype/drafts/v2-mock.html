@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>已被 v3 取代 · workflow-story-map 人类状态工作台 v2</title>
+  <style>
+    :root {
+      --bg: #f3f5f8; --panel: #fff; --ink: #202433; --muted: #687086; --line: #dce1e9;
+      --accent: #eb6c36; --accent-soft: #fff1ea; --green: #26754e; --green-soft: #e9f5ee;
+      --amber: #8a5d12; --amber-soft: #fff4d8; --red: #a93636; --red-soft: #fdecec;
+      --blue: #315f92; --blue-soft: #eaf2fb; --purple: #6e4c91; --purple-soft: #f2ebf8;
+      --ui: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+      --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--ui); }
+    button { font: inherit; }
+    .app { min-height: 100vh; display: grid; grid-template-rows: auto auto 1fr; }
+    header { padding: 14px 22px; background: var(--panel); border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+    h1, h2, h3, p { margin: 0; }
+    h1 { font-size: 18px; } h2 { font-size: 15px; } h3 { font-size: 13px; }
+    .small { font-size: 11px; } .muted { color: var(--muted); } .mono { font-family: var(--mono); }
+    .top-meta, .tabs, .actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .pill, .badge { display: inline-flex; align-items: center; border-radius: 999px; padding: 4px 8px; font-size: 11px; font-weight: 650; }
+    .green { color: var(--green); background: var(--green-soft); } .amber { color: var(--amber); background: var(--amber-soft); }
+    .red { color: var(--red); background: var(--red-soft); } .blue { color: var(--blue); background: var(--blue-soft); }
+    .purple { color: var(--purple); background: var(--purple-soft); }
+    .button, .tab { border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--ink); padding: 7px 10px; cursor: pointer; }
+    .button.primary { background: var(--ink); border-color: var(--ink); color: #fff; }
+    .button:disabled { opacity: .45; cursor: not-allowed; }
+    .tab.active { color: #873b19; border-color: var(--accent); background: var(--accent-soft); }
+    .status-strip { padding: 12px 22px; display: grid; grid-template-columns: 1.25fr 1fr 1.3fr .8fr .8fr; gap: 10px; }
+    .status-card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 11px 12px; min-width: 0; }
+    .status-card strong { display: block; margin-top: 4px; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .changed { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .workspace { min-height: 0; display: grid; grid-template-columns: minmax(720px, 1.65fr) minmax(350px, .75fr); gap: 12px; padding: 0 22px 22px; }
+    .column { display: grid; align-content: start; gap: 12px; min-width: 0; }
+    .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+    .panel-head { min-height: 48px; padding: 11px 13px; display: flex; align-items: center; justify-content: space-between; gap: 10px; border-bottom: 1px solid var(--line); }
+    .panel-body { padding: 12px; }
+    .attention-list { display: grid; gap: 7px; }
+    .attention { width: 100%; display: grid; grid-template-columns: 72px minmax(180px, 1fr) minmax(180px, .9fr) 112px; gap: 10px; align-items: center; text-align: left; border: 1px solid var(--line); border-left: 4px solid var(--amber); border-radius: 6px; background: #fff; padding: 9px 10px; cursor: pointer; }
+    .attention:hover, .attention.selected { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+    .attention.p0 { border-left-color: var(--red); } .attention.p1 { border-left-color: var(--amber); }
+    .attention .why, .attention .next { font-size: 11px; line-height: 1.35; }
+    .attention .why { color: var(--muted); } .attention .next { color: var(--ink); }
+    .attention .owner { text-align: right; font-size: 11px; }
+    .lane-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    .lane-table th { color: var(--muted); font-weight: 600; text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); }
+    .lane-table td { padding: 9px 8px; border-bottom: 1px solid #edf0f4; vertical-align: top; }
+    .lane-table tr:last-child td { border-bottom: 0; }
+    .lane-table tr { cursor: pointer; } .lane-table tbody tr:hover { background: #fafbfc; }
+    .lane-name { font-weight: 700; font-size: 12px; }
+    .view { min-height: 280px; }
+    .queue { display: grid; grid-template-columns: repeat(5, minmax(132px, 1fr)); gap: 8px; overflow-x: auto; }
+    .queue-col { min-width: 132px; border: 1px solid var(--line); background: #fafbfc; border-radius: 6px; padding: 8px; }
+    .queue-title { display: flex; justify-content: space-between; gap: 6px; margin-bottom: 8px; font-size: 11px; font-weight: 700; }
+    .ticket { border: 1px solid var(--line); background: #fff; border-radius: 5px; padding: 8px; margin-top: 7px; font-size: 11px; cursor: pointer; }
+    .ticket:hover { border-color: var(--accent); }
+    .graph { display: none; min-height: 280px; position: relative; background: linear-gradient(#f6f7f9 1px, transparent 1px), linear-gradient(90deg,#f6f7f9 1px, transparent 1px); background-size: 24px 24px; padding: 18px; }
+    .graph.visible, .queue.visible { display: grid; }
+    .queue:not(.visible) { display: none; }
+    .graph-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; align-items: center; }
+    .graph-node { border: 1px solid #b9c1cf; background: #fff; border-radius: 6px; padding: 10px; min-height: 58px; box-shadow: 0 2px 8px rgba(32,36,51,.06); }
+    .graph-node.focus { border: 2px solid var(--accent); background: var(--accent-soft); }
+    .peek { position: sticky; top: 12px; }
+    .peek-block { padding: 12px 0; border-bottom: 1px solid var(--line); }
+    .peek-block:last-child { border-bottom: 0; }
+    .now-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin-top: 9px; }
+    .axis { border: 1px solid var(--line); border-radius: 5px; padding: 7px; }
+    .axis b { display: block; margin-top: 3px; font-size: 12px; }
+    .why-card { margin-top: 8px; padding: 9px; background: var(--red-soft); color: #742525; border-radius: 6px; font-size: 11px; line-height: 1.5; }
+    .next-card { margin-top: 8px; padding: 9px; background: var(--blue-soft); color: #254d74; border-radius: 6px; font-size: 11px; line-height: 1.5; }
+    .unlock { margin-top: 7px; color: var(--muted); font-size: 11px; }
+    .activity { display: grid; gap: 8px; }
+    .activity-item { display: grid; grid-template-columns: 48px 1fr; gap: 8px; font-size: 11px; }
+    .evidence { display: none; margin-top: 10px; padding: 9px; border: 1px solid var(--line); border-radius: 6px; background: #f8f9fb; font: 10px/1.5 var(--mono); }
+    .evidence.visible { display: block; }
+    @media (max-width: 1040px) {
+      .status-strip { grid-template-columns: 1fr 1fr; }
+      .workspace { grid-template-columns: 1fr; }
+      .peek { position: static; }
+      .attention { grid-template-columns: 64px 1fr; }
+      .attention .next, .attention .owner { grid-column: 2; text-align: left; }
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div><div class="small muted mono">StoryRoot story-147 · contract@4 · sha256:contract-v4</div><h1>workflow-story-map 状态工作台 v2（已被 v3 取代）</h1></div>
+    <div class="top-meta"><span class="pill amber">DRAFT · SUPERSEDED</span><span class="small muted">请查看 v3-product-prototype.html</span><button class="button" id="refresh">重放场景</button><button class="button">打开 Tracker</button></div>
+  </header>
+
+  <div class="status-strip">
+    <div class="status-card changed"><span class="small muted">NOW · Story 状态</span><strong>ACTIVE · NEEDS ATTENTION</strong><span class="small muted">2 个必需 RepoLane · 1 个降级</span></div>
+    <div class="status-card"><span class="small muted">WHY · 未完成</span><strong>3 个阻塞面</strong><span class="small muted">决策 1 · 人工 1 · degraded 1</span></div>
+    <div class="status-card"><span class="small muted">NEXT · 最高优先动作</span><strong>确认 API 公共行为</strong><span class="small muted">完成后解锁 4 张 Delivery 票</span></div>
+    <div class="status-card"><span class="small muted">必需 Lane Gate</span><strong>1 / 2</strong><span class="small muted">backend 已通过</span></div>
+    <div class="status-card"><span class="small muted">证据健康度</span><strong>9 valid · 2 stale</strong><span class="small muted">NOT_RUN 1</span></div>
+  </div>
+
+  <main class="workspace">
+    <div class="column">
+      <section class="panel changed">
+        <div class="panel-head"><div><h2>Action Center</h2><span class="small muted">只列会改变下一步的异常与人工动作，按阻塞面和解锁量排序</span></div><span class="badge red">3 需要处理</span></div>
+        <div class="panel-body attention-list">
+          <button class="attention p0 selected" data-item="decision"><span class="badge red">P0 决策</span><span><b>D17 · API 公共行为变化</b><span class="why">WHY：验收发现写接口需求，改变当前 Contract</span></span><span class="next"><b>NEXT：</b>选择保持只读或修订 Contract</span><span class="owner">owner: 你<br>解锁 4 tickets</span></button>
+          <button class="attention p0" data-item="degraded"><span class="badge red">P0 降级</span><span><b>I42 · Profile digest 不匹配</b><span class="why">WHY：expected profile-abc，checkout 为 profile-def</span></span><span class="next"><b>NEXT：</b>恢复精确 Registry 或回流创建替代票</span><span class="owner">owner: desktop<br>已暂停</span></button>
+          <button class="attention p1" data-item="human"><span class="badge amber">P1 人工</span><span><b>VIS-1..3 · Desktop 视觉验收</b><span class="why">WHY：AI 无法充分断言布局与交互观感</span></span><span class="next"><b>NEXT：</b>授权 visual_qa 完成 3 条 testcase</span><span class="owner">owner: visual QA<br>解锁 final gate</span></button>
+        </div>
+      </section>
+
+      <section class="panel changed">
+        <div class="panel-head"><div><h2>RepoLane Beacons</h2><span class="small muted">活跃、人工等待、blocked、degraded 的 Lane 永远常显</span></div><button class="button">全部 Lane</button></div>
+        <div class="panel-body" style="padding:0 12px 4px">
+          <table class="lane-table">
+            <thead><tr><th>RepoLane</th><th>精确 Subject</th><th>当前工作</th><th>Gate / Evidence</th><th>WHY</th><th>NEXT</th></tr></thead>
+            <tbody>
+              <tr data-item="degraded"><td><div class="lane-name">desktop</div><span class="badge red">DEGRADED</span></td><td class="mono">checkout c3<br>integration —</td><td>Wave 3 · I42<br>attempt-4 paused</td><td>7/9 valid<br>1 stale · 1 NOT_RUN</td><td>Profile digest mismatch</td><td>restore Registry<br>or replace ticket</td></tr>
+              <tr data-item="backend"><td><div class="lane-name">backend</div><span class="badge green">PASSED</span></td><td class="mono">checkout 7a31c2de<br>integration 91b0aa10</td><td>Wave 2 complete<br>no active attempt</td><td>full suite PASS<br>human N/A</td><td>无阻塞</td><td>等待 desktop<br>Story reducer</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head"><div><h2>WorkTicket 关系与队列</h2><span class="small muted">List 用于快速扫状态；Map 用于解释依赖和解锁关系</span></div><div class="tabs"><button class="tab active" data-view="list">List</button><button class="tab" data-view="map">Map</button><button class="button">搜索</button><button class="button">筛选 3</button></div></div>
+        <div class="panel-body view">
+          <div class="queue visible" id="list-view">
+            <div class="queue-col"><div class="queue-title"><span>待人工</span><span>1</span></div><div class="ticket" data-item="human"><b>VIS-1..3</b><br><span class="muted">visual QA checklist</span></div></div>
+            <div class="queue-col"><div class="queue-title"><span>阻塞 / 决策</span><span>1</span></div><div class="ticket" data-item="decision"><b>D17 API 行为</b><br><span class="muted">requires-decision</span></div></div>
+            <div class="queue-col"><div class="queue-title"><span>降级</span><span>1</span></div><div class="ticket" data-item="degraded"><b>I42 Desktop</b><br><span class="muted">profile mismatch</span></div></div>
+            <div class="queue-col"><div class="queue-title"><span>可启动</span><span>2</span></div><div class="ticket"><b>I48 Receipt UI</b><br><span class="muted">ready · unclaimed</span></div><div class="ticket"><b>Q43 Final QA</b><br><span class="muted">blocked by I42</span></div></div>
+            <div class="queue-col"><div class="queue-title"><span>已完成</span><span>7</span></div><div class="ticket" data-item="backend"><b>I41 Backend</b><br><span class="muted">integration passed</span></div></div>
+          </div>
+          <div class="graph" id="map-view">
+            <div class="graph-row"><div class="graph-node"><b>D12 Profile taxonomy</b><div class="small muted">closed · produces I42</div></div><div class="graph-node focus"><b>D17 API behavior</b><div class="small muted">requires-decision</div></div><div class="graph-node"><b>StoryRoot</b><div class="small muted">active · needs attention</div></div></div>
+            <div class="graph-row"><div class="graph-node"><b>I41 Backend</b><div class="small muted">integration passed</div></div><div class="graph-node focus"><b>I42 Desktop</b><div class="small muted">degraded · paused</div></div><div class="graph-node"><b>Q43 Final QA</b><div class="small muted">blocked by I42</div></div></div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <aside class="column">
+      <section class="panel peek">
+        <div class="panel-head"><div><h2 id="peek-title">D17 · API 公共行为变化</h2><span class="small muted">Peek · 一跳信息，不遮挡主工作台</span></div><span class="badge red" id="peek-badge">requires-decision</span></div>
+        <div class="panel-body">
+          <div class="peek-block"><h3>NOW</h3><div class="now-grid"><div class="axis"><span class="small muted">lifecycle</span><b id="life">active</b></div><div class="axis"><span class="small muted">control</span><b id="control">blocked</b></div><div class="axis"><span class="small muted">gate</span><b id="gate">needs-human</b></div></div></div>
+          <div class="peek-block"><h3>WHY</h3><div class="why-card" id="why">验收发现写接口需求；这会改变公共行为和当前 Contract，Delivery 无权自行吸收。</div><div class="unlock" id="unlock">阻塞：desktop Wave 3、Q43 final QA、Story done</div></div>
+          <div class="peek-block"><h3>NEXT</h3><div class="next-card" id="next">由 Story owner 选择保持只读，或进入 Discovery 修订 Contract。完成后 Core 自动重算受影响票与 stale receipts。</div><div class="actions" style="margin-top:10px"><button class="button primary" id="primary-action">回答决策</button><button class="button">打开 Ticket</button><button class="button" id="evidence-toggle">完整证据</button></div><div class="evidence" id="evidence">contract revision: 4<br>triggered by: acceptance receipt-A71<br>blocked tickets: I42, I48, Q43<br>subject receipts affected: 5<br>last transition: 16:21 requires-decision</div></div>
+          <div class="peek-block"><h3>最近变化</h3><div class="activity"><div class="activity-item"><span class="muted">12 秒</span><span>backend integration full suite PASS</span></div><div class="activity-item"><span class="muted">4 分钟</span><span>I42 进入 profile degraded</span></div><div class="activity-item"><span class="muted">9 分钟</span><span>acceptance 发现 API 行为变化</span></div></div></div>
+        </div>
+      </section>
+    </aside>
+  </main>
+</div>
+
+<script>
+  const detail = {
+    decision: {title:'D17 · API 公共行为变化', badge:'requires-decision', life:'active', control:'blocked', gate:'needs-human', why:'验收发现写接口需求；这会改变公共行为和当前 Contract，Delivery 无权自行吸收。', unlock:'阻塞：desktop Wave 3、Q43 final QA、Story done', next:'由 Story owner 选择保持只读，或进入 Discovery 修订 Contract。完成后 Core 自动重算受影响票与 stale receipts。', action:'回答决策'},
+    degraded: {title:'I42 · Profile digest 不匹配', badge:'degraded', life:'active', control:'paused', gate:'unknown', why:'票绑定 profile-abc，但当前 checkout 只能读取 profile-def。Core 无法重建测试、授权和关闭门禁。', unlock:'阻塞：I42 retry、evidence publish、desktop integration、Story done', next:'恢复 digest 精确匹配的 Repo Registry；否则回流 Discovery 创建替代票。旧票不原地迁移。', action:'查看恢复步骤'},
+    human: {title:'VIS-1..3 · Desktop 视觉验收', badge:'awaiting-human', life:'active', control:'paused', gate:'needs-human', why:'高度可视化交互无法由自动证据充分断言；Profile 要求 visual_qa capability 逐项签收。', unlock:'阻塞：desktop final gate、Q43 final QA、Story done', next:'完成 3 条 step/expected testcase，并为每条提交 evidence。Agent 不能代答。', action:'开始 checklist'},
+    backend: {title:'backend RepoLane', badge:'passed', life:'terminal', control:'unclaimed', gate:'passed', why:'integration 91b0aa10 上 full suite PASS；无人工 Gate。', unlock:'未阻塞其他票；正在等待所有 required RepoLane 合成。', next:'无需动作。保持 evidence 可用，等待 desktop lane。', action:'查看 Receipt'}
+  };
+  function selectItem(key) {
+    const d = detail[key] || detail.decision;
+    document.querySelectorAll('[data-item]').forEach(el => el.classList.toggle('selected', el.dataset.item === key && el.classList.contains('attention')));
+    document.getElementById('peek-title').textContent = d.title; document.getElementById('peek-badge').textContent = d.badge;
+    document.getElementById('life').textContent = d.life; document.getElementById('control').textContent = d.control; document.getElementById('gate').textContent = d.gate;
+    document.getElementById('why').textContent = d.why; document.getElementById('unlock').textContent = d.unlock; document.getElementById('next').textContent = d.next;
+    document.getElementById('primary-action').textContent = d.action; document.getElementById('evidence').classList.remove('visible');
+  }
+  document.querySelectorAll('[data-item]').forEach(el => el.addEventListener('click', () => selectItem(el.dataset.item)));
+  document.querySelectorAll('[data-view]').forEach(button => button.addEventListener('click', () => {
+    document.querySelectorAll('[data-view]').forEach(b => b.classList.toggle('active', b === button));
+    const map = button.dataset.view === 'map'; document.getElementById('list-view').classList.toggle('visible', !map); document.getElementById('map-view').classList.toggle('visible', map);
+  }));
+  document.getElementById('evidence-toggle').addEventListener('click', () => document.getElementById('evidence').classList.toggle('visible'));
+  document.getElementById('refresh').addEventListener('click', event => { event.target.textContent = '已刷新'; setTimeout(() => event.target.textContent = '立即刷新', 900); });
+</script>
+
+<!-- v2 新增/改变：Action Center；Now/Why/Next 首屏；RepoLane beacons；List/Map 双投影；peek→完整证据三级披露；freshness、stale、NOT_RUN 常显。
+不变：StoryRoot/RepoLane、三轴状态、typed command、Receipt/Gate 仍由同一 Core 投影；Web 不直接写真源、不管理 Agent/worktree/merge。 -->
+</body>
+</html>

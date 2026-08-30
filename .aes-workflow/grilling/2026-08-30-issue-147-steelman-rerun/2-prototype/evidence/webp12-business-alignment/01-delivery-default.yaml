@@ -1,0 +1,231 @@
+- generic [active] [ref=e1] [box=0,0,768,1793]:
+  - banner [ref=e2] [box=0,0,768,46]:
+    - button "打开来源导航" [ref=e3] [cursor=pointer] [box=14,7,46,31]: 导航
+    - generic [ref=e4] [box=70,12,90,22]: Story Atlas
+    - generic [ref=e6] [box=170,10,252,25]: "parkth1026/parking-agents · Story #147"
+    - button "查看来源" [ref=e7] [cursor=pointer] [box=432,7,70,31]
+  - main [ref=e8] [box=0,46,768,1747]:
+    - region [ref=e9] [box=10,64,748,241]:
+      - generic [ref=e10] [box=10,64,450,224]:
+        - generic [ref=e11] [box=10,64,450,12]: StoryRoot · current projection · read only
+        - heading "#147 · story 级全链条工作流整合设计" [level=1] [ref=e12] [box=10,81,450,28]
+        - generic [ref=e13] [box=10,120,450,53]:
+          - generic [ref=e14] [box=10,120,93,23]: TRACKER CLOSED
+          - generic [ref=e15] [box=110,120,98,23]: DISCOVERY 12/12
+          - generic [ref=e16] [box=215,120,120,23]: DELIVERY 0 VERIFIED
+          - generic [ref=e17] [box=10,150,153,23]: LOCAL 2-PROTOTYPE PENDING
+        - paragraph [ref=e18] [box=10,186,371,69]:
+          - strong [ref=e19] [box=23,196,147,12]: CURRENT ACTION SCOPE
+          - text: · 历史 tracker Story 已关闭；当前操作者正在核对本地 v5 对照物。Web 只读，领域事实由 Workflow / Skill 写入。
+      - complementary "数据真值边界" [ref=e20] [box=478,64,280,224]:
+        - generic [ref=e21] [box=491,75,254,12]: TRUTH BOUNDARY
+        - generic [ref=e22] [box=491,93,254,89]:
+          - strong [ref=e23] [box=491,93,105,12]: ISSUE FACT
+          - paragraph [ref=e24] [box=605,93,140,89]: "#147 + 12 native members + 7 descendant dependency；root 自身 blockedBy / blocking 为 0 / 0。"
+        - generic [ref=e25] [box=491,188,254,89]:
+          - strong [ref=e26] [box=491,188,105,12]: SIMULATED GAP
+          - paragraph [ref=e27] [box=605,188,140,89]: Delivery runtime 不存在；下方 Lane、Receipt、Gate、owner 与 wave 均由 spec / ADR / dossier 推演。
+    - region [ref=e28] [box=10,321,748,106]:
+      - generic [ref=e29] [box=25,334,426,80]:
+        - generic [ref=e30] [box=25,334,426,12]: STORY PULSE · DELIVERY PROJECTION
+        - heading "WEB QA 是当前必需 Lane 的最长剩余路径。" [level=2] [ref=e31] [box=25,349,426,25]
+        - paragraph [ref=e32] [box=25,377,426,37]: 完成模拟 WEB QA 会解锁 WEB Review；模拟 CORE Review 可安全并行。Web 只读，不直接改变 Story。
+      - generic [ref=e33] [box=465,356,278,36]:
+        - button "定位 WEB QA" [ref=e34] [cursor=pointer] [box=465,356,117,36]
+        - button "定位 CORE Review" [ref=e35] [cursor=pointer] [box=591,356,152,36]
+    - tablist "Story 两大阶段" [ref=e36] [box=10,441,748,62]:
+      - 'tab "Discovery Graph ISSUE FACT 12/12 closed · 7 native deps · real #148–#159" [ref=e37] [cursor=pointer] [box=10,441,370,62]':
+        - generic [ref=e38] [box=25,453,340,23]:
+          - text: Discovery Graph
+          - generic [ref=e39] [box=159,453,71,23]: ISSUE FACT
+        - generic [ref=e40] [box=25,479,340,13]: "12/12 closed · 7 native deps · real #148–#159"
+      - tab "Delivery Graph SIMULATED active · wave-2 · 2 required RepoLanes" [selected] [ref=e41] [cursor=pointer] [box=388,441,370,62]:
+        - generic [ref=e42] [box=403,453,340,23]:
+          - text: Delivery Graph
+          - generic [ref=e43] [box=525,453,67,23]: SIMULATED
+        - generic [ref=e44] [box=403,479,340,13]: active · wave-2 · 2 required RepoLanes
+    - region "跨图闭环" [ref=e45] [box=10,503,748,88]:
+      - generic [ref=e46] [box=23,520,344,53]:
+        - strong [ref=e47] [box=33,528,324,19]: 真实设计依据
+        - text: "#159 spec / ADR + 当前 dossier"
+      - generic [ref=e48] [box=377,536,14,22]: →
+      - generic [ref=e49] [box=401,513,344,67]:
+        - strong [ref=e50] [box=411,521,324,19]: SIM contract@2 → Delivery wave-2
+        - button "1 requires-decision return → Discovery" [ref=e51] [cursor=pointer] [box=497,540,238,32]
+    - tabpanel "Delivery Graph SIMULATED active · wave-2 · 2 required RepoLanes" [ref=e52] [box=10,591,748,872]:
+      - generic [ref=e53] [box=11,592,746,52]:
+        - generic [ref=e55] [box=38,600,382,35]:
+          - heading "Delivery Graph · 推演交付闭环" [level=2] [ref=e56] [box=38,600,382,22]
+          - paragraph [ref=e57] [box=38,622,382,12]: "SIMULATED GAP · design basis: spec §10, ADR 0002–0004, Q23–Q35, P12, WEB-P9–P11 · runtime NOT_CONNECTED"
+        - generic [ref=e58] [box=429,600,316,34]:
+          - searchbox "搜索 Delivery 节点" [ref=e59] [box=429,600,215,34]
+          - button "Map" [pressed] [ref=e60] [cursor=pointer] [box=650,602,46,31]
+          - button "List" [ref=e61] [cursor=pointer] [box=702,602,43,31]
+      - generic "Delivery 过滤" [ref=e62] [box=11,643,746,48]:
+        - button "全部 13" [pressed] [ref=e63] [cursor=pointer] [box=23,651,59,31]
+        - button "Frontier 2" [ref=e64] [cursor=pointer] [box=88,651,69,31]
+        - button "阻塞 / Gate 4" [ref=e65] [cursor=pointer] [box=163,651,86,31]
+        - button "WEB Lane" [ref=e66] [cursor=pointer] [box=256,651,75,31]
+        - button "CORE Lane" [ref=e67] [cursor=pointer] [box=336,651,81,31]
+        - button "一跳聚焦" [ref=e68] [cursor=pointer] [box=423,651,66,31]
+      - generic [ref=e70] [box=24,691,720,660]:
+        - generic [box=34,703,700,12]:
+          - generic [box=34,703,225,12]:
+            - strong [box=34,703,126,12]: SIM contract@2 · wave-2
+            - text: · projection only
+          - generic [box=514,703,220,12]: 2 required RepoLanes · acceptance locked
+        - generic [box=32,921,704,128]: SIM-LANE-WEB · required · owner SIM-WEB-Q
+        - generic [box=32,1073,704,128]: SIM-LANE-CORE · required · owner SIM-C3
+        - button "SIM-I01 passed Tracker Story index CORE · foundation" [ref=e71] [cursor=pointer] [box=44,773,150,83]:
+          - generic [ref=e72] [box=58,783,125,11]:
+            - generic [ref=e73] [box=58,783,37,11]: SIM-I01
+            - generic [ref=e74] [box=152,783,31,11]: passed
+          - generic [ref=e75] [box=58,799,125,30]: Tracker Story index
+          - generic [ref=e76] [box=58,833,125,13]: CORE · foundation
+        - button "SIM-I02 passed 双图 Story reducer CORE · contract@2" [ref=e77] [cursor=pointer] [box=219,773,150,76]:
+          - generic [ref=e78] [box=233,787,125,11]:
+            - generic [ref=e79] [box=233,787,37,11]: SIM-I02
+            - generic [ref=e80] [box=327,787,31,11]: passed
+          - generic [ref=e81] [box=233,803,125,15]: 双图 Story reducer
+          - generic [ref=e82] [box=233,822,125,13]: CORE · contract@2
+        - button "SIM-I05 passed Profile / Receipt / Gate CORE · deterministic projection" [ref=e83] [cursor=pointer] [box=394,773,150,96]:
+          - generic [ref=e84] [box=408,783,125,11]:
+            - generic [ref=e85] [box=408,783,37,11]: SIM-I05
+            - generic [ref=e86] [box=502,783,31,11]: passed
+          - generic [ref=e87] [box=408,799,125,30]: Profile / Receipt / Gate
+          - generic [ref=e88] [box=408,833,125,26]: CORE · deterministic projection
+        - button "SIM-I04 passed Projection Runtime CORE · one-way sync · read only" [ref=e89] [cursor=pointer] [box=569,773,150,96]:
+          - generic [ref=e90] [box=583,783,125,11]:
+            - generic [ref=e91] [box=583,783,37,11]: SIM-I04
+            - generic [ref=e92] [box=677,783,31,11]: passed
+          - generic [ref=e93] [box=583,799,125,30]: Projection Runtime
+          - generic [ref=e94] [box=583,833,125,26]: CORE · one-way sync · read only
+        - button "SIM-W01R passed 双 Tab Story Work Graph WEB · candidate SIM-WEB-C2" [ref=e95] [cursor=pointer] [box=44,949,150,96]:
+          - generic [ref=e96] [box=58,959,125,11]:
+            - generic [ref=e97] [box=58,959,42,11]: SIM-W01R
+            - generic [ref=e98] [box=152,959,31,11]: passed
+          - generic [ref=e99] [box=58,975,125,30]: 双 Tab Story Work Graph
+          - generic [ref=e100] [box=58,1009,125,26]: WEB · candidate SIM-WEB-C2
+        - button "SIM-W2-WEB-Q running WEB QA WEB · frontier · current subject" [pressed] [ref=e101] [cursor=pointer] [box=219,949,150,81]:
+          - generic [ref=e102] [box=233,959,125,11]:
+            - generic [ref=e103] [box=233,959,63,11]: SIM-W2-WEB-Q
+            - generic [ref=e104] [box=321,959,37,11]: running
+          - generic [ref=e105] [box=233,975,125,15]: WEB QA
+          - generic [ref=e106] [box=233,994,125,26]: WEB · frontier · current subject
+        - button "SIM-W2-WEB-R blocked WEB Review WEB · blocked by QA" [ref=e107] [cursor=pointer] [box=394,949,150,76]:
+          - generic [ref=e108] [box=408,963,125,11]:
+            - generic [ref=e109] [box=408,963,63,11]: SIM-W2-WEB-R
+            - generic [ref=e110] [box=496,963,37,11]: blocked
+          - generic [ref=e111] [box=408,979,125,15]: WEB Review
+          - generic [ref=e112] [box=408,998,125,13]: WEB · blocked by QA
+        - button "SIM-G-WEB pending WEB Lane Gate WEB · integration Gate" [ref=e113] [cursor=pointer] [box=569,949,150,76]:
+          - generic [ref=e114] [box=583,963,125,11]:
+            - generic [ref=e115] [box=583,963,47,11]: SIM-G-WEB
+            - generic [ref=e116] [box=671,963,37,11]: pending
+          - generic [ref=e117] [box=583,979,125,15]: WEB Lane Gate
+          - generic [ref=e118] [box=583,998,125,13]: WEB · integration Gate
+        - button "SIM-I06 passed RepoLane reducer CORE · integration target" [ref=e119] [cursor=pointer] [box=44,1101,150,81]:
+          - generic [ref=e120] [box=58,1111,125,11]:
+            - generic [ref=e121] [box=58,1111,37,11]: SIM-I06
+            - generic [ref=e122] [box=152,1111,31,11]: passed
+          - generic [ref=e123] [box=58,1127,125,15]: RepoLane reducer
+          - generic [ref=e124] [box=58,1146,125,26]: CORE · integration target
+        - button "SIM-W2-CORE-Q passed CORE QA CORE · fresh Receipt" [ref=e125] [cursor=pointer] [box=219,1101,150,76]:
+          - generic [ref=e126] [box=233,1115,125,11]:
+            - generic [ref=e127] [box=233,1115,68,11]: SIM-W2-CORE-Q
+            - generic [ref=e128] [box=327,1115,31,11]: passed
+          - generic [ref=e129] [box=233,1131,125,15]: CORE QA
+          - generic [ref=e130] [box=233,1150,125,13]: CORE · fresh Receipt
+        - button "SIM-W2-CORE-R ready CORE Review CORE · safe parallel frontier" [ref=e131] [cursor=pointer] [box=394,1101,150,81]:
+          - generic [ref=e132] [box=408,1111,125,11]:
+            - generic [ref=e133] [box=408,1111,68,11]: SIM-W2-CORE-R
+            - generic [ref=e134] [box=507,1111,26,11]: ready
+          - generic [ref=e135] [box=408,1127,125,15]: CORE Review
+          - generic [ref=e136] [box=408,1146,125,26]: CORE · safe parallel frontier
+        - button "SIM-G-CORE pending CORE Lane Gate CORE · integration Gate" [ref=e137] [cursor=pointer] [box=569,1101,150,76]:
+          - generic [ref=e138] [box=583,1115,125,11]:
+            - generic [ref=e139] [box=583,1115,52,11]: SIM-G-CORE
+            - generic [ref=e140] [box=671,1115,37,11]: pending
+          - generic [ref=e141] [box=583,1131,125,15]: CORE Lane Gate
+          - generic [ref=e142] [box=583,1150,125,13]: CORE · integration Gate
+        - button "SIM-A-ROOT locked Story acceptance reducer required Lane terminal" [ref=e143] [cursor=pointer] [box=309,1246,150,83]:
+          - generic [ref=e144] [box=323,1256,125,11]:
+            - generic [ref=e145] [box=323,1256,52,11]: SIM-A-ROOT
+            - generic [ref=e146] [box=417,1256,31,11]: locked
+          - generic [ref=e147] [box=323,1272,125,30]: Story acceptance reducer
+          - generic [ref=e148] [box=323,1306,125,13]: required Lane terminal
+      - generic [ref=e149] [box=11,1351,746,110]:
+        - generic [ref=e150] [box=11,1352,161,109]:
+          - generic [ref=e151] [box=23,1362,136,10]: NOW
+          - strong [ref=e152] [box=23,1376,136,37]: SIM-W2-WEB-Q · WEB QA
+          - generic [ref=e153] [box=23,1418,136,17]: 模拟 WEB QA 正在运行。
+        - generic [ref=e154] [box=172,1352,176,109]:
+          - generic [ref=e155] [box=184,1362,151,10]: WHY
+          - strong [ref=e156] [box=184,1376,151,19]: SIMULATED GAP
+          - generic [ref=e157] [box=184,1399,151,34]: 它是 WEB required Lane 的最长剩余路径。
+        - generic [ref=e158] [box=347,1352,117,109]:
+          - generic [ref=e159] [box=359,1362,92,10]: OWNER
+          - strong [ref=e160] [box=359,1376,92,19]: SIM-WEB-Q
+          - generic [ref=e161] [box=359,1399,92,17]: WEB Lane
+        - generic [ref=e162] [box=464,1352,146,109]:
+          - generic [ref=e163] [box=476,1362,121,10]: NEXT
+          - strong [ref=e164] [box=476,1376,121,37]: 完成当前 subject 的可视化与交互核对。
+          - generic [ref=e165] [box=476,1418,121,34]: Web projection is read only
+        - generic [ref=e166] [box=611,1352,146,109]:
+          - generic [ref=e167] [box=623,1362,122,10]: UNLOCKS / SOURCE
+          - strong [ref=e168] [box=623,1376,122,19]: WEB Review
+          - generic [ref=e169] [box=623,1399,122,34]: DERIVED simulation from Profile rules
+    - region "RepoLane 摘要" [ref=e170] [box=10,1475,748,108]:
+      - article [ref=e171] [box=10,1475,369,108]:
+        - generic [ref=e172] [box=11,1476,367,42]:
+          - generic [ref=e173] [box=22,1485,57,23]: SIM-WEB
+          - strong [ref=e174] [box=87,1487,118,19]: WEB Lane · required
+          - generic [ref=e175] [box=313,1485,55,23]: BLOCKED
+        - generic [ref=e176] [box=11,1518,367,64]:
+          - generic [ref=e177] [box=11,1518,92,64]:
+            - generic [ref=e178] [box=21,1527,71,10]: OWNER
+            - generic [ref=e179] [box=21,1540,71,16]: SIM-WEB-Q
+          - generic [ref=e180] [box=103,1518,92,64]:
+            - generic [ref=e181] [box=113,1527,71,10]: SUBJECT
+            - generic [ref=e182] [box=113,1540,71,16]: SIM-WEB-C2
+          - generic [ref=e183] [box=195,1518,92,64]:
+            - generic [ref=e184] [box=205,1527,71,10]: WORST GATE
+            - generic [ref=e185] [box=205,1540,71,33]: WEB Gate pending
+          - generic [ref=e186] [box=286,1518,92,64]:
+            - generic [ref=e187] [box=296,1527,72,10]: NEXT
+            - generic [ref=e188] [box=296,1540,72,33]: Finish WEB QA
+      - article [ref=e189] [box=389,1475,369,108]:
+        - generic [ref=e190] [box=390,1476,367,42]:
+          - generic [ref=e191] [box=401,1485,62,23]: SIM-CORE
+          - strong [ref=e192] [box=471,1487,125,19]: CORE Lane · required
+          - generic [ref=e193] [box=703,1485,44,23]: READY
+        - generic [ref=e194] [box=390,1518,367,64]:
+          - generic [ref=e195] [box=390,1518,92,64]:
+            - generic [ref=e196] [box=400,1527,71,10]: OWNER
+            - generic [ref=e197] [box=400,1540,71,16]: SIM-C3
+          - generic [ref=e198] [box=482,1518,92,64]:
+            - generic [ref=e199] [box=492,1527,71,10]: SUBJECT
+            - generic [ref=e200] [box=492,1540,71,16]: SIM-CORE-C2
+          - generic [ref=e201] [box=574,1518,92,64]:
+            - generic [ref=e202] [box=584,1527,71,10]: WORST GATE
+            - generic [ref=e203] [box=584,1540,71,33]: CORE Gate pending
+          - generic [ref=e204] [box=665,1518,92,64]:
+            - generic [ref=e205] [box=675,1527,72,10]: NEXT
+            - generic [ref=e206] [box=675,1540,72,33]: Start CORE Review
+    - generic [ref=e207] [box=10,1594,748,82]:
+      - generic [ref=e208] [box=23,1606,492,58]:
+        - strong [ref=e209] [box=23,1610,298,14]: REQUIRES-DECISION RETURN · 1 simulated finding
+        - paragraph [ref=e210] [box=23,1630,492,34]: 若 WEB QA 发现会改变公共承诺的差异，Delivery 停止推进并回到 Discovery 生成 decision ticket；contract revision 后旧 Receipt 变 stale。
+      - button "去 Discovery Graph 查看回流" [ref=e211] [cursor=pointer] [box=527,1617,218,36]
+    - region "当前证据与 Gate" [ref=e212] [box=10,1688,748,67]:
+      - generic [ref=e213] [box=11,1689,203,65]:
+        - strong [ref=e214] [box=23,1700,178,17]: FRESH · CORE QA Receipt
+        - generic [ref=e215] [box=23,1721,178,22]: SIM-RCPT-W2-CORE-QA · contributes to CORE Gate
+      - generic [ref=e216] [box=214,1689,203,65]:
+        - strong [ref=e217] [box=226,1700,178,17]: STALE · wave-1 WEB Receipt
+        - generic [ref=e218] [box=226,1721,178,22]: SIM-RCPT-W1-WEB-QA · audit only · Gate contribution none
+      - generic [ref=e219] [box=418,1689,203,65]:
+        - strong [ref=e220] [box=430,1700,178,17]: MISSING · WEB QA Receipt
+        - generic [ref=e221] [box=430,1721,178,22]: current subject SIM-WEB-C2 · WEB Gate stays pending
+      - button "打开证据对照" [ref=e223] [cursor=pointer] [box=633,1704,112,36]
+    - generic [ref=e224] [box=10,1755,1,1]: 已切换到 Delivery Graph

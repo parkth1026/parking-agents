@@ -1,0 +1,36 @@
+{
+  "scope": "v6 business logic prototype drafts",
+  "status": "PASS_WITH_OPEN_DECISION",
+  "open_decision": "OPEN-1 optional RepoLane terminal semantics",
+  "markdown": {
+    "api_json_blocks": 11,
+    "json_parse_failures": 0,
+    "draft_metadata_files": 5,
+    "draft_metadata_valid": 5
+  },
+  "diagram_overview": {
+    "scripts": 0,
+    "external_resources": 0,
+    "horizontal_overflow_px": 0,
+    "svg_views": [
+      {"name": "architecture", "nodes": 8, "edges": 9, "title": true, "aria_labelledby": true, "visible_fidelity_ledger": true},
+      {"name": "closed-loop flow", "nodes": 9, "edges": 9, "title": true, "aria_labelledby": true, "visible_fidelity_ledger": true}
+    ]
+  },
+  "diagram_detail": {
+    "scripts": 0,
+    "external_resources": 0,
+    "horizontal_overflow_px": 0,
+    "nodes": 9,
+    "edges": 11,
+    "title": true,
+    "aria_labelledby": true,
+    "visible_fidelity_ledger": true
+  },
+  "runtime_claims": {
+    "real_delivery": "NOT_CONNECTED",
+    "current_web": "not built",
+    "product_implementation": "not implemented"
+  },
+  "browser_note": "The only console error during local HTTP capture was a missing favicon.ico; the self-contained diagram documents loaded and rendered without script/runtime errors."
+}

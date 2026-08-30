@@ -1,0 +1,200 @@
+{
+  "viewport": "768x1080",
+  "captures": {
+    "v3Current": {
+      "metrics": {
+        "viewport": [
+          768,
+          1080
+        ],
+        "document": [
+          768,
+          768,
+          1080
+        ],
+        "visibleLeafTextBelow12": 78,
+        "buttons": 21,
+        "headings": [
+          "story 级全链条工作流整合设计",
+          "本次 workflow-story-map 重设计尚未确认；#147 原 Map 本身已关闭。",
+          "完成事实",
+          "当前重新设计工作",
+          "Provenance Ledger"
+        ]
+      },
+      "data": {
+        "mode": "issue",
+        "issueTitle": "",
+        "stageCount": 12,
+        "summary": "GitHub Issue 快照 + 本地 dossier；Repo runtime 未连接；当前视图 0 条模拟记录。"
+      }
+    },
+    "v3Scenario": {
+      "metrics": {
+        "viewport": [
+          768,
+          1080
+        ],
+        "document": [
+          768,
+          768,
+          1080
+        ],
+        "visibleLeafTextBelow12": 95,
+        "buttons": 41,
+        "headings": [
+          "SIM-XREPO-001 · 跨 RepoLane 异常交付演练",
+          "SIM-DESKTOP 已暂停；需要处理模拟 API 决策。",
+          "需要处理",
+          "RepoLane 轨道",
+          "SIM-D17 · API 公共行为"
+        ]
+      },
+      "data": {
+        "mode": "scenario",
+        "pulse": "SIM-DESKTOP 已暂停；需要处理模拟 API 决策。",
+        "stageCount": 6,
+        "parallel": "恢复 SIM-DESKTOP 执行规则\nSIMULATED · 与 SIM-D17 无写冲突\nSCENARIO"
+      }
+    },
+    "v3Map": {
+      "metrics": {
+        "viewport": [
+          768,
+          1080
+        ],
+        "document": [
+          768,
+          768,
+          1080
+        ],
+        "visibleLeafTextBelow12": 80,
+        "buttons": 44,
+        "headings": [
+          "SIM-XREPO-001 · 跨 RepoLane 异常交付演练",
+          "SIM-DESKTOP 已暂停；需要处理模拟 API 决策。",
+          "SIM-D17 · API 是否保持只读",
+          "SIM-D17 · API 公共行为"
+        ]
+      },
+      "data": {
+        "view": "map",
+        "nodes": 6,
+        "mapText": "requires\nverifies\nSIM-STORY-001\nactive · SIM-contract-r4\nSIM-BACKEND\nscenario integration PASS\nSIM-D17 API 决策\nrequires-decision\nSIM-DESKTOP\ndegraded · paused\nSIM-VISUAL-QA\nawaiting assumed actor\nSIM-FINAL-GATE\nblocked by SIM-DESKTOP"
+      }
+    },
+    "v4Current": {
+      "metrics": {
+        "viewport": [
+          768,
+          1080
+        ],
+        "document": [
+          768,
+          768,
+          1080
+        ],
+        "visibleLeafTextBelow12": 97,
+        "buttons": 37,
+        "headings": [
+          "#147 · story 级全链条工作流整合设计",
+          "当前本地重新设计工作",
+          "verified DeliveryMap nodes",
+          "ISSUE-147 · story 级全链条工作流整合设计",
+          "Story / Map"
+        ]
+      },
+      "data": {
+        "dataset": "current",
+        "view": "map",
+        "nodes": 13,
+        "fixedStageCount": 0,
+        "discovery": "12 nodes",
+        "delivery": "0 verified nodes"
+      }
+    },
+    "v4Scenario": {
+      "metrics": {
+        "viewport": [
+          768,
+          1080
+        ],
+        "document": [
+          768,
+          768,
+          1080
+        ],
+        "visibleLeafTextBelow12": 111,
+        "buttons": 41,
+        "headings": [
+          "SIM-STORY-001 · 跨 RepoLane 动态交付",
+          "SIM-W2-WEB-Q · WEB QA",
+          "Story / Map"
+        ]
+      },
+      "data": {
+        "dataset": "scenario",
+        "view": "map",
+        "nodes": 18,
+        "frontier": [
+          "SIM-W2-WEB-Q",
+          "SIM-W2-CORE-R"
+        ],
+        "loopbacks": 1,
+        "summary": "NEXT · SIM-W2-WEB-Q 正在运行；SIM-W2-CORE-R 可安全并行。"
+      }
+    }
+  },
+  "interactions": [
+    {
+      "type": "pointer",
+      "before": {
+        "selector": "[data-mode=\"scenario\"]",
+        "text": "模拟异常演练",
+        "rect": {
+          "x": 639,
+          "y": 51,
+          "width": 98,
+          "height": 44
+        },
+        "visible": true,
+        "selected": "false"
+      }
+    },
+    {
+      "type": "pointer",
+      "before": {
+        "selector": "[data-view=\"map\"]",
+        "text": "依赖地图",
+        "rect": {
+          "x": 98,
+          "y": 440.046875,
+          "width": 78,
+          "height": 44
+        },
+        "visible": true,
+        "selected": "false"
+      }
+    },
+    {
+      "type": "pointer",
+      "before": {
+        "selector": "[data-dataset=\"scenario\"]",
+        "text": "SIM 动态双图",
+        "rect": {
+          "x": 655.71875,
+          "y": 167.4375,
+          "width": 94.28125,
+          "height": 40
+        },
+        "visible": true,
+        "selected": "false"
+      }
+    }
+  ],
+  "consoleErrors": [],
+  "accessibility": {
+    "unnamedButtons": 0,
+    "nodeCount": 530
+  }
+}

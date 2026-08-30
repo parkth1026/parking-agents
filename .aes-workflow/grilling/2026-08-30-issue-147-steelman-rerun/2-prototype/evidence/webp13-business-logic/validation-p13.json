@@ -1,0 +1,92 @@
+{
+  "checked_at": "2026-08-30T16:04:26.0804260Z",
+  "scope": "P13 documentation and fixture consistency; bounded next-wave/draft-publication corrections; browser rendering only",
+  "status": "STRUCTURE_CHECKS_PASSED_AWAITING_USER_CONFIRMATION",
+  "json_blocks": 13,
+  "checks": {
+    "optional_does_not_enter_required_set": true,
+    "required_results_are_passed": true,
+    "optional_gate_not_rewritten": true,
+    "done_preserves_optional_debt": true,
+    "debt_has_owner_reason_impact_recovery": true,
+    "web_remains_read_only": true,
+    "p13_present:v6-business-behavior.md": true,
+    "still_draft:v6-business-behavior.md": true,
+    "no_pending_open1:v6-business-behavior.md": true,
+    "p13_present:v6-business-api-mock.md": true,
+    "still_draft:v6-business-api-mock.md": true,
+    "no_pending_open1:v6-business-api-mock.md": true,
+    "p13_present:v6-business-example-run.md": true,
+    "still_draft:v6-business-example-run.md": true,
+    "no_pending_open1:v6-business-example-run.md": true,
+    "p13_present:v6-business-diagram.html": true,
+    "still_draft:v6-business-diagram.html": true,
+    "no_pending_open1:v6-business-diagram.html": true,
+    "p13_present:v6-business-diagram-detail.html": true,
+    "still_draft:v6-business-diagram-detail.html": true,
+    "no_pending_open1:v6-business-diagram-detail.html": true,
+    "no_scripts_or_external_assets:v6-business-diagram.html": true,
+    "no_scripts_or_external_assets:v6-business-diagram-detail.html": true,
+    "p13_recorded_once": true,
+    "prototype_gate_unchanged": true,
+    "no_confirmed_root_files": true,
+    "no_v6_web": true,
+    "draft_revision_does_not_claim_published_replacement": true,
+    "contract_unchanged_finding_returns_to_next_wave": true
+  },
+  "failed": [],
+  "diagrams": [
+    {
+      "file": "v6-business-diagram.html",
+      "views": [
+        {
+          "nodes": 8,
+          "edges": 9
+        },
+        {
+          "nodes": 8,
+          "edges": 9
+        }
+      ]
+    },
+    {
+      "file": "v6-business-diagram-detail.html",
+      "views": [
+        {
+          "nodes": 9,
+          "edges": 11,
+          "within_node_edge_budget": true
+        }
+      ]
+    }
+  ],
+  "artifact_hashes": [
+    {
+      "file": "v6-business-behavior.md",
+      "sha256": "2864903557b766e8b18aaf7cc808d531dcb25845662a8743af51e148cf85174a"
+    },
+    {
+      "file": "v6-business-api-mock.md",
+      "sha256": "cbef2951b349f9d211556a9d87fad153a4239b56331c5f2f05da75e927e603ee"
+    },
+    {
+      "file": "v6-business-example-run.md",
+      "sha256": "84737467760f7e79c702c37ead39b62127d7e607cbc070da0721cc84507e3135"
+    },
+    {
+      "file": "v6-business-diagram.html",
+      "sha256": "690eaabbeeb0a25f2c5a3677801f81eb0d050bc06a8f32b015060c9876970c7e"
+    },
+    {
+      "file": "v6-business-diagram-detail.html",
+      "sha256": "fdcc3426e60312c3d964004471df2fd2a466258dbb15dddb11febd14d9ad9721"
+    }
+  ],
+  "business_artifacts_confirmed": false,
+  "web_artifact_confirmed": false,
+  "browser_retest": "Fresh captures inspected this turn: p13-overview.png (1200x1700), p13-detail.png (1200x1000). Console 0 errors, 0 warnings. Not a full visual/accessibility or domain-runtime conformance test.",
+  "product_runtime": "NOT_CONNECTED",
+  "production_tests": "NOT_RUN; no product implementation",
+  "bundle_digest": "sha256:91a444cfc3099dc56c72e8e076aa98f527e47751d31af91e9c099be6a870fdb7",
+  "supersedes_validation_claims_for_current_files": "validation-results.json is retained as historical evidence; do not apply its file revision claims to edited drafts."
+}

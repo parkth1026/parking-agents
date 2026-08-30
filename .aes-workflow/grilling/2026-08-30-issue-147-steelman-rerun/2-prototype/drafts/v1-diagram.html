@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>workflow-story-map 新版架构与流程草稿</title>
+  <style>
+    :root {
+      --paper: #f5f5f5;
+      --ink: #2d3142;
+      --muted: #4f5d75;
+      --soft: #7a8399;
+      --accent: #eb6c36;
+      --accent-tint: #fdf1ec;
+      --chip: #eef1f6;
+      --chip-changed: #f7dfd3;
+      --font-ui: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+      --font-mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--font-ui); }
+    main { width: min(1040px, calc(100% - 32px)); margin: 32px auto 48px; }
+    header, section, footer { background: #fff; border: 1px solid #d8dce5; border-radius: 8px; }
+    header { padding: 24px 28px; }
+    h1 { margin: 0 0 8px; font-size: 24px; }
+    h2 { margin: 0 0 8px; font-size: 20px; }
+    p { margin: 8px 0; line-height: 1.6; }
+    .eyebrow { color: var(--soft); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }
+    .legend { display: flex; gap: 24px; color: var(--muted); font-size: 12px; }
+    .legend span::before { content: ""; display: inline-block; width: 12px; height: 12px; margin-right: 8px; vertical-align: -2px; border-radius: 2px; background: #fff; border: 2px solid var(--muted); }
+    .legend .changed::before { background: var(--accent-tint); border-color: var(--accent); }
+    section { margin-top: 20px; padding: 24px; overflow-x: auto; }
+    svg { display: block; width: 100%; min-width: 880px; height: auto; margin-top: 16px; background: var(--paper); border-radius: 8px; }
+    .node { fill: #fff; stroke: var(--muted); stroke-width: 1.25; }
+    .node.changed { fill: var(--accent-tint); stroke: var(--accent); stroke-width: 2; }
+    .chip { fill: var(--chip); }
+    .chip.changed { fill: var(--chip-changed); }
+    .edge { fill: none; stroke: var(--muted); stroke-width: 1.5; }
+    .edge.changed { stroke: var(--accent); stroke-width: 1.75; }
+    .title { fill: var(--ink); font: 600 12px var(--font-ui); }
+    .sub { fill: var(--muted); font: 9px var(--font-mono); }
+    .type { fill: var(--muted); font: 8px var(--font-mono); letter-spacing: 1px; }
+    .type.changed { fill: var(--accent); }
+    .edge-label { fill: var(--muted); font: 8px var(--font-mono); }
+    .edge-label.changed { fill: var(--accent); }
+    .mask { fill: var(--paper); }
+    .ledger { margin-top: 16px; padding: 16px; background: #f8f9fb; border-left: 4px solid var(--muted); font-size: 12px; line-height: 1.55; }
+    .ledger strong { color: var(--ink); }
+    footer { margin-top: 20px; padding: 20px 24px; color: var(--muted); font-size: 12px; }
+    code { font-family: var(--font-mono); }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="eyebrow">draft v1 · superseded by v2-diagram.html</div>
+    <h1>workflow-story-map 新版架构与流程</h1>
+    <p>改后态单视图。橙 = 本次新增/变更，灰 = 既有边界（不动）。</p>
+    <div class="legend"><span class="changed">新增或改变的领域边界</span><span>复用的既有组件与依赖</span></div>
+  </header>
+
+  <section>
+    <h2>架构视图：薄 Core 只组合协议，不拥有执行资源</h2>
+    <p>重点质疑：StoryRoot/RepoLane 的归属、Profile/Gate 的权威位置，以及 Core 到 Router 的依赖方向。</p>
+    <svg viewBox="0 0 960 400" role="img" aria-labelledby="arch-title arch-desc">
+      <title id="arch-title">workflow-story-map 新版架构</title>
+      <desc id="arch-desc">Web 通过薄 Core 读取 tracker 与 repo 事实；StoryRoot 聚合多个 RepoLane；ProfileRegistry 和 Gate Projector 提供确定性规则；Router 通过 ExecutionAdapter 选择外部执行载体。</desc>
+      <defs>
+        <marker id="arch-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4f5d75"/></marker>
+        <marker id="arch-arrow-accent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#eb6c36"/></marker>
+      </defs>
+
+      <!-- 连线先画 -->
+      <path class="edge" d="M 192,100 H 252" marker-end="url(#arch-arrow)"/>
+      <path class="edge" d="M 352,136 V 228" marker-end="url(#arch-arrow)"/>
+      <path class="edge" d="M 192,268 H 252" marker-end="url(#arch-arrow)"/>
+      <path class="edge" d="M 508,100 H 452" marker-end="url(#arch-arrow)"/>
+      <path class="edge" d="M 448,268 H 508" marker-end="url(#arch-arrow)"/>
+      <path class="edge" d="M 448,100 H 480 Q 488,100 488,108 V 260 Q 488,268 496,268 H 508" marker-end="url(#arch-arrow)"/>
+      <path class="edge" d="M 764,100 H 708" marker-end="url(#arch-arrow)"/>
+      <path class="edge" d="M 704,268 H 764" marker-end="url(#arch-arrow)"/>
+      <path class="edge" d="M 848,232 V 140" marker-end="url(#arch-arrow)"/>
+
+      <rect class="mask" x="204" y="80" width="40" height="12"/><text class="edge-label" x="224" y="89" text-anchor="middle">typed</text>
+      <rect class="mask" x="456" y="76" width="48" height="12"/><text class="edge-label" x="480" y="85" text-anchor="middle">规则读取</text>
+      <rect class="mask" x="716" y="248" width="40" height="12"/><text class="edge-label" x="736" y="257" text-anchor="middle">route</text>
+
+      <!-- 节点后画 -->
+      <g><rect class="node" x="32" y="64" width="160" height="72" rx="6"/><rect class="chip" x="40" y="72" width="40" height="12" rx="2"/><text class="type" x="60" y="81" text-anchor="middle">WEB</text><text class="title" x="112" y="104" text-anchor="middle">Web 分层 Graph</text><text class="sub" x="112" y="120" text-anchor="middle">投影 + 白名单命令</text></g>
+      <g><rect class="node" x="256" y="64" width="192" height="72" rx="6"/><rect class="chip" x="264" y="72" width="40" height="12" rx="2"/><text class="type" x="284" y="81" text-anchor="middle">CORE</text><text class="title" x="352" y="104" text-anchor="middle">workflow-story-map Core</text><text class="sub" x="352" y="120" text-anchor="middle">协议 · 路由 · 确定性投影</text></g>
+      <g><rect class="node changed" x="512" y="64" width="192" height="72" rx="6"/><rect class="chip changed" x="520" y="72" width="64" height="12" rx="2"/><text class="type changed" x="552" y="81" text-anchor="middle">CHANGED</text><text class="title" x="608" y="104" text-anchor="middle">ProfileRegistry + Gate</text><text class="sub" x="608" y="120" text-anchor="middle">版本规则 · risk · receipts · auth</text></g>
+      <g><rect class="node" x="768" y="64" width="160" height="72" rx="6"/><rect class="chip" x="776" y="72" width="40" height="12" rx="2"/><text class="type" x="796" y="81" text-anchor="middle">REPO</text><text class="title" x="848" y="104" text-anchor="middle">Repo / Git Evidence</text><text class="sub" x="848" y="120" text-anchor="middle">contract · artifact · receipt</text></g>
+
+      <g><rect class="node" x="32" y="232" width="160" height="72" rx="6"/><rect class="chip" x="40" y="240" width="56" height="12" rx="2"/><text class="type" x="68" y="249" text-anchor="middle">TRACKER</text><text class="title" x="112" y="272" text-anchor="middle">GitHub / GitLab Adapter</text><text class="sub" x="112" y="288" text-anchor="middle">成员 · 控制索引 · ack</text></g>
+      <g><rect class="node changed" x="256" y="232" width="192" height="72" rx="6"/><rect class="chip changed" x="264" y="240" width="64" height="12" rx="2"/><text class="type changed" x="296" y="249" text-anchor="middle">CHANGED</text><text class="title" x="352" y="272" text-anchor="middle">StoryRoot + RepoLane</text><text class="sub" x="352" y="288" text-anchor="middle">DiscoveryMap · DeliveryMap</text></g>
+      <g><rect class="node" x="512" y="232" width="192" height="72" rx="6"/><rect class="chip" x="520" y="240" width="56" height="12" rx="2"/><text class="type" x="548" y="249" text-anchor="middle">ROUTER</text><text class="title" x="608" y="272" text-anchor="middle">Router + ExecutionAdapter</text><text class="sub" x="608" y="288" text-anchor="middle">capability 选载体</text></g>
+      <g><rect class="node" x="768" y="232" width="160" height="72" rx="6"/><rect class="chip" x="776" y="240" width="48" height="12" rx="2"/><text class="type" x="800" y="249" text-anchor="middle">CARRIER</text><text class="title" x="848" y="272" text-anchor="middle">Harness / Agent / Human</text><text class="sub" x="848" y="288" text-anchor="middle">board · manual · external</text></g>
+    </svg>
+    <div class="ledger"><strong>Fidelity ledger</strong><br>Detail: balanced · 源 = 8 类架构职责 → 绘制 8 节点 / 9 边<br>Merged: ProfileRegistry、GateCatalog、Gate projector 合为“ProfileRegistry + Gate”，因为三者共同拥有声明规则到投影的边界<br>Collapsed: GitHub/GitLab 两 adapter 合为 tracker 节点；各类 harness/subagent/Task/human 合为 carrier 节点<br>Dropped: JSON 字段、具体状态枚举、目录布局与网络传输；这些不改变拓扑<br>Kept in full: tracker/repo 分治、StoryRoot/RepoLane、Profile/Gate、Router/Adapter 四条难逆边界</div>
+  </section>
+
+  <section>
+    <h2>流程视图：Delivery 自动收敛与保守回流</h2>
+    <p>变化行来源：B3、B4、B10、B12、B17。主线向右；两条回流分别进入下一 Delivery wave 或回到 Discovery。</p>
+    <svg viewBox="0 0 960 336" role="img" aria-labelledby="flow-title flow-desc">
+      <title id="flow-title">workflow-story-map Delivery wave 流程</title>
+      <desc id="flow-desc">Discovery 冻结 contract 后进入 Delivery wave，执行与验证完成后由 change classifier 判断自动进入下一 wave、回流 Discovery 或进入最终 integration gates，全部必需 RepoLane 通过后 Story done。</desc>
+      <defs>
+        <marker id="flow-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4f5d75"/></marker>
+        <marker id="flow-arrow-accent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#eb6c36"/></marker>
+      </defs>
+
+      <path class="edge" d="M 152,120 H 180" marker-end="url(#flow-arrow)"/>
+      <path class="edge" d="M 312,120 H 340" marker-end="url(#flow-arrow)"/>
+      <path class="edge" d="M 472,120 H 500" marker-end="url(#flow-arrow)"/>
+      <path class="edge" d="M 632,120 H 660" marker-end="url(#flow-arrow)"/>
+      <path class="edge" d="M 792,120 H 820" marker-end="url(#flow-arrow)"/>
+      <path class="edge changed" d="M 544,156 V 200 Q 544,208 536,208 H 256 Q 248,208 248,200 V 160" marker-end="url(#flow-arrow-accent)"/>
+      <path class="edge changed" d="M 592,156 V 244 Q 592,252 584,252 H 96 Q 88,252 88,244 V 160" marker-end="url(#flow-arrow-accent)"/>
+
+      <rect class="mask" x="636" y="96" width="20" height="12"/><text class="edge-label" x="646" y="105" text-anchor="middle">完成</text>
+      <rect class="mask" x="352" y="188" width="88" height="12"/><text class="edge-label changed" x="396" y="197" text-anchor="middle">Contract 不变</text>
+      <rect class="mask" x="304" y="232" width="104" height="12"/><text class="edge-label changed" x="356" y="241" text-anchor="middle">改变承诺 / 不确定</text>
+
+      <g><rect class="node" x="24" y="84" width="128" height="72" rx="6"/><rect class="chip" x="32" y="92" width="56" height="12" rx="2"/><text class="type" x="60" y="101" text-anchor="middle">DISCOVERY</text><text class="title" x="88" y="124" text-anchor="middle">冻结 Contract</text><text class="sub" x="88" y="140" text-anchor="middle">变化行 B4</text></g>
+      <g><rect class="node" x="184" y="84" width="128" height="72" rx="6"/><rect class="chip" x="192" y="92" width="48" height="12" rx="2"/><text class="type" x="216" y="101" text-anchor="middle">DELIVERY</text><text class="title" x="248" y="124" text-anchor="middle">当前 Wave</text><text class="sub" x="248" y="140" text-anchor="middle">变化行 B3</text></g>
+      <g><rect class="node" x="344" y="84" width="128" height="72" rx="6"/><rect class="chip" x="352" y="92" width="44" height="12" rx="2"/><text class="type" x="374" y="101" text-anchor="middle">EXECUTE</text><text class="title" x="408" y="124" text-anchor="middle">实现 + 有效验证</text><text class="sub" x="408" y="140" text-anchor="middle">变化行 B10/B12</text></g>
+      <g><rect class="node changed" x="504" y="84" width="128" height="72" rx="6"/><rect class="chip changed" x="512" y="92" width="64" height="12" rx="2"/><text class="type changed" x="544" y="101" text-anchor="middle">CHANGED</text><text class="title" x="568" y="124" text-anchor="middle">Change Classifier</text><text class="sub" x="568" y="140" text-anchor="middle">自动继续 / 回流</text></g>
+      <g><rect class="node changed" x="664" y="84" width="128" height="72" rx="6"/><rect class="chip changed" x="672" y="92" width="64" height="12" rx="2"/><text class="type changed" x="704" y="101" text-anchor="middle">CHANGED</text><text class="title" x="728" y="124" text-anchor="middle">Integration Gates</text><text class="sub" x="728" y="140" text-anchor="middle">每个必需 RepoLane</text></g>
+      <g><rect class="node" x="824" y="84" width="112" height="72" rx="6"/><rect class="chip" x="832" y="92" width="40" height="12" rx="2"/><text class="type" x="852" y="101" text-anchor="middle">STORY</text><text class="title" x="880" y="124" text-anchor="middle">Done / Waiver</text><text class="sub" x="880" y="140" text-anchor="middle">变化行 B17</text></g>
+    </svg>
+    <div class="ledger"><strong>Fidelity ledger</strong><br>Detail: balanced · 源 = behavior 变化行 B3/B4/B10/B12/B17 → 绘制 6 节点 / 7 边<br>Merged: 实现、session 验证、receipt 失效合并为“实现 + 有效验证”，因为它们在 classifier 前同进同出<br>Collapsed: 多 RepoLane 的并行 integration checks 收进一个节点，sub 行保留“每个必需 RepoLane”<br>Dropped: claim/pause/retry 的局部控制循环与人工 checklist 细节，避免与 story 级 wave 流程混层<br>Kept in full: Contract 不变回 Delivery、改变承诺回 Discovery、必需 RepoLane 合成 Story done 三条关键流向</div>
+  </section>
+
+  <footer>
+    删除清单：旧版 universal <code>ready → handed_off</code> 终态、candidate/merge-ready 即完成、tracker 写权限即人工授权、receipt carry-forward、Profile 自动迁移。它们不占改后态图面。
+  </footer>
+</main>
+</body>
+</html>

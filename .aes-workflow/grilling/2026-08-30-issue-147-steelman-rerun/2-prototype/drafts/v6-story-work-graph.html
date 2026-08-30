@@ -1,0 +1,433 @@
+<!-- draft v6 | published 2026-08-31
+     用户意见：WEB-P13 先确认业务逻辑；P14 已确认五份业务基线
+     状态：awaiting Web confirmation; local prototype only, no domain implementation -->
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Story Atlas · Story Work Graph v6</title><style>
+:root{
+  --bg:#f5f4ed;--surface:#faf9f5;--surface-warm:#e8e6dc;--surface-blue:#edf5fb;--surface-red:#fbefec;
+  --fg:#141413;--fg-2:#3d3d3a;--muted:#5e5d59;--meta:#87867f;
+  --border:#f0eee6;--border-soft:#e8e6dc;--accent:#c96442;--accent-on:#faf9f5;--accent-ink:#8f3f24;
+  --success:#17a34a;--success-ink:#0b6b30;--warn:#eab308;--warn-ink:#6b5304;--danger:#b53333;--danger-ink:#8f2626;--focus:#3898ec;
+  --font-display:"Anthropic Serif",Georgia,"Times New Roman",serif;
+  --font-body:"Anthropic Sans",Arial,system-ui,-apple-system,sans-serif;
+  --font-mono:"Anthropic Mono",ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;
+  --r-sm:8px;--r-md:12px;--r-lg:16px;--pill:999px;--ring:0 0 0 3px rgba(56,152,236,.28);
+  --shadow:rgba(0,0,0,.05) 0 4px 24px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--fg)}
+body{font:14px/1.55 var(--font-body);-webkit-font-smoothing:antialiased;overflow-x:hidden}
+button,input{font:inherit}
+button{cursor:pointer}
+button:focus-visible,input:focus-visible{outline:none;box-shadow:var(--ring)}
+[hidden]{display:none!important}
+.mono{font-family:var(--font-mono)}
+.shell{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:10px;min-height:46px;padding:0 14px;background:rgba(250,249,245,.96);border-bottom:1px solid var(--border-soft);backdrop-filter:blur(12px)}
+.brand{display:flex;align-items:center;gap:8px;font-weight:700;white-space:nowrap}.brand-dot{width:9px;height:9px;border-radius:50%;background:var(--accent)}
+.repo{min-width:0;max-width:340px;padding:5px 10px;border:1px solid var(--border-soft);border-radius:var(--pill);background:var(--bg);color:var(--muted);font:11px var(--font-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.shell-meta{margin-left:auto;color:var(--meta);font:10px var(--font-mono);white-space:nowrap}
+.btn{min-height:36px;padding:0 13px;border:1px solid var(--border-soft);border-radius:var(--r-sm);background:var(--surface);color:var(--fg);font-weight:600}
+.btn:hover{border-color:var(--meta);background:white}.btn.primary{color:var(--accent-on);border-color:var(--accent);background:var(--accent)}.btn.primary:hover{background:#b95737}
+.btn.compact{min-height:31px;padding:0 10px;font-size:12px}.btn[aria-pressed="true"],.btn.active{border-color:var(--accent);color:var(--accent-ink);background:#fff7f2}
+.page{max-width:1180px;margin:auto;padding:18px 18px 38px}
+.story-kicker{display:flex;align-items:center;gap:8px;color:var(--meta);font:10px var(--font-mono);letter-spacing:.08em;text-transform:uppercase}
+.story-head{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(280px,.65fr);gap:18px;padding-bottom:16px;border-bottom:1px solid var(--border-soft)}
+h1,h2,h3{margin:0}h1{font:500 28px/1.18 var(--font-display);margin-top:5px;text-wrap:balance}h2{font-size:15px}h3{font-size:13px}
+.facts{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-top:11px}.badge{display:inline-flex;align-items:center;min-height:23px;padding:0 8px;border-radius:var(--pill);font:700 10px var(--font-mono);white-space:nowrap}
+.badge.ok{background:#e3f4e7;color:var(--success-ink)}.badge.warn{background:#fbf0c9;color:var(--warn-ink)}.badge.bad{background:#f8e3df;color:var(--danger-ink)}.badge.info{background:#e3f0fb;color:#1f5f91}.badge.neutral{background:var(--surface-warm);color:var(--muted)}.badge.sim{border:1px solid #e5a894;background:#fff5f1;color:var(--danger-ink)}
+.story-context{max-width:58ch;margin:13px 0 0;padding:8px 10px;border-left:3px solid var(--focus);background:var(--surface-blue);color:var(--muted);font-size:11.5px}.story-context strong{color:var(--fg)}
+.truth{display:grid;gap:6px;padding:10px 12px;border:1px solid var(--border-soft);border-radius:var(--r-md);background:var(--surface)}
+.truth-title{font:700 10px var(--font-mono);letter-spacing:.08em;color:var(--meta)}.truth-row{display:grid;grid-template-columns:105px minmax(0,1fr);gap:9px;align-items:start}.truth-row strong{font:700 10px var(--font-mono)}.truth-row p{margin:0;color:var(--muted);font-size:11.5px}.truth-row.issue strong{color:#1f5f91}.truth-row.sim strong{color:var(--danger-ink)}
+.pulse{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:center;margin:16px 0 14px;padding:12px 14px;border:1px solid #ead7a4;border-radius:var(--r-md);background:#fbf3dd}
+.pulse-kicker{font:700 10px var(--font-mono);color:var(--warn-ink);letter-spacing:.07em}.pulse h2{margin-top:3px;font-size:16px}.pulse p{margin:3px 0 0;color:var(--muted);font-size:12px}.pulse-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.phase-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px}.phase-tab{position:relative;min-height:62px;padding:10px 14px;border:1px solid var(--border-soft);border-radius:var(--r-md) var(--r-md) 0 0;background:var(--surface);text-align:left;color:var(--fg)}
+.phase-tab::after{content:"";position:absolute;left:12px;right:12px;bottom:-1px;height:3px;background:transparent}.phase-tab[aria-selected="true"]{border-color:var(--accent);background:#fff}.phase-tab[aria-selected="true"]::after{background:var(--accent)}
+.phase-title{display:flex;gap:8px;align-items:center;font-weight:800}.phase-sub{display:block;margin-top:3px;color:var(--muted);font:11px var(--font-mono)}
+.bridge{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center;padding:10px 12px;border:1px solid var(--border-soft);border-top:0;background:var(--surface)}
+.bridge-step{padding:7px 9px;border:1px solid var(--border-soft);border-radius:var(--r-sm);background:var(--bg);font-size:12px}.bridge-step strong{display:block;font-size:12px}.bridge-arrow{color:var(--accent);font-weight:800}.bridge-return{text-align:right}.bridge-return button{min-height:32px;border:1px dashed #dc7860;border-radius:var(--r-sm);background:#fff8f5;color:var(--danger-ink);font-weight:700}
+.workspace{border:1px solid var(--border-soft);border-radius:0 0 var(--r-lg) var(--r-lg);background:var(--surface);overflow:hidden}
+.workspace-head{display:flex;align-items:center;gap:9px;min-height:50px;padding:8px 12px;border-bottom:1px solid var(--border-soft);background:var(--surface)}
+.phase-mark{width:9px;height:34px;border-radius:var(--pill);background:var(--focus)}.phase-mark.delivery{background:var(--accent)}
+.workspace-title{min-width:0}.workspace-title h2{font-size:14px}.workspace-title p{margin:1px 0 0;color:var(--muted);font:10px var(--font-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.workspace-tools{margin-left:auto;display:flex;align-items:center;gap:6px}.search{width:min(230px,28vw);min-height:34px;padding:0 10px;border:1px solid var(--border-soft);border-radius:var(--r-sm);background:var(--bg);color:var(--fg)}
+.filters{display:flex;align-items:center;gap:6px;padding:8px 12px;border-bottom:1px solid var(--border-soft);background:var(--bg);overflow:auto}.filter{min-height:31px;padding:0 10px;border:1px solid var(--border-soft);border-radius:var(--pill);background:var(--surface);color:var(--muted);white-space:nowrap;font-size:11px}.filter[aria-pressed="true"]{border-color:var(--accent);background:#fff7f2;color:var(--accent-ink)}
+.graph-scroll{overflow:auto;background:var(--bg);scrollbar-color:var(--surface-warm) transparent}.graph-canvas{position:relative;width:720px;min-width:720px;margin:auto;background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);background-size:24px 24px}
+.graph-canvas.discovery{height:690px}.graph-canvas.delivery{height:660px}
+.edges{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}.edge{fill:none;stroke:#8f8e88;stroke-width:1.5;opacity:.85}.edge.membership{stroke:#a6b9c6;stroke-width:1;opacity:.34}.edge.dependency{stroke:#3b6f97;stroke-width:2}.edge.progression{stroke:#8c6aa2;stroke-dasharray:5 5;opacity:.8}.edge.blocks,.edge.return{stroke:var(--danger);stroke-width:2;stroke-dasharray:6 5}.edge.produces{stroke:var(--accent);stroke-width:2}.edge.gate{stroke:#8b6a08;stroke-width:2}.edge.dim{opacity:.08}.edge[hidden]{display:none}
+.graph-node{position:absolute;width:150px;min-height:76px;padding:9px 10px;border:1px solid #bdb9ae;border-left:4px solid var(--meta);border-radius:var(--r-sm);background:var(--surface);color:var(--fg);text-align:left;box-shadow:0 2px 9px rgba(25,24,21,.04);transition:opacity .15s,border-color .15s,transform .15s}.graph-node:hover{border-color:var(--accent);transform:translateY(-1px)}.graph-node[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 0 0 2px rgba(201,100,66,.18)}.graph-node.dim{opacity:.18}.graph-node.match{box-shadow:0 0 0 3px rgba(56,152,236,.25)}
+.graph-node.research{border-left-color:var(--focus)}.graph-node.decision{border-left-color:#7653a6}.graph-node.contract{border-left-color:#a57800}.graph-node.work{border-left-color:var(--success)}.graph-node.qa{border-left-color:var(--accent)}.graph-node.review{border-left-color:#7653a6}.graph-node.gate{border-left-color:#a57800}.graph-node.story{border-left-color:var(--accent);background:#fff6f1}.graph-node.blocked{border-color:var(--danger)}.graph-node.running{border-color:var(--accent);background:#fff8f4}.graph-node.ready{border-color:#b58d1f}.graph-node.locked{border-color:#a57800}
+.node-top{display:flex;gap:6px;align-items:center;color:var(--meta);font:9.5px var(--font-mono)}.node-state{margin-left:auto;font-weight:700}.node-state.closed,.node-state.passed{color:var(--success-ink)}.node-state.running{color:var(--accent-ink)}.node-state.blocked,.node-state.locked{color:var(--danger-ink)}.node-state.ready,.node-state.pending{color:var(--warn-ink)}.node-title{display:block;margin-top:5px;font-weight:800;font-size:12px;line-height:1.25}.node-meta{display:block;margin-top:4px;color:var(--muted);font:9.5px/1.35 var(--font-mono)}
+.lane-label{position:absolute;left:8px;width:704px;height:128px;border:1px dashed #d4cfc2;border-radius:var(--r-md);pointer-events:none}.lane-label.web{top:230px;background:rgba(201,100,66,.025)}.lane-label.core{top:382px;background:rgba(56,152,236,.025)}.lane-copy{position:absolute;top:7px;left:10px;font:700 10px var(--font-mono);color:var(--muted)}
+.graph-note{position:absolute;left:10px;right:10px;top:12px;display:flex;justify-content:space-between;gap:10px;color:var(--muted);font:10px var(--font-mono);pointer-events:none}.graph-note strong{color:var(--fg)}
+.selection{display:grid;grid-template-columns:1.1fr 1.2fr .8fr 1fr 1fr;border-top:1px solid var(--border-soft);background:var(--surface)}.selection>div{min-width:0;padding:10px 12px;border-right:1px solid var(--border-soft)}.selection>div:last-child{border-right:0}.selection label{display:block;color:var(--meta);font:700 9px var(--font-mono);letter-spacing:.06em}.selection strong,.selection span{display:block;margin-top:4px}.selection strong{font-size:12px}.selection span{color:var(--muted);font-size:11px;white-space:normal}
+.list-view{padding:10px 12px;background:var(--bg)}.list-table{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--border-soft)}.list-table th,.list-table td{padding:9px 10px;border-bottom:1px solid var(--border-soft);text-align:left;font-size:12px}.list-table th{color:var(--meta);font:700 9px var(--font-mono);letter-spacing:.06em}.list-table tr[data-selected="true"]{background:#fff7f2}.list-table button{border:0;background:transparent;color:var(--accent-ink);font-weight:700;text-align:left}
+.lane-summary{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}.lane-card{border:1px solid var(--border-soft);border-radius:var(--r-md);background:var(--surface);overflow:hidden}.lane-head{display:flex;align-items:center;gap:8px;padding:9px 11px;border-bottom:1px solid var(--border-soft)}.lane-head strong{font-size:12px}.lane-grid{display:grid;grid-template-columns:repeat(4,1fr)}.lane-grid div{padding:9px 10px;border-right:1px solid var(--border-soft)}.lane-grid div:last-child{border-right:0}.lane-grid label{display:block;color:var(--meta);font:700 8.5px var(--font-mono)}.lane-grid span{display:block;margin-top:3px;font-size:10.5px}
+.evidence-strip{display:grid;grid-template-columns:repeat(3,1fr) auto;gap:0;margin-top:12px;border:1px solid var(--border-soft);border-radius:var(--r-md);background:var(--surface);overflow:hidden}.evidence-item{padding:11px 12px;border-right:1px solid var(--border-soft)}.evidence-item strong{display:block;font-size:11px}.evidence-item span{display:block;margin-top:4px;color:var(--muted);font:9.5px var(--font-mono)}.evidence-action{display:grid;place-items:center;padding:10px 12px}
+.return-banner{display:flex;align-items:center;gap:12px;margin-top:12px;padding:11px 12px;border:1px dashed #d98470;border-radius:var(--r-md);background:#fff7f4}.return-banner strong{font-size:12px}.return-banner p{margin:2px 0 0;color:var(--muted);font-size:11px}.return-banner .btn{margin-left:auto;white-space:nowrap}
+.modal-backdrop{position:fixed;inset:0;z-index:80;display:none;place-items:center;padding:18px;background:rgba(20,20,19,.28)}.modal-backdrop.open{display:grid}.modal{width:min(680px,100%);max-height:min(84vh,760px);overflow:auto;border:1px solid var(--border-soft);border-radius:var(--r-lg);background:var(--surface);box-shadow:var(--shadow)}.modal-head{position:sticky;top:0;display:flex;align-items:center;gap:10px;padding:13px 15px;border-bottom:1px solid var(--border-soft);background:var(--surface);z-index:2}.modal-head h2{font-size:16px}.modal-head .btn{margin-left:auto}.modal-body{padding:15px}.source-block{padding:11px 12px;margin-bottom:10px;border:1px solid var(--border-soft);border-radius:var(--r-sm);background:var(--bg)}.source-block strong{display:block}.source-block p{margin:5px 0 0;color:var(--muted)}.source-block code{font:10px/1.5 var(--font-mono);overflow-wrap:anywhere}.live{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+@media(max-width:820px){
+  .shell-meta{display:none}.repo{max-width:260px}.page{padding-left:10px;padding-right:10px}h1{font-size:24px}
+}
+@media(max-width:640px){
+  .page{padding:14px 10px 30px}.story-head{grid-template-columns:1fr}.truth{grid-template-columns:1fr 1fr}.truth-title{grid-column:1/-1}.pulse{grid-template-columns:1fr}.pulse-actions{justify-content:flex-start}.workspace-head{align-items:flex-start;flex-wrap:wrap}.workspace-tools{width:100%;margin-left:0}.search{flex:1;width:auto}.selection{grid-template-columns:repeat(2,1fr)}.selection>div{border-bottom:1px solid var(--border-soft)}.selection>div:last-child{grid-column:1/-1}.lane-summary{grid-template-columns:1fr}.graph-canvas{margin-left:0}.evidence-strip{grid-template-columns:1fr 1fr}.evidence-item:nth-child(2){border-right:0}.evidence-action{border-top:1px solid var(--border-soft)}
+}
+@media(max-width:520px){
+  body{font-size:13px}.shell{padding:0 8px}.repo{display:none}.page{padding:10px 7px 24px}h1{font-size:22px}.truth{grid-template-columns:1fr}.truth-title{grid-column:auto}.phase-tab{padding:9px;min-height:68px}.phase-title{font-size:12px}.phase-sub{font-size:9px}.bridge{grid-template-columns:1fr}.bridge-arrow{display:none}.bridge-return{text-align:left}.pulse-actions .btn{flex:1}.workspace-tools{display:grid;grid-template-columns:1fr auto auto}.selection{grid-template-columns:1fr}.selection>div:last-child{grid-column:auto}.lane-grid{grid-template-columns:1fr 1fr}.lane-grid div{border-bottom:1px solid var(--border-soft)}.return-banner{align-items:flex-start;flex-wrap:wrap}.return-banner .btn{margin-left:0}.evidence-strip{grid-template-columns:1fr}.evidence-item{border-right:0;border-bottom:1px solid var(--border-soft)}
+}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition-duration:0s!important}}
+
+/* v6: preserve AES tokens and two-map composition; bound scroll and accessible inspectors. */
+:root{--meta:#6b6a64}select{font:inherit;color:var(--fg);max-width:100%;min-height:34px;border:1px solid #bdb9ae;border-radius:8px;background:var(--surface);padding:4px 8px}
+a{color:#1f5f91;overflow-wrap:anywhere}button,input,select{touch-action:manipulation}
+button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{outline:2px solid #236a9f;outline-offset:2px}
+.page{max-width:1120px;padding-top:12px}.shell{backdrop-filter:none}.shell .right{margin-left:auto;display:flex;gap:6px}
+.story-head{display:block;padding-bottom:12px}.story-kicker{font-size:11px}h1{font-size:26px}.facts{margin-top:8px}
+.dataset-bar{display:flex;align-items:center;gap:10px;margin:10px 0 0;flex-wrap:wrap}.dataset-bar label{font-size:12px;color:var(--muted)}
+.truth-inline{font-size:12px;color:var(--muted);margin:8px 0 0}.truth-inline.simulation{color:var(--danger-ink);font-weight:600}
+.pulse{margin:10px 0;padding:10px 12px}.pulse h2{font-size:15px}.pulse p{font-size:12px}.pulse-actions{max-width:235px}
+.btn.primary{background:#a94c2c;border-color:#a94c2c}.btn.compact{min-height:34px}.phase-tab{min-height:60px}.phase-sub{font:11px/1.4 var(--font-body)}
+.bridge{display:flex;gap:10px;justify-content:space-between;flex-wrap:wrap;font-size:12px;min-height:45px}.bridge p{margin:0}.bridge strong{color:var(--accent-ink)}
+.workspace-head{flex-wrap:wrap}.workspace-title{flex:1}.workspace-title p{white-space:normal;max-width:520px;line-height:1.4}
+.workspace-tools{margin-left:0}.search{width:180px}.filters{flex-wrap:wrap;overflow:visible;padding:6px 10px;gap:5px}
+.filter{font-size:12px;min-height:32px}.graph-scroll{height:550px;max-height:64vh;overscroll-behavior:contain;position:relative;outline-offset:-3px}
+.graph-canvas{background-image:none;background:var(--bg);height:690px;min-width:720px;width:720px;transform-origin:top left;margin:0}
+.graph-scale{position:relative;margin:auto;min-height:100%;width:720px}
+.graph-node{width:204px;min-height:102px;padding:10px 11px;border-radius:8px;transition:none}
+.graph-node:hover{transform:none}.node-title{font-size:13px;line-height:1.5;margin-top:4px}.node-top{font-size:10px;flex-wrap:wrap}.node-meta{font-size:10px;line-height:1.5;overflow-wrap:anywhere}
+.graph-node .kind-chip{font-size:10px;color:var(--muted);display:block;margin-top:4px}.graph-node.current{border:2px solid var(--accent);background:#fff6f1}.graph-node.selected{outline:2px solid var(--accent);outline-offset:2px}
+.graph-node.receipt,.graph-node.gate{border-left-color:#a57800;background:#fffdf6}.graph-node.readonly{border-left-color:#1f5f91}.graph-node.debt{border-left-color:var(--danger)}
+.lane-band{position:absolute;left:8px;width:704px;border:1px dashed #c5bfb1;border-radius:10px;height:170px;background:#faf9f566}
+.lane-band h3{font:600 11px/1.4 var(--font-mono);margin:8px 12px;overflow-wrap:anywhere}.lane-band small{color:var(--muted);font:11px var(--font-body)}
+.legend-row{display:flex;gap:12px;flex-wrap:wrap;font-size:11px;padding:7px 12px;border-top:1px solid var(--border-soft);color:var(--muted)}
+.legend-row span{border-bottom:2px solid #3b6f97}.legend-row .derived{border-bottom-style:dashed;border-color:var(--accent)}.legend-row .membership{border-color:#a6b9c6}
+.canvas-note{position:absolute;left:16px;top:8px;color:var(--muted);font-size:11px}.graph-node.dim{opacity:.32}
+.empty{padding:38px 20px;max-width:660px;margin:auto;text-align:left}.empty h2{font:500 24px var(--font-display)}.empty p{color:var(--muted);line-height:1.8}
+.empty .counts{display:flex;gap:20px;margin:25px 0}.empty .counts strong{display:block;font:32px var(--font-display)}.empty .counts small{display:block;color:var(--muted)}
+.summary{margin-top:10px;padding:12px;border:1px solid var(--border-soft);border-radius:12px;background:var(--surface)}.summary h2{font-size:14px}.summary p{margin:6px 0;color:var(--muted);font-size:12px}
+.lane-list{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}.lane-item{padding:10px;border:1px solid #d4cfc2;border-radius:8px}.lane-item h3{font-size:12px;overflow-wrap:anywhere}.lane-item p{margin:4px 0}.lane-item code{font-size:10px;overflow-wrap:anywhere}
+.debt-banner{margin-top:10px;border:1px solid #d98470;border-left:4px solid var(--danger);padding:10px 12px;border-radius:8px;background:#fff7f4;font-size:12px}.debt-banner p{margin:4px 0}
+.list-table td{vertical-align:top}.list-table td:first-child{max-width:240px}.list-table td code{font-size:10px;overflow-wrap:anywhere}
+dialog{color:var(--fg);border:1px solid #c5bfb1;border-radius:14px;background:var(--surface);padding:0;box-shadow:0 10px 40px #0002}
+dialog::backdrop{background:#14141344}dialog.inspector{position:fixed;inset:0 12px 0 auto;margin:auto 0;width:430px;max-width:calc(100% - 24px);max-height:90vh}
+dialog.review{width:850px;max-width:calc(100% - 24px);height:88vh;max-height:88vh}
+.dialog-head{display:flex;align-items:center;gap:12px;position:sticky;top:0;background:var(--surface);border-bottom:1px solid var(--border-soft);padding:12px 14px;z-index:1}
+.dialog-head h2{font-size:15px;line-height:1.6;flex:1}.dialog-body{padding:14px}.dialog-body h3{margin:15px 0 6px}
+.kv{display:grid;grid-template-columns:100px minmax(0,1fr);gap:8px;font-size:12px;line-height:1.6;margin:14px 0}.kv dt{color:var(--muted)}.kv dd{margin:0;overflow-wrap:anywhere}.kv code{font-size:10px}
+.axes{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid #d4cfc2;border-radius:8px;overflow:hidden;margin:12px 0}.axes div{padding:9px;border-right:1px solid #d4cfc2}.axes div:last-child{border:0}.axes small{display:block;color:var(--muted);font:10px var(--font-mono)}.axes strong{display:block;font-size:12px;margin-top:5px}
+.explain{padding:10px;border-left:3px solid var(--accent);background:#fff5ef;font-size:12px;line-height:1.8}.explain p{margin:4px 0}.dialog-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.provenance{padding:10px;background:var(--bg);border:1px solid var(--border-soft);border-radius:8px;font-size:12px;margin-top:12px;overflow-wrap:anywhere}.provenance code{font-size:10px}
+.receipt-card{padding:12px;border:1px solid #d4cfc2;border-radius:8px;margin-top:10px}.receipt-card h3{font-size:13px;margin:0}.receipt-card p{font-size:12px;margin:6px 0;color:var(--muted)}.receipt-card code{font-size:10px;overflow-wrap:anywhere}
+.review-tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}.review-table{width:100%;border-collapse:collapse;font-size:12px}.review-table td,.review-table th{border-bottom:1px solid #d4cfc2;padding:10px 6px;text-align:left;vertical-align:top;overflow-wrap:anywhere}
+.review-table td{max-width:250px}.trace-steps{display:grid;gap:10px}.trace-steps button{text-align:left;padding:12px;line-height:1.6}.trace-steps small{display:block;color:var(--muted)}
+.view-footer{color:var(--muted);font-size:11px;margin:12px 0}.return-context{border:1px solid #d98470;background:#fff5ef;padding:8px 12px;margin:10px 0;display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12px}
+@media(min-width:1000px){.story-head{display:grid;grid-template-columns:1.25fr 1fr}.dataset-bar{align-content:start}.graph-scroll{height:570px}.graph-scale{margin:auto}}
+@media(max-width:820px){.story-head{display:block}h1{font-size:23px}.page{padding:10px}.graph-scroll{height:520px}.pulse{grid-template-columns:1fr auto}.pulse-actions{max-width:196px}dialog.inspector{inset:auto 12px 12px;margin:0;width:calc(100% - 24px);max-height:64vh}.dialog-head{padding:10px 14px}}
+@media(max-width:560px){.page{padding:8px}.shell{padding:6px 8px;flex-wrap:wrap}.shell .right{gap:4px}.shell .btn{padding:0 8px;font-size:11px}.story-head{padding-bottom:8px}.dataset-bar{display:grid;grid-template-columns:70px 1fr;gap:6px}.dataset-bar select{min-width:0}.pulse{display:block}.pulse-actions{max-width:none;justify-content:flex-start;margin-top:8px}.phase-sub{font-size:10px}.phase-title{font-size:12px;display:block}.workspace-tools{width:100%;display:flex}.search{min-width:0;flex:1}.lane-list{grid-template-columns:1fr}.filters{gap:5px}.graph-scale{margin-left:0}.list-table th:nth-child(3),.list-table td:nth-child(3){display:none}.review-table{font-size:11px}.review-table td{max-width:110px}.graph-scroll{max-height:58vh}.btn{min-height:36px}.truth-inline{font-size:11px}.kv{grid-template-columns:85px 1fr}}
+</style></head><body>
+<header class="shell">
+ <div class="brand">Story Atlas</div><span class="repo">Story Work Graph · v6</span>
+ <div class="right"><button class="btn compact" id="sources">来源</button><button class="btn compact" id="review">证据对照</button><button class="btn compact" id="export">导出</button></div>
+</header>
+<main class="page">
+ <section class="story-head"><div><div class="story-kicker">One Story · two graphs · read-only prototype</div><h1 id="storyTitle"></h1><div class="facts" id="storyBadges"></div></div>
+ <div><div class="dataset-bar"><label for="dataset">数据集</label><select id="dataset"><option value="real">真实快照 · #147</option><option value="sim">模拟补全 · SIM-STORY-900</option></select><label for="scenario" id="scenarioLabel">演练快照</label><select id="scenario" hidden><option value="qa">01 · QA 取证中</option><option value="candidate">02 · 候选通过 / 待集成</option><option value="merged">03 · 新 integration 缺证</option><option value="done">04 · required 完成 / optional 债务</option><option value="return">05 · 回流后 Contract@3 / wave-3</option><option value="degraded">06 · Registry 缺失 / degraded</option></select></div><p class="truth-inline" id="truthLine"></p></div></section>
+ <section class="pulse"><div><div class="pulse-kicker" id="pulseLabel"></div><h2 id="pulseTitle"></h2><p id="pulseCopy"></p></div><div class="pulse-actions"><button class="btn primary" id="primary"></button><button class="btn compact" id="parallel"></button></div></section>
+ <div class="phase-tabs" role="tablist" aria-label="Story 两大阶段">
+ <button class="phase-tab" role="tab" id="tab-discovery" data-phase="discovery" aria-controls="graphPanel"><span class="phase-title">Discovery <span class="badge info">探索图</span></span><span class="phase-sub" id="discoverySub"></span></button>
+ <button class="phase-tab" role="tab" id="tab-delivery" data-phase="delivery" aria-controls="graphPanel"><span class="phase-title">Delivery <span class="badge neutral">交付图</span></span><span class="phase-sub" id="deliverySub"></span></button>
+ </div>
+ <section class="bridge" aria-label="双图关系"><p id="bridgeText"></p><button class="btn compact" id="traceButton">跨图追溯</button></section>
+ <div class="return-context" id="returnContext" hidden><span>正在追溯跨图因果；原图位置已保存。</span><button class="btn compact" id="returnOrigin">返回来源位置</button></div>
+ <section class="workspace" id="graphPanel" role="tabpanel" aria-labelledby="tab-discovery">
+ <header class="workspace-head"><div class="workspace-title"><h2 id="graphTitle"></h2><p id="graphSubtitle"></p></div><div class="workspace-tools"><input class="search" id="search" type="search" placeholder="搜索节点、标题…" aria-label="搜索当前图"><button class="btn compact" id="mapView" aria-pressed="true">Map</button><button class="btn compact" id="listView" aria-pressed="false">List</button></div></header>
+ <div class="filters"><label for="revision" class="live">Discovery 版本</label><select id="revision"><option value="current">当前 · 本地重访</option><option value="historical">历史 · #148–159</option></select>
+ <button class="filter" data-filter="all" aria-pressed="true">全部</button><button class="filter" data-filter="frontier">可启动</button><button class="filter" data-filter="blocked">阻塞 / 缺证</button><button class="filter" id="focusNode" aria-pressed="false">一跳聚焦</button><button class="filter" id="membership" aria-pressed="false" hidden>成员边</button><button class="filter" id="progression" aria-pressed="false" hidden>评论演进</button>
+ <button class="btn compact" id="zoomOut" aria-label="缩小图">缩小</button><button class="btn compact" id="zoomReset" aria-label="重置图缩放">100%</button><button class="btn compact" id="zoomIn" aria-label="放大图">放大</button></div>
+ <div class="graph-scroll" id="graphScroll" tabindex="0" aria-label="工作图画布，可滚动，节点也可用 List 阅读"><div class="graph-scale" id="graphScale"><div class="graph-canvas" id="canvas"></div></div></div>
+ <div class="list-view" id="list" hidden></div>
+ <div class="legend-row"><span>实线：原生依赖 / 模拟依赖（按数据集）</span><span class="derived">虚线：引用、门禁或评论推演</span><span class="membership">浅线：成员关系</span><b id="visibleCount"></b></div>
+ </section>
+ <section class="debt-banner" id="debt" hidden></section>
+ <section class="summary" id="summary"></section>
+ <p class="view-footer">交互仅改变视图，不写 Story。数据为内嵌快照，不是 live Runtime。Gate 与 reducer 是证据投影，不是可派发任务。</p>
+ <div class="live" aria-live="polite" id="announcement"></div>
+</main>
+<dialog class="inspector" id="inspector" aria-labelledby="inspectTitle"><header class="dialog-head"><h2 id="inspectTitle" tabindex="-1"></h2><button class="btn compact" id="closeInspector">关闭详情</button></header><div class="dialog-body" id="inspectBody"></div></dialog>
+<dialog class="review" id="reviewDialog" aria-labelledby="reviewTitle"><header class="dialog-head"><h2 id="reviewTitle" tabindex="-1"></h2><button class="btn compact" id="closeReview">返回图</button></header><div class="dialog-body" id="reviewBody"></div></dialog>
+
+<script>
+
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const esc=s=>String(s??'—').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const badge=(text,kind='neutral')=>'<span class="badge '+kind+'">'+esc(text)+'</span>';
+const issueBase='https://github.com/parkth1026/parking-agents/issues/';
+const dossier='../';
+const exactTitles=['story 级全链条工作流整合设计','调研：workflow-interview-web 能力全景盘点','调研：wayfinder 双变体与票协议深读','调研：aes-worktree-board 星图与 Issue 关系数据面','调研：aes-workflow engineering 路由与门禁思想','裁决：整合能力落点——升级 interview 家族 / 独立新技能 / 强化 wayfinder','裁决：执行与验收的挂载架构','裁决：票载体与 claim 强度','裁决：三阶段门禁与 map 票流的融合','裁决：决策档案分层——map 索引 + 票级 dossier 两级同构','裁决：新编排技能命名与发布路径','裁决：web 投影层与星图归一——双 tracker 渲染归属','定稿：workflow-story-map 设计 spec + ADR 撰写'];
+const shortTitles=['Story 全链条设计','访谈 / Web 能力盘点','Wayfinder 双变体','Board 关系数据面','Engineering 路由与门禁','整合能力落点','执行与验收挂载','票载体与 claim','门禁与 map 票流','决策档案分层','命名与发布路径','Web 投影与星图','spec + ADR 定稿'];
+const nativePairs=[[148,152],[148,153],[148,155],[149,152],[149,154],[150,153],[158,159]];
+const historical=exactTitles.map((title,i)=>({id:'ISSUE-'+(147+i),n:'#'+(147+i),title:shortTitles[i],rawTitle:title,kind:i===0?'story':i<5?'research':i===12?'contract':'decision',type:'historical-issue',status:'CLOSED',truth:'ISSUE SNAPSHOT',x:i===0?258:20+((i-1)%3)*238,y:i===0?36:190+Math.floor((i-1)/3)*158,owner:null,assignee:i===0?'未分配':'parkth1026',source:issueBase+(147+i),why:i===12?'作者声明 spec/ADR 已交付；这不是代码交付证据。':'历史设计工作；CLOSED 不证明本轮 dossier 或 Delivery 已完成。',next:'历史快照只读；当前事项见「当前 · 本地重访」。',meta:'历史 tracker · 简称为编辑派生',profile:null}));
+const historicalEdges=[...historical.slice(1).map(n=>({a:'ISSUE-147',b:n.id,kind:'membership',source:'native subIssues'})),...nativePairs.map(([a,b])=>({a:'ISSUE-'+a,b:'ISSUE-'+b,kind:'dependency',source:'native blockedBy'}))];
+const currentNodes=[
+{id:'DISC-CURRENT-DOSSIER',n:'CURRENT DOSSIER',title:'正在重访 Story 设计',kind:'story',status:'IN PROGRESS',type:'revision',x:258,y:32,truth:'DOSSIER FACT',source:'../../manifest.json',meta:'2-prototype · 非 tracker member',why:'历史 #159 只代表旧设计。本轮没有已发布的 Contract digest。',next:'完成 v6 Web 对照物审阅。'},
+{id:'DECISION-P12',n:'P12 · 已裁决',title:'Web 只观察，不发命令',kind:'decision',status:'CONFIRMED',type:'decision',x:20,y:194,truth:'DOSSIER FACT',source:'../../1-interview/rounds.jsonl',meta:'Workflow / Skill → facts → Web',why:'Runtime 单向同步，不负责 Agent lifecycle。',next:'核对页面没有 claim、retry 或放行入口。'},
+{id:'DECISION-P13',n:'P13 · 已裁决',title:'required 决定完成',kind:'decision',status:'CONFIRMED',type:'decision',x:258,y:194,truth:'DOSSIER FACT',source:'../../1-interview/rounds.jsonl',meta:'optional debt 必须常显',why:'optional 的不阻塞不等于把 Gate 改为 PASS。',next:'用模拟快照 04 检查终态与债务能否同时读懂。'},
+{id:'ARTIFACT-P14',n:'P14 · 已确认',title:'五份业务逻辑对照物',kind:'contract',status:'CONFIRMED',type:'artifact',x:496,y:194,truth:'DOSSIER FACT',source:'../behavior.md',meta:'behavior / API / examples / diagrams',why:'P14 只确认业务基线；不确认 Web 成品，不启动实现。',next:'据此构建并审阅 v6。'},
+{id:'ARTIFACT-WEB-V6',n:'WEB · 待审阅',title:'双图 Web 对照物 v6',kind:'readonly',status:'PENDING',type:'artifact',x:496,y:360,truth:'DERIVED VIEW',source:'v6-story-work-graph.html',meta:'当前页面 · 不是已确认产物',why:'页面由已确认业务基线派生；需要用户单独确认。',next:'审阅真实 / 模拟隔离、证据门禁和跨图返回。'},
+{id:'CONTRACT-NOT-PUBLISHED',n:'CONTRACT · 未发布',title:'Goal Contract 尚未形成',kind:'contract',status:'PENDING',type:'artifact',x:258,y:526,truth:'DOSSIER FACT',source:'../../manifest.json',meta:'digest: null · supersedes: null',why:'2-prototype 尚未通过阶段门禁，不能进入 3-contract。',next:'先确认全部对照物，再进入契约阶段。'}
+];
+const currentEdges=[['DISC-CURRENT-DOSSIER','DECISION-P12'],['DISC-CURRENT-DOSSIER','DECISION-P13'],['DISC-CURRENT-DOSSIER','ARTIFACT-P14'],['DECISION-P12','ARTIFACT-WEB-V6'],['DECISION-P13','ARTIFACT-WEB-V6'],['ARTIFACT-P14','ARTIFACT-WEB-V6'],['ARTIFACT-WEB-V6','CONTRACT-NOT-PUBLISHED']].map(([a,b])=>({a,b,kind:'derived',source:'dossier references / awaits; not native dependency'}));
+const state={dataset:'real',scenario:'qa',phase:'discovery',revision:'current',view:'map',filter:'all',query:'',selected:'DISC-CURRENT-DOSSIER',focus:false,membership:false,progression:false,zoom:1};
+let origin=null,dialogOrigin=null,viewCache={};
+const simSubject=()=>state.scenario==='return'?'sha256:SIM-CONTRACT-3':'sha256:SIM-CONTRACT-2';
+const isFinal=()=>state.scenario==='done';
+const isMerged=()=>['merged','done'].includes(state.scenario);
+const isDegraded=()=>state.scenario==='degraded';
+function ticket(id,title,x,y,lane,axes,extra={}){
+ return {id,n:id.replace('SIM-WT-','WT · '),title,x,y,lane,type:'work-ticket',kind:'work',truth:'SIMULATED GAP',axes,status:axes.control==='blocked'?'BLOCKED':axes.gate==='passed'?'PASSED':axes.control==='running'?'RUNNING':axes.lifecycle==='open'?'READY':'PENDING',profile:{id:'implementation.web',schema_version:3,digest:'sha256:SIM-PROFILE-WEB-3'},owner:'SIM-ACTOR-IMPL-2',claimed:false,dependenciesSatisfied:true,capabilityProven:true,meta:lane==='skill'?'parking-agents-manual · web':'parking-agents · projection-runtime',...extra};
+}
+function simulationDelivery(){
+ const qa=state.scenario==='qa',done=isFinal(),ret=state.scenario==='return',degraded=isDegraded(),merged=isMerged();
+ const candidatePassed=!qa&&!ret&&!degraded;
+ const nodes=[
+ {id:'SIM-CONTRACT',n:'CONTRACT · '+(ret?'3':'2'),title:'版本化用户承诺',kind:'contract',status:'FROZEN',type:'contract',x:258,y:12,truth:'SIMULATED GAP',meta:simSubject(),why:'required/optional 分类与验收下限在 Contract 冻结。',next:'观察下游 Gate，不能在 Web 修改。'},
+ ticket('SIM-WT-SKILL-42','双 Tab 工作图实现',20,184,'skill',{lifecycle:done?'closed':'active',control:ret?'paused':qa?'running':'idle',gate:candidatePassed?'passed':degraded?'unknown':'pending'},{candidate:'git:SIM-SKILL-C3',attempt:'SIM-ATTEMPT-4',claimed:qa,why:qa?'独立 QA 正在对 candidate C3 取证；没有 current PASS。':ret?'公共行为 finding 已回流，Contract@3 使旧证据失效。':degraded?'精确 Profile digest 无法读取，Gate 不得推进。':'candidate C3 的 QA / Review 已满足；不等于 integration PASS。',next:qa?'由 SIM-ACTOR-QA-7 完成当前 subject 的验证。':ret?'在新 Contract 下使用新 WorkTicket，不复活旧票。':'形成 integration subject 后重新取证。',qaActor:'SIM-ACTOR-QA-7',carrier:'independent-task',reviewActor:'SIM-ACTOR-REVIEW-8'}),
+ ticket('SIM-WT-SKILL-INTEGRATE','集成到 dev',258,184,'skill',{lifecycle:merged?'closed':'open',control:qa||ret||degraded?'blocked':'idle',gate:merged?'passed':'pending'},{profile:{id:'integration',schema_version:1,digest:'sha256:SIM-PROFILE-INTEGRATION-1'},owner:'SIM-ACTOR-INTEGRATOR-5',dependenciesSatisfied:candidatePassed,capabilityProven:!degraded,why:qa?'等待来源票 candidate Gate；不是手动放行。':ret?'旧 Contract 的集成被阻断。':degraded?'Profile 不可验证，停止推进。':'候选通过后可集成；最终完整回归仍需绑定 integration SHA。',next:merged?'检查 integration full-suite。':'通过 Workflow/Skill 处理，本页只解释。'}),
+ {id:'SIM-GATE-SKILL-INTEGRATION',n:'GATE · SKILL',title:done?'集成验证已满足':'集成验证未满足',x:496,y:184,type:'gate',kind:'gate',truth:'SIMULATED GAP',lane:'skill',status:done?'PASSED':degraded?'DEGRADED':'PENDING',meta:merged?'git:SIM-SKILL-I8':'integration: null',why:done?'I8 完整回归 PASS，无待完成人工必需项。':merged?'I8 已形成，但缺 FinalFullSuiteReceipt；C3 Receipt 不贡献当前 Gate。':'缺 integration subject 与 final full suite。',next:'查看证据对照；Web 不提供放行按钮。'},
+ ticket('SIM-WT-RUNTIME-CORE','单向投影 Runtime',20,374,'runtime',{lifecycle:'closed',control:'idle',gate:ret||degraded?'pending':'passed'},{profile:{id:'implementation.runtime',schema_version:2,digest:'sha256:SIM-PROFILE-RUNTIME-2'},owner:'SIM-ACTOR-RUNTIME-IMPL-3',candidate:'git:SIM-RUNTIME-C2',attempt:'SIM-RUNTIME-ATTEMPT-2',why:'投影同步，不持有 Agent / Task lifecycle；历史 candidate 结果与当前 Gate 分开。',next:'只读观察本 Lane 集成证据。'}),
+ ticket('SIM-WT-RUNTIME-DOCS','说明文档补充',258,374,'runtime',{lifecycle:done?'closed':'open',control:degraded?'blocked':'idle',gate:done?'passed':'pending'},{profile:{id:'documentation',schema_version:1,digest:'sha256:SIM-PROFILE-DOCS-1'},owner:null,capabilityProven:!degraded,why:'模拟 Contract 中不阻塞集成的文档补充；可独立启动，没有 claim。',next:'由 Workflow 选择 Documenter；这里仅定位。'}),
+ {id:'SIM-GATE-RUNTIME-INTEGRATION',n:'GATE · RUNTIME',title:ret||degraded?'集成证据待重验':'集成验证已满足',x:496,y:374,type:'gate',kind:'gate',truth:'SIMULATED GAP',lane:'runtime',status:ret?'STALE':degraded?'DEGRADED':'PASSED',meta:'git:SIM-RUNTIME-I7',why:ret?'Contract@3 变化，I7 旧 Receipt 不再贡献新 Gate。':degraded?'Registry 不可用；历史 PASS 不构成当前推进授权。':'I7 完整回归 PASS，必需 Human 无待办。',next:'核对 exact subject 与独立验证 actor。'},
+ {id:'SIM-STORY-REDUCER',n:'STORY · REQUIRED ONLY',title:done?'Story done':'Story 尚未完成',x:258,y:566,type:'reducer',kind:'story',truth:'SIMULATED GAP',status:done?'DONE':degraded?'DEGRADED':'BLOCKED',meta:done?'2/2 required · 1 optional debt':'不是 WorkTicket · 不属于 Frontier',why:done?'required 两条 Lane 已满足，无全局必需待办；optional 债务常显。':ret?'Contract@3 下旧 Receipt stale，新 wave 尚未完成。':degraded?'精确 Registry 缺失，fail-closed。':'SKILL integration 未满足；RUNTIME 的 PASS 不能抵消缺证。',next:done?'查看 optional debt，不改写它的原始状态。':'优先查看 SKILL integration 缺证。'}
+ ];
+ if(done)nodes.push(ticket('SIM-WT-REPORTS-DEMO','Optional 报表演示',20,566,'reports',{lifecycle:'active',control:'blocked',gate:'pending'},{owner:'SIM-ACTOR-REPORTS-OWNER',profile:{id:'optional.reports',schema_version:1,digest:'sha256:SIM-REPORTS-PROFILE-1'},dependenciesSatisfied:false,kind:'debt',why:'optional demo environment unavailable。',next:'在 Workflow/Skill 修复环境并恢复；本页仅查看。',meta:'SIM-LANE-REPORTS · optional'}));
+ if(ret)nodes.push(ticket('SIM-WT-SKILL-43','新承诺下的替代票',20,566,'skill',{lifecycle:'open',control:'idle',gate:'pending'},{profile:{id:'implementation.web',schema_version:3,digest:'sha256:SIM-PROFILE-WEB-3'},owner:null,meta:'wave-3 · contract@3',why:'通过新 WorkTicket 承接变更；旧 Attempt / Receipt 留存审计。',next:'Workflow 指派 Role / Carrier 后执行，不在 Web 启动。'}));
+ const edges=[['SIM-CONTRACT','SIM-WT-SKILL-42','produces'],['SIM-CONTRACT','SIM-WT-RUNTIME-CORE','produces'],['SIM-WT-SKILL-42','SIM-WT-SKILL-INTEGRATE','dependency'],['SIM-WT-SKILL-INTEGRATE','SIM-GATE-SKILL-INTEGRATION','gate'],['SIM-WT-RUNTIME-CORE','SIM-GATE-RUNTIME-INTEGRATION','gate'],['SIM-GATE-SKILL-INTEGRATION','SIM-STORY-REDUCER','gate'],['SIM-GATE-RUNTIME-INTEGRATION','SIM-STORY-REDUCER','gate']].map(([a,b,kind])=>({a,b,kind,source:'SIM fixture dependency or reducer input'}));
+ // Routing the runtime edge around the independent docs ticket avoids a false implied dependency.
+ return {nodes,edges,height:712,title:'Delivery Graph · '+(done?'required 收口与债务':'跨仓交付'),subtitle:'SIMULATED GAP · 2 required RepoLane · Web/Core 仅是仓内 Workstream',bands:[{y:148,title:'SIM-LANE-SKILL · required',repo:'parking-agents-manual'},{y:338,title:'SIM-LANE-RUNTIME · required',repo:'parking-agents'}]};
+}
+function simulationDiscovery(){
+ const ret=state.scenario==='return';
+ const nodes=[
+ {id:'SIM-DISC-RESEARCH',n:'RESEARCH',title:'路由与证据边界探索',kind:'research',type:'work-ticket',status:'CLOSED',x:20,y:54,truth:'SIMULATED GAP',meta:'设计依据 #148–151 / Q23–35',why:'仅模拟工作事实，设计依据来自真实访谈。',next:'历史探索完成。'},
+ {id:'SIM-WT-DECISION-18',n:'DECISION · 18',title:'公共行为变更裁决',kind:'decision',type:'decision',status:ret?'CONFIRMED':'NOT PRESENT',x:258,y:222,truth:'SIMULATED GAP',meta:ret?'SIM-FINDING-PUBLIC-BEHAVIOR':'此快照尚未出现 finding',why:ret?'由 Delivery finding 触发；不是固定阶段节点。':'本快照没有回流；该节点只在回流场景出现。',next:'查看已模拟发布的 Contract@3；不收集真实用户裁决。'},
+ {id:'SIM-DISC-CONTRACT-2',n:'CONTRACT · 2',title:'冻结用户承诺',kind:'contract',type:'contract',status:ret?'HISTORICAL':'FROZEN',x:258,y:54,truth:'SIMULATED GAP',meta:'sha256:SIM-CONTRACT-2',why:'两个 required repo，Reports 为预先声明 optional。',next:'跳转交付图检查相同 subject。'},
+ {id:'SIM-DISC-CONTRACT-3',n:'CONTRACT · 3',title:'发布修订后的承诺',kind:'contract',type:'contract',status:'FROZEN',x:496,y:388,truth:'SIMULATED GAP',meta:'sha256:SIM-CONTRACT-3',why:'模拟已完成裁决与发布的后续时间点，不代表现实审批。',next:'进入 wave-3；旧 Receipt 仅供审计。'}
+ ];
+ return {nodes:ret?nodes:nodes.filter(n=>['SIM-DISC-RESEARCH','SIM-DISC-CONTRACT-2'].includes(n.id)),edges:(ret?[['SIM-DISC-RESEARCH','SIM-DISC-CONTRACT-2'],['SIM-DISC-CONTRACT-2','SIM-WT-DECISION-18'],['SIM-WT-DECISION-18','SIM-DISC-CONTRACT-3']]:[['SIM-DISC-RESEARCH','SIM-DISC-CONTRACT-2']]).map(([a,b])=>({a,b,kind:'derived',source:'SIM exploration / decision / produces'})),height:540,title:'Discovery Graph · 模拟设计版本',subtitle:'SIMULATED GAP · 节点来自具体探索和 finding；不是必经固定槽位',bands:[]};
+}
+function graph(){
+ if(state.dataset==='sim')return state.phase==='delivery'?simulationDelivery():simulationDiscovery();
+ if(state.phase==='delivery')return {nodes:[],edges:[],height:400,title:'Delivery Graph · 尚无已验证运行数据',subtitle:'NOT_CONNECTED · 0 VERIFIED · 不等于客观上不存在工作',bands:[]};
+ if(state.revision==='current')return {nodes:currentNodes,edges:currentEdges,height:668,title:'Discovery Graph · 当前重访',subtitle:'当前 dossier 引用图 · 节点为已记录裁决与产物，非新增 tracker WorkTicket',bands:[]};
+ const progression=state.progression?[[152,153],[153,154],[154,155],[155,156],[156,157],[157,158],[158,159]].map(([a,b])=>({a:'ISSUE-'+a,b:'ISSUE-'+b,kind:'progression',source:'DERIVED from root closure comment'})):[];
+ return {nodes:historical,edges:[...historicalEdges,...progression],height:865,title:'Discovery Graph · 历史 #147',subtitle:'12 原生成员 / 7 原生依赖 · 2026-08-30 抓取摘录，非实时查询',bands:[]};
+}
+function frontier(n){return n.type==='work-ticket'&&n.axes?.lifecycle==='open'&&n.axes.control==='idle'&&!n.claimed&&n.dependenciesSatisfied&&n.capabilityProven&&!isDegraded();}
+function matches(n){
+ if(state.query&&!JSON.stringify(n).toLowerCase().includes(state.query.toLowerCase()))return false;
+ if(state.filter==='frontier'&&!frontier(n))return false;
+ if(state.filter==='blocked'&&!['BLOCKED','PENDING','DEGRADED','STALE'].includes(n.status))return false;
+ return true;
+}
+
+function path(a,b,edge){
+ const w=204,h=102;
+ if(edge.a==='SIM-WT-RUNTIME-CORE'&&edge.b==='SIM-GATE-RUNTIME-INTEGRATION')return 'M122 476 V502 H598 V476';
+ if(b.y>a.y+105){const m=(a.y+h+b.y)/2;return 'M'+(a.x+w/2)+' '+(a.y+h)+' V'+m+' H'+(b.x+w/2)+' V'+b.y;}
+ const x1=a.x+w,y1=a.y+h/2,x2=b.x,y2=b.y+h/2,m=(x1+x2)/2;
+ return 'M'+x1+' '+y1+' H'+m+' V'+y2+' H'+x2;
+}
+function buttonNode(n){
+ const selected=n.id===state.selected;
+ return '<button class="graph-node '+esc(n.kind)+' '+(selected?'selected':'')+' '+(n.status==='BLOCKED'?'blocked':'')+'" data-node="'+esc(n.id)+'" aria-pressed="'+selected+'" style="left:'+n.x+'px;top:'+n.y+'px" title="'+esc(n.rawTitle||n.title)+'"><span class="node-top">'+esc(n.n)+' <span class="node-state '+(['PASSED','DONE','CLOSED','CONFIRMED'].includes(n.status)?'passed':n.status==='BLOCKED'?'blocked':'pending')+'">'+esc(n.status)+'</span></span><span class="node-title">'+esc(n.title)+'</span><span class="node-meta">'+esc(n.meta)+'</span></button>';
+}
+function draw(){
+ const g=graph(),visible=g.nodes.filter(matches);
+ const ids=new Set(visible.map(n=>n.id)),near=new Set([state.selected]);
+ g.edges.forEach(e=>{if(e.a===state.selected)near.add(e.b);if(e.b===state.selected)near.add(e.a);});
+ $('#graphTitle').textContent=g.title;$('#graphSubtitle').textContent=g.subtitle;
+ $('#revision').hidden=state.dataset!=='real'||state.phase!=='discovery';
+ const hist=state.dataset==='real'&&state.phase==='discovery'&&state.revision==='historical';
+ $('#membership').hidden=!hist;$('#progression').hidden=!hist;
+ $('#visibleCount').textContent=visible.length+' / '+g.nodes.length+' 节点';
+ $('#focusNode').setAttribute('aria-pressed',state.focus);
+ $('#membership').setAttribute('aria-pressed',state.membership);$('#progression').setAttribute('aria-pressed',state.progression);
+ $$('[data-filter]').forEach(b=>{b.setAttribute('aria-pressed',state.filter===b.dataset.filter);if(b.dataset.filter==='frontier')b.textContent='可启动 '+g.nodes.filter(frontier).length;});
+ $('#mapView').setAttribute('aria-pressed',state.view==='map');$('#listView').setAttribute('aria-pressed',state.view==='list');
+ $('#graphScroll').hidden=state.view!=='map';$('#list').hidden=state.view!=='list';
+ $('#zoomReset').textContent=Math.round(state.zoom*100)+'%';
+ $('#canvas').style.height=g.height+'px';$('#canvas').style.transform='scale('+state.zoom+')';
+ $('#graphScale').style.width=(720*state.zoom)+'px';$('#graphScale').style.height=(g.height*state.zoom)+'px';
+ const empty=g.nodes.length===0;
+ if(empty){
+  $('#canvas').style.transform='none';$('#canvas').style.minWidth='0';$('#canvas').style.width='100%';$('#graphScale').style.width='100%';
+  const content='<div class="empty"><span class="badge neutral">NOT_CONNECTED</span><h2 style="margin-top:18px">没有足够事实绘制交付图。</h2><p>当前 #147 只确认历史设计材料和本地重访。尚未连接 implementation WorkTicket、RepoLane 或 Receipt 的运行证据。</p><div class="counts"><div><strong>0</strong><small>VERIFIED WorkTickets</small></div><div><strong>0</strong><small>VERIFIED RepoLanes</small></div><div><strong>0</strong><small>VERIFIED Receipts</small></div></div><p>这不是“所有工作已经完成”，也不是“没有人在做”。真实状态未知，不填造 owner、SHA 或 Gate。</p><button class="btn" data-enter-sim>进入隔离的模拟补全</button></div>';
+  $('#canvas').innerHTML=content;$('#list').innerHTML=content;
+ }else{
+  $('#canvas').style.minWidth='720px';$('#canvas').style.width='720px';
+  let html=g.bands.map(b=>'<div class="lane-band" style="top:'+b.y+'px"><h3>'+esc(b.title)+' <small>'+esc(b.repo)+'</small></h3></div>').join('');
+  html+='<svg class="edges" viewBox="0 0 720 '+g.height+'" aria-hidden="true"><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10Z" fill="#6b6a64"/></marker></defs>';
+  for(const e of g.edges){
+   if(!ids.has(e.a)||!ids.has(e.b)||e.kind==='membership'&&!state.membership)continue;
+   const a=g.nodes.find(n=>n.id===e.a),b=g.nodes.find(n=>n.id===e.b);
+   html+='<path class="edge '+esc(e.kind)+' '+(state.focus&&(!near.has(e.a)||!near.has(e.b))?'dim':'')+'" style="'+(['derived','gate','produces'].includes(e.kind)?'stroke-dasharray:5 4;stroke:#a65639':'')+'" d="'+path(a,b,e)+'" marker-end="url(#arrow)"><title>'+esc(e.source)+'</title></path>';
+  }
+  html+='</svg>'+visible.map(n=>buttonNode(n)).join('');
+  if(!visible.length)html+='<div class="empty"><h2>没有匹配节点</h2><p>搜索与筛选不改变 Story 数据。</p><button class="btn" data-clear>清空筛选</button></div>';
+  $('#canvas').innerHTML=html;
+  if(state.focus)$$('#canvas [data-node]').forEach(b=>b.classList.toggle('dim',!near.has(b.dataset.node)));
+  $('#list').innerHTML=visible.length?'<table class="list-table"><thead><tr><th>节点 / 来源</th><th>状态</th><th>责任 / subject</th></tr></thead><tbody>'+visible.map(n=>'<tr data-selected="'+(n.id===state.selected)+'"><td><button data-node="'+esc(n.id)+'">'+esc(n.rawTitle||n.title)+'</button><br><code>'+esc(n.id)+' · '+esc(n.truth)+'</code></td><td>'+esc(n.status)+(n.axes?'<br><code>'+esc(Object.values(n.axes).join(' / '))+'</code>':'')+'</td><td>'+esc(n.owner||(n.assignee?'快照 assignee: '+n.assignee:'NOT_VERIFIED'))+'<br><code>'+esc(n.candidate||n.meta)+'</code></td></tr>').join('')+'</tbody></table>':'<p>没有匹配节点。</p><button class="btn" data-clear>清空筛选</button>';
+ }
+ $$('[data-node]').forEach(b=>b.addEventListener('click',()=>selectNode(b.dataset.node)));
+ $$('[data-clear]').forEach(b=>b.addEventListener('click',()=>{state.filter='all';state.query='';$('#search').value='';draw();}));
+ $$('[data-enter-sim]').forEach(b=>b.addEventListener('click',()=>changeDataset('sim')));
+}
+function renderHeader(){
+ const real=state.dataset==='real',done=isFinal(),ret=state.scenario==='return';
+ $('#dataset').value=state.dataset;$('#scenario').value=state.scenario;$('#scenario').hidden=real;$('#scenarioLabel').hidden=real;
+ $('#revision').value=state.revision;$('#search').value=state.query;
+ $('#storyTitle').textContent=real?'#147 · story 级全链条工作流整合设计':'SIM-STORY-900 · Story 闭环演练';
+ $('#storyBadges').innerHTML=real?badge('当前 · PROTOTYPE 待确认','warn')+badge('历史 TRACKER CLOSED','neutral')+badge('DELIVERY 0 VERIFIED','info'):badge('SIMULATED GAP','sim')+badge(done?'STORY DONE':isDegraded()?'DEGRADED':'STORY NOT DONE',done?'ok':'warn')+badge('CONTRACT@'+(ret?'3':'2'),'info');
+ $('#truthLine').classList.toggle('simulation',!real);
+ $('#truthLine').textContent=real?'历史 API 摘录：2026-08-30 · 当前 dossier：P14 已确认业务基线。内嵌快照，不自动刷新。':'全部运行 ID、owner、subject、Receipt 与状态均为模拟；不汇入真实 #147。切换快照仅改变视图。';
+ $('#discoverySub').textContent=real?'当前重访 + 历史 12 成员 / 7 依赖':ret?'finding → decision → contract@3':'模拟设计 · contract@2 已冻结';
+ $('#deliverySub').textContent=real?'NOT_CONNECTED · 不补造执行状态':done?'2/2 required 满足 · 1 optional 债务':'2 个 required repo · '+(ret?'wave-3':'wave-2');
+ $$('[data-phase]').forEach(b=>{const on=b.dataset.phase===state.phase;b.setAttribute('aria-selected',on);b.tabIndex=on?0:-1;});
+ $('#graphPanel').setAttribute('aria-labelledby','tab-'+state.phase);
+ $('#bridgeText').innerHTML=real?'<strong>当前 dossier revisits 历史 #159</strong> · supersedes / Contract digest 仍为空':ret?'<strong>公共行为 finding → Discovery 裁决 → Contract@3 → wave-3</strong>':'<strong>Contract@2</strong> 约束两张图 · 候选通过不等于集成通过';
+ $('#traceButton').hidden=false;$('#traceButton').textContent=real?'版本对照':ret?'追溯回流链':'查看闭环规则';
+ $('#returnContext').hidden=!origin;
+ $('#pulseLabel').textContent=real?'当前判断 · 已确认业务，Web 尚待审阅':'SIMULATED · '+(done?'完成判断':'当前关键缺口');
+ $('#pulseTitle').textContent=real?'先审阅当前 Web，再进入 Goal Contract。':done?'承诺已满足；optional 报表演示仍受阻。':ret?'新承诺已经发布，旧证据不能继续过关。':isDegraded()?'Registry 无法精确重建，暂停推进。':state.scenario==='qa'?'SKILL 的独立 QA 正在取证。':state.scenario==='candidate'?'候选已经通过；集成仍未形成。':'集成 SHA 已改变，必须重新取证。';
+ $('#pulseCopy').textContent=real?'理由：P14 仅确认五份业务对照物；Web 未确认是当前门禁，不是实施任务。':done?'2 条 required Lane 的 exact integration / full-suite 满足；债务不改写为 PASS。':ret?'理由：Contract@2 Receipt 对 Contract@3 全部 stale；下一波使用新票。':isDegraded()?'原因：缺少 SIM-PROFILE-WEB-3；历史 PASS 不允许绕过当前门禁。':state.scenario==='qa'?'优先看 QA：它挡住 SKILL 集成。可并行：独立文档补充，未认领。':'优先看 SKILL integration：RUNTIME 的绿灯不能抵消这条 Lane 的缺证。';
+ $('#primary').textContent=real?'定位待审 Web':done?'查看完成依据':isDegraded()?'查看恢复边界':ret?'定位新 wave 工作':'查看关键节点';
+ $('#parallel').hidden=real||done||isDegraded();$('#parallel').textContent='可并行 · 文档补充';
+ $('#debt').hidden=real||!done;
+ $('#debt').innerHTML='<strong>OPTIONAL DEBT · 1 · 仍然 blocked，不是 PASS</strong><p>SIM-LANE-REPORTS · owner: SIM-ACTOR-REPORTS-OWNER</p><p>原因：演示环境不可用。影响：仅报表演示，required 交付不受影响。</p><p>恢复：在 Workflow/Skill 通道修复环境后继续。本页只查看，不 resume、不签 Waiver。</p><button class="btn compact" data-debt>查看原始状态与恢复说明</button>';
+ if(real){
+  $('#summary').innerHTML='<h2>事实边界与当前未完成项</h2><p>历史 #147：设计定稿关闭。当前 dossier：1-interview 已完成 / 2-prototype 待确认 / 3-contract 未进入。这是本轮访谈的状态，不是全系统固定阶段。</p><p>当前 Discovery 的连线表示记录引用与产物依赖，不伪装成 GitHub 原生依赖。Delivery 的 owner / RepoLane / Receipt 未验证。</p><button class="btn compact" data-current>回到当前 Discovery</button>';
+ }else{
+  const skillSubject=isMerged()?'git:SIM-SKILL-I8':'未形成';
+  $('#summary').innerHTML='<h2>RepoLane · 真实仓库身份形状，运行值全部模拟</h2><div class="lane-list"><article class="lane-item"><h3>SIM-LANE-SKILL · required</h3><p>github:parkth1026/parking-agents-manual</p><code>checkout git:SIM-SKILL-BASE-2<br>target refs/heads/dev<br>candidate git:SIM-SKILL-C3<br>integration '+skillSubject+'</code><p>'+esc(done?'FinalFullSuite PASS · 无待完成人工项':'integration / final full suite 尚未满足')+'</p></article><article class="lane-item"><h3>SIM-LANE-RUNTIME · required</h3><p>github:parkth1026/parking-agents</p><code>checkout git:SIM-RUNTIME-BASE-4<br>target refs/heads/dev<br>candidate git:SIM-RUNTIME-C2<br>integration git:SIM-RUNTIME-I7</code><p>'+esc(ret?'旧 Contract 的 Receipt stale':isDegraded()?'Registry 缺失，不允许推进':'FinalFullSuite PASS · 无待完成人工项')+'</p></article></div><p>required/optional 分类由 Contract 冻结；Web/Core 是仓内 Workstream，不是额外 RepoLane。空 required 集合不会合成 done。</p>';
+ }
+ $('[data-current]')?.addEventListener('click',()=>{state.revision='current';switchPhase('discovery');});
+ $('[data-debt]')?.addEventListener('click',()=>{state.phase='delivery';state.filter='all';state.query='';render();selectNode('SIM-WT-REPORTS-DEMO');});
+}
+function render(){renderHeader();draw();}
+function viewKey(){return state.dataset+'/'+state.scenario+'/'+state.phase+'/'+state.revision;}
+function saveView(){viewCache[viewKey()]={filter:state.filter,query:state.query,view:state.view,selected:state.selected,focus:state.focus,zoom:state.zoom,scroll:$('#graphScroll').scrollTop,left:$('#graphScroll').scrollLeft};}
+function restoreView(){const v=viewCache[viewKey()]||{filter:'all',query:'',view:'map',selected:null,focus:false,zoom:1,scroll:0,left:0};Object.assign(state,v);render();$('#graphScroll').scrollTop=v.scroll;$('#graphScroll').scrollLeft=v.left;}
+function switchPhase(p){saveView();state.phase=p;restoreView();$('#tab-'+p).focus();$('#announcement').textContent='切换到 '+p+' Graph';}
+function changeDataset(value){saveView();state.dataset=value;state.phase=value==='real'?'discovery':'delivery';origin=null;restoreView();}
+function selectNode(id){
+ const n=graph().nodes.find(n=>n.id===id);if(!n)return;
+ state.selected=id;draw();$('#announcement').textContent='已选择 '+n.title;
+ const dialog=$('#inspector');dialogOrigin=document.activeElement;
+ $('#inspectTitle').textContent=n.rawTitle||n.title;
+ let body=badge(n.truth,n.truth==='SIMULATED GAP'?'sim':'info')+' '+badge(n.status,['PASSED','DONE','CLOSED','CONFIRMED'].includes(n.status)?'ok':'warn');
+ if(n.axes)body+='<div class="axes">'+Object.entries(n.axes).map(([k,v])=>'<div><small>'+esc(k)+'</small><strong>'+esc(v)+'</strong></div>').join('')+'</div>';
+ body+='<div class="explain"><p><strong>为什么：</strong>'+esc(n.why)+'</p><p><strong>下一步：</strong>'+esc(n.next)+'</p></div>';
+ body+='<dl class="kv"><dt>对象 / ID</dt><dd>'+esc(n.type)+'<br><code>'+esc(n.id)+'</code></dd><dt>实际执行 owner</dt><dd>'+esc(n.owner||'NOT_VERIFIED / 未指派')+'</dd>';
+ if(n.assignee)body+='<dt>历史 assignee</dt><dd>'+esc(n.assignee)+' · ISSUE FACT；不等于 runtime owner</dd>';
+ if(n.profile)body+='<dt>Profile</dt><dd>'+esc(n.profile.id)+' @ schema '+n.profile.schema_version+'<br><code>'+esc(n.profile.digest)+'</code></dd>';
+ if(n.candidate)body+='<dt>Subject</dt><dd><code>'+esc(n.candidate)+'<br>'+esc(n.attempt)+'<br>'+esc(simSubject())+'</code></dd>';
+ if(n.qaActor)body+='<dt>独立 QA</dt><dd>'+esc(n.qaActor)+' ≠ '+esc(n.owner)+'<br>Role: QAValidator · Carrier: '+esc(n.carrier)+'<br>fresh_context / browser_live / durable_receipt；Skill 不授予角色权限。</dd>';
+ body+='</dl>';
+ if(n.type==='historical-issue')body+='<div class="provenance"><strong>字段来源</strong><p>完整标题、CLOSED、快照 assignee：ISSUE FACT（本地 API 摘录）。图上简称 / kind / 原因与下一步：DERIVED。精确抓取时间未知，仅记录日期 2026-08-30。</p><p>作者交付声明：ISSUE COMMENT，不是 typed Receipt。原始 API JSON 未随本原型保存。</p><a href="'+n.source+'" target="_blank" rel="noopener">打开原始 Issue</a><br><a href="../../1-interview/facts/issue-147-real-data.md">查看历史摘录</a></div>';
+ else if(n.truth==='SIMULATED GAP')body+='<div class="provenance"><strong>SIMULATED GAP · '+esc(state.scenario)+' 快照</strong><p>运行事实均为补全样本。设计依据：已确认 behavior B1–B21、API §2–6；本页面没有 real runtime 连接。</p><code>profile / policy / contract / subject 均需精确匹配；无 digest 不贡献 Gate。</code></div>';
+ else body+='<div class="provenance"><strong>'+esc(n.truth)+'</strong><p>当前 dossier 的持久记录；图的位置与引用线为派生布局，不是原生任务依赖。</p><a href="'+esc(n.source)+'" target="_blank" rel="noopener">查看来源文件</a><p>revisits: DISC-HISTORICAL-159<br>supersedes: null · contract_digest: null</p></div>';
+ if(n.id==='SIM-WT-REPORTS-DEMO')body+='<div class="provenance"><strong>optional 不会被改成 PASS</strong><p>repo: github:sim-org/story-reports<br>checkout: git:SIM-REPORTS-BASE-1<br>target: refs/heads/dev<br>catalog: sha256:SIM-REPORTS-CATALOG-1</p><p>恢复入口：story:SIM-STORY-900/lane:SIM-LANE-REPORTS<br>环境修复 / 恢复由 Workflow/Skill 负责。</p></div>';
+ body+='<div class="dialog-actions"><button class="btn" id="inspectFocus">在图中一跳聚焦</button><button class="btn" id="inspectEvidence">'+(state.dataset==='sim'?'进入证据对照':'查看来源与版本')+'</button></div>';
+ if(state.dataset==='sim'&&state.scenario==='return')body+='<div class="dialog-actions"><button class="btn" id="inspectTrace">沿回流链跨图追溯</button></div>';
+ $('#inspectBody').innerHTML=body;
+ $('#inspectFocus').onclick=()=>{state.focus=true;dialog.close();draw();const b=$$('#canvas [data-node]').find(b=>b.dataset.node===id);b?.scrollIntoView({block:'nearest',inline:'nearest'});b?.focus();};
+ $('#inspectEvidence').onclick=()=>{dialog.close();openReview(state.dataset==='sim'?'evidence':'sources');};
+ $('#inspectTrace')?.addEventListener('click',()=>{dialog.close();openReview('trace');});
+ dialog.showModal();$('#inspectTitle').focus();
+}
+
+function receiptCard(id,status,subject,actor,reason){
+ return '<article class="receipt-card"><h3>'+badge(status,status==='PASS'?'ok':status==='STALE'?'neutral':'warn')+' '+esc(id)+'</h3><p>'+esc(reason)+'</p><code>subject: '+esc(subject)+'<br>actor: '+esc(actor)+'<br>attempt: '+(id.includes('RUNTIME')?'SIM-RUNTIME-ATTEMPT-2':'SIM-ATTEMPT-4')+'<br>contract: sha256:SIM-CONTRACT-2<br>profile: '+(id.includes('RUNTIME')?'sha256:SIM-PROFILE-RUNTIME-2':'sha256:SIM-PROFILE-WEB-3')+'<br>policy: sha256:SIM-QA-POLICY-5</code></article>';
+}
+function reviewContent(kind){
+ if(kind==='sources'){
+  $('#reviewTitle').textContent='来源与版本 · 只读审计';
+  return '<div class="review-tabs"><button class="btn" data-review-kind="versions">当前 / 历史对照</button><button class="btn" data-review-kind="rules">边界规则</button></div><article class="receipt-card"><h3>历史 tracker · 事实摘录，不是 live</h3><p>#147 + #148–159；12 membership / 7 native dependency。抓取日期 2026-08-30，精确抓取时间未知。本轮未重新抓取 GitHub。</p><a href="../../1-interview/facts/issue-147-real-data.md">Issue 原文与字段摘录</a><br><a href="../../1-interview/facts/web-v5-real-story-dataset.md">逐票 dependency 与 provenance 分片</a></article><article class="receipt-card"><h3>本轮 dossier · 用户决定</h3><p>P12 单向只读；P13 required-only + optional debt；P14 确认业务基线，但未确认 Web。</p><a href="../../1-interview/rounds.jsonl">查看持久问答</a><br><a href="../behavior.md">确认版行为</a> · <a href="../api-mock.md">确认版报文</a> · <a href="../diagram.html">确认版架构</a></article><article class="receipt-card"><h3>SIMULATED GAP · 隔离演练</h3><p>真实 #147 缺少运行数据，Delivery 样本依据确认版业务构造；包括仓库关系、Gate、exact subject、actor、Receipt、回流与 optional debt。页面只消费嵌入的固定快照，不执行真实 reducer。</p></article>';
+ }
+ if(kind==='versions'){
+  $('#reviewTitle').textContent='Discovery · 版本对照';
+  return '<table class="review-table"><thead><tr><th>对象</th><th>历史 #147 / #159</th><th>当前 dossier</th></tr></thead><tbody><tr><td>来源</td><td>GitHub 12 子票 + 7 dependency</td><td>本地 rounds / manifest / 对照物</td></tr><tr><td>状态</td><td>Tracker CLOSED</td><td>2-prototype pending</td></tr><tr><td>契约</td><td>作者声明 spec v1.0 + ADR</td><td>contract_digest=null</td></tr><tr><td>关系</td><td>DISC-HISTORICAL-159</td><td>revisits 历史；supersedes=null</td></tr><tr><td>交付证明</td><td>设计完成声明，不是代码交付</td><td>Delivery NOT_CONNECTED / 0 VERIFIED</td></tr></tbody></table><p class="explain">当前图不是又造了一组 Issue。它是同一 Story 的本地重访版本；两种来源必须分开读。</p><div class="dialog-actions"><button class="btn" data-jump-history>在图中查看历史</button><button class="btn" data-jump-current>在图中查看当前</button></div>';
+ }
+ if(kind==='rules'){
+  $('#reviewTitle').textContent='闭环边界 · 这些操作不在 Web 执行';
+  return '<div class="receipt-card"><h3>Contract 不变</h3><p>finding 经分类后自动形成下一 Delivery wave 的新 WorkTicket；不是跳过验证直接进入 integration。Workflow/Skill 维护这些事实。</p></div><div class="receipt-card"><h3>公共承诺变化 / 分类未知</h3><p>requires-decision 回 Discovery。裁决、Contract 新版本、下一 wave 都有独立对象；变化后的 subject 必须重新取证。</p><button class="btn" data-return-sim>查看模拟回流快照</button></div><div class="receipt-card"><h3>非 PASS 与人工边界</h3><p>FAIL / NOT_RUN / BLOCKED 默认阻断。Profile 明示可豁免并由授权 actor 签发 Waiver 才能 done-with-waiver，原始结果不改为 PASS。</p><p>HumanTest / quorum / Waiver 只读展示证据；当前 v1 不在 Web 签收、撤销或提交 decision。</p></div><div class="receipt-card"><h3>Registry 降级</h3><p>缺精确 digest 时不能改用同名最新版；暂停推进。恢复原 Registry 或在 Discovery 创建替代票由 Workflow/Skill 完成。</p></div>';
+ }
+ if(kind==='trace'){
+  $('#reviewTitle').textContent='跨图 Trace · 全部模拟 / 已发布后的快照';
+  return '<p class="explain">此演练展示一次已经完成裁决的历史链，不是在本页面批准变更。点击每步会实际定位对应图与对象，随后可返回来源位置。</p><div class="trace-steps"><button class="btn" data-trace="finding">1. Delivery finding · SIM-FINDING-PUBLIC-BEHAVIOR<small>来源 SIM-WT-SKILL-42 · 公共行为差异 · requires-decision</small></button><button class="btn" data-trace="decision">2. Discovery decision · SIM-WT-DECISION-18<small>一次独立裁决，不把实现票原地变成设计票</small></button><button class="btn" data-trace="contract">3. Discovery Contract@3<small>sha256:SIM-CONTRACT-3 · 旧 Contract@2 Receipt stale</small></button><button class="btn" data-trace="wave">4. Delivery wave-3 · SIM-WT-SKILL-43<small>新 WorkTicket / 新 Attempt / 重新取证；不复活旧票</small></button></div>';
+ }
+ const done=isFinal(),ret=state.scenario==='return',qa=state.scenario==='qa',degraded=isDegraded();
+ $('#reviewTitle').textContent='Evidence Review Workspace · 只读';
+ let html='<div class="review-tabs"><button class="btn" data-review-kind="evidence">当前证据</button><button class="btn" data-review-kind="attempts">Attempt / freshness</button><button class="btn" data-review-kind="rules">判定边界</button></div>';
+ if(kind==='attempts')return html+'<table class="review-table"><thead><tr><th>Attempt</th><th>Subject</th><th>当前贡献</th></tr></thead><tbody><tr><td>SIM-ATTEMPT-3</td><td>SIM-SKILL-C2 / Contract@1</td><td>STALE · audit only</td></tr><tr><td>SIM-ATTEMPT-4</td><td>SIM-SKILL-C3 / Contract@2</td><td>'+esc(ret?'STALE · Contract changed':qa?'尚在取证':'仅 candidate Gate')+'</td></tr><tr><td>集成验证</td><td>'+esc(isMerged()?'SIM-SKILL-I8':'尚未形成当前 subject')+'</td><td>'+esc(done?'FinalFullSuite PASS':'缺 current full-suite')+'</td></tr></tbody></table><p class="explain">Attempt append-only。Subject、Contract、Profile 或 policy digest 变化，旧 Receipt 保留但不贡献新 Gate。</p>';
+ html+='<p class="explain"><strong>'+esc(done?'Story done · required 2/2':degraded?'DEGRADED · 不允许推进':'Story 尚未完成')+'</strong><br>'+esc(done?'无全局必需待办；optional 债务另列，Waiver 数 0。':'candidate QA 只证明 candidate；integration final full-suite 必须独立匹配。')+'</p>';
+ html+=receiptCard('SIM-RCPT-SKILL-QA-C3',qa?'MISSING':ret?'STALE':degraded?'UNVERIFIED':'PASS','candidate / git:SIM-SKILL-C3','SIM-ACTOR-QA-7',qa?'QA 正在执行，不能展示为 PASS。':ret?'Contract@3 已改变，旧 Receipt 为 audit only。':isMerged()?'历史 candidate Gate 满足；对 integration I8 不贡献。':'仅对 candidate C3 Gate 有效。');
+ html+=receiptCard('SIM-RCPT-SKILL-REVIEW-C3',qa?'MISSING':ret?'STALE':degraded?'UNVERIFIED':'PASS','candidate / git:SIM-SKILL-C3','SIM-ACTOR-REVIEW-8','来源票的 Review Receipt；独立 reviewer，不强制建立 Review WorkTicket。');
+ html+=receiptCard('SIM-RCPT-SKILL-FULL-SUITE-I8',done?'PASS':'MISSING','integration / git:SIM-SKILL-I8','SIM-ACTOR-INTEGRATION-QA-9',done?'精确 I8 上完整回归 PASS；必需 Human 无待办。':isMerged()?'当前 I8 缺最终 full suite，阻止 required Lane 收口。':'尚没有匹配的 integration full-suite；I8 仅为后续模拟 subject。');
+ html+=receiptCard('SIM-RCPT-RUNTIME-FULL-SUITE-I7',ret?'STALE':degraded?'UNVERIFIED':'PASS','integration / git:SIM-RUNTIME-I7','SIM-ACTOR-RUNTIME-QA-4',ret?'旧 Contract@2 证据不能贡献 Contract@3 Gate。':'Runtime Lane 的完整回归，不能替 SKILL Lane 过关。');
+ html+='<div class="receipt-card"><h3>独立性与 Gate predicate</h3><p>implementation actor SIM-ACTOR-IMPL-2 ≠ QA actor SIM-ACTOR-QA-7 ≠ Review actor SIM-ACTOR-REVIEW-8。</p><p>Gate predicate：exact subject + contract/profile/policy match + required receipts + actor separation + 所需 Human requirements。Review 默认为来源票的 Gate/Receipt，不强行生成另一张 Review WorkTicket。</p><p>本场景无 required Human 待办；这不是用户签发的 Human PASS。</p></div>';
+ if(done)html+='<div class="debt-banner"><strong>OPTIONAL DEBT 仍有 1 条</strong><p>SIM-LANE-REPORTS / SIM-ACTOR-REPORTS-OWNER · 环境 unavailable；required 不受影响。只能通过 Workflow/Skill 恢复。</p></div>';
+ return html;
+}
+function openReview(kind){
+ if(state.dataset==='real'&&['evidence','attempts'].includes(kind))kind='sources';
+ dialogOrigin=document.activeElement;
+ $('#reviewBody').innerHTML=reviewContent(kind);
+ $$('[data-review-kind]').forEach(b=>b.onclick=()=>{openReview(b.dataset.reviewKind);});
+ $('[data-jump-history]')?.addEventListener('click',()=>{rememberOrigin();$('#reviewDialog').close();state.phase='discovery';state.revision='historical';state.filter='all';state.query='';render();});
+ $('[data-jump-current]')?.addEventListener('click',()=>{rememberOrigin();$('#reviewDialog').close();state.phase='discovery';state.revision='current';state.filter='all';state.query='';render();});
+ $('[data-return-sim]')?.addEventListener('click',()=>{$('#reviewDialog').close();changeDataset('sim');state.scenario='return';render();openReview('trace');});
+ $$('[data-trace]').forEach(b=>b.onclick=()=>traceTo(b.dataset.trace));
+ if(!$('#reviewDialog').open)$('#reviewDialog').showModal();$('#reviewTitle').focus();
+}
+function rememberOrigin(){if(!origin)origin={state:structuredClone(state),scroll:$('#graphScroll').scrollTop,left:$('#graphScroll').scrollLeft,windowY:window.scrollY};}
+function traceTo(step){
+ rememberOrigin();$('#reviewDialog').close();state.filter='all';state.query='';state.focus=false;state.view='map';
+ const targets={finding:['delivery','SIM-WT-SKILL-42'],decision:['discovery','SIM-WT-DECISION-18'],contract:['discovery','SIM-DISC-CONTRACT-3'],wave:['delivery','SIM-WT-SKILL-43']};
+ [state.phase,state.selected]=targets[step];render();const node=$$('#canvas [data-node]').find(b=>b.dataset.node===state.selected);node?.scrollIntoView({block:'nearest',inline:'nearest'});selectNode(state.selected);
+}
+function returnOrigin(){
+ if(!origin)return;const saved=origin;origin=null;$('#inspector').close();$('#reviewDialog').close();Object.assign(state,saved.state);render();$('#graphScroll').scrollTop=saved.scroll;$('#graphScroll').scrollLeft=saved.left;window.scrollTo(0,saved.windowY);$('#announcement').textContent='已恢复来源 Tab、筛选、选择、缩放和滚动位置。';$('#tab-'+state.phase).focus({preventScroll:true});
+}
+$('#dataset').onchange=e=>changeDataset(e.target.value);
+$('#scenario').onchange=e=>{saveView();state.scenario=e.target.value;origin=null;restoreView();};
+$('#revision').onchange=e=>{saveView();state.revision=e.target.value;restoreView();};
+$$('[data-phase]').forEach(b=>{b.onclick=()=>switchPhase(b.dataset.phase);b.onkeydown=e=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(e.key)){e.preventDefault();switchPhase(e.key==='Home'?'discovery':e.key==='End'?'delivery':state.phase==='discovery'?'delivery':'discovery');}};});
+$('#search').oninput=e=>{state.query=e.target.value;draw();};
+$$('[data-filter]').forEach(b=>b.onclick=()=>{state.filter=b.dataset.filter;draw();});
+$('#mapView').onclick=()=>{state.view='map';draw();};$('#listView').onclick=()=>{state.view='list';draw();};
+$('#focusNode').onclick=()=>{if(!state.selected){$('#announcement').textContent='请先选中一个节点。';return;}state.focus=!state.focus;draw();};
+$('#membership').onclick=()=>{state.membership=!state.membership;draw();};$('#progression').onclick=()=>{state.progression=!state.progression;draw();};
+$('#zoomOut').onclick=()=>{state.zoom=Math.max(.8,Math.round((state.zoom-.1)*10)/10);draw();};$('#zoomIn').onclick=()=>{state.zoom=Math.min(1.4,Math.round((state.zoom+.1)*10)/10);draw();};$('#zoomReset').onclick=()=>{state.zoom=1;draw();};
+$('#sources').onclick=()=>openReview('sources');$('#review').onclick=()=>openReview('evidence');
+$('#traceButton').onclick=()=>openReview(state.dataset==='real'?'versions':state.scenario==='return'?'trace':'rules');
+$('#closeInspector').onclick=()=>$('#inspector').close();$('#closeReview').onclick=()=>$('#reviewDialog').close();
+$('#inspector').addEventListener('close',()=>{if($('#reviewDialog').open)return;const selected=$$('[data-node]').find(b=>b.dataset.node===state.selected&&!b.closest('[hidden]'));selected?.focus({preventScroll:true});});
+$('#returnOrigin').onclick=returnOrigin;
+$('#primary').onclick=()=>{
+ if(state.dataset==='real'){state.phase='discovery';state.revision='current';state.query='';state.filter='all';render();selectNode('ARTIFACT-WEB-V6');return;}
+ if(isFinal()||isDegraded()){openReview(isFinal()?'evidence':'rules');return;}
+ state.phase='delivery';state.query='';state.filter='all';render();selectNode(state.scenario==='return'?'SIM-WT-SKILL-43':state.scenario==='qa'?'SIM-WT-SKILL-42':'SIM-GATE-SKILL-INTEGRATION');
+};
+$('#parallel').onclick=()=>{state.phase='delivery';state.query='';state.filter='all';render();selectNode('SIM-WT-RUNTIME-DOCS');};
+$('#export').onclick=()=>{
+ const g=graph();
+ const payload={prototype:'Story Atlas v6',static_snapshot:true,truth_class:state.dataset==='real'?'HISTORICAL_AND_DOSSIER_WITH_FIELD_PROVENANCE':'SIMULATED_GAP',story_id:state.dataset==='real'?'github:parkth1026/parking-agents#147':'SIM-STORY-900',runtime:'NOT_CONNECTED',view:structuredClone(state),graph:g,domain_commands:[],source_notice:'historical local excerpts, not raw API or live Runtime; all SIM fields constructed from P14 baseline'};
+ const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='story-atlas-v6-'+state.dataset+'-'+state.phase+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);$('#announcement').textContent='已导出当前带 provenance 的只读快照。';
+};
+render();
+
+</script>
+<!-- Changed: current/historical Discovery split; real/SIM isolation; proper RepoLanes; three axes; exact candidate/integration evidence; required-only done with debt; actual trace and context restore; immediate native-dialog inspector.
+Unchanged: selected two-tab Map-first structure, AES Console tokens, one StoryRoot, read-only Web.
+No network, backend, domain commands or workflow-story-map implementation. Code-native graph is a data visualization, not an image substitute. -->
+</body></html>

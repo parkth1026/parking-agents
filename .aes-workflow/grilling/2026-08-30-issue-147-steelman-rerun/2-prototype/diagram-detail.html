@@ -1,0 +1,55 @@
+<!-- confirmed P14 | 2026-08-31
+     用户确认：好的请继续；仅业务基线，不含 Web 或实现授权
+     确认版·锁定不可修改；执行 Agent 改产品，不改本对照物 -->
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Story Atlas v6 · 领域对象关系</title>
+<style>
+:root{--paper:#f5f5f5;--ink:#2d3142;--muted:#4f5d75;--soft:#7a8399;--accent:#eb6c36;--accent-tint:#fdf1ec;--surface:#fff;--chip:#eef1f6;--chip-accent:#f7dfd3;--font-ui:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;--font-mono:ui-monospace,"Cascadia Mono",Consolas,monospace}*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--font-ui)}main{width:min(1160px,calc(100% - 32px));margin:24px auto 48px}h1{font-size:24px;margin:0 0 8px}p{color:var(--muted)}section{margin-top:24px;padding:20px;background:#fff;border:1px solid #d9dde6;border-radius:8px;overflow:auto}.canvas{min-width:1100px}svg{display:block;width:1100px;height:auto;margin:auto}.node{fill:#fff;stroke:var(--muted);stroke-width:1.25}.node.changed{fill:var(--accent-tint);stroke:var(--accent);stroke-width:2}.chip{fill:var(--chip)}.chip.changed{fill:var(--chip-accent)}.edge{fill:none;stroke:var(--muted);stroke-width:1.5}.edge.changed{stroke:var(--accent);stroke-width:1.75}.edge.owns{stroke-dasharray:4 4}.title{font:600 12px var(--font-ui);fill:var(--ink)}.sub{font:9px var(--font-mono);fill:var(--muted)}.kind{font:8px var(--font-mono);fill:var(--muted);letter-spacing:1px}.kind.changed{fill:var(--accent)}.edge-label{font:8px var(--font-mono);fill:var(--muted)}.label-mask{fill:var(--paper)}.ledger{margin-top:16px;padding:12px 16px;background:#eef1f6;border-radius:6px;font-size:12px;color:var(--muted)}.ledger b{color:var(--ink)}.legend{font:12px var(--font-mono);color:var(--muted)}.swatch{display:inline-block;width:12px;height:12px;margin:0 6px 0 18px;vertical-align:-2px;border-radius:2px;background:#fff;border:1.25px solid var(--muted)}.swatch:first-child{margin-left:0}.swatch.changed{background:var(--accent-tint);border:2px solid var(--accent)}footer{margin-top:24px;color:var(--muted);font-size:12px}
+</style>
+</head>
+<body><main>
+<h1>Story Atlas v6 · 领域对象关系</h1>
+<p>本图回答“谁拥有谁、证据绑在哪、什么参与 done”。它不定义固定执行阶段。P13=A：只有 required RepoLane 参与终态门禁；optional Lane 保留原状态与 optional_debt，不自动关闭、不自动 PASS。</p>
+<div class="legend"><i class="swatch changed"></i>本次纠正的对象边界<i class="swatch"></i>既有责任</div>
+<section><div class="canvas">
+<svg viewBox="0 0 1100 432" role="img" aria-labelledby="domain-title domain-desc">
+  <title id="domain-title">Story Atlas v6 领域对象关系</title>
+  <desc id="domain-desc">StoryRoot 拥有 Discovery revision、DeliveryMap 和 RepoLane；Contract 约束 Delivery。RepoLane 内 WorkTicket 追加 Attempt，Attempt 产生绑定精确 subject 的 Receipt，Gate 与 Story reducer从这些事实计算终态。</desc>
+  <defs>
+    <marker id="d-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10Z" fill="#4f5d75"/></marker>
+    <marker id="d-arrow-accent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10Z" fill="#eb6c36"/></marker>
+  </defs>
+
+  <path class="edge" d="M192 108 H216" marker-end="url(#d-arrow)"/>
+  <path class="edge owns" d="M112 72 V36 H676 V72" marker-end="url(#d-arrow)"/>
+  <path class="edge" d="M380 108 H404" marker-end="url(#d-arrow)"/>
+  <path class="edge" d="M568 108 H592" marker-end="url(#d-arrow)"/>
+  <path class="edge changed" d="M112 140 V268 H216" marker-end="url(#d-arrow-accent)"/>
+  <path class="edge" d="M672 140 V224 H300 V252" marker-end="url(#d-arrow)"/>
+  <path class="edge" d="M380 284 H404" marker-end="url(#d-arrow)"/>
+  <path class="edge" d="M568 284 H592" marker-end="url(#d-arrow)"/>
+  <path class="edge" d="M756 284 H780" marker-end="url(#d-arrow)"/>
+  <path class="edge" d="M944 284 H968" marker-end="url(#d-arrow)"/>
+  <path class="edge changed" d="M300 316 V360 H1020 V320" marker-end="url(#d-arrow-accent)"/>
+  <rect class="label-mask" x="360" y="20" width="68" height="12"/><text class="edge-label" x="394" y="30" text-anchor="middle">owns both maps</text>
+
+  <g><rect class="node" x="32" y="76" width="160" height="64" rx="6"/><rect class="chip" x="40" y="84" width="48" height="12" rx="2"/><text class="kind" x="64" y="93" text-anchor="middle">STORY</text><text class="title" x="112" y="114" text-anchor="middle">StoryRoot</text><text class="sub" x="112" y="130" text-anchor="middle">one user intent</text></g>
+  <g><rect class="node" x="220" y="76" width="160" height="64" rx="6"/><rect class="chip" x="228" y="84" width="68" height="12" rx="2"/><text class="kind" x="262" y="93" text-anchor="middle">DISCOVERY</text><text class="title" x="300" y="114" text-anchor="middle">DiscoveryRevision</text><text class="sub" x="300" y="130" text-anchor="middle">current / historical</text></g>
+  <g><rect class="node" x="408" y="76" width="160" height="64" rx="6"/><rect class="chip" x="416" y="84" width="60" height="12" rx="2"/><text class="kind" x="446" y="93" text-anchor="middle">SUBJECT</text><text class="title" x="488" y="114" text-anchor="middle">ContractRevision</text><text class="sub" x="488" y="130" text-anchor="middle">digest-bound promise</text></g>
+  <g><rect class="node" x="596" y="76" width="160" height="64" rx="6"/><rect class="chip" x="604" y="84" width="60" height="12" rx="2"/><text class="kind" x="634" y="93" text-anchor="middle">DELIVERY</text><text class="title" x="676" y="114" text-anchor="middle">DeliveryMap</text><text class="sub" x="676" y="130" text-anchor="middle">waves · dynamic edges</text></g>
+
+  <g><rect class="node changed" x="220" y="252" width="160" height="64" rx="6"/><rect class="chip changed" x="228" y="260" width="60" height="12" rx="2"/><text class="kind changed" x="258" y="269" text-anchor="middle">CHANGED</text><text class="title" x="300" y="288" text-anchor="middle">RepoLane</text><text class="sub" x="300" y="302" text-anchor="middle">repo · tracker</text><text class="sub" x="300" y="312" text-anchor="middle">checkout · integration</text></g>
+  <g><rect class="node" x="408" y="252" width="160" height="64" rx="6"/><rect class="chip" x="416" y="260" width="52" height="12" rx="2"/><text class="kind" x="442" y="269" text-anchor="middle">TICKET</text><text class="title" x="488" y="288" text-anchor="middle">WorkTicket</text><text class="sub" x="488" y="302" text-anchor="middle">profile binding</text><text class="sub" x="488" y="312" text-anchor="middle">lifecycle · control · gate</text></g>
+  <g><rect class="node" x="596" y="252" width="160" height="64" rx="6"/><rect class="chip" x="604" y="260" width="56" height="12" rx="2"/><text class="kind" x="632" y="269" text-anchor="middle">ATTEMPT</text><text class="title" x="676" y="288" text-anchor="middle">Attempt</text><text class="sub" x="676" y="302" text-anchor="middle">role · carrier · skill</text><text class="sub" x="676" y="312" text-anchor="middle">candidate subject</text></g>
+  <g><rect class="node" x="784" y="252" width="160" height="64" rx="6"/><rect class="chip" x="792" y="260" width="60" height="12" rx="2"/><text class="kind" x="822" y="269" text-anchor="middle">RECEIPT</text><text class="title" x="864" y="288" text-anchor="middle">Typed Receipt</text><text class="sub" x="864" y="302" text-anchor="middle">actor · subject</text><text class="sub" x="864" y="312" text-anchor="middle">policy/profile digests</text></g>
+  <g><rect class="node" x="972" y="252" width="96" height="64" rx="6"/><rect class="chip" x="980" y="260" width="44" height="12" rx="2"/><text class="kind" x="1002" y="269" text-anchor="middle">CORE</text><text class="title" x="1020" y="290" text-anchor="middle">Gate</text><text class="sub" x="1020" y="306" text-anchor="middle">+ reducer</text></g>
+</svg>
+</div>
+<div class="ledger"><b>Fidelity ledger</b><br>Detail: detailed · 源 = StoryRoot、两图、Contract、RepoLane、WorkTicket、Attempt、Receipt、Gate/Reducer → 9 节点 / 11 边<br>Merged: Gate projector、RepoLane reducer、Story reducer → Core Gate + reducer（避免超过 9 节点）<br>Collapsed: WorkTicket 内部 ProfileBinding 与三轴；Attempt 内部 Role/Carrier/Skill/candidate → sub 行保留；required/optional 分类在 Contract 冻结，P13 optional_debt 见图前旁注与 behavior B21<br>Dropped: Workstream → 它只用于视觉分组，不参与领域终态；optional 债务的 owner/原因/影响/恢复入口不作为额外图节点，完整字段见 API §2A<br>Kept in full: StoryRoot 对双图的拥有关系、RepoLane identity、append-only Attempt、Receipt exact subject、只由 required Lane 合成终态且保留 optional 原始状态</div>
+</section>
+<footer>删除清单：WEB/CORE 作为 RepoLane；owner 代替 Role/actor/Carrier；单一 state；candidate subject 直接满足 integration Gate。</footer>
+</main></body></html>
+

@@ -1,0 +1,452 @@
+{
+  "viewport": "768x1080",
+  "flow": {
+    "initial": {
+      "phase": "delivery",
+      "pulse": "WEB QA 是当前必需 Lane 的最长剩余路径。",
+      "deliveryNodes": 13,
+      "truth": "TRUTH BOUNDARY\nISSUE FACT\n\n#147 + 12 native members + 7 descendant dependency；root 自身 blockedBy / blocking 为 0 / 0。\n\nSIMULATED GAP\n\nDelivery runtime 不存在；下方 Lane、Receipt、Gate、owner 与 wave 均由 spec / ADR / dossier 推演。",
+      "fixedStages": 0,
+      "simLabels": 4,
+      "runtimeNotConnected": true
+    },
+    "webQa": {
+      "selected": "SIM-W2-WEB-Q",
+      "selection": "NOW\nSIM-W2-WEB-Q · WEB QA\n模拟 WEB QA 正在运行。\nWHY\nSIMULATED GAP\n它是 WEB required Lane 的最长剩余路径。\nOWNER\nSIM-WEB-Q\nWEB Lane\nNEXT\n完成当前 subject 的可视化与交互核对。\nWeb projection is read only\nUNLOCKS / SOURCE\nWEB Review\nDERIVED simulation from Profile rules"
+    },
+    "deliveryFocus": {
+      "pressed": "true",
+      "dim": 10
+    },
+    "deliveryList": {
+      "mapHidden": true,
+      "listHidden": false,
+      "rows": 13
+    },
+    "evidence": {
+      "open": true,
+      "title": "Evidence / Gate 对照 · 只读演练",
+      "body": "SIM-RCPT-W2-CORE-QA · FRESH\n\nsubject: contract@2 + SIM-CORE-C2；profile digest match；可贡献 CORE QA Gate。\n\nSIM-RCPT-W1-WEB-QA · STALE\n\nsubject: contract@1 + SIM-WEB-C1；contract 与 candidate 已变化；audit only；Gate contribution none。\n\nSIM-W2-WEB-QA · MISSING\n\n当前 WEB QA 仍 running；未生成 current Receipt；WEB Review blocked，WEB Lane Gate pending。\n\nStory acceptance · LOCKED\n\nWEB / CORE 两条 required RepoLane Gate 尚未全部 terminal；不得合成 Story done。",
+      "focus": "modalTitle"
+    },
+    "discovery": {
+      "phase": "discovery",
+      "nodes": 13,
+      "membership": 12,
+      "dependency": 7,
+      "pulse": "真实 #147 设计图已闭合；当前本地 prototype 仍待确认。"
+    },
+    "issue153": {
+      "selected": "ISSUE-153",
+      "selection": "NOW\n#153 · 裁决：执行与验收挂载\n架构裁决完成，不是代码实现。\nWHY\nISSUE FACT\n定义可插拔执行层与 Story 收口。\nOWNER\nparkth1026\ndecision · NOT implementation\nNEXT\n历史终态。\nWeb projection is read only\nUNLOCKS / SOURCE\n作者演进 #154\nhttps://github.com/parkth1026/parking-agents/issues/153"
+    },
+    "progression": {
+      "pressed": "true",
+      "edges": 7
+    },
+    "search": {
+      "query": "#158",
+      "visible": [
+        "ISSUE-158"
+      ],
+      "rows": 1
+    },
+    "return": {
+      "modal": true,
+      "title": "Delivery → Discovery 回流",
+      "body": "SIM-FINDING-01 · requires-decision\n\n演练：WEB QA 发现固定阶段表达会改变公共 Story 语义，因此 Delivery 不自动继续。\n\nSIM-D-REVISION-01 · Discovery decision\n\n返回 Discovery 重新裁决双 Tab Graph；修订 contract@2。\n\nReceipt freshness\n\ncontract revision 后 wave-1 Receipt 全部 stale，保留审计但不能满足 wave-2 Gate。"
+    },
+    "source": {
+      "open": true,
+      "body": "ISSUE FACT · real tracker data\n\nhttps://github.com/parkth1026/parking-agents/issues/147\n\nRoot #147；12 native sub-issues；12 membership；7 descendant dependency；1 closure comment。root 0/0 不能外推为整个 descendant graph 0 edge。\n\nDOSSIER FACT · current design workflow\n\n1-interview/context.md · rounds.jsonl · manifest.json\n\n2-prototype pending；WEB-P9 Map-first；WEB-P10 two tabs；P12 Runtime→Web 单向只读投影。\n\nSIMULATED GAP · delivery coverage\n\ndesign basis: spec §10 · ADR 0002–0004 · Q23–Q35 · P12 · WEB-P9–P11\n\n所有 SIM-*、RepoLane、candidate、Receipt、Gate、owner、wave 和 next action 都是演练；真实 Delivery runtime 为 NOT_CONNECTED。"
+    }
+  },
+  "responsive": {
+    "delivery768": {
+      "body": [
+        753,
+        753,
+        1793
+      ],
+      "viewport": [
+        768,
+        1080
+      ],
+      "visibleButtons": 30,
+      "smallText": 24
+    },
+    "viewport480": {
+      "body": [
+        465,
+        465,
+        2758
+      ],
+      "viewport": [
+        480,
+        900
+      ],
+      "visibleButtons": 30,
+      "smallText": 2
+    },
+    "viewport1440": {
+      "body": [
+        1425,
+        1425,
+        1657
+      ],
+      "viewport": [
+        1440,
+        1000
+      ],
+      "visibleButtons": 30,
+      "smallText": 24
+    }
+  },
+  "interactions": [
+    {
+      "type": "pointer",
+      "before": {
+        "selector": "[data-node=\"SIM-W2-WEB-Q\"]",
+        "text": "SIM-W2-WEB-Q running WEB QA WEB · frontier · current subject",
+        "rect": {
+          "x": 211.5,
+          "y": 499.390625,
+          "width": 150,
+          "height": 80.625
+        },
+        "visible": true,
+        "disabled": false,
+        "selected": null,
+        "pressed": "true"
+      }
+    },
+    {
+      "type": "pointer",
+      "before": {
+        "selector": "#deliveryFocus",
+        "text": "一跳聚焦",
+        "rect": {
+          "x": 423.484375,
+          "y": 524.390625,
+          "width": 66,
+          "height": 31
+        },
+        "visible": true,
+        "disabled": false,
+        "selected": null,
+        "pressed": "false"
+      }
+    },
+    {
+      "type": "pointer",
+      "before": {
+        "selector": "#deliveryFocus",
+        "text": "一跳聚焦",
+        "rect": {
+          "x": 423.484375,
+          "y": 524.390625,
+          "width": 66,
+          "height": 31
+        },
+        "visible": true,
+        "disabled": false,
+        "selected": null,
+        "pressed": "true"
+      }
+    },
+    {
+      "type": "pointer",
+      "before": {
+        "selector": "[data-view-toggle=\"delivery\"][data-view=\"list\"]",
+        "text": "List",
+        "rect": {
+          "x": 686.65625,
+          "y": 524.546875,
+          "width": 43.34375,
+          "height": 31
+        },
+        "visible": true,
+        "disabled": false,
+        "selected": null,
+        "pressed": "false"
+      }
+    },
+    {
+      "type": "pointer",
+      "before": {
+        "selector": "[data-view-toggle=\"delivery\"][data-view=\"map\"]",
+        "text": "Map",
+        "rect": {
+          "x": 634.65625,
+          "y": 524.546875,
+          "width": 46,
+          "height": 31
+        },
+        "visible": true,
+        "disabled": false,
+        "selected": null,
+        "pressed": "false"
+      }
+    },
+    {
+      "type": "pointer",
+      "before": {
+        "selector": "#evidenceButton",
+        "text": "打开证据对照",
+        "rect": {
+          "x": 617.984375,
+          "y": 990.5,
+          "width": 112,
+          "height": 36
+        },
+        "visible": true,
+        "disabled": false,
+        "selected": null,
+        "pressed": null
+      }
+    },
+    {
+      "type": "key",
+      "key": "Escape",
+      "modifiers": 0
+    },
+    {
+      "type": "pointer",
+      "before": {
+        "selector": "[data-phase=\"discovery\"]",
+        "text": "Discovery Graph ISSUE FACT 12/12 closed · 7 native deps · real #148–#159",
+        "rect": {
+          "x": 10,
+          "y": 441.109375,
+          "width": 362.5,
+          "height": 62
+        },
+        "visible": true,
+        "disabled": false,
+        "selected": "false",
+        "pressed": null
+      }
+    },
+    {
+      "type": "pointer",
+      "before": {
+        "selector": "[data-node=\"ISSUE-153\"]",
+        "text": "#153 closed 裁决：执行与验收挂载 decision · NOT implementation",
+        "rect": {
+          "x": 211.5,
+          "y": 585.796875,
+          "width": 150,
+          "height": 80.625
+        },
+        "visible": true,
+        "disabled": false,
+        "selected": null,
+        "pressed": "false"
+      }
+    },
+    {
+      "type": "pointer",
+      "before": {
+        "selector": "#progressionToggle",
+        "text": "作者演进线",
+        "rect": {
+          "x": 282.96875,
+          "y": 524.796875,
+          "width": 77,
+          "height": 31
+        },
+        "visible": true,
+        "disabled": false,
+        "selected": null,
+        "pressed": "false"
+      }
+    },
+    {
+      "type": "pointer",
+      "before": {
+        "selector": "#progressionToggle",
+        "text": "作者演进线",
+        "rect": {
+          "x": 282.96875,
+          "y": 524.796875,
+          "width": 77,
+          "height": 31
+        },
+        "visible": true,
+        "disabled": false,
+        "selected": null,
+        "pressed": "true"
+      }
+    },
+    {
+      "type": "pointer",
+      "before": {
+        "selector": "#searchDiscovery",
+        "text": "搜索 Discovery 节点",
+        "rect": {
+          "x": 357.625,
+          "y": 523.453125,
+          "width": 215.03125,
+          "height": 34
+        },
+        "visible": true,
+        "disabled": false,
+        "selected": null,
+        "pressed": null
+      }
+    },
+    {
+      "type": "key",
+      "key": "a",
+      "modifiers": 2
+    },
+    {
+      "type": "text",
+      "selector": "#searchDiscovery",
+      "length": 4
+    },
+    {
+      "type": "pointer",
+      "before": {
+        "selector": "#searchDiscovery",
+        "text": "搜索 Discovery 节点",
+        "rect": {
+          "x": 357.625,
+          "y": 523.453125,
+          "width": 215.03125,
+          "height": 34
+        },
+        "visible": true,
+        "disabled": false,
+        "selected": null,
+        "pressed": null
+      }
+    },
+    {
+      "type": "key",
+      "key": "a",
+      "modifiers": 2
+    },
+    {
+      "type": "text",
+      "selector": "#searchDiscovery",
+      "length": 0
+    },
+    {
+      "type": "pointer",
+      "before": {
+        "selector": "#bridgeTo button",
+        "text": "查看 requires-decision 回流说明",
+        "rect": {
+          "x": 527.296875,
+          "y": 521.109375,
+          "width": 192.703125,
+          "height": 32
+        },
+        "visible": true,
+        "disabled": false,
+        "selected": null,
+        "pressed": null
+      }
+    },
+    {
+      "type": "key",
+      "key": "Escape",
+      "modifiers": 0
+    },
+    {
+      "type": "pointer",
+      "before": {
+        "selector": "#sourceButton",
+        "text": "查看来源",
+        "rect": {
+          "x": 432.21875,
+          "y": 7,
+          "width": 70,
+          "height": 31
+        },
+        "visible": true,
+        "disabled": false,
+        "selected": null,
+        "pressed": null
+      }
+    },
+    {
+      "type": "key",
+      "key": "Escape",
+      "modifiers": 0
+    }
+  ],
+  "consoleErrors": [],
+  "accessibility": {
+    "nodeCount": 394,
+    "unnamedButtons": 0
+  },
+  "targets": {
+    "count": 16,
+    "below24": [],
+    "below36": [
+      {
+        "text": "导航",
+        "w": 46,
+        "h": 31
+      },
+      {
+        "text": "查看来源",
+        "w": 70,
+        "h": 31
+      },
+      {
+        "text": "查看 requires-decision 回流说明",
+        "w": 192.703125,
+        "h": 32
+      },
+      {
+        "text": "搜索 Discovery 节点",
+        "w": 215.03125,
+        "h": 34
+      },
+      {
+        "text": "Map",
+        "w": 46,
+        "h": 31
+      },
+      {
+        "text": "List",
+        "w": 43.34375,
+        "h": 31
+      },
+      {
+        "text": "全部 12",
+        "w": 59.296875,
+        "h": 31
+      },
+      {
+        "text": "调研 4",
+        "w": 53.1875,
+        "h": 31
+      },
+      {
+        "text": "裁决 7",
+        "w": 53.1875,
+        "h": 31
+      },
+      {
+        "text": "成员边 12",
+        "w": 70.296875,
+        "h": 31
+      },
+      {
+        "text": "作者演进线",
+        "w": 77,
+        "h": 31
+      },
+      {
+        "text": "一跳聚焦",
+        "w": 66,
+        "h": 31
+      }
+    ]
+  },
+  "reducedMotion": "0s"
+}

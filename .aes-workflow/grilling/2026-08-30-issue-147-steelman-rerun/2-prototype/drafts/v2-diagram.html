@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>workflow-story-map Skill 组合与状态流 v2</title>
+  <style>
+    :root { --paper:#f5f5f5; --ink:#2d3142; --muted:#4f5d75; --soft:#7a8399; --accent:#eb6c36; --accent-tint:#fdf1ec; --chip:#eef1f6; --chip2:#f7dfd3; --ui:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif; --mono:ui-monospace,"Cascadia Mono",Consolas,monospace; }
+    * { box-sizing:border-box; } body { margin:0; background:var(--paper); color:var(--ink); font-family:var(--ui); }
+    main { width:min(1100px,calc(100% - 32px)); margin:28px auto 48px; }
+    header,section,footer { background:#fff; border:1px solid #d8dce5; border-radius:8px; }
+    header { padding:22px 26px; } section { margin-top:18px; padding:22px; overflow-x:auto; } footer { margin-top:18px; padding:18px 22px; color:var(--muted); font-size:12px; }
+    h1 { margin:0 0 8px; font-size:24px; } h2 { margin:0 0 6px; font-size:19px; } p { margin:6px 0; line-height:1.55; }
+    .eyebrow { color:var(--soft); font-size:12px; letter-spacing:.08em; text-transform:uppercase; }
+    .legend { display:flex; gap:20px; font-size:12px; color:var(--muted); }
+    .legend span::before { content:""; display:inline-block; width:12px; height:12px; margin-right:7px; vertical-align:-2px; border:2px solid var(--muted); border-radius:2px; background:#fff; }
+    .legend .changed::before { border-color:var(--accent); background:var(--accent-tint); }
+    svg { display:block; width:100%; min-width:940px; height:auto; margin-top:14px; background:var(--paper); border-radius:8px; }
+    .node { fill:#fff; stroke:var(--muted); stroke-width:1.25; } .node.changed { fill:var(--accent-tint); stroke:var(--accent); stroke-width:2; }
+    .chip { fill:var(--chip); } .chip.changed { fill:var(--chip2); }
+    .edge { fill:none; stroke:var(--muted); stroke-width:1.5; } .edge.changed { stroke:var(--accent); stroke-width:1.75; }
+    .title { fill:var(--ink); font:600 12px var(--ui); } .sub { fill:var(--muted); font:9px var(--mono); } .type { fill:var(--muted); font:8px var(--mono); letter-spacing:1px; } .type.changed { fill:var(--accent); }
+    .label { fill:var(--muted); font:8px var(--mono); } .label.changed { fill:var(--accent); } .mask { fill:var(--paper); }
+    .lane-label { fill:var(--soft); font:600 10px var(--ui); letter-spacing:1px; }
+    .ledger { margin-top:14px; padding:14px; background:#f8f9fb; border-left:4px solid var(--muted); font-size:12px; line-height:1.5; }
+  </style>
+</head>
+<body>
+<main>
+  <header><div class="eyebrow">draft v2 · skill invocation semantics superseded by v3</div><h1>workflow-story-map Skill 组合与状态流</h1><p>此版只保留能力 inventory；Role/Carrier/Skill 的权威关系改见 v3-role-runtime-diagram.html。</p><div class="legend"><span class="changed">新增或重定义</span><span>复用且不扩权</span></div></header>
+
+  <section>
+    <h2>总览：一个入口 workflow，三类阶段闭环</h2>
+    <p>热路径只有一个 Story 总控；Web、tracker、执行器都是 adapter，不能成为第二真源。</p>
+    <svg viewBox="0 0 1000 360" role="img" aria-labelledby="ov-title ov-desc">
+      <title id="ov-title">workflow-story-map 总体组合层</title><desc id="ov-desc">Human 与 Web 进入 workflow-story-map，总控先通过 deterministic core 恢复与对账，再路由到 Discovery、Delivery 或 Integration 阶段 workflow，最终由 RepoLane 和 Story reducer 合成状态并投影回 Web。</desc>
+      <defs><marker id="ov-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4f5d75"/></marker></defs>
+      <path class="edge" d="M 160,100 H 212" marker-end="url(#ov-a)"/><path class="edge" d="M 396,100 H 448" marker-end="url(#ov-a)"/>
+      <path class="edge" d="M 632,100 H 684" marker-end="url(#ov-a)"/>
+      <path class="edge" d="M 540,136 V 180 Q 540,188 532,188 H 312 Q 304,188 304,196 V 228" marker-end="url(#ov-a)"/>
+      <path class="edge" d="M 392,264 H 448" marker-end="url(#ov-a)"/><path class="edge" d="M 628,264 H 684" marker-end="url(#ov-a)"/>
+      <g><rect class="node" x="24" y="64" width="136" height="72" rx="6"/><rect class="chip" x="32" y="72" width="44" height="12" rx="2"/><text class="type" x="54" y="81" text-anchor="middle">HUMAN</text><text class="title" x="92" y="104" text-anchor="middle">Human / Story Web</text><text class="sub" x="92" y="120" text-anchor="middle">请求 · 命令 · Receipt</text></g>
+      <g><rect class="node changed" x="216" y="64" width="176" height="72" rx="6"/><rect class="chip changed" x="224" y="72" width="64" height="12" rx="2"/><text class="type changed" x="256" y="81" text-anchor="middle">NEW ROOT</text><text class="title" x="304" y="104" text-anchor="middle">workflow-story-map</text><text class="sub" x="304" y="120" text-anchor="middle">唯一用户入口 workflow</text></g>
+      <g><rect class="node changed" x="452" y="64" width="176" height="72" rx="6"/><rect class="chip changed" x="460" y="72" width="64" height="12" rx="2"/><text class="type changed" x="492" y="81" text-anchor="middle">NEW CORE</text><text class="title" x="540" y="104" text-anchor="middle">Recover + Reconcile</text><text class="sub" x="540" y="120" text-anchor="middle">Profile · Receipt · Gate</text></g>
+      <g><rect class="node" x="688" y="64" width="176" height="72" rx="6"/><rect class="chip" x="696" y="72" width="52" height="12" rx="2"/><text class="type" x="722" y="81" text-anchor="middle">DISCOVERY</text><text class="title" x="776" y="104" text-anchor="middle">Discovery Coordinator</text><text class="sub" x="776" y="120" text-anchor="middle">workflow-interview + planners</text></g>
+      <g><rect class="node" x="216" y="228" width="176" height="72" rx="6"/><rect class="chip" x="224" y="236" width="52" height="12" rx="2"/><text class="type" x="250" y="245" text-anchor="middle">DELIVERY</text><text class="title" x="304" y="268" text-anchor="middle">Delivery Coordinator</text><text class="sub" x="304" y="284" text-anchor="middle">Router + ExecutionAdapter</text></g>
+      <g><rect class="node" x="452" y="228" width="176" height="72" rx="6"/><rect class="chip" x="460" y="236" width="64" height="12" rx="2"/><text class="type" x="492" y="245" text-anchor="middle">INTEGRATE</text><text class="title" x="540" y="268" text-anchor="middle">Integration Workflow</text><text class="sub" x="540" y="284" text-anchor="middle">merge-worker + full suite</text></g>
+      <g><rect class="node" x="688" y="228" width="176" height="72" rx="6"/><rect class="chip" x="696" y="236" width="48" height="12" rx="2"/><text class="type" x="720" y="245" text-anchor="middle">REDUCER</text><text class="title" x="776" y="268" text-anchor="middle">RepoLane + Story Reducer</text><text class="sub" x="776" y="284" text-anchor="middle">done / done-with-waiver</text></g>
+    </svg>
+    <div class="ledger"><b>Fidelity ledger</b><br>Detail: overview · 源 = 五层分类与三阶段闭环 → 7 节点 / 6 边<br>Merged: Profile loader、membership、receipt、gate 合并为 Recover + Reconcile<br>Collapsed: GitHub/GitLab、Board/Manual 与 Web 的具体 adapter 收进各阶段边界<br>Dropped: 原子 Skill 名称，放到下两张详情图<br>Kept in full: 唯一入口、deterministic core 分流 Discovery/Delivery、Delivery→Integration→Reducer</div>
+  </section>
+
+  <section>
+    <h2>Discovery：现有 workflow-interview + 无副作用规划原子</h2>
+    <p>`wayfinder`、`to-spec`、`to-tickets` 不直接嵌套；只复用规则，避免第二 tracker 写入者。</p>
+    <svg viewBox="0 0 1000 360" role="img" aria-labelledby="ds-title ds-desc">
+      <title id="ds-title">Discovery Skill 调用链</title><desc id="ds-desc">Discovery Coordinator 调用 workflow-interview，后者依次调用 interview、prototype 和 goal-contract；确认 Contract 后调用 TicketSlicer 与 RiskVerificationPlanner 产生无副作用 proposals，最后交给 Core 和 TrackerAdapter 持久化。</desc>
+      <defs><marker id="ds-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4f5d75"/></marker></defs>
+      <path class="edge" d="M 172,100 H 216" marker-end="url(#ds-a)"/><path class="edge" d="M 360,100 H 404" marker-end="url(#ds-a)"/><path class="edge" d="M 548,100 H 592" marker-end="url(#ds-a)"/><path class="edge" d="M 736,100 H 780" marker-end="url(#ds-a)"/>
+      <path class="edge" d="M 852,136 V 228" marker-end="url(#ds-a)"/><path class="edge" d="M 780,264 H 736" marker-end="url(#ds-a)"/><path class="edge" d="M 592,264 H 548" marker-end="url(#ds-a)"/>
+      <g><rect class="node" x="28" y="64" width="144" height="72" rx="6"/><rect class="chip" x="36" y="72" width="52" height="12" rx="2"/><text class="type" x="62" y="81" text-anchor="middle">WORKFLOW</text><text class="title" x="100" y="104" text-anchor="middle">Discovery Coordinator</text><text class="sub" x="100" y="120" text-anchor="middle">阶段路由</text></g>
+      <g><rect class="node" x="220" y="64" width="140" height="72" rx="6"/><rect class="chip" x="228" y="72" width="52" height="12" rx="2"/><text class="type" x="254" y="81" text-anchor="middle">WORKFLOW</text><text class="title" x="290" y="104" text-anchor="middle">workflow-interview</text><text class="sub" x="290" y="120" text-anchor="middle">三阶段门禁</text></g>
+      <g><rect class="node" x="408" y="64" width="140" height="72" rx="6"/><rect class="chip" x="416" y="72" width="40" height="12" rx="2"/><text class="type" x="436" y="81" text-anchor="middle">ATOMIC</text><text class="title" x="478" y="104" text-anchor="middle">aes-interview</text><text class="sub" x="478" y="120" text-anchor="middle">事实 + 用户裁决</text></g>
+      <g><rect class="node" x="596" y="64" width="140" height="72" rx="6"/><rect class="chip" x="604" y="72" width="40" height="12" rx="2"/><text class="type" x="624" y="81" text-anchor="middle">ATOMIC</text><text class="title" x="666" y="104" text-anchor="middle">aes-prototype</text><text class="sub" x="666" y="120" text-anchor="middle">七面 + 对照物</text></g>
+      <g><rect class="node" x="784" y="64" width="140" height="72" rx="6"/><rect class="chip" x="792" y="72" width="40" height="12" rx="2"/><text class="type" x="812" y="81" text-anchor="middle">ATOMIC</text><text class="title" x="854" y="104" text-anchor="middle">aes-goal-contract</text><text class="sub" x="854" y="120" text-anchor="middle">Contract + finalize</text></g>
+      <g><rect class="node changed" x="784" y="228" width="140" height="72" rx="6"/><rect class="chip changed" x="792" y="236" width="52" height="12" rx="2"/><text class="type changed" x="818" y="245" text-anchor="middle">NEW ATOM</text><text class="title" x="854" y="268" text-anchor="middle">TicketSlicer</text><text class="sub" x="854" y="284" text-anchor="middle">typed proposals</text></g>
+      <g><rect class="node changed" x="596" y="228" width="140" height="72" rx="6"/><rect class="chip changed" x="604" y="236" width="52" height="12" rx="2"/><text class="type changed" x="630" y="245" text-anchor="middle">NEW ATOM</text><text class="title" x="666" y="268" text-anchor="middle">RiskVerification</text><text class="sub" x="666" y="284" text-anchor="middle">risk · tests · role DAG</text></g>
+      <g><rect class="node" x="408" y="228" width="140" height="72" rx="6"/><rect class="chip" x="416" y="236" width="40" height="12" rx="2"/><text class="type" x="436" y="245" text-anchor="middle">ADAPTER</text><text class="title" x="478" y="268" text-anchor="middle">TrackerCommandPort</text><text class="sub" x="478" y="284" text-anchor="middle">Core 校验后持久化</text></g>
+    </svg>
+    <div class="ledger"><b>Fidelity ledger</b><br>Detail: focused · 源 = Discovery workflow、3 个现有原子、2 个新规划原子、持久写入口 → 8 节点 / 7 边<br>Merged: research/grilling/domain-modeling/prototype 作为 profile 按需旁路，不塞进固定主链<br>Collapsed: GitHub/GitLab 写入差异收进 TrackerCommandPort<br>Dropped: 事实调查 subagent 拓扑，不改变主调用链<br>Kept in full: workflow-interview 三原子链、TicketSlicer、RiskVerification、单一持久写入口</div>
+  </section>
+
+  <section>
+    <h2>Delivery / Integration：执行 workflow 与验证原子分层</h2>
+    <p>Core 选择 carrier；Board 只是一个执行器 workflow。merge 与最终 integration 由独立阶段 workflow 持有。</p>
+    <svg viewBox="0 0 1000 360" role="img" aria-labelledby="dl-title dl-desc">
+      <title id="dl-title">Delivery 和 Integration Skill 调用链</title><desc id="dl-desc">Capability Router 经 BoardExecutionAdapter 调用 aes-worktree-board，再调用 aes-issue-worker；ticket owner 使用 TDD 或诊断、QA 与 simplify 形成 candidate，之后独立 aes-merge-worker 调用 code-review 并在精确 integration SHA 上跑完整回归，Receipt 最终交给 Gate projector。</desc>
+      <defs><marker id="dl-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4f5d75"/></marker></defs>
+      <path class="edge" d="M 172,100 H 216" marker-end="url(#dl-a)"/><path class="edge" d="M 360,100 H 404" marker-end="url(#dl-a)"/><path class="edge" d="M 548,100 H 592" marker-end="url(#dl-a)"/><path class="edge" d="M 736,100 H 780" marker-end="url(#dl-a)"/>
+      <path class="edge" d="M 852,136 V 228" marker-end="url(#dl-a)"/><path class="edge" d="M 780,264 H 736" marker-end="url(#dl-a)"/><path class="edge" d="M 592,264 H 548" marker-end="url(#dl-a)"/>
+      <g><rect class="node" x="28" y="64" width="144" height="72" rx="6"/><rect class="chip" x="36" y="72" width="44" height="12" rx="2"/><text class="type" x="58" y="81" text-anchor="middle">CORE</text><text class="title" x="100" y="104" text-anchor="middle">Capability Router</text><text class="sub" x="100" y="120" text-anchor="middle">requirements → carrier</text></g>
+      <g><rect class="node changed" x="220" y="64" width="140" height="72" rx="6"/><rect class="chip changed" x="228" y="72" width="60" height="12" rx="2"/><text class="type changed" x="258" y="81" text-anchor="middle">NEW PORT</text><text class="title" x="290" y="104" text-anchor="middle">BoardExecAdapter</text><text class="sub" x="290" y="120" text-anchor="middle">typed dispatch/events</text></g>
+      <g><rect class="node" x="408" y="64" width="140" height="72" rx="6"/><rect class="chip" x="416" y="72" width="52" height="12" rx="2"/><text class="type" x="442" y="81" text-anchor="middle">WORKFLOW</text><text class="title" x="478" y="104" text-anchor="middle">aes-worktree-board</text><text class="sub" x="478" y="120" text-anchor="middle">资源与执行控制面</text></g>
+      <g><rect class="node" x="596" y="64" width="140" height="72" rx="6"/><rect class="chip" x="604" y="72" width="52" height="12" rx="2"/><text class="type" x="630" y="81" text-anchor="middle">WORKFLOW</text><text class="title" x="666" y="104" text-anchor="middle">aes-issue-worker</text><text class="sub" x="666" y="120" text-anchor="middle">单票 owner 闭环</text></g>
+      <g><rect class="node" x="784" y="64" width="140" height="72" rx="6"/><rect class="chip" x="792" y="72" width="40" height="12" rx="2"/><text class="type" x="812" y="81" text-anchor="middle">ATOMIC</text><text class="title" x="854" y="104" text-anchor="middle">TDD / Diagnose</text><text class="sub" x="854" y="120" text-anchor="middle">⇄ aes-qa → simplify</text></g>
+      <g><rect class="node changed" x="784" y="228" width="140" height="72" rx="6"/><rect class="chip changed" x="792" y="236" width="64" height="12" rx="2"/><text class="type changed" x="824" y="245" text-anchor="middle">MISSING WF</text><text class="title" x="854" y="268" text-anchor="middle">aes-merge-worker</text><text class="sub" x="854" y="284" text-anchor="middle">integration owner</text></g>
+      <g><rect class="node" x="596" y="228" width="140" height="72" rx="6"/><rect class="chip" x="604" y="236" width="40" height="12" rx="2"/><text class="type" x="624" y="245" text-anchor="middle">ATOMIC</text><text class="title" x="666" y="268" text-anchor="middle">code-review + full suite</text><text class="sub" x="666" y="284" text-anchor="middle">exact integration SHA</text></g>
+      <g><rect class="node" x="408" y="228" width="140" height="72" rx="6"/><rect class="chip" x="416" y="236" width="44" height="12" rx="2"/><text class="type" x="438" y="245" text-anchor="middle">CORE</text><text class="title" x="478" y="268" text-anchor="middle">Receipt → Gate</text><text class="sub" x="478" y="284" text-anchor="middle">stale · waiver · auth</text></g>
+    </svg>
+    <div class="ledger"><b>Fidelity ledger</b><br>Detail: focused · 源 = Router、Board adapter、3 个 workflow、实现/验证原子、Gate → 8 节点 / 7 边<br>Merged: tdd 与 diagnosing-bugs 合并；aes-qa loop/final 与 simplify 收进 owner 原子组<br>Collapsed: review、merge、full suite 收进 integration 原子组，但精确 SHA 保留在 sub 行<br>Dropped: ManualAdapter 分支，完整列在 skill-chain.md，避免此图超过主执行链预算<br>Kept in full: Board 不是 Core、issue-worker 不 merge、merge-worker 独立、Receipt 回 Core</div>
+  </section>
+
+  <section>
+    <h2>反馈流：Contract 不变自动收敛，改变承诺保守回流</h2>
+    <p>这张图只投影 behavior 的 wave 变化行，不另立新语义。</p>
+    <svg viewBox="0 0 1000 320" role="img" aria-labelledby="fb-title fb-desc">
+      <title id="fb-title">Delivery wave 与 Discovery 回流</title><desc id="fb-desc">冻结 Contract 后进入 Delivery wave，实现和有效验证完成后由 ChangeClassifier 判断继续下一 wave、回流 Discovery 或进入每个必需 RepoLane 的 integration gates，最终合成 Story done。</desc>
+      <defs><marker id="fb-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4f5d75"/></marker><marker id="fb-ac" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#eb6c36"/></marker></defs>
+      <path class="edge" d="M 160,112 H 188" marker-end="url(#fb-a)"/><path class="edge" d="M 320,112 H 348" marker-end="url(#fb-a)"/><path class="edge" d="M 480,112 H 508" marker-end="url(#fb-a)"/><path class="edge" d="M 640,112 H 668" marker-end="url(#fb-a)"/><path class="edge" d="M 800,112 H 828" marker-end="url(#fb-a)"/>
+      <path class="edge changed" d="M 548,148 V 196 Q 548,204 540,204 H 260 Q 252,204 252,196 V 152" marker-end="url(#fb-ac)"/><path class="edge changed" d="M 596,148 V 240 Q 596,248 588,248 H 100 Q 92,248 92,240 V 152" marker-end="url(#fb-ac)"/>
+      <g><rect class="node" x="28" y="76" width="132" height="72" rx="6"/><text class="title" x="94" y="112" text-anchor="middle">冻结 Contract</text><text class="sub" x="94" y="128" text-anchor="middle">Discovery</text></g>
+      <g><rect class="node" x="192" y="76" width="128" height="72" rx="6"/><text class="title" x="256" y="112" text-anchor="middle">当前 Wave</text><text class="sub" x="256" y="128" text-anchor="middle">Delivery</text></g>
+      <g><rect class="node" x="352" y="76" width="128" height="72" rx="6"/><text class="title" x="416" y="112" text-anchor="middle">实现 + 有效验证</text><text class="sub" x="416" y="128" text-anchor="middle">按风险匹配</text></g>
+      <g><rect class="node changed" x="512" y="76" width="128" height="72" rx="6"/><text class="title" x="576" y="112" text-anchor="middle">ChangeClassifier</text><text class="sub" x="576" y="128" text-anchor="middle">自动继续 / 回流</text></g>
+      <g><rect class="node changed" x="672" y="76" width="128" height="72" rx="6"/><text class="title" x="736" y="112" text-anchor="middle">Integration Gates</text><text class="sub" x="736" y="128" text-anchor="middle">每个 required lane</text></g>
+      <g><rect class="node" x="832" y="76" width="132" height="72" rx="6"/><text class="title" x="898" y="112" text-anchor="middle">Story Reducer</text><text class="sub" x="898" y="128" text-anchor="middle">done / waiver</text></g>
+      <rect class="mask" x="352" y="184" width="88" height="12"/><text class="label changed" x="396" y="193" text-anchor="middle">Contract 不变</text><rect class="mask" x="304" y="228" width="112" height="12"/><text class="label changed" x="360" y="237" text-anchor="middle">改变承诺 / 不确定</text>
+    </svg>
+    <div class="ledger"><b>Fidelity ledger</b><br>Detail: focused · 源 = Delivery wave 5 条变化行 → 6 节点 / 7 边<br>Merged: 实现与 session 验证合并，因为 classifier 前同进同出<br>Collapsed: 多 RepoLane checks 收进 Integration Gates，required 语义保留<br>Dropped: ticket 局部 retry/cancel 与人工 checklist，不属于 story wave 层<br>Kept in full: Contract 不变回 Delivery、改变承诺回 Discovery、required lanes 合成</div>
+  </section>
+
+  <footer>删除清单：旧版匿名“to-spec/to-tickets 功能位”、把 board 当 Core、静态一次拆票链、Web 只读 Map。完整节点输入/输出/禁区见同目录 <code>v2-skill-chain.md</code>。</footer>
+</main>
+</body>
+</html>

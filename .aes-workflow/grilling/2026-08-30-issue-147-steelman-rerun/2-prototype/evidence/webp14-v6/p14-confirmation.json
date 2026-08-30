@@ -1,0 +1,48 @@
+{
+  "confirmation": "P14",
+  "round": 59,
+  "date": "2026-08-31",
+  "user_verbatim": "好的请继续",
+  "bundle_digest": "sha256:91a444cfc3099dc56c72e8e076aa98f527e47751d31af91e9c099be6a870fdb7",
+  "business_artifacts_confirmed": true,
+  "web_artifact_confirmed": false,
+  "source_to_confirmed": [
+    {
+      "confirmed_sha256": "92ae87b6c76f82002e5342b81fa99d4df341546943da9ea345212012609e7181",
+      "source_sha256": "2864903557b766e8b18aaf7cc808d531dcb25845662a8743af51e148cf85174a",
+      "source": "drafts/v6-business-behavior.md",
+      "confirmed": "behavior.md"
+    },
+    {
+      "confirmed_sha256": "56d88233532de057515cffe68fb3d48dd2917d0840979399747bc3a332b66a6e",
+      "source_sha256": "cbef2951b349f9d211556a9d87fad153a4239b56331c5f2f05da75e927e603ee",
+      "source": "drafts/v6-business-api-mock.md",
+      "confirmed": "api-mock.md"
+    },
+    {
+      "confirmed_sha256": "0da1d9796b19f5e5988180ca4b40f5b00b0463f9fe0a6a5c75a26dd7af5d8302",
+      "source_sha256": "84737467760f7e79c702c37ead39b62127d7e607cbc070da0721cc84507e3135",
+      "source": "drafts/v6-business-example-run.md",
+      "confirmed": "example-run.md"
+    },
+    {
+      "confirmed_sha256": "29e3f9f2b9ed42b8ec72d8acef4f56a86165c5b53a8b917683409af47efaecb9",
+      "source_sha256": "690eaabbeeb0a25f2c5a3677801f81eb0d050bc06a8f32b015060c9876970c7e",
+      "source": "drafts/v6-business-diagram.html",
+      "confirmed": "diagram.html"
+    },
+    {
+      "confirmed_sha256": "45bf2f605cfaed5f53bb7b720d5fe1700ac307ad5abfe126eb4565b343b16948",
+      "source_sha256": "fdcc3426e60312c3d964004471df2fd2a466258dbb15dddb11febd14d9ad9721",
+      "source": "drafts/v6-business-diagram-detail.html",
+      "confirmed": "diagram-detail.html"
+    }
+  ],
+  "transforms": [
+    "确认版声明取代草稿元数据",
+    "首段标记 P14 已确认",
+    "结尾待确认说明改为 P14 已确认",
+    "内部 api/behavior 链接使用根文件固定名"
+  ],
+  "immutable": "执行 Agent 改产品，不修改已确认对照物"
+}

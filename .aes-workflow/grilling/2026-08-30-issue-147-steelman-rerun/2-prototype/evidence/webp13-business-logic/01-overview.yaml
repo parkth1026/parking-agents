@@ -1,0 +1,90 @@
+- main [ref=e2] [box=20,24,1160,1385]:
+  - generic [ref=e3] [box=20,24,1160,87]:
+    - heading "Story Atlas v6 · 业务架构与闭环流程" [level=1] [ref=e4] [box=20,24,1160,32]
+    - paragraph [ref=e5] [box=20,64,1160,21]: 改后态单视图。橙色只标本轮最关键的边界变化；灰色是必须保持的既有责任。
+    - generic [ref=e6] [box=20,97,1160,14]:
+      - generic [ref=e7] [box=20,97,97,14]: 本次新增/变更
+      - generic [ref=e9] [box=137,97,114,14]: 既有责任（不动）
+  - generic [ref=e11] [box=20,135,1160,585]:
+    - heading "架构视图：唯一业务规则 + 单向 Projection Runtime" [level=2] [ref=e12] [box=41,156,1118,27]
+    - paragraph [ref=e13] [box=41,191,1118,16]: Web 不写 Story；Projection Runtime 不调动 Agent。Workflow/Skill 写持久事实，Core 从事实重算同一投影。
+    - img "Story Atlas v6 业务架构 Workflow 与 Skill 写 tracker、repo 和 registry 事实，Workflow Core 读取并计算，单向 Projection Runtime 广播给只读 Web Shell；浏览器本地视图状态不写回 Story。" [ref=e15] [box=50,219,1100,344]:
+      - generic [ref=e22] [box=699,358,75,9]: normalized facts
+      - generic [ref=e24] [box=914,358,16,9]: 单向
+      - generic [ref=e25] [box=82,331,160,64]:
+        - generic [ref=e28] [box=104,341,35,9]: WRITER
+        - generic [ref=e29] [box=118,356,88,16]: Workflow / Skill
+        - generic [ref=e30] [box=122,377,81,10]: 产生与维护持久事实
+      - generic [ref=e31] [box=302,259,160,64]:
+        - generic [ref=e34] [box=316,269,40,9]: TRACKER
+        - generic [ref=e35] [box=357,284,49,16]: 控制索引
+        - generic [ref=e36] [box=308,305,148,11]: membership · lifecycle · ack
+      - generic [ref=e37] [box=302,343,160,64]:
+        - generic [ref=e40] [box=313,353,46,9]: REPO/GIT
+        - generic [ref=e41] [box=307,368,151,16]: Contract / Artifact / Receipt
+        - generic [ref=e42] [box=319,389,127,10]: versioned evidence facts
+      - generic [ref=e43] [box=302,427,160,64]:
+        - generic [ref=e46] [box=319,437,46,9]: REGISTRY
+        - generic [ref=e47] [box=325,452,114,16]: Profile / GateCatalog
+        - generic [ref=e48] [box=319,473,127,10]: exact digest or degraded
+      - generic [ref=e49] [box=518,343,160,64]:
+        - generic [ref=e52] [box=539,353,23,9]: CORE
+        - generic [ref=e53] [box=556,368,83,16]: Workflow Core
+        - generic [ref=e54] [box=532,389,132,10]: validate · reducer · Gate
+      - generic [ref=e55] [box=734,343,160,64]:
+        - generic [ref=e58] [box=752,353,40,9]: CHANGED
+        - generic [ref=e59] [box=762,368,105,16]: Projection Runtime
+        - generic [ref=e60] [box=745,389,137,10]: read · rebuild · broadcast
+      - generic [ref=e61] [box=950,343,160,64]:
+        - generic [ref=e64] [box=970,353,18,9]: WEB
+        - generic [ref=e65] [box=988,368,83,16]: 共用 Web Shell
+        - generic [ref=e66] [box=964,389,132,11]: read-only SurfaceDocument
+      - generic [ref=e67] [box=950,455,160,64]:
+        - generic [ref=e70] [box=968,465,28,9]: LOCAL
+        - generic [ref=e71] [box=981,480,98,16]: 浏览器 View State
+        - generic [ref=e72] [box=967,501,127,10]: tab · filter · selection
+    - generic [ref=e73] [box=41,579,1118,120]: "Fidelity ledgerDetail: balanced · 源 = writer、三类事实源、Core、Runtime、Web、local state → 8 节点 / 9 边Merged: schema validator、Receipt validator、Gate projector、Story reducer → Workflow CoreCollapsed: tracker/repo 的 GitHub/GitLab Adapter 差异 → 各自事实源节点内部Dropped: Agent/Provider/Task lifecycle → P11/P12 明确不属于当前 RuntimeKept in full: Workflow/Skill → facts → Core → Projection Runtime → Web 单向边界"
+  - generic [ref=e74] [box=20,744,1160,625]:
+    - heading "流程视图：Discovery 决定 Contract，Delivery 以证据收敛" [level=2] [ref=e75] [box=41,765,1118,27]
+    - paragraph [ref=e76] [box=41,800,1118,16]: "对应 `v6-business-behavior.md` 的 B5–B14；节点是动态工作与 reducer，不是固定阶段槽位。"
+    - img "Story 从 Discovery 到 Delivery 的闭环 Discovery 形成 Contract，WorkTicket 产生 Attempt 与 Evidence；ChangeClassifier 决定继续 Delivery 或回到 Discovery。收敛后进入每条 RepoLane 的 integration 和 full suite，再由 Lane Gate 合成 Story terminal。" [ref=e78] [box=50,828,1100,384]:
+      - generic [ref=e82] [box=478,1103,136,9]: contract unchanged / continue
+      - generic [ref=e84] [box=176,1091,80,9]: requires-decision
+      - generic [ref=e85] [box=82,928,160,64]:
+        - generic [ref=e88] [box=98,938,51,9]: DISCOVERY
+        - generic [ref=e89] [box=113,953,98,16]: DiscoveryRevision
+        - generic [ref=e90] [box=109,974,105,10]: historical + current
+      - generic [ref=e91] [box=270,928,160,64]:
+        - generic [ref=e94] [box=288,938,40,9]: SUBJECT
+        - generic [ref=e95] [box=304,953,92,16]: Contract revision
+        - generic [ref=e96] [box=284,974,132,11]: goal · AC · policy digest
+      - generic [ref=e97] [box=458,928,160,64]:
+        - generic [ref=e100] [box=475,938,34,9]: TICKET
+        - generic [ref=e101] [box=484,953,107,16]: WorkTicket frontier
+        - generic [ref=e102] [box=480,974,116,10]: stable Profile binding
+      - generic [ref=e103] [box=646,928,160,64]:
+        - generic [ref=e106] [box=661,938,41,9]: ATTEMPT
+        - generic [ref=e107] [box=670,953,112,16]: Role + Carrier + Skill
+        - generic [ref=e108] [box=671,974,111,11]: append-only execution
+      - generic [ref=e109] [box=834,928,160,64]:
+        - generic [ref=e112] [box=851,938,46,9]: EVIDENCE
+        - generic [ref=e113] [box=845,953,138,16]: Receipt + candidate Gate
+        - generic [ref=e114] [box=853,974,121,10]: fresh / stale / missing
+      - generic [ref=e115] [box=270,1088,160,64]:
+        - generic [ref=e118] [box=288,1098,40,9]: CHANGED
+        - generic [ref=e119] [box=305,1113,90,16]: ChangeClassifier
+        - generic [ref=e120] [box=303,1134,95,10]: continue or return
+      - generic [ref=e121] [box=646,1088,160,64]:
+        - generic [ref=e124] [box=664,1098,51,9]: INTEGRATE
+        - generic [ref=e125] [box=665,1113,123,16]: Integration + full suite
+        - generic [ref=e126] [box=663,1134,127,10]: exact SHA · new receipts
+      - generic [ref=e127] [box=834,1088,160,64]:
+        - generic [ref=e130] [box=853,1098,23,9]: LANE
+        - generic [ref=e131] [box=859,1113,111,16]: RepoLane local Gate
+        - generic [ref=e132] [box=853,1134,122,10]: PASS / blocked / waiver
+      - generic [ref=e133] [box=1022,1088,96,64]:
+        - generic [ref=e136] [box=1038,1098,28,9]: STORY
+        - generic [ref=e137] [box=1048,1113,45,16]: Reducer
+        - generic [ref=e138] [box=1049,1134,42,10]: terminal
+    - generic [ref=e139] [box=41,1228,1118,120]: "Fidelity ledgerDetail: balanced · 源 = Discovery/Contract/WorkTicket/Attempt/Receipt/Classifier/Integration/Lane Gate/Story reducer → 9 节点 / 9 边Merged: candidate evidence 与 candidate Gate → Evidence 节点；merge 与 final full suite → Integration 节点Collapsed: contract unchanged 的 regression、新 ticket 与下一 wave → Classifier 到 Delivery continuation 一条边Dropped: optional RepoLane 终态语义 → 仍是 OPEN-1，未画成既定行为Kept in full: requires-decision 回流、subject 改变后重新取证、required Lane 合成 Story terminal"
+  - generic [ref=e140] [box=20,1393,1160,16]: 删除清单：v5 的 WEB/CORE 假 RepoLane、单一 state、candidate-as-integration、Web command channel、Projection Runtime Agent lifecycle。

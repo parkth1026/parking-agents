@@ -1,0 +1,716 @@
+{
+  "flow": {
+    "initial": {
+      "dataset": "current",
+      "view": "map",
+      "title": "#147 · story 级全链条工作流整合设计",
+      "globalMapSelected": "true",
+      "fixedStageElements": 0,
+      "nodes": 13,
+      "discovery": "12 nodes",
+      "delivery": "0 verified nodes",
+      "empty": "0\nverified DeliveryMap nodes\n\n#147 明确把实现留给另一个 effort；没有连接 implementation StoryRoot、RepoLane、candidate、QA/Review Receipt 或 runtime Gate。\n\nREPO NOT_CONNECTED",
+      "root": "ISSUE-147\nclosed\nstory 级全链条工作流整合设计\nStoryRoot · wayfinder:map",
+      "returnEdges": 0
+    },
+    "issue153": {
+      "selected": "ISSUE-153",
+      "title": "ISSUE-153 · 执行与验收挂载架构",
+      "meta": "decision · NOT implementation · unassigned · closed",
+      "body": "NOW\n这是“如何挂载执行”的设计裁决，不是实现或 QA 节点。\nWHY\n标题包含执行，但 Issue 本身属于 #147 设计 Map。\nOWNER\nunassigned\nNEXT\n不得放进真实 DeliveryMap。\nUNLOCKS\narchitecture decision\n三轴状态\n\nlifecycle/control/gate 在真实产品中独立保存；这里显示的是可读投影，不是固定阶段。",
+      "open": true
+    },
+    "progression": {
+      "pressed": "true",
+      "edges": 8
+    },
+    "sourceModal": {
+      "open": true,
+      "focus": "modalTitle",
+      "title": "#147 全局图 · 数据来源",
+      "body": "ISSUE\nGitHub #147 captured snapshot\n12 members\nDOSSIER\nlocal workflow records\n2-prototype pending\nREPO\nexecution runtime\nNOT_CONNECTED\nSIM\ncurrent dataset\n0 records"
+    },
+    "simInitial": {
+      "dataset": "scenario",
+      "nodes": 18,
+      "discovery": "6 nodes",
+      "delivery": "11 verified nodes",
+      "returnEdges": 1,
+      "frontier": [
+        "SIM-W2-CORE-R",
+        "SIM-W2-WEB-Q"
+      ],
+      "selected": "SIM-W2-WEB-Q",
+      "summary": "NEXT · SIM-W2-WEB-Q 正在运行；SIM-W2-CORE-R 可安全并行。",
+      "laneBands": 2,
+      "wave": "WAVE 2 · bound to contract@2 · nodes appear from actual profiles, not fixed slots"
+    },
+    "frontierFilter": {
+      "visible": [
+        "SIM-STORY-001",
+        "SIM-W2-CORE-R",
+        "SIM-W2-WEB-Q"
+      ],
+      "summary": "NEXT · SIM-W2-WEB-Q 正在运行；SIM-W2-CORE-R 可安全并行。"
+    },
+    "webQa": {
+      "selected": "SIM-W2-WEB-Q",
+      "title": "SIM-W2-WEB-Q · WEB QA",
+      "body": "NOW\n当前最高杠杆节点正在运行。\nWHY\n完成它会解锁 WEB Review，并缩短最长 required-lane 路径。\nOWNER\nSIM-qa-agent\nNEXT\n继续当前 QA；不得复用 wave-1 stale Receipt。\nUNLOCKS\nSIM-W2-WEB-R\n三轴状态\n\nlifecycle/control/gate 在真实产品中独立保存；这里显示的是可读投影，不是固定阶段。",
+      "primary": "查看当前节点"
+    },
+    "reviewStart": {
+      "reviewHidden": false,
+      "appHidden": true,
+      "focus": "reviewTitle",
+      "title": "SIM-W2-CORE-R · Review Workspace"
+    },
+    "reviewEdited": {
+      "actual": "真实浏览器输入：动态双图、回流边、选中节点与返回位置均可见。",
+      "verdict": "pass",
+      "evidence": "SIM-evidence-SIM-R1.png",
+      "draft": "SIM DRAFT · 已保存",
+      "progress": "1 / 2 cases ready\n仅保存当前浏览器；不写 tracker 或 canonical state"
+    },
+    "reviewReturn": {
+      "dataset": "scenario",
+      "view": "map",
+      "selected": "SIM-W2-CORE-R",
+      "reviewHidden": true,
+      "appHidden": false,
+      "inspectorOpen": true,
+      "focus": "insPrimary"
+    },
+    "queue": {
+      "view": "queue",
+      "rows": 2,
+      "text": "Current frontier → actions\n2 derived actions\nRUNNING\nSIM-W2-WEB-Q · 继续 WEB QA\n\n解锁 WEB Review，缩短最长 required-lane 路径。\n\nPRIMARY · FRONTIER\nREADY\nSIM-W2-CORE-R · 执行 CORE Review\n\n与 WEB QA 无依赖，可安全并行。\n\nPARALLEL · FRONTIER"
+    },
+    "evidence": {
+      "view": "evidence",
+      "stale": 2,
+      "text": "Current contract@2 evidence\nSIMULATED GAP\nSTALE\nSIM-RCPT-W1-WEB-QA · contract@1 + SIM-WEB-C1\nGATE NONE\nSTALE\nSIM-RCPT-W1-CORE-QA · contract@1 + SIM-CORE-C1\nGATE NONE\nFRESH\nSIM-RCPT-W2-CORE-QA · contract@2 + SIM-CORE-C2\nQA PASS\nMISSING\nWEB QA / WEB Review / CORE Review / lane integration Receipts\nREQUIRED"
+    },
+    "targets": {
+      "count": 40,
+      "below24": [],
+      "below44": [
+        {
+          "text": "导航",
+          "w": 50,
+          "h": 36
+        },
+        {
+          "text": "查看来源",
+          "w": 74,
+          "h": 36
+        },
+        {
+          "text": "#147 真实全图",
+          "w": 100.953125,
+          "h": 40
+        },
+        {
+          "text": "SIM 动态双图",
+          "w": 94.28125,
+          "h": 40
+        },
+        {
+          "text": "全部",
+          "w": 40,
+          "h": 34
+        },
+        {
+          "text": "Frontier",
+          "w": 57.78125,
+          "h": 34
+        },
+        {
+          "text": "阻塞/回流",
+          "w": 62.78125,
+          "h": 34
+        },
+        {
+          "text": "−",
+          "w": 25.84375,
+          "h": 34
+        },
+        {
+          "text": "＋",
+          "w": 30,
+          "h": 34
+        },
+        {
+          "text": "Fit",
+          "w": 32.21875,
+          "h": 34
+        },
+        {
+          "text": "Now / Why / Next",
+          "w": 110.125,
+          "h": 40
+        },
+        {
+          "text": "证据",
+          "w": 38,
+          "h": 40
+        },
+        {
+          "text": "历史",
+          "w": 38,
+          "h": 40
+        },
+        {
+          "text": "关闭",
+          "w": 50,
+          "h": 36
+        }
+      ]
+    },
+    "accessibility": {
+      "nodeCount": 587,
+      "unnamedButtons": 0
+    },
+    "reducedMotion": {
+      "drawer": "0s",
+      "toast": "0s"
+    }
+  },
+  "responsive": {
+    "viewport768Current": {
+      "body": [
+        768,
+        768
+      ],
+      "viewport": [
+        768,
+        1080
+      ],
+      "map": {
+        "x": 0,
+        "y": 261.4375,
+        "width": 768,
+        "height": 702.5625,
+        "bottom": 964,
+        "scroll": [
+          753,
+          753
+        ]
+      },
+      "canvas": {
+        "x": 10,
+        "y": 269.4375,
+        "width": 733,
+        "height": 672,
+        "bottom": 941.4375
+      },
+      "inspector": {
+        "x": 12,
+        "y": 1008,
+        "width": 744,
+        "height": 64,
+        "bottom": 1072
+      }
+    },
+    "viewport480Current": {
+      "body": [
+        480,
+        480
+      ],
+      "viewport": [
+        480,
+        900
+      ],
+      "map": {
+        "x": 0,
+        "y": 374,
+        "width": 480,
+        "height": 410,
+        "bottom": 784,
+        "scroll": [
+          465,
+          465
+        ]
+      },
+      "canvas": {
+        "x": 7,
+        "y": 381,
+        "width": 451,
+        "height": 383.03125,
+        "bottom": 764.03125
+      },
+      "inspector": {
+        "x": 12,
+        "y": 828,
+        "width": 456,
+        "height": 64,
+        "bottom": 892
+      },
+      "zoom": "57%"
+    },
+    "viewport480Scenario": {
+      "body": [
+        480,
+        480
+      ],
+      "viewport": [
+        480,
+        900
+      ],
+      "map": {
+        "x": 0,
+        "y": 347,
+        "width": 480,
+        "height": 437,
+        "bottom": 784,
+        "scroll": [
+          465,
+          465
+        ]
+      },
+      "canvas": {
+        "x": 7,
+        "y": 354,
+        "width": 451,
+        "height": 409.90625,
+        "bottom": 763.90625
+      },
+      "inspector": {
+        "x": 12,
+        "y": 828,
+        "width": 456,
+        "height": 64,
+        "bottom": 892
+      },
+      "zoom": "61%"
+    },
+    "viewport1440Scenario": {
+      "body": [
+        1440,
+        1440
+      ],
+      "viewport": [
+        1440,
+        1000
+      ],
+      "map": {
+        "x": 0,
+        "y": 234.4375,
+        "width": 1122,
+        "height": 723.5625,
+        "bottom": 958,
+        "scroll": [
+          1107,
+          1107
+        ]
+      },
+      "canvas": {
+        "x": 10,
+        "y": 242.4375,
+        "width": 1087,
+        "height": 672,
+        "bottom": 914.4375
+      },
+      "inspector": {
+        "x": 1122,
+        "y": 188.4375,
+        "width": 318,
+        "height": 811.5625,
+        "bottom": 1000
+      }
+    }
+  },
+  "interactions": [
+    {
+      "type": "pointer",
+      "target": {
+        "selector": "[data-node=\"ISSUE-153\"]",
+        "text": "ISSUE-153 closed 执行与验收挂载架构 decision · NOT implementation",
+        "rect": {
+          "x": 225.46875,
+          "y": 391.4375,
+          "width": 112,
+          "height": 50.5
+        },
+        "visible": true,
+        "disabled": false
+      }
+    },
+    {
+      "type": "pointer",
+      "target": {
+        "selector": "#inspectorToggle",
+        "text": "展开",
+        "rect": {
+          "x": 695,
+          "y": 1019,
+          "width": 50,
+          "height": 36
+        },
+        "visible": true,
+        "disabled": false
+      }
+    },
+    {
+      "type": "key",
+      "key": "Escape",
+      "modifiers": 0
+    },
+    {
+      "type": "pointer",
+      "target": {
+        "selector": "#progressionToggle",
+        "text": "作者演进线",
+        "rect": {
+          "x": 535.9375,
+          "y": 220.9375,
+          "width": 70,
+          "height": 34
+        },
+        "visible": true,
+        "disabled": false
+      }
+    },
+    {
+      "type": "pointer",
+      "target": {
+        "selector": "#progressionToggle",
+        "text": "作者演进线",
+        "rect": {
+          "x": 535.9375,
+          "y": 220.9375,
+          "width": 70,
+          "height": 34
+        },
+        "visible": true,
+        "disabled": false
+      }
+    },
+    {
+      "type": "pointer",
+      "target": {
+        "selector": "#sourceButton",
+        "text": "查看来源",
+        "rect": {
+          "x": 680,
+          "y": 4.5,
+          "width": 74,
+          "height": 36
+        },
+        "visible": true,
+        "disabled": false
+      }
+    },
+    {
+      "type": "key",
+      "key": "Escape",
+      "modifiers": 0
+    },
+    {
+      "type": "pointer",
+      "target": {
+        "selector": "[data-dataset=\"current\"]",
+        "text": "#147 真实全图",
+        "rect": {
+          "x": 549.765625,
+          "y": 167.4375,
+          "width": 100.953125,
+          "height": 40
+        },
+        "visible": true,
+        "disabled": false
+      }
+    },
+    {
+      "type": "key",
+      "key": "ArrowRight",
+      "modifiers": 0
+    },
+    {
+      "type": "pointer",
+      "target": {
+        "selector": "[data-filter=\"frontier\"]",
+        "text": "Frontier",
+        "rect": {
+          "x": 482.375,
+          "y": 193.9375,
+          "width": 57.78125,
+          "height": 34
+        },
+        "visible": true,
+        "disabled": false
+      }
+    },
+    {
+      "type": "pointer",
+      "target": {
+        "selector": "[data-filter=\"all\"]",
+        "text": "全部",
+        "rect": {
+          "x": 439.375,
+          "y": 193.9375,
+          "width": 40,
+          "height": 34
+        },
+        "visible": true,
+        "disabled": false
+      }
+    },
+    {
+      "type": "pointer",
+      "target": {
+        "selector": "[data-node=\"SIM-W2-WEB-Q\"]",
+        "text": "SIM-W2-WEB-Q running WEB QA QA WorkTicket · wave-2",
+        "rect": {
+          "x": 247.390625,
+          "y": 657.4375,
+          "width": 112,
+          "height": 52.5
+        },
+        "visible": true,
+        "disabled": false
+      }
+    },
+    {
+      "type": "pointer",
+      "target": {
+        "selector": "#inspectorToggle",
+        "text": "展开",
+        "rect": {
+          "x": 695,
+          "y": 1019,
+          "width": 50,
+          "height": 36
+        },
+        "visible": true,
+        "disabled": false
+      }
+    },
+    {
+      "type": "key",
+      "key": "Escape",
+      "modifiers": 0
+    },
+    {
+      "type": "pointer",
+      "target": {
+        "selector": "[data-node=\"SIM-W2-CORE-R\"]",
+        "text": "SIM-W2-CORE-R ready CORE Review review WorkTicket",
+        "rect": {
+          "x": 430.140625,
+          "y": 754.4375,
+          "width": 112,
+          "height": 52.5
+        },
+        "visible": true,
+        "disabled": false
+      }
+    },
+    {
+      "type": "pointer",
+      "target": {
+        "selector": "#inspectorToggle",
+        "text": "展开",
+        "rect": {
+          "x": 695,
+          "y": 1019,
+          "width": 50,
+          "height": 36
+        },
+        "visible": true,
+        "disabled": false
+      }
+    },
+    {
+      "type": "pointer",
+      "target": {
+        "selector": "#insPrimary",
+        "text": "进入模拟 Review",
+        "rect": {
+          "x": 27,
+          "y": 1017,
+          "width": 353.5,
+          "height": 44
+        },
+        "visible": true,
+        "disabled": false
+      }
+    },
+    {
+      "type": "pointer",
+      "target": {
+        "selector": "#reviewActual",
+        "text": "",
+        "rect": {
+          "x": 230,
+          "y": 267,
+          "width": 518,
+          "height": 88
+        },
+        "visible": true,
+        "disabled": false
+      }
+    },
+    {
+      "type": "key",
+      "key": "a",
+      "modifiers": 2
+    },
+    {
+      "type": "text",
+      "selector": "#reviewActual",
+      "length": 30
+    },
+    {
+      "type": "pointer",
+      "target": {
+        "selector": "label.verdict:has(input[value=\"pass\"])",
+        "text": "Pass",
+        "rect": {
+          "x": 230,
+          "y": 392,
+          "width": 82.125,
+          "height": 44
+        },
+        "visible": true,
+        "disabled": false
+      }
+    },
+    {
+      "type": "pointer",
+      "target": {
+        "selector": "#reviewEvidence",
+        "text": "生成模拟 Evidence",
+        "rect": {
+          "x": 617.96875,
+          "y": 448,
+          "width": 130.03125,
+          "height": 44
+        },
+        "visible": true,
+        "disabled": false
+      }
+    },
+    {
+      "type": "pointer",
+      "target": {
+        "selector": "#reviewSave",
+        "text": "保存模拟草稿",
+        "rect": {
+          "x": 521.3125,
+          "y": 1026,
+          "width": 98,
+          "height": 44
+        },
+        "visible": true,
+        "disabled": false
+      }
+    },
+    {
+      "type": "pointer",
+      "target": {
+        "selector": "#reviewBack",
+        "text": "返回全局地图",
+        "rect": {
+          "x": 16,
+          "y": 58,
+          "width": 98,
+          "height": 44
+        },
+        "visible": true,
+        "disabled": false
+      }
+    },
+    {
+      "type": "pointer",
+      "target": {
+        "selector": "[data-view=\"queue\"]",
+        "text": "行动投影",
+        "rect": {
+          "x": 583,
+          "y": 88.4375,
+          "width": 76,
+          "height": 44
+        },
+        "visible": true,
+        "disabled": false
+      }
+    },
+    {
+      "type": "pointer",
+      "target": {
+        "selector": "[data-view=\"evidence\"]",
+        "text": "证据与历史",
+        "rect": {
+          "x": 662,
+          "y": 88.4375,
+          "width": 88,
+          "height": 44
+        },
+        "visible": true,
+        "disabled": false
+      }
+    },
+    {
+      "type": "pointer",
+      "target": {
+        "selector": "[data-view=\"map\"]",
+        "text": "全局双地图",
+        "rect": {
+          "x": 12,
+          "y": 143,
+          "width": 88,
+          "height": 44
+        },
+        "visible": true,
+        "disabled": false
+      }
+    },
+    {
+      "type": "pointer",
+      "target": {
+        "selector": "[data-dataset=\"current\"]",
+        "text": "#147 真实全图",
+        "rect": {
+          "x": 12,
+          "y": 252,
+          "width": 225.5,
+          "height": 40
+        },
+        "visible": true,
+        "disabled": false
+      }
+    },
+    {
+      "type": "pointer",
+      "target": {
+        "selector": "[data-dataset=\"scenario\"]",
+        "text": "SIM 动态双图",
+        "rect": {
+          "x": 242.5,
+          "y": 279,
+          "width": 225.5,
+          "height": 40
+        },
+        "visible": true,
+        "disabled": false
+      }
+    },
+    {
+      "type": "pointer",
+      "target": {
+        "selector": "[data-view=\"map\"]",
+        "text": "全局双地图",
+        "rect": {
+          "x": 1164,
+          "y": 88.4375,
+          "width": 88,
+          "height": 44
+        },
+        "visible": true,
+        "disabled": false
+      }
+    }
+  ],
+  "consoleErrors": []
+}

@@ -1,0 +1,44 @@
+- main [ref=f1e2] [box=20,24,1160,773]:
+  - heading "Story Atlas v6 · 领域对象关系" [level=1] [ref=f1e3] [box=20,24,1160,32]
+  - paragraph [ref=f1e4] [box=20,72,1160,21]: 本图回答“谁拥有谁、证据绑在哪、什么参与 done”。它不定义固定执行阶段。
+  - generic [ref=f1e5] [box=20,109,1160,14]: 本次纠正的对象边界既有责任
+  - generic [ref=f1e8] [box=20,147,1160,610]:
+    - img "Story Atlas v6 领域对象关系 StoryRoot 拥有 Discovery revision、DeliveryMap 和 RepoLane；Contract 约束 Delivery。RepoLane 内 WorkTicket 追加 Attempt，Attempt 产生绑定精确 subject 的 Receipt，Gate 与 Story reducer从这些事实计算终态。" [ref=f1e10] [box=50,168,1100,432]:
+      - generic [ref=f1e14] [box=82,244,160,64]:
+        - generic [ref=f1e17] [box=100,254,28,9]: STORY
+        - generic [ref=f1e18] [box=135,269,55,16]: StoryRoot
+        - generic [ref=f1e19] [box=122,290,79,10]: one user intent
+      - generic [ref=f1e20] [box=270,244,160,64]:
+        - generic [ref=f1e23] [box=286,254,51,9]: DISCOVERY
+        - generic [ref=f1e24] [box=301,269,98,16]: DiscoveryRevision
+        - generic [ref=f1e25] [box=297,290,105,10]: current / historical
+      - generic [ref=f1e26] [box=458,244,160,64]:
+        - generic [ref=f1e29] [box=476,254,40,9]: SUBJECT
+        - generic [ref=f1e30] [box=492,269,92,16]: ContractRevision
+        - generic [ref=f1e31] [box=485,290,105,10]: digest-bound promise
+      - generic [ref=f1e32] [box=646,244,160,64]:
+        - generic [ref=f1e35] [box=661,254,46,9]: DELIVERY
+        - generic [ref=f1e36] [box=691,269,70,16]: DeliveryMap
+        - generic [ref=f1e37] [box=671,290,111,11]: waves · dynamic edges
+      - generic [ref=f1e38] [box=247,420,206,64]:
+        - generic [ref=f1e41] [box=288,430,40,9]: CHANGED
+        - generic [ref=f1e42] [box=323,445,54,16]: RepoLane
+        - generic [ref=f1e43] [box=247,466,206,10]: repo · tracker · checkout · integration
+      - generic [ref=f1e44] [box=454,420,169,64]:
+        - generic [ref=f1e47] [box=475,430,34,9]: TICKET
+        - generic [ref=f1e48] [box=506,445,63,16]: WorkTicket
+        - generic [ref=f1e49] [box=454,466,169,11]: profile + lifecycle/control/gate
+      - generic [ref=f1e50] [box=636,420,179,64]:
+        - generic [ref=f1e53] [box=661,430,41,9]: ATTEMPT
+        - generic [ref=f1e54] [box=702,445,47,16]: Attempt
+        - generic [ref=f1e55] [box=636,466,179,10]: Role · Carrier · Skill · candidate
+      - generic [ref=f1e56] [box=830,420,169,64]:
+        - generic [ref=f1e59] [box=852,430,40,9]: RECEIPT
+        - generic [ref=f1e60] [box=875,445,78,16]: Typed Receipt
+        - generic [ref=f1e61] [box=830,466,169,11]: actor · subject · policy digests
+      - generic [ref=f1e62] [box=1022,420,96,64]:
+        - generic [ref=f1e65] [box=1041,430,23,9]: CORE
+        - generic [ref=f1e66] [box=1057,445,26,16]: Gate
+        - generic [ref=f1e67] [box=1046,466,48,10]: + reducer
+    - generic [ref=f1e68] [box=41,616,1118,120]: "Fidelity ledgerDetail: detailed · 源 = StoryRoot、两图、Contract、RepoLane、WorkTicket、Attempt、Receipt、Gate/Reducer → 9 节点 / 10 边Merged: Gate projector、RepoLane reducer、Story reducer → Core Gate + reducer（避免超过 9 节点）Collapsed: WorkTicket 内部 ProfileBinding 与三轴；Attempt 内部 Role/Carrier/Skill/candidate → sub 行保留Dropped: Workstream → 它只用于视觉分组，不参与领域终态；optional Lane → OPEN-1 未裁决Kept in full: RepoLane identity、append-only Attempt、Receipt exact subject、Gate/Story terminal 的确定性合成"
+  - generic [ref=f1e69] [box=20,781,1160,16]: 删除清单：WEB/CORE 作为 RepoLane；owner 代替 Role/actor/Carrier；单一 state；candidate subject 直接满足 integration Gate。

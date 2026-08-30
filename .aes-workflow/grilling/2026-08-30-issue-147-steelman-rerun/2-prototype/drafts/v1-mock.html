@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>workflow-story-map Web 投影草稿 v1（已被 v2 替代）</title>
+  <style>
+    :root {
+      --bg: #f4f5f7;
+      --panel: #ffffff;
+      --ink: #202433;
+      --muted: #687086;
+      --line: #dfe3ea;
+      --accent: #eb6c36;
+      --accent-soft: #fff1ea;
+      --green: #277a50;
+      --green-soft: #e8f5ee;
+      --amber: #9a6410;
+      --amber-soft: #fff5d9;
+      --red: #b43a3a;
+      --red-soft: #fdecec;
+      --blue: #356aa0;
+      --blue-soft: #eaf2fb;
+      --font-ui: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+      --font-mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font-ui); }
+    button { font: inherit; }
+    .app { min-height: 100vh; display: grid; grid-template-rows: auto auto 1fr; }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 24px; background: var(--panel); border-bottom: 1px solid var(--line); }
+    h1 { margin: 0; font-size: 18px; }
+    h2 { margin: 0; font-size: 15px; }
+    .mono { font-family: var(--font-mono); }
+    .muted { color: var(--muted); }
+    .small { font-size: 12px; }
+    .changed { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .top-actions, .tabs, .lane-tabs, .commands { display: flex; gap: 8px; flex-wrap: wrap; }
+    .tab, .command { border: 1px solid var(--line); background: #fff; color: var(--ink); border-radius: 6px; padding: 7px 10px; cursor: pointer; }
+    .tab.active { border-color: var(--accent); background: var(--accent-soft); color: #873b19; }
+    .command.primary { background: var(--ink); color: #fff; border-color: var(--ink); }
+    .command:disabled { opacity: .42; cursor: not-allowed; }
+    .summary { display: grid; grid-template-columns: 1.7fr repeat(4, minmax(110px, .65fr)); gap: 12px; padding: 14px 24px; }
+    .summary-card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+    .summary-card strong { display: block; margin-top: 4px; font-size: 17px; }
+    .badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 7px; border-radius: 999px; font-size: 11px; font-weight: 650; }
+    .badge.green { color: var(--green); background: var(--green-soft); }
+    .badge.amber { color: var(--amber); background: var(--amber-soft); }
+    .badge.red { color: var(--red); background: var(--red-soft); }
+    .badge.blue { color: var(--blue); background: var(--blue-soft); }
+    .workspace { min-height: 0; display: grid; grid-template-columns: minmax(520px, 1.6fr) minmax(360px, .9fr); gap: 14px; padding: 0 24px 24px; }
+    .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; min-height: 0; overflow: hidden; }
+    .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+    .graph { padding: 20px; min-height: 500px; overflow: auto; }
+    .root { width: min(680px, 100%); margin: 0 auto 24px; border: 1px solid #b8c0cf; background: #f8fafc; border-radius: 8px; padding: 14px; }
+    .root-line { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+    .maps { width: min(760px, 100%); margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 28px; position: relative; }
+    .maps::before { content: ""; position: absolute; left: 50%; top: -24px; width: 1px; height: 24px; background: #b8c0cf; }
+    .map { border: 1px solid #b8c0cf; border-radius: 8px; background: #fafbfc; padding: 12px; }
+    .map-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .wave { padding: 8px; margin-top: 10px; border-radius: 6px; border: 1px dashed #cbd1dc; }
+    .wave-label { margin-bottom: 8px; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+    .tickets { display: grid; gap: 8px; }
+    .ticket { text-align: left; width: 100%; border: 1px solid var(--line); border-left: 4px solid var(--blue); border-radius: 6px; background: #fff; padding: 9px 10px; cursor: pointer; }
+    .ticket:hover, .ticket.selected { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+    .ticket .meta { display: flex; justify-content: space-between; gap: 8px; margin-top: 6px; color: var(--muted); font-size: 11px; }
+    .ticket.blocked { border-left-color: var(--red); }
+    .ticket.done { border-left-color: var(--green); }
+    .detail { padding: 16px; height: calc(100% - 55px); overflow: auto; }
+    .three-axis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 0; }
+    .axis { border: 1px solid var(--line); border-radius: 6px; padding: 9px; }
+    .axis b { display: block; margin-top: 4px; font-size: 13px; }
+    .journey { margin: 16px 0; display: grid; gap: 8px; }
+    .journey-step { display: grid; grid-template-columns: 26px 1fr; gap: 9px; align-items: start; }
+    .dot { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--green-soft); color: var(--green); font-size: 11px; font-weight: 700; }
+    .dot.pending { background: var(--amber-soft); color: var(--amber); }
+    .dot.stale { background: var(--red-soft); color: var(--red); }
+    .receipt { margin-top: 8px; padding: 9px; border-radius: 6px; background: #f7f8fa; border: 1px solid var(--line); font-size: 11px; }
+    .checklist { display: grid; gap: 8px; margin: 12px 0; }
+    .check { display: flex; gap: 8px; padding: 9px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+    .notice { margin: 12px 0; padding: 10px; border-radius: 6px; background: var(--amber-soft); color: #68440c; border: 1px solid #eed28c; font-size: 12px; }
+    .notice.error { background: var(--red-soft); color: #7d2525; border-color: #efb6b6; }
+    .event { margin-top: 12px; padding: 10px; border-radius: 6px; background: #eef1f6; font: 11px/1.5 var(--font-mono); white-space: pre-wrap; }
+    footer { padding: 14px 24px 24px; color: var(--muted); font-size: 12px; }
+    @media (max-width: 940px) {
+      .summary { grid-template-columns: 1fr 1fr; }
+      .workspace { grid-template-columns: 1fr; }
+      .maps { grid-template-columns: 1fr; }
+      .maps::before { display: none; }
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div>
+      <div class="small muted">draft v1 · superseded by v2-mock.html</div>
+      <h1>跨 RepoLane 的 story 级交付</h1>
+    </div>
+    <div class="top-actions">
+      <button class="tab active" data-mode="healthy">正常</button>
+      <button class="tab" data-mode="human">等待人工</button>
+      <button class="tab" data-mode="degraded">Registry degraded</button>
+    </div>
+  </header>
+
+  <div class="summary">
+    <div class="summary-card changed"><span class="small muted">Story 主状态（投影）</span><strong id="story-main">ACTIVE · GATES PENDING</strong><span class="small muted">展开后始终显示 lifecycle / control / gate 三轴</span></div>
+    <div class="summary-card"><span class="small muted">必需 RepoLane</span><strong>2 / 2</strong></div>
+    <div class="summary-card"><span class="small muted">Discovery frontier</span><strong>1</strong></div>
+    <div class="summary-card"><span class="small muted">Delivery frontier</span><strong>2</strong></div>
+    <div class="summary-card"><span class="small muted">最终 Gate</span><strong id="gate-count">7 / 10</strong></div>
+  </div>
+
+  <div class="workspace">
+    <section class="panel">
+      <div class="panel-head">
+        <div><h2>Story 全局 Graph</h2><span class="small muted">只展示 ticket、依赖、owner、状态与 Gate</span></div>
+        <div class="lane-tabs"><button class="tab active">全部 Lane</button><button class="tab">desktop</button><button class="tab">backend</button></div>
+      </div>
+      <div class="graph">
+        <div class="root changed">
+          <div class="root-line"><div><b>StoryRoot story-147</b><div class="small muted mono">contract@4 · sha256:contract-v4</div></div><span class="badge amber" id="root-badge">gate pending</span></div>
+          <div class="small muted" style="margin-top:8px">RepoLane: desktop · GitHub · dev &nbsp; | &nbsp; backend · GitLab · dev</div>
+        </div>
+        <div class="maps">
+          <div class="map">
+            <div class="map-title"><b>DiscoveryMap</b><span class="badge blue">frontier 1</span></div>
+            <div class="tickets">
+              <button class="ticket blocked" data-ticket="D17"><b>D17 · API 行为变化裁决</b><div class="meta"><span>requires-decision</span><span>owner: human</span></div></button>
+              <button class="ticket done" data-ticket="D12"><b>D12 · Profile taxonomy</b><div class="meta"><span>closed</span><span>produces I42</span></div></button>
+            </div>
+          </div>
+          <div class="map changed">
+            <div class="map-title"><b>DeliveryMap</b><span class="badge amber">wave 3</span></div>
+            <div class="wave"><div class="wave-label">Wave 3 · contract revision 4</div><div class="tickets">
+              <button class="ticket selected" data-ticket="I42"><b>I42 · Desktop 分层 Graph</b><div class="meta"><span>desktop · attempt-4</span><span>gate pending</span></div></button>
+              <button class="ticket done" data-ticket="I41"><b>I41 · Backend adapter</b><div class="meta"><span>backend · integration</span><span>passed</span></div></button>
+              <button class="ticket" data-ticket="Q43"><b>Q43 · 跨 Lane 最终回归</b><div class="meta"><span>verifies I41/I42</span><span>ready</span></div></button>
+            </div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="panel">
+      <div class="panel-head"><div><h2 id="ticket-title">I42 · Desktop 分层 Graph</h2><span class="small muted mono">ticket-I42 · profile implementation@3</span></div><span class="badge blue" id="ticket-badge">attempt-4</span></div>
+      <div class="detail">
+        <div class="three-axis changed">
+          <div class="axis"><span class="small muted">lifecycle</span><b id="axis-life">active</b></div>
+          <div class="axis"><span class="small muted">control</span><b id="axis-control">claimed</b></div>
+          <div class="axis"><span class="small muted">gate</span><b id="axis-gate">pending</b></div>
+        </div>
+
+        <div id="mode-notice" class="notice" hidden></div>
+
+        <h2>票内局部旅程</h2>
+        <div class="journey">
+          <div class="journey-step"><span class="dot">✓</span><div><b>Contract bound</b><div class="small muted mono">contract-v4 · profile-abc</div></div></div>
+          <div class="journey-step"><span class="dot">✓</span><div><b>Attempt 3 · failed</b><div class="receipt">receipt-QA-811 · FAIL · subject git:c1</div></div></div>
+          <div class="journey-step"><span class="dot">✓</span><div><b>Attempt 4 · candidate c2</b><div class="receipt">receipt-QA-900 · PASS · subject git:c2</div></div></div>
+          <div class="journey-step"><span class="dot stale">!</span><div><b>Candidate advanced to c3</b><div class="receipt">receipt-QA-900 · STALE · SUBJECT_CHANGED</div></div></div>
+          <div class="journey-step"><span class="dot pending">…</span><div><b id="journey-pending">Re-run required verification</b><div class="small muted">Gate remains pending</div></div></div>
+        </div>
+
+        <div id="human-area" hidden>
+          <h2>人工 checklist</h2>
+          <div class="checklist">
+            <label class="check"><input type="checkbox"> <span><b>VIS-1 拖动预览面板</b><br><span class="small muted">expected: 重启后宽度保持</span></span></label>
+            <label class="check"><input type="checkbox"> <span><b>VIS-2 最小窗口宽度</b><br><span class="small muted">expected: Graph 可平移且面板不遮挡</span></span></label>
+            <label class="check"><input type="checkbox"> <span><b>VIS-3 切换 RepoLane</b><br><span class="small muted">expected: ticket 与缩放状态保持</span></span></label>
+          </div>
+          <div class="small muted">授权：<span class="mono">human-test.visual</span> · Agent 不得代勾</div>
+        </div>
+
+        <h2 style="margin-top:18px">受控命令</h2>
+        <div class="commands">
+          <button class="command primary" data-command="retry">Retry</button>
+          <button class="command" data-command="pause">Pause</button>
+          <button class="command" data-command="cancel">Cancel attempt</button>
+          <button class="command" data-command="withdraw">Withdraw ticket</button>
+        </div>
+        <div class="event" id="event-log">No command submitted. Canonical state unchanged.</div>
+      </div>
+    </aside>
+  </div>
+  <footer>结构 mock，不是像素规范。重点确认：全局/局部分层、RepoLane、三轴状态、关键失败态、人工清单与白名单命令。</footer>
+</div>
+
+<script>
+  const modes = {
+    healthy: {
+      main: 'ACTIVE · GATES PENDING', count: '7 / 10', root: 'gate pending', life: 'active', control: 'claimed', gate: 'pending', badge: 'attempt-4',
+      notice: '', human: false, disabled: []
+    },
+    human: {
+      main: 'AWAITING HUMAN', count: '9 / 10', root: 'needs human', life: 'active', control: 'paused', gate: 'needs-human', badge: 'VIS-1..3',
+      notice: '必须由具备 human-test.visual capability 的 tester 逐项提交 evidence。', human: true, disabled: ['retry']
+    },
+    degraded: {
+      main: 'DEGRADED · PROFILE UNAVAILABLE', count: '? / 10', root: 'degraded', life: 'active', control: 'paused', gate: 'unknown', badge: 'profile mismatch',
+      notice: 'expected profile-abc，current profile-def。只允许 read / diagnose / pause / cancel / release。', human: false, disabled: ['retry', 'withdraw']
+    }
+  };
+
+  function setMode(name) {
+    document.querySelectorAll('[data-mode]').forEach(button => button.classList.toggle('active', button.dataset.mode === name));
+    const state = modes[name];
+    document.getElementById('story-main').textContent = state.main;
+    document.getElementById('gate-count').textContent = state.count;
+    document.getElementById('root-badge').textContent = state.root;
+    document.getElementById('axis-life').textContent = state.life;
+    document.getElementById('axis-control').textContent = state.control;
+    document.getElementById('axis-gate').textContent = state.gate;
+    document.getElementById('ticket-badge').textContent = state.badge;
+    const notice = document.getElementById('mode-notice');
+    notice.hidden = !state.notice;
+    notice.textContent = state.notice;
+    notice.classList.toggle('error', name === 'degraded');
+    document.getElementById('human-area').hidden = !state.human;
+    document.querySelectorAll('[data-command]').forEach(button => button.disabled = state.disabled.includes(button.dataset.command));
+    document.getElementById('event-log').textContent = 'View switched to ' + name + '. This mock did not change canonical state.';
+  }
+
+  document.querySelectorAll('[data-mode]').forEach(button => button.addEventListener('click', () => setMode(button.dataset.mode)));
+  document.querySelectorAll('[data-ticket]').forEach(button => button.addEventListener('click', () => {
+    document.querySelectorAll('[data-ticket]').forEach(item => item.classList.remove('selected'));
+    button.classList.add('selected');
+    document.getElementById('ticket-title').textContent = button.querySelector('b').textContent;
+    document.getElementById('event-log').textContent = 'Ticket projection selected. No canonical write occurred.';
+  }));
+  document.querySelectorAll('[data-command]').forEach(button => button.addEventListener('click', () => {
+    document.getElementById('event-log').textContent = 'MOCK command.submit kind=' + button.dataset.command + '\nWaiting for tracker ack; no local-first state change.';
+  }));
+</script>
+
+<!--
+新增：StoryRoot 多 RepoLane、Discovery/Delivery 双图、三轴状态、票内 attempt/receipt 旅程、人工 checklist、Registry degraded、白名单命令。
+不变：Web 仍不是事实真源，不直接创建 Agent/worktree/merge，不替人签 Receipt；tracker/repo 真源与旧 Skill charter 保持。
+-->
+</body>
+</html>

@@ -1,0 +1,22 @@
+{
+  "artifact": "2-prototype/drafts/v6-story-work-graph.html",
+  "sha256": "31251b9c74be78795d0dc2a7aa63a5f3a437d7ba453814d94ec0ea494489a231",
+  "date": "2026-08-31",
+  "static_fixture_checks": {
+    "command": "node .aes-workflow/grilling/2026-08-30-issue-147-steelman-rerun/2-prototype/evidence/webp14-v6/check-v6.mjs",
+    "exit_code": 0,
+    "passed": 53
+  },
+  "browser": "NOT_RUN",
+  "design_qa": "blocked",
+  "reason": "In-app Browser bootstrap import rejected: Importing module \"node:process\" is not allowed in node_repl",
+  "alternative_browser_permission": "AWAITING_USER_RESPONSE",
+  "real_runtime": "NOT_CONNECTED",
+  "business_confirmed": "P14",
+  "web_artifact_confirmed": false,
+  "limitations": [
+    "Static fixture checks do not prove DOM or visual behavior",
+    "Local historical API excerpts, not full raw JSON or live tracker refresh",
+    "No product implementation or domain gate execution"
+  ]
+}

@@ -1,0 +1,105 @@
+<!-- draft v6-business | published 2026-08-30T14:48:00Z
+     用户意见：先锁业务逻辑对照物，再定向构建 v6
+     状态：awaiting business confirmation · architecture + flow overview -->
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Story Atlas v6 · 业务架构与闭环流程</title>
+<style>
+:root{--paper:#f5f5f5;--ink:#2d3142;--muted:#4f5d75;--soft:#7a8399;--accent:#eb6c36;--accent-tint:#fdf1ec;--surface:#fff;--chip:#eef1f6;--chip-accent:#f7dfd3;--font-ui:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;--font-mono:ui-monospace,"Cascadia Mono",Consolas,monospace}
+*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--font-ui)}main{width:min(1160px,calc(100% - 32px));margin:24px auto 48px}header{margin-bottom:24px}h1{font-size:24px;margin:0 0 8px}h2{font-size:20px;margin:0 0 8px}.lede{color:var(--muted);margin:0}.legend{display:flex;gap:20px;margin-top:12px;font:12px var(--font-mono);color:var(--muted)}.swatch{display:inline-block;width:12px;height:12px;margin-right:6px;vertical-align:-2px;border-radius:2px;background:#fff;border:1.25px solid var(--muted)}.swatch.changed{background:var(--accent-tint);border:2px solid var(--accent)}section{margin-top:24px;padding:20px;background:var(--surface);border:1px solid #d9dde6;border-radius:8px;overflow:auto}.canvas{min-width:1100px}.note{margin:8px 0 0;color:var(--muted);font-size:12px}.ledger{margin-top:16px;padding:12px 16px;background:#eef1f6;border-radius:6px;font-size:12px;color:var(--muted)}.ledger b{color:var(--ink)}svg{display:block;width:1100px;height:auto;margin:12px auto 0}.node{fill:#fff;stroke:var(--muted);stroke-width:1.25}.node.changed{fill:var(--accent-tint);stroke:var(--accent);stroke-width:2}.chip{fill:var(--chip)}.chip.changed{fill:var(--chip-accent)}.edge{fill:none;stroke:var(--muted);stroke-width:1.5}.edge.changed{stroke:var(--accent);stroke-width:1.75}.edge.dashed{stroke-dasharray:6 4}.label-mask{fill:var(--paper)}.title{font:600 12px var(--font-ui);fill:var(--ink)}.sub{font:9px var(--font-mono);fill:var(--muted)}.kind{font:8px var(--font-mono);fill:var(--muted);letter-spacing:1px}.kind.changed,.edge-label.changed{fill:var(--accent)}.edge-label{font:8px var(--font-mono);fill:var(--muted)}footer{margin-top:24px;color:var(--muted);font-size:12px}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <h1>Story Atlas v6 · 业务架构与闭环流程</h1>
+  <p class="lede">改后态单视图。橙色只标本轮最关键的边界变化；灰色是必须保持的既有责任。</p>
+  <div class="legend"><span><i class="swatch changed"></i>本次新增/变更</span><span><i class="swatch"></i>既有责任（不动）</span></div>
+</header>
+
+<section>
+  <h2>架构视图：唯一业务规则 + 单向 Projection Runtime</h2>
+  <p class="note">Web 不写 Story；Projection Runtime 不调动 Agent。Workflow/Skill 写持久事实，Core 从事实重算同一投影。</p>
+  <div class="canvas">
+  <svg viewBox="0 0 1100 344" role="img" aria-labelledby="arch-title arch-desc">
+    <title id="arch-title">Story Atlas v6 业务架构</title>
+    <desc id="arch-desc">Workflow 与 Skill 写 tracker、repo 和 registry 事实，Workflow Core 读取并计算，单向 Projection Runtime 广播给只读 Web Shell；浏览器本地视图状态不写回 Story。</desc>
+    <defs>
+      <marker id="arch-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10Z" fill="#4f5d75"/></marker>
+      <marker id="arch-arrow-accent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10Z" fill="#eb6c36"/></marker>
+    </defs>
+
+    <!-- edges first -->
+    <path class="edge" d="M192 144 H220 V72 H248" marker-end="url(#arch-arrow)"/>
+    <path class="edge" d="M192 144 H220 V156 H248" marker-end="url(#arch-arrow)"/>
+    <path class="edge" d="M192 144 H220 V240 H248" marker-end="url(#arch-arrow)"/>
+    <path class="edge" d="M412 72 H440 V140 Q440 148 448 148 H464" marker-end="url(#arch-arrow)"/>
+    <path class="edge" d="M412 156 H464" marker-end="url(#arch-arrow)"/>
+    <path class="edge" d="M412 240 H440 V172 Q440 164 448 164 H464" marker-end="url(#arch-arrow)"/>
+    <path class="edge" d="M628 156 H680" marker-end="url(#arch-arrow)"/>
+    <path class="edge changed" d="M844 156 H896" marker-end="url(#arch-arrow-accent)"/>
+    <path class="edge dashed" d="M980 188 V232" marker-end="url(#arch-arrow)"/>
+
+    <rect class="label-mask" x="648" y="136" width="76" height="12"/><text class="edge-label" x="686" y="146" text-anchor="middle">normalized facts</text>
+    <rect class="label-mask" x="852" y="136" width="40" height="12"/><text class="edge-label changed" x="872" y="146" text-anchor="middle">单向</text>
+
+    <!-- nodes -->
+    <g><rect class="node" x="32" y="112" width="160" height="64" rx="6"/><rect class="chip" x="40" y="120" width="64" height="12" rx="2"/><text class="kind" x="72" y="129" text-anchor="middle">WRITER</text><text class="title" x="112" y="150" text-anchor="middle">Workflow / Skill</text><text class="sub" x="112" y="166" text-anchor="middle">产生与维护持久事实</text></g>
+    <g><rect class="node" x="252" y="40" width="160" height="64" rx="6"/><rect class="chip" x="260" y="48" width="52" height="12" rx="2"/><text class="kind" x="286" y="57" text-anchor="middle">TRACKER</text><text class="title" x="332" y="78" text-anchor="middle">控制索引</text><text class="sub" x="332" y="94" text-anchor="middle">membership · lifecycle · ack</text></g>
+    <g><rect class="node" x="252" y="124" width="160" height="64" rx="6"/><rect class="chip" x="260" y="132" width="52" height="12" rx="2"/><text class="kind" x="286" y="141" text-anchor="middle">REPO/GIT</text><text class="title" x="332" y="162" text-anchor="middle">Contract / Artifact / Receipt</text><text class="sub" x="332" y="178" text-anchor="middle">versioned evidence facts</text></g>
+    <g><rect class="node" x="252" y="208" width="160" height="64" rx="6"/><rect class="chip" x="260" y="216" width="64" height="12" rx="2"/><text class="kind" x="292" y="225" text-anchor="middle">REGISTRY</text><text class="title" x="332" y="246" text-anchor="middle">Profile / GateCatalog</text><text class="sub" x="332" y="262" text-anchor="middle">exact digest or degraded</text></g>
+    <g><rect class="node" x="468" y="124" width="160" height="64" rx="6"/><rect class="chip" x="476" y="132" width="48" height="12" rx="2"/><text class="kind" x="500" y="141" text-anchor="middle">CORE</text><text class="title" x="548" y="162" text-anchor="middle">Workflow Core</text><text class="sub" x="548" y="178" text-anchor="middle">validate · reducer · Gate</text></g>
+    <g><rect class="node changed" x="684" y="124" width="160" height="64" rx="6"/><rect class="chip changed" x="692" y="132" width="60" height="12" rx="2"/><text class="kind changed" x="722" y="141" text-anchor="middle">CHANGED</text><text class="title" x="764" y="162" text-anchor="middle">Projection Runtime</text><text class="sub" x="764" y="178" text-anchor="middle">read · rebuild · broadcast</text></g>
+    <g><rect class="node" x="900" y="124" width="160" height="64" rx="6"/><rect class="chip" x="908" y="132" width="44" height="12" rx="2"/><text class="kind" x="930" y="141" text-anchor="middle">WEB</text><text class="title" x="980" y="162" text-anchor="middle">共用 Web Shell</text><text class="sub" x="980" y="178" text-anchor="middle">read-only SurfaceDocument</text></g>
+    <g><rect class="node" x="900" y="236" width="160" height="64" rx="6"/><rect class="chip" x="908" y="244" width="48" height="12" rx="2"/><text class="kind" x="932" y="253" text-anchor="middle">LOCAL</text><text class="title" x="980" y="274" text-anchor="middle">浏览器 View State</text><text class="sub" x="980" y="290" text-anchor="middle">tab · filter · selection</text></g>
+  </svg>
+  </div>
+  <div class="ledger"><b>Fidelity ledger</b><br>Detail: balanced · 源 = writer、三类事实源、Core、Runtime、Web、local state → 8 节点 / 9 边<br>Merged: schema validator、Receipt validator、Gate projector、Story reducer → Workflow Core<br>Collapsed: tracker/repo 的 GitHub/GitLab Adapter 差异 → 各自事实源节点内部<br>Dropped: Agent/Provider/Task lifecycle → P11/P12 明确不属于当前 Runtime<br>Kept in full: Workflow/Skill → facts → Core → Projection Runtime → Web 单向边界</div>
+</section>
+
+<section>
+  <h2>流程视图：Discovery 决定 Contract，Delivery 以证据收敛</h2>
+  <p class="note">对应 `v6-business-behavior.md` 的 B5–B14、B21；节点是动态工作与 reducer，不是固定阶段槽位。P13=A：终态只合成 required Lane；optional debt 保留 owner、原因、影响和恢复入口，不改写为 PASS。</p>
+  <div class="canvas">
+  <svg viewBox="0 0 1100 384" role="img" aria-labelledby="flow-title flow-desc">
+    <title id="flow-title">Story 从 Discovery 到 Delivery 的闭环</title>
+    <desc id="flow-desc">Discovery 形成 Contract，WorkTicket 产生 Attempt 与 Evidence。发现 Contract 不变的问题时进入下一 wave 的 WorkTicket；改变承诺则回到 Discovery。没有剩余阻塞且 candidate Gate 满足时才进入 integration 和 full suite，最终仅合成 required Lane 并保留 optional debt。</desc>
+    <defs>
+      <marker id="flow-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10Z" fill="#4f5d75"/></marker>
+      <marker id="flow-arrow-accent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10Z" fill="#eb6c36"/></marker>
+    </defs>
+
+    <path class="edge" d="M192 132 H216" marker-end="url(#flow-arrow)"/>
+    <path class="edge" d="M380 132 H404" marker-end="url(#flow-arrow)"/>
+    <path class="edge" d="M568 132 H592" marker-end="url(#flow-arrow)"/>
+    <path class="edge" d="M756 132 H780" marker-end="url(#flow-arrow)"/>
+    <path class="edge" d="M864 164 V188 Q864 196 856 196 H684 Q676 196 676 204 V256" marker-end="url(#flow-arrow)"/>
+    <path class="edge changed" d="M840 164 V224 Q840 232 832 232 H684 a8 8 0 0 0 -16 0 H496 Q488 232 488 224 V168" marker-end="url(#flow-arrow-accent)"/>
+    <path class="edge changed" d="M888 164 V244 Q888 252 880 252 H684 a8 8 0 0 0 -16 0 H120 Q112 252 112 244 V168" marker-end="url(#flow-arrow-accent)"/>
+    <path class="edge" d="M756 292 H780" marker-end="url(#flow-arrow)"/>
+    <path class="edge" d="M944 292 H968" marker-end="url(#flow-arrow)"/>
+
+    <rect class="label-mask" x="700" y="176" width="132" height="12"/><text class="edge-label" x="766" y="186" text-anchor="middle">candidate satisfied / no blocker</text>
+    <rect class="label-mask" x="500" y="208" width="156" height="12"/><text class="edge-label changed" x="578" y="218" text-anchor="middle">contract unchanged / next wave</text>
+    <rect class="label-mask" x="228" y="264" width="100" height="12"/><text class="edge-label changed" x="278" y="274" text-anchor="middle">requires-decision</text>
+
+    <g><rect class="node" x="32" y="100" width="160" height="64" rx="6"/><rect class="chip" x="40" y="108" width="68" height="12" rx="2"/><text class="kind" x="74" y="117" text-anchor="middle">DISCOVERY</text><text class="title" x="112" y="138" text-anchor="middle">DiscoveryRevision</text><text class="sub" x="112" y="154" text-anchor="middle">historical + current</text></g>
+    <g><rect class="node" x="220" y="100" width="160" height="64" rx="6"/><rect class="chip" x="228" y="108" width="60" height="12" rx="2"/><text class="kind" x="258" y="117" text-anchor="middle">SUBJECT</text><text class="title" x="300" y="138" text-anchor="middle">Contract revision</text><text class="sub" x="300" y="154" text-anchor="middle">goal · AC · policy digest</text></g>
+    <g><rect class="node" x="408" y="100" width="160" height="64" rx="6"/><rect class="chip" x="416" y="108" width="52" height="12" rx="2"/><text class="kind" x="442" y="117" text-anchor="middle">TICKET</text><text class="title" x="488" y="138" text-anchor="middle">WorkTicket frontier</text><text class="sub" x="488" y="154" text-anchor="middle">stable Profile binding</text></g>
+    <g><rect class="node" x="596" y="100" width="160" height="64" rx="6"/><rect class="chip" x="604" y="108" width="56" height="12" rx="2"/><text class="kind" x="632" y="117" text-anchor="middle">ATTEMPT</text><text class="title" x="676" y="138" text-anchor="middle">Role + Carrier + Skill</text><text class="sub" x="676" y="154" text-anchor="middle">append-only execution</text></g>
+    <g><rect class="node" x="784" y="100" width="160" height="64" rx="6"/><rect class="chip" x="792" y="108" width="64" height="12" rx="2"/><text class="kind" x="824" y="117" text-anchor="middle">EVIDENCE</text><text class="title" x="864" y="138" text-anchor="middle">Receipt / Gate / 发现分类</text><text class="sub" x="864" y="154" text-anchor="middle">exact subject · B9/B13/B14</text></g>
+    <g><rect class="node" x="596" y="260" width="160" height="64" rx="6"/><rect class="chip" x="604" y="268" width="72" height="12" rx="2"/><text class="kind" x="640" y="277" text-anchor="middle">INTEGRATE</text><text class="title" x="676" y="298" text-anchor="middle">Integration + full suite</text><text class="sub" x="676" y="314" text-anchor="middle">exact SHA · new receipts</text></g>
+    <g><rect class="node" x="784" y="260" width="160" height="64" rx="6"/><rect class="chip" x="792" y="268" width="44" height="12" rx="2"/><text class="kind" x="814" y="277" text-anchor="middle">LANE</text><text class="title" x="864" y="298" text-anchor="middle">RepoLane local Gate</text><text class="sub" x="864" y="314" text-anchor="middle">PASS / blocked / waiver</text></g>
+    <g><rect class="node" x="972" y="260" width="96" height="64" rx="6"/><rect class="chip" x="980" y="268" width="44" height="12" rx="2"/><text class="kind" x="1002" y="277" text-anchor="middle">STORY</text><text class="title" x="1020" y="298" text-anchor="middle">Reducer</text><text class="sub" x="1020" y="314" text-anchor="middle">terminal</text></g>
+  </svg>
+  </div>
+  <div class="ledger"><b>Fidelity ledger</b><br>Detail: balanced · 源 = Discovery/Contract/WorkTicket/Attempt/Receipt/Classifier/Integration/Lane Gate/Story reducer → 8 节点 / 9 边<br>Merged: candidate evidence、candidate Gate 与 ChangeClassifier 的输出 → Evidence 节点，仅是流程压缩，不合并实现职责；merge 与 final full suite → Integration 节点<br>Collapsed: P13 optional_debt → Story reducer 旁注，完整例子见 behavior B21/E11–E15<br>Dropped: optional Lane 不画入必需门禁主线，因为 P13=A 已排除其直接阻断作用；其债务不删除<br>Kept in full: Contract 不变的发现回到下一 wave WorkTicket，而非直接集成；requires-decision 回 Discovery；仅收敛后集成；required Lane 合成终态并保留 optional 原始状态</div>
+</section>
+
+<footer>删除清单：v5 的 WEB/CORE 假 RepoLane、单一 state、candidate-as-integration、Web command channel、Projection Runtime Agent lifecycle。</footer>
+</main>
+</body>
+</html>
