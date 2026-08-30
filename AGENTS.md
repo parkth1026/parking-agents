@@ -5,6 +5,7 @@
 
 - commit message 必须中文，写面向用户的解释：关键参数的修正、针对行业知识的修改；不能写成改动代码的流水账。
 - 正在执行 issue 时，必须把 issue 编号加入 commit message。例：`fix(workflow): 通过通用能力标志保留历史交互草稿 - #48`
+- 如果是 merge message ，必须参考 pr 的标准规范h来写 merge message，不能用默认 merge massage
 
 ## 仓库约定
 
