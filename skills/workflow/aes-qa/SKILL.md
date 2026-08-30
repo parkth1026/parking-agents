@@ -1,12 +1,27 @@
 ---
 name: aes-qa
-description: worker 闭环内唯一的验证角色，三种调用形态：循环轮逐轮验证实现（只出 finding）、最终轮为唯一 candidate commit 出具绑定 SHA 的 typed QaReceipt（按影响面决定自动/live/人工）、打回修复后回归重验。如实记录未执行项与人工债务，绝不把 NOT_RUN 说成 PASS。当 aes-issue-worker 在实现循环中逐轮验证、commit 后出具最终 receipt，或需要为一次交付产出可审计的 QA 证据时使用。
+description: worker 闭环内唯一的验证角色，三种调用形态：循环轮逐轮验证实现（只出 finding）、最终轮为唯一 candidate commit 出具绑定 SHA 的 typed QaReceipt（按影响面决定自动/live/人工）、打回修复后回归重验。如实记录未执行项与人工债务，绝不把 NOT_RUN 说成 PASS。当 aes-issue-worker 在实现循环中逐轮验证、commit 后出具最终 receipt，或需要为一次交付产出可审计的 QA 证据时使用；实际执行 screenshot check 时按 AES GitLab terminal batch 发布并要求 VERIFIED，未跑截图不触发。
 ---
 
 # AES QA
 
 给一个 candidate commit 出具**可审计**的验证结论。本技能的价值不在于「跑测试」，
 而在于**如实**：哪些验证真的跑了、哪些没跑、哪些只有人能做。
+
+## 截图证据分支：实际跑了才触发
+
+只有本 QA attempt **实际执行 screenshot check**，或截图实际参与规格、verdict / Finding，
+才产生 GitLab 发布义务；Issue 有界面 AC 或代码改了 UI 都不自动触发。进入该分支前必须读
+[GitLab 截图证据协议](references/screenshot-evidence.md)，按其中公共入口执行：capture 只写
+stable local spool，完整 attempt terminal 后只冻结并发布一个 claim-complete batch，final
+candidate 必须新 attempt 重跑。没有实际截图则 publisher、GitLab note 与空 marker 都是 0。
+
+capture executor 不持远端写权限；owner session 的最小权限 publisher 是唯一 GitLab writer；
+gate 只读 aggregate marker。默认 `A=3`、`R=2`，正常严格路径为 `2U+2` HTTP；首次成功
+模型摘要≤512 UTF-8 bytes，异常/resume 与批次总预算见详细协议。
+
+这是内部 GitLab 的 AES QA 协议，不适用于通用 artifacts、非 GitLab tracker、trace/video/
+日志或 source-controlled visual baseline。
 
 ## 三种调用形态
 
@@ -47,7 +62,7 @@ Master 的机械门会检查这些：`checks[]` 里出现 `NOT_RUN`、或 `unexe
 | 纯内部逻辑、有单测覆盖 | `automated` | 跑既有回归入口 |
 | CLI / 报文 / 文件格式 | `automated` + 端到端 | 真实调用一次，比对输出 |
 | GitHub identity、权限、外部 API | `live` | 真实环境验证正例与反例（错误账号必须 fail closed） |
-| 界面、交互、视觉 | `live` + 人工 | 固定视口截图 + 人工确认 |
+| 界面、交互、视觉 | `live` + 人工 | 若实际执行 screenshot，固定视口截图进入 GitLab 证据分支；人工确认仍由人完成 |
 | 无法自动断言的判断（观感、措辞、业务正确性） | `manual` | `humanChecklist` |
 
 选 `automated` 却改了 identity，等于没验。选 `manual` 却本可以自动断言，
@@ -71,11 +86,17 @@ candidate 前进后必须重跑，不能拿旧结论顶。
     { "id": "QA-1", "kind": "automated", "outcome": "PASS", "command": "node run-tests.mjs" },
     { "id": "QA-2", "kind": "live", "outcome": "PASS", "summary": "错误账号 fail closed" }
   ],
+  "screenshotEvidence": { "required": false },
   "outcome": "PASS",
   "unexecuted": [],
   "manualDebt": []
 }
 ```
+
+新 receipt 明确写 `screenshotEvidence.required`。任何 `checks[].kind` 为
+`screenshot|live-screenshot` 的 receipt 都必须是 `required:true`，并携带 VERIFIED
+`aggregateMarker`；漏填或冲突 fail closed。无截图的旧 v1 receipt 继续兼容。wrapper、marker
+字段和 candidate gate 只由 [截图证据协议](references/screenshot-evidence.md) 定义，不在这里复制。
 
 失败时必须带 `failureClass`（`must-fix` / `retryable` / `environment`）。
 环境污染与真实缺陷烧的是不同预算，混为一谈会让 owner 在还没修到点子上时

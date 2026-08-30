@@ -86,9 +86,26 @@ node .agents/skills/aes-worktree-board/scripts/master.mjs stage qa --job <jobId>
 最终轮与循环轮是**同一验证角色的两种调用**，唯一区别是输出格式与 SHA 绑定。
 FAIL 回实现（烧 `qaLoops`），修完重走循环轮收敛再回到这里。
 
+#### 实际截图分支
+
+若本 attempt 实际执行 screenshot check，或 screenshot 被规格、verdict / Finding 引用，先读
+[aes-qa GitLab 截图证据协议](../aes-qa/references/screenshot-evidence.md) 并在 owner session 内闭环：
+
+1. capture executor 只落 stable local spool，GitLab HTTP=0；
+2. 完整 attempt 得到 PASS/FAIL/BLOCKED terminal 后冻结一个 claim-complete batch；
+3. 登记 final candidate 后用新 `{qaRoundId,attemptId}` 在该 candidate 运行态重跑最终截图，
+   一次 publish 并严格回读到 VERIFIED；dirty/nonFinal 图片不能顶替；
+4. QaReceipt 顶层写 `screenshotEvidence:{required:true,aggregateMarker}`。marker 未 VERIFIED、
+   candidate 不一致或 claim 不完整时，不得发 READY terminal。
+
+没有实际截图与引用时不调用 publisher、不写空 GitLab note；新 receipt 写
+`screenshotEvidence.required=false`，旧无截图 v1 保持兼容。此分支只覆盖 AES QA 的内部
+GitLab screenshot evidence，不扩成通用 artifact 发布。
+
 ### READY 之后：交付即结束
 
-QaReceipt PASS 后发 `READY_TO_MERGE` terminal（≈提一份本地 PR）——它写进
+QaReceipt PASS（以及实际截图分支的 VERIFIED 子门）后发 `READY_TO_MERGE` terminal
+（≈提一份本地 PR）——它写进
 registry 的 mergeQueue，**worker 的工作到此结束**，不与任何合并方直连。
 
 之后由 aes-merge-worker 从 queue 领取：派独立 `code-review` subagent

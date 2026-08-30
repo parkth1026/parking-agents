@@ -51,6 +51,59 @@ export function maxRisk(a, b) {
   return RISK_ORDER[a] >= RISK_ORDER[b] ? a : b;
 }
 
+function declaresScreenshotEvidenceObligation(qa) {
+  return qa?.screenshotEvidence?.required === true
+    || (qa?.checks || []).some((check) => ['screenshot', 'live-screenshot'].includes(check?.kind));
+}
+
+function screenshotEvidenceGate(qa, candidateCommit) {
+  const marker = qa?.screenshotEvidence?.aggregateMarker;
+  if (!marker) return { ok: false, detail: '截图证据义务已触发，但 aggregate marker 缺失' };
+  const sha256 = /^[0-9a-f]{64}$/i;
+  if (marker.schema !== 'aes.screenshot-evidence-marker/v1') {
+    return { ok: false, detail: `截图证据 marker schema=${marker.schema || 'NOT_SET'}，必须为 aes.screenshot-evidence-marker/v1` };
+  }
+  if (typeof marker.batchId !== 'string' || !/^sha256:[0-9a-f]{64}$/i.test(marker.batchId)) {
+    return { ok: false, detail: '截图证据 batchId 不是完整 sha256 identity' };
+  }
+  if (typeof marker.qaRoundId !== 'string' || !marker.qaRoundId.trim()
+    || typeof marker.attemptId !== 'string' || !marker.attemptId.trim()) {
+    return { ok: false, detail: '截图证据 qaRoundId/attemptId 缺失' };
+  }
+  if (typeof marker.frozenManifestSha256 !== 'string' || !sha256.test(marker.frozenManifestSha256)
+    || typeof marker.receiptSha256 !== 'string' || !sha256.test(marker.receiptSha256)) {
+    return { ok: false, detail: '截图证据 manifest/receipt SHA-256 缺失或非法' };
+  }
+  if (marker.status !== 'VERIFIED') {
+    return { ok: false, detail: `截图证据 marker status=${marker.status || 'NOT_SET'}，必须为 VERIFIED` };
+  }
+  if (marker.assertionOutcome !== 'PASS') {
+    return { ok: false, detail: `截图证据 assertion=${marker.assertionOutcome || 'NOT_SET'}，只有 PASS 可获得 release eligibility` };
+  }
+  if (!candidateCommit || marker.candidateSha !== candidateCommit) {
+    return {
+      ok: false,
+      detail: `截图证据 candidate=${marker.candidateSha || 'NOT_BOUND'} current=${candidateCommit || 'NOT_RUN'}，过期或未绑定`,
+    };
+  }
+  const n = marker.claimRefsN;
+  const u = marker.uniqueSha256U;
+  const verified = marker.verifiedU;
+  if (!Number.isInteger(n) || !Number.isInteger(u) || n < u || u < 1) {
+    return { ok: false, detail: `截图证据 claim-complete 计数非法 N=${n ?? 'NOT_SET'} U=${u ?? 'NOT_SET'}` };
+  }
+  if (!Number.isInteger(verified) || verified !== u) {
+    return { ok: false, detail: `截图证据 verifiedU=${verified ?? 'NOT_SET'} 与 U=${u} 不一致` };
+  }
+  if (!Number.isInteger(marker.totalUniqueBytes) || marker.totalUniqueBytes < 1) {
+    return { ok: false, detail: `截图证据 totalUniqueBytes=${marker.totalUniqueBytes ?? 'NOT_SET'} 非法` };
+  }
+  if (!Number.isInteger(marker.noteId) || marker.noteId < 1) {
+    return { ok: false, detail: `截图证据 noteId=${marker.noteId ?? 'NOT_SET'} 非法` };
+  }
+  return { ok: true, detail: '截图证据 aggregate marker 已 VERIFIED' };
+}
+
 // 纯函数：给定自报档位与改动路径集合，推导出实际生效的档位与 policy。
 export function resolveMergePolicy({ declaredRisk, changedPaths = [], waiver = null }) {
   assertRiskProfile(declaredRisk);
@@ -152,12 +205,15 @@ export function evaluateMechanicalGate({
   push('GATE-review-base', Boolean(reviewBaseOk), reviewBaseReason);
 
   // runtime=NOT_RUN 不得伪装 PASS（不变清单）。
+  const screenshotRequired = declaresScreenshotEvidenceObligation(qa);
+  const screenshotGate = screenshotRequired ? screenshotEvidenceGate(qa, candidateCommit) : null;
   const qaOk = qa && qa.outcome === 'PASS'
     && candidateCommit && qa.commitSha === candidateCommit
     && !(qa.checks || []).some((check) => check.outcome === 'NOT_RUN')
-    && !(qa.unexecuted || []).length;
+    && !(qa.unexecuted || []).length
+    && (!screenshotRequired || screenshotGate.ok);
   push('GATE-qa', Boolean(qaOk), qa
-    ? `qa outcome=${qa.outcome} commit=${qa.commitSha || 'NOT_BOUND'} candidate=${candidateCommit || 'NOT_RUN'} unexecuted=${(qa.unexecuted || []).length}`
+    ? `qa outcome=${qa.outcome} commit=${qa.commitSha || 'NOT_BOUND'} candidate=${candidateCommit || 'NOT_RUN'} unexecuted=${(qa.unexecuted || []).length}${screenshotRequired ? ` screenshot=${screenshotGate.detail}` : ''}`
     : 'QA 证据缺失');
 
   // QA 必须在当前 integration base 上取证；base 前进使旧证据失效（AC-007/AC-2）。
