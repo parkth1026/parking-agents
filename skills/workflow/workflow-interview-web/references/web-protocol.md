@@ -8,9 +8,8 @@
 web/
 ├── state.json                 页面声明式状态
 ├── decision-ledger.jsonl      Web 侧不可变事件链（带前序摘要）
-├── server-info               当前 URL、token、pid（owner-only）
-├── .session-token            当前 token（owner-only）
-├── .last-port                上次使用的端口，重启时复用（owner-only）
+├── server-info               当前 plain URL、port、pid
+├── .last-port                上次使用的端口，重启时复用
 ├── submissions/<round>.json  浏览器提交；一轮一个，不覆盖
 ├── consumed/<round>.json     已成功映射回家族 rounds 的标记
 ├── runtime/                   宿主 continuation authority 私有状态
@@ -78,7 +77,7 @@ transport/runtime 测试。
 
 `GET /api/state` 和 dossier 只投影以下安全字段：`round`、`mode`、`status`、`receipt_stage`、
 `next_user_action`、有限的 `correlation`（session slug、round、revision、digest、generation）
-与 fallback `reason`。raw owner nonce、进程/cell/session identity、token 和完整 runtime 文件
+与 fallback `reason`。raw owner nonce、进程/cell/session identity 和完整 runtime 文件
 永不进入公开投影。
 
 transport 的顺序固定为：建立 `<issue>/web/submissions/` watch → 立即重查目标 submission → 命中后
@@ -243,8 +242,9 @@ agent 必须用当时发布的 item 补齐家族 line。服务端返回的 `GET 
 
 ## HTTP/WS 约定
 
-- 首次 URL `?key=` 校验后设置 HttpOnly、SameSite=Strict cookie，并 303 到无 key 的 `/`。
-- HTTP API 与静态资源始终鉴权。WS 除鉴权外还要求 loopback 同源 Origin。
+- server 只绑定 `127.0.0.1`，对当前 issue 提供稳定 plain URL；不生成 session key、cookie 或登录步骤。
+- 页面、HTTP API、静态资源和 WS 直接使用同一 loopback origin。server 重启复用 `.last-port`，旧页面
+  无需重新认证；发布和 consumed 变化由 WS 通知，页面重读 `/api/state` 并原地 render。
 - `POST /api/submit`：成功 200；同 round 重复 409；必答缺失 422；非法 round 400。
 - `GET /api/state`：返回运行状态、normalized `continuation` 及当前 round+上 3 个已锁定 round 的
   dossier 投影；已提交答案以服务器 submission 为准。旧 state 没有 continuation 字段时，投影为
@@ -253,7 +253,7 @@ agent 必须用当时发布的 item 补齐家族 line。服务端返回的 `GET 
   返回的 dossier 只包含该批次，不能替代默认 Agent recovery payload。
 - `GET /export`：下载自包含 HTML 决策档案；响应禁止缓存并使用收紧的 CSP。
 - `GET /files/<name>`：只读 `web/assets/` 的普通非符号链接 basename；其余统一 404。
-- `GET /shutdown?key=...`：先回执，再写 `server-stopped` 并退出。
+- `GET /shutdown`：先回执，再写 `server-stopped` 并退出。
 
 提交文件在 200 回执之前完成原子落盘；重复提交永远以第一份为准。响应结构仍保持现有字段，成功时
 额外返回安全的 `continuation` 投影；manual 主路径为 `manual_recovery_required/persisted/send_message`，

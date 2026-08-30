@@ -62,10 +62,8 @@ function writeJson(name, value) {
   return pathname;
 }
 
-function keyUrl(pathname) {
-  const url = new URL(pathname, `http://127.0.0.1:${serverInfo.port}`);
-  url.searchParams.set('key', serverInfo.token);
-  return url;
+function plainUrl(pathname) {
+  return new URL(pathname, `http://127.0.0.1:${serverInfo.port}`);
 }
 
 async function jsonFetch(url, options = {}) {
@@ -97,7 +95,7 @@ function spawnWait(args) {
   return child;
 }
 
-function badWebSocketUpgrade(port, token) {
+function webSocketUpgrade(port) {
   return new Promise((resolveSocket, rejectSocket) => {
     const socket = connect({ host: '127.0.0.1', port });
     let response = '';
@@ -112,12 +110,17 @@ function badWebSocketUpgrade(port, token) {
       'Connection: Upgrade',
       'Sec-WebSocket-Version: 13',
       'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==',
-      'Origin: http://evil.example',
-      `Cookie: wi_web_key=${token}`,
       '',
       '',
     ].join('\r\n')));
-    socket.on('data', (chunk) => { response += chunk.toString('utf8'); });
+    socket.on('data', (chunk) => {
+      response += chunk.toString('utf8');
+      if (/^HTTP\/1\.1 101/m.test(response)) {
+        clearTimeout(timer);
+        socket.destroy();
+        resolveSocket(response);
+      }
+    });
     socket.on('close', () => {
       clearTimeout(timer);
       resolveSocket(response);
@@ -158,22 +161,17 @@ try {
     env: { WI_WEB_IDLE_TIMEOUT_MS: '120000' }, timeout: 12_000,
   });
   serverInfo = parseJsonOutput(start, 'server start');
-  assert(serverInfo.type === 'server-started' && serverInfo.port > 0 && /^[a-f0-9]{64}$/.test(serverInfo.token), 'server-info 缺 URL/token/port');
+  assert(serverInfo.type === 'server-started' && serverInfo.port > 0 && serverInfo.url === `http://127.0.0.1:${serverInfo.port}/`, 'server-info 缺 plain URL/port');
   const infoOnDisk = JSON.parse(readFileSync(join(issueDir, 'web', 'server-info'), 'utf8'));
-  assert(infoOnDisk.token === serverInfo.token && infoOnDisk.pid === serverInfo.pid, 'server-info 落盘内容不一致');
-  check('server start → server-info 含 URL/token');
-
-  const firstHop = await fetch(serverInfo.url, { redirect: 'manual' });
-  const cookie = firstHop.headers.get('set-cookie') ?? '';
-  assert(firstHop.status === 303 && firstHop.headers.get('location') === '/', '首跳没有 303 清除 query key');
-  assert(/HttpOnly/i.test(cookie) && /SameSite=Strict/i.test(cookie), 'cookie 缺 HttpOnly/SameSite=Strict');
-  const noKey = await jsonFetch(`http://127.0.0.1:${serverInfo.port}/api/state`);
-  assert(noKey.response.status === 403 && noKey.body?.error === 'session_key_required', '无 key 访问未被拒绝');
-  const malformedCookie = await jsonFetch(`http://127.0.0.1:${serverInfo.port}/api/state`, { headers: { Cookie: 'wi_web_key=%ZZ' } });
-  assert(malformedCookie.response.status === 403, '畸形 cookie 没有稳定拒绝');
-  const badWs = await badWebSocketUpgrade(serverInfo.port, serverInfo.token);
-  assert(/^HTTP\/1\.1 403/m.test(badWs), '跨源 WS upgrade 未被拒绝');
-  check('token 首跳/cookie/HTTP/WS 同源鉴权全链');
+  assert(infoOnDisk.url === serverInfo.url && infoOnDisk.pid === serverInfo.pid && infoOnDisk.token === undefined, 'server-info 落盘内容不一致或仍含 token');
+  const directPage = await fetch(serverInfo.url);
+  const directState = await jsonFetch(plainUrl('/api/state'));
+  const ignoredLegacyCookie = await jsonFetch(plainUrl('/api/state'), { headers: { Cookie: 'wi_web_key=%ZZ' } });
+  const openWs = await webSocketUpgrade(serverInfo.port);
+  assert(directPage.status === 200 && directState.response.status === 200 && ignoredLegacyCookie.response.status === 200, 'plain loopback 页面/API 仍要求 key 或 cookie');
+  assert(/^HTTP\/1\.1 101/m.test(openWs), 'WS upgrade 无 key 时不可用');
+  assert(!existsSync(join(issueDir, 'web', '.session-token')), 'server start 仍生成 legacy token 文件');
+  check('server start → plain loopback URL；HTTP/WS 无 key、cookie 或登录');
 
   const invalid = structuredClone(roundOne);
   invalid.round.items[0].options[1].pct = 20;
@@ -189,26 +187,26 @@ try {
   ]);
   const publishOutput = parseJsonOutput(publishOne, 'publish r1');
   assert(publishOutput.round === 'r1' && publishOutput.items === 3, 'publish 输出不匹配');
-  const stateResult = await jsonFetch(keyUrl('/api/state'));
+  const stateResult = await jsonFetch(plainUrl('/api/state'));
   assert(stateResult.response.status === 200 && stateResult.body?.state?.rounds?.[0]?.id === 'r1', '/api/state 未返回新 round');
-  const page = await fetch(keyUrl('/app.mjs'));
+  const page = await fetch(plainUrl('/app.mjs'));
   assert(page.status === 200 && (await page.text()).includes('localStorage'), '单页静态资产不可读');
   check('合法 round 原子发布，/api/state 与单页资产可读');
 
-  const originDenied = await jsonFetch(keyUrl('/api/submit'), {
+  const crossOriginMissing = await jsonFetch(plainUrl('/api/submit'), {
     method: 'POST', headers: { 'Content-Type': 'application/json', Origin: 'http://evil.example' },
     body: JSON.stringify({ round: 'r1', answers: [] }),
   });
-  assert(originDenied.response.status === 403 && originDenied.body?.error === 'origin_forbidden', '跨源 POST 未被拒绝');
-  const missing = await jsonFetch(keyUrl('/api/submit'), {
+  assert(crossOriginMissing.response.status === 422 && crossOriginMissing.body?.error === 'missing_required', 'Origin header 仍阻断本地提交或绕过必答校验');
+  const missing = await jsonFetch(plainUrl('/api/submit'), {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ round: 'r1', answers: [] }),
   });
   assert(missing.response.status === 422 && missing.body?.q_ids?.includes('Q1') && missing.body.q_ids.includes('C1'), '必答缺失没有 422');
-  check('POST 同源边界与必答缺失 422');
+  check('POST 无登录门槛；必答缺失稳定返回 422');
 
   const longOther = '跨天边界'.repeat(600);
-  const submit = await jsonFetch(keyUrl('/api/submit'), {
+  const submit = await jsonFetch(plainUrl('/api/submit'), {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ round: 'r1', answers: [
       { q_id: 'Q1', type: 'custom', text: longOther },
@@ -220,19 +218,19 @@ try {
   const submission = JSON.parse(readFileSync(submissionPath, 'utf8'));
   assert(submission.answers.find((answer) => answer.q_id === 'Q1').text.length === 2000, 'Other 没有截断到 2000');
   assert(submission.answers.some((answer) => answer.q_id === 'D1' && answer.type === 'accept'), '默认项未正规化为 accept');
-  const submittedState = await jsonFetch(keyUrl('/api/state'));
+  const submittedState = await jsonFetch(plainUrl('/api/state'));
   assert(submittedState.body?.state?.open_ambiguities === 0, '最后一个 pending round 提交后开放歧义未归零');
   check('提交先落盘再 200；Other 截断且默认项正规化');
 
   const immediateWait = run(WAIT, ['--issue-dir', issueDir, '--round', 'r1']);
   const waited = parseJsonOutput(immediateWait, 'wait existing');
   assert(waited.round === 'r1' && waited.answers.length === 3, 'wait-submit 没有打印提交 JSON');
-  const detachedProjection = await jsonFetch(keyUrl('/api/state'));
+  const detachedProjection = await jsonFetch(plainUrl('/api/state'));
   assert(detachedProjection.body?.state?.continuation?.mode === 'manual_followup'
     && detachedProjection.body.state.continuation.status === 'manual_recovery_required'
     && detachedProjection.body.state.continuation.receipt_stage === 'persisted'
     && detachedProjection.body.state.continuation.next_user_action === 'send_message', 'manual wait-submit 没有诚实提示请继续');
-  const duplicate = await jsonFetch(keyUrl('/api/submit'), {
+  const duplicate = await jsonFetch(plainUrl('/api/submit'), {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ round: 'r1', answers: [{ q_id: 'Q1', type: 'choice', choice: 'A' }, { q_id: 'C1', type: 'confirm' }] }),
   });
@@ -259,7 +257,7 @@ try {
   parseJsonOutput(run(PUBLISH, ['round', '--issue-dir', issueDir, '--file', writeJson('round-r2.json', roundTwo)]), 'publish r2');
   const waitingChild = spawnWait(['--issue-dir', issueDir, '--round', 'r2']);
   await delay(150);
-  const submitTwo = await jsonFetch(keyUrl('/api/submit'), {
+  const submitTwo = await jsonFetch(plainUrl('/api/submit'), {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ round: 'r2', answers: [{ q_id: 'Q2', type: 'choice', choice: 'A' }] }),
   });
@@ -295,7 +293,7 @@ try {
   };
   const typesPublished = parseJsonOutput(run(PUBLISH, ['round', '--issue-dir', issueDir, '--file', writeJson('round-r3.json', roundTypes)]), 'publish r3');
   assert(typesPublished.round === 'r3' && typesPublished.items === 8, 'v2 结构化 round 未发布');
-  const invalidMulti = await jsonFetch(keyUrl('/api/submit'), {
+  const invalidMulti = await jsonFetch(plainUrl('/api/submit'), {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ round: 'r3', answers: [
       { q_id: 'M1', type: 'multi', choices: ['NONE', 'WEB'] },
@@ -306,7 +304,7 @@ try {
     ] }),
   });
   assert(invalidMulti.response.status === 400, '排他多选组合没有被拒绝');
-  const submitTypes = await jsonFetch(keyUrl('/api/submit'), {
+  const submitTypes = await jsonFetch(plainUrl('/api/submit'), {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ round: 'r3', answers: [
       { q_id: 'M1', type: 'multi', choices: ['WEB'], custom: 'CLI 摘要页' },
@@ -320,7 +318,7 @@ try {
   const typeSubmission = JSON.parse(readFileSync(join(issueDir, 'web', 'submissions', 'r3.json'), 'utf8'));
   assert(typeSubmission.schema_version === 2 && typeSubmission.answers.find((answer) => answer.q_id === 'M1').choices[0] === 'WEB', 'v2 多选没有正规化落盘');
   assert(typeSubmission.answers.find((answer) => answer.q_id === 'N1').unit === '天', '数字回答没有保留单位');
-  const dossierState = await jsonFetch(keyUrl('/api/state'));
+  const dossierState = await jsonFetch(plainUrl('/api/state'));
   assert(typeSubmission.answers.length === 8 && !dossierState.body?.dossier?.submissions?.r3, '/api/state 默认应只返回当前历史窗口；submission 仍由服务器文件保留');
   assert(dossierState.body.dossier.title === 'Goal Contract 决策档案 · runtime test', '决策档案没有保留发布标题');
   assert(dossierState.body.dossier.ledger.some((event) => event.type === 'round_published') && dossierState.body.dossier.ledger.some((event) => event.type === 'round_submitted'), '决策账本缺发布或提交事件');
@@ -333,16 +331,16 @@ try {
   assert(exportHtml.includes('goal-contract-decision-dossier') && exportHtml.includes('decision-dossier-data') && exportHtml.includes('哪些页面进入范围？') && exportHtml.includes('Goal Contract 决策档案 · runtime test'), '静态导出缺标题、完整轨迹或机器 JSON');
   assert(exportHtml.includes('<div class="markdown"><h2>Context Snapshot') && !exportHtml.includes('<h2>原始请求与上下文</h2><pre>'), '静态档案主上下文仍在展示原始 Markdown 标记');
   assert(exportHtml.includes('<link rel="icon" href="data:,">') && !exportHtml.includes('<span>%</span>'), '静态档案有无意义的百分号或离线 favicon 请求');
-  assert(exportHtml.includes('prototype fixture') && !exportHtml.includes(serverInfo.token), '静态导出没有内嵌来源或泄露 session token');
-  const exportResponse = await fetch(keyUrl('/export'));
+  assert(exportHtml.includes('prototype fixture') && !exportHtml.includes('session_key_required'), '静态导出没有内嵌来源或仍含登录错误');
+  const exportResponse = await fetch(plainUrl('/export'));
   assert(exportResponse.status === 200 && /attachment/.test(exportResponse.headers.get('content-disposition') ?? '') && (await exportResponse.text()).includes('追踪矩阵'), '浏览器导出端点不可用');
   check('自包含静态决策档案、来源内嵌、机器 JSON 与下载端点');
 
-  const allowedFile = await fetch(keyUrl('/files/prototype.html'));
+  const allowedFile = await fetch(plainUrl('/files/prototype.html'));
   assert(allowedFile.status === 200 && (await allowedFile.text()).includes('prototype fixture'), '白名单附件不可读');
-  const traversal = await jsonFetch(keyUrl('/files/%2e%2e%2fsecret.txt'));
+  const traversal = await jsonFetch(plainUrl('/files/%2e%2e%2fsecret.txt'));
   assert(traversal.response.status === 404, '/files/ 越权路径没有 404');
-  const malformedPath = await jsonFetch(keyUrl('/files/%ZZ'));
+  const malformedPath = await jsonFetch(plainUrl('/files/%ZZ'));
   assert(malformedPath.response.status === 404, '/files/ 畸形编码没有 404');
   check('/files/ 仅允许 assets basename，越权路径 404');
 
@@ -364,7 +362,7 @@ try {
   const normalizedItem = normalizedRound.items.find((item) => item.q_id === 'DM1');
   assert(normalizedItem.response.min_selections === 2 && normalizedItem.response.max_selections === 2 && normalizedItem.response.min === undefined, '文档 min/max 没有正规化为 min_selections/max_selections');
   assert(normalizedRound.items.find((item) => item.q_id === 'DB1').options === undefined, 'boolean 无 options 形态不应被塞入 options');
-  const tooFew = await jsonFetch(keyUrl('/api/submit'), {
+  const tooFew = await jsonFetch(plainUrl('/api/submit'), {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ round: 'r4', answers: [
       { q_id: 'DM1', type: 'multi', choices: ['A'] },
@@ -372,7 +370,7 @@ try {
     ] }),
   });
   assert(tooFew.response.status === 400, '文档 min/max 边界没有被服务端强制');
-  const docSubmit = await jsonFetch(keyUrl('/api/submit'), {
+  const docSubmit = await jsonFetch(plainUrl('/api/submit'), {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ round: 'r4', answers: [
       { q_id: 'DM1', type: 'multi', choices: ['A', 'B'] },
@@ -394,6 +392,8 @@ try {
   const app = readFileSync(join(HERE, 'web', 'app.mjs'), 'utf8');
   assert(existsSync(CONTINUATION_TESTS) && app.includes('continuation-status') && app.includes('agent_resumed') && app.includes('manual_recovery_required'), 'continuation runtime/七态页面未接入');
   assert(app.includes('localStorage') && app.includes('new WebSocket') && app.includes('contract-revision-input'), '单页缺草稿/WS/契约修改能力');
+  assert(app.includes("['state-updated', 'submitted', 'continuation-updated', 'reload'].includes(message.type)")
+    && app.includes('await loadState()') && !app.includes('location.reload'), 'state 更新没有原地同步或仍会整页 reload');
   assert(app.includes('renderSingleDetails') && app.includes('renderMultiChoice') && app.includes('decision-detail-stack'), '紧凑问卷缺逐题固定详情槽或多选能力');
   assert(app.includes('true_label') && app.includes('false_label'), 'boolean 无 options 时不读 true_label/false_label');
   assert(app.includes('dossierData?.submissions') && app.includes('renderDossier') && app.includes('markdownBlock(dossierData.context_markdown)'), '提交后没有从权威决策档案回看、缺完整轨迹或上下文仍为原始 Markdown');
@@ -407,12 +407,12 @@ try {
   assert(existsSync(stickyPath) && Number.parseInt(readFileSync(stickyPath, 'utf8').trim(), 10) === serverInfo.port, 'sticky 端口没有落在 <issue>/web/.last-port');
   check('sticky 端口写入 issue 自己的 web/，不再外溢 .aes-workflow');
 
-  const shutdown = await jsonFetch(keyUrl('/shutdown'));
+  const shutdown = await jsonFetch(plainUrl('/shutdown'));
   assert(shutdown.response.status === 200 && shutdown.body?.stopped === true, 'shutdown 没有成功回执');
   for (let attempt = 0; attempt < 50 && !existsSync(join(issueDir, 'web', 'server-stopped')); attempt += 1) await delay(50);
   assert(existsSync(join(issueDir, 'web', 'server-stopped')), 'server-stopped 标记没有写出');
   assert(!existsSync(join(issueDir, 'web', 'server-info')), 'shutdown 后 server-info 仍存在');
-  assert(!existsSync(join(issueDir, 'web', '.session-token')), 'shutdown 后 token 文件仍存在');
+  assert(!existsSync(join(issueDir, 'web', '.session-token')), 'legacy token 文件被重新生成');
   check('shutdown 回执、进程收尾与 server-stopped 标记');
 
   console.log(`${checks}/${checks} passed`);
@@ -421,7 +421,7 @@ try {
   process.exitCode = 1;
 } finally {
   if (serverInfo) {
-    try { await fetch(keyUrl('/shutdown'), { signal: AbortSignal.timeout(500) }); } catch { /* already stopped */ }
+    try { await fetch(plainUrl('/shutdown'), { signal: AbortSignal.timeout(500) }); } catch { /* already stopped */ }
   }
   await delay(80);
   try { rmSync(workDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 }); }

@@ -15,7 +15,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { createServer } from 'node:http';
-import { randomBytes, timingSafeEqual, createHash } from 'node:crypto';
+import { randomBytes, createHash } from 'node:crypto';
 import { basename, dirname, extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
@@ -33,7 +33,6 @@ const WEB_ASSETS = join(HERE, 'web');
 const DEFAULT_PORT = 19433;
 const DEFAULT_IDLE_TIMEOUT_MS = 48 * 60 * 60 * 1000;
 const MAX_BODY_BYTES = 1024 * 1024;
-const COOKIE_NAME = 'wi_web_key';
 
 function fail(message, code = 1) {
   console.error(`server: ${message}`);
@@ -97,17 +96,6 @@ function resolveIssueDir(input) {
   return issueDir;
 }
 
-function safeEqual(left, right) {
-  const a = Buffer.from(String(left ?? ''), 'utf8');
-  const b = Buffer.from(String(right ?? ''), 'utf8');
-  if (a.length !== b.length) {
-    const padded = Buffer.alloc(a.length);
-    timingSafeEqual(a, padded);
-    return false;
-  }
-  return timingSafeEqual(a, b);
-}
-
 function readJson(pathname, fallback = null) {
   try { return JSON.parse(readFileSync(pathname, 'utf8')); }
   catch { return fallback; }
@@ -159,10 +147,9 @@ function validRoundId(value) {
 }
 
 async function probe(info) {
-  if (!info?.url || !info?.token) return false;
+  if (!info?.url) return false;
   try {
     const url = new URL('/api/state', info.url);
-    url.searchParams.set('key', info.token);
     const response = await fetch(url, {
       signal: AbortSignal.timeout(800),
     });
@@ -206,9 +193,7 @@ async function start(issueDir, flags) {
   }
 
   rmSync(infoPath, { force: true });
-  const token = randomBytes(32).toString('hex');
-  const tokenPath = join(webDir, '.session-token');
-  atomicText(tokenPath, `${token}\n`);
+  rmSync(join(webDir, '.session-token'), { force: true });
 
   // sticky 端口是本 issue 的运行状态，留在 web/ 内，不向 issue 目录外写任何文件。
   const stickyPath = join(webDir, '.last-port');
@@ -254,30 +239,6 @@ function jsonResponse(response, status, body, extraHeaders = {}) {
     ...extraHeaders,
   });
   response.end(payload);
-}
-
-function parseCookies(header) {
-  const cookies = {};
-  for (const part of String(header ?? '').split(';')) {
-    const at = part.indexOf('=');
-    if (at < 0) continue;
-    try { cookies[part.slice(0, at).trim()] = decodeURIComponent(part.slice(at + 1).trim()); }
-    catch { /* Malformed cookie values never authenticate. */ }
-  }
-  return cookies;
-}
-
-function authorized(request, url, token) {
-  const queryKey = url.searchParams.get('key');
-  if (queryKey && safeEqual(queryKey, token)) return true;
-  const cookie = parseCookies(request.headers.cookie)[COOKIE_NAME];
-  return Boolean(cookie && safeEqual(cookie, token));
-}
-
-function requestOriginAllowed(request, port) {
-  const origin = request.headers.origin;
-  if (!origin) return true;
-  return origin === `http://127.0.0.1:${port}` || origin === `http://localhost:${port}`;
 }
 
 function contentType(pathname) {
@@ -471,8 +432,6 @@ function websocketFrame(value) {
 
 async function serve(issueDir, flags) {
   const webDir = join(issueDir, 'web');
-  const token = readFileIfPresent(join(webDir, '.session-token'));
-  if (!/^[a-f0-9]{64}$/.test(token)) fail('缺少合法的 web/.session-token。');
   const requestedPort = Number.parseInt(String(flags.port ?? DEFAULT_PORT), 10);
   const idleTimeout = Number.parseInt(process.env.WI_WEB_IDLE_TIMEOUT_MS ?? String(DEFAULT_IDLE_TIMEOUT_MS), 10);
   const clients = new Set();
@@ -499,29 +458,6 @@ async function serve(issueDir, flags) {
   const server = createServer(async (request, response) => {
     touch();
     const url = new URL(request.url ?? '/', `http://127.0.0.1:${actualPort ?? requestedPort}`);
-
-    if (request.method === 'GET' && url.pathname === '/' && url.searchParams.has('key')) {
-      if (!safeEqual(url.searchParams.get('key'), token)) {
-        jsonResponse(response, 403, { ok: false, error: 'session_key_required' });
-        return;
-      }
-      response.writeHead(303, {
-        Location: '/',
-        'Set-Cookie': `${COOKIE_NAME}=${encodeURIComponent(token)}; HttpOnly; SameSite=Strict; Path=/`,
-        'Cache-Control': 'no-store',
-      });
-      response.end();
-      return;
-    }
-
-    if (!authorized(request, url, token)) {
-      jsonResponse(response, 403, { ok: false, error: 'session_key_required' });
-      return;
-    }
-    if (!requestOriginAllowed(request, actualPort)) {
-      jsonResponse(response, 403, { ok: false, error: 'origin_forbidden' });
-      return;
-    }
 
     if (request.method === 'GET' && url.pathname === '/api/state') {
       const { state, continuation, publicState } = publicStateProjection(issueDir);
@@ -723,7 +659,6 @@ async function serve(issueDir, flags) {
     clients.clear();
     atomicJson(join(webDir, 'server-stopped'), { reason, stopped_at: new Date().toISOString(), pid: process.pid });
     rmSync(join(webDir, 'server-info'), { force: true });
-    rmSync(join(webDir, '.session-token'), { force: true });
     server.close(() => process.exit(0));
     setTimeout(() => process.exit(0), 1000).unref();
   };
@@ -731,7 +666,7 @@ async function serve(issueDir, flags) {
   server.on('upgrade', (request, socket) => {
     touch();
     const url = new URL(request.url ?? '/', `http://127.0.0.1:${actualPort}`);
-    if (url.pathname !== '/ws' || !authorized(request, url, token) || !requestOriginAllowed(request, actualPort)) {
+    if (url.pathname !== '/ws') {
       socket.write('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n');
       socket.destroy();
       return;
@@ -770,8 +705,7 @@ async function serve(issueDir, flags) {
     const info = {
       type: 'server-started',
       port: actualPort,
-      url: `http://127.0.0.1:${actualPort}/?key=${token}`,
-      token,
+      url: `http://127.0.0.1:${actualPort}/`,
       web_dir: webDir,
       pid: process.pid,
       started_at: new Date().toISOString(),
