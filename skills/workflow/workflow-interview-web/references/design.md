@@ -15,7 +15,8 @@
 - 保持薄编排：复用 `workflow-interview` 与三个阶段子技能，不复制访谈、原型或契约规则。
 - 保持权威层级：Web submission 是待吸收输入，家族 `rounds.jsonl` 是吸收后的过程真源，最终
   Goal Contract 是交付契约；页面是这些事实的确定性投影，不另造结论。
-- 使用 loopback、会话 key、同源校验和原子落盘，使本地便利性不牺牲提交完整性。
+- 使用 loopback plain URL、WebSocket 原地同步和原子落盘；单用户本机页面不设置 session key、cookie
+  或登录。提交完整性由 revision/digest、原子 submission 与 exactly-once consume 保证。
 - 把 server 当可恢复的交互入口，不把它当 Agent 生命周期；跨会话恢复只依赖盘上状态。
 - 主路径依赖 durable submission 与用户明确的“请继续”消息；不保持模型 turn，不用 subagent、模型轮询
   或非标准 resume 模拟唤醒。未来宿主能力可以作为可选增强，但不改变人工主路径。
@@ -79,7 +80,8 @@ ask 选项以可换行 pill 一次平铺多个问题，默认只显示选项正�
 
 未提交答案以 slug+round 为键写 localStorage；刷新继续编辑，成功提交后删除草稿。网络失败时
 把整轮 payload 写本机离线队列，WS 重连后顺序补发；409 视为已被首次提交吸收。WS 重连从
-500ms 指数退避，上限 30s。
+500ms 指数退避，上限 30s。发布新 round 或 consumed 状态时，页面只重新读取 `/api/state` 并原地
+render，不整页 reload。server 重启复用同一 sticky port 和 plain URL；页面不需要重新认证。
 
 附件 iframe 使用空 sandbox，不能执行附件脚本。server 同时给附件收紧 CSP；附件只用于查看
 确认版对照物。
@@ -103,21 +105,24 @@ WS 基础形态与本地视觉 companion 的早期参考来自 Jesse Vincent 的
 | --- | --- |
 | AC-1 | 仅显式调用本技能时进入 Web 路径；三阶段规则仍读取并遵守家族技能。 |
 | AC-2 | submission 先原子写入 `web/submissions/`；只有全部家族 round 写入成功后才生成 consumed marker，失败可重试且不丢输入。 |
-| AC-3 | server 只绑定 loopback；HTTP、WS 与附件访问均鉴权，会话 key 不写入日志或 git。 |
-| AC-4 | 单页完整呈现 ask/default/confirm、附件和契约确认；刷新、断线与重复提交均有确定行为。 |
+| AC-3 | server 只绑定 loopback；HTTP、WS、附件、提交和关闭均使用 plain URL，不生成 session key、cookie 或登录步骤。 |
+| AC-4 | 单页完整呈现 ask/default/confirm、附件和契约确认；刷新、断线、server 重启与重复提交均有确定行为。 |
 | AC-5 | 缺少 deferred pending tool、Node 或浏览器时按文档降级，且不改变三阶段范围与门禁。 |
-| AC-6 | 技能根部 `run-tests.mjs` 可一次执行 runtime 黑盒回归，覆盖启动、鉴权、发布、提交、恢复、附件隔离和关闭。 |
+| AC-6 | 技能根部 `run-tests.mjs` 可一次执行 runtime 黑盒回归，覆盖无登录启动、发布、提交、固定 URL 重启恢复、附件边界和关闭。 |
 | AC-7 | 最终确认吸收后调用家族 `finalize`，报告契约与交接证据并显式停止 server。 |
-| AC-8 | 在 pending round 中止本次 Web 交互时，可显式关闭 server，保留 state 与关闭标记，并清理会话凭据和 server-info。 |
+| AC-8 | 在 pending round 中止本次 Web 交互时，可显式关闭 server，保留 state 与关闭标记，并清理 server-info。 |
 | AC-9 | 每道题在选项下方永久保留自己的详情槽；连续选择 choice、Other 或 veto 时，后续问题不发生纵向位移，已答题的覆盖、好处和代价仍同时可见。 |
 | AC-10 | ask 支持 single-select、multi-select、boolean、short/long text、number、date/time、ranking、evidence；多选互斥/min/max 同时由 UI 与 server 校验。 |
 | AC-11 | 已提交答案、发布 revision/digest、吸收状态与 ledger 都由服务器文件重建；刷新或跨会话时不依赖 localStorage 作为权威来源。 |
 | AC-12 | `/export` 与 `export-static.mjs` 生成单文件决策档案，包含任务原文、全部候选及优劣势、全部决定、Goal Contract、来源/附件索引、事件链、追溯与 digest，断开 server 后仍可阅读。 |
+| AC-13 | state 变化通过 WebSocket 触发 `/api/state` 重读和原地 render；Agent 发布后不主动 reload，用户未提交草稿不被打断。 |
+| AC-14 | server 重启后复用 sticky port 与同一 plain URL；页面、API、WS 和提交不依赖 key、cookie 或重新认证。 |
 
 ## 迭代记录
 
 | 日期 | 改动 | 与上轮比较 | 拆分建议 |
 | --- | --- | --- | --- |
+| 2026-08-30 | 按单用户本机工具边界删除 session key、cookie、Origin 鉴权和重新认证；固定 plain URL，明确 WebSocket 原地同步且 Agent 不主动 reload。 | runtime 15/15、continuation 7/7；重启同 URL 恢复与无登录提交成为硬回归。 | 保持在本技能内；状态同步与 durable submission 共用同一 runtime。 |
 | 2026-08-30 | 把 Agent recovery payload 与完整 dossier 分离：默认只回传当前问答和身份字段；页面默认当前+上3，旧历史用 `/api/history` 分页，`--scan --oldest` 保证多 pending 按序恢复。 | 长访谈恢复输入从随历史增长改为 O(1)；完整审计仍通过显式历史与 export 保留。 | 保持在本技能内；若未来改变宿主 turn 生命周期，另立契约。 |
 | 2026-08-30 | 切换到人工 follow-up 主路径：Web submission 先 durable persist，提交后明确提示回同一个 Codex task 输入“请继续”；默认不保持模型 turn，不用 subagent、轮询或 detached waiter 伪造自动续接。 | 等待期间从模型持续存活改为零模型等待；`wait-submit` 仅保留 transport/recovery 能力，不改变 continuation authority。 | 若未来引入自动续接，只能是明确 host-owned capability，并需另行补充契约与人工验收。 |
 | 2026-08-23 | 补齐标准 frontmatter、根部自测入口、设计依据与 AC 追溯锚点。 | 严格评测待运行 | 保持 Web 薄编排层，不进一步拆分。 |

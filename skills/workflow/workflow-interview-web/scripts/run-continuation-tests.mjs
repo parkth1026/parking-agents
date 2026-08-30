@@ -101,18 +101,18 @@ function publish(fixture, id, no = 1) {
   parseJsonOutput(run(PUBLISH, ['round', '--issue-dir', fixture.issueDir, '--file', inputPath]), `publish ${id}`);
 }
 
-function startServer(fixture) {
-  const result = run(SERVER, ['start', '--issue-dir', fixture.issueDir, '--port', '0'], {
+function startServer(fixture, port = 0) {
+  const result = run(SERVER, ['start', '--issue-dir', fixture.issueDir, '--port', String(port)], {
     env: { WI_WEB_IDLE_TIMEOUT_MS: '120000' },
   });
   const info = parseJsonOutput(result, 'server start');
-  assert(info.type === 'server-started' && info.port > 0 && /^[a-f0-9]{64}$/.test(info.token), 'server info 不完整');
+  assert(info.type === 'server-started' && info.port > 0 && info.url === `http://127.0.0.1:${info.port}/` && info.token === undefined, 'server info 仍要求 token 或缺 plain URL');
   return info;
 }
 
 async function assertServerAlive(info, label) {
   try {
-    const response = await fetch(keyUrl(info, '/api/state'));
+    const response = await fetch(plainUrl(info, '/api/state'));
     assert(response.ok, `${label} HTTP ${response.status}`);
   } catch (error) {
     throw new Error(`${label} server 不可达：${error.cause?.code ?? error.message}`);
@@ -122,20 +122,18 @@ async function assertServerAlive(info, label) {
 async function stopServer(info, fixture) {
   if (!info) return;
   try {
-    await fetch(keyUrl(info, '/shutdown'));
+    await fetch(plainUrl(info, '/shutdown'));
   } catch { /* The server may already have exited during a failure injection. */ }
   const marker = join(fixture.issueDir, 'web', 'server-stopped');
   for (let attempt = 0; attempt < 100 && !existsSync(marker); attempt += 1) await delay(10);
 }
 
-function keyUrl(info, pathname) {
-  const url = new URL(pathname, `http://127.0.0.1:${info.port}`);
-  url.searchParams.set('key', info.token);
-  return url;
+function plainUrl(info, pathname) {
+  return new URL(pathname, `http://127.0.0.1:${info.port}`);
 }
 
 async function jsonFetch(info, pathname, options = {}) {
-  const response = await fetch(keyUrl(info, pathname), options);
+  const response = await fetch(plainUrl(info, pathname), options);
   let body = null;
   try { body = await response.json(); } catch { /* non-JSON error bodies are reported by status */ }
   return { response, body };
@@ -234,9 +232,11 @@ async function caseSubmissionDurability() {
     const beforeRestart = await publicState(currentInfo);
     assert(beforeRestart.state.continuation.status === 'submitted'
       && beforeRestart.state.continuation.receipt_stage === 'persisted', '提交后不能提前显示 Agent 已恢复');
+    const stableUrl = currentInfo.url;
     await stopServer(info, fixture);
-    currentInfo = startServer(fixture);
+    currentInfo = startServer(fixture, info.port);
     replaceInfo(currentInfo);
+    assert(currentInfo.url === stableUrl && currentInfo.token === undefined, 'server 重启改变了本地 URL 或重新引入 token');
     const afterRestart = await publicState(currentInfo);
     assert(afterRestart.dossier.submissions.r1.answers[0].choice === 'A', '重启后没有从盘上读取答案');
     assert(afterRestart.state.continuation.status === 'manual_recovery_required'
@@ -244,7 +244,7 @@ async function caseSubmissionDurability() {
 
     const duplicate = await postAnswer(currentInfo, 'r1');
     assert(duplicate.response.status === 409 && duplicate.body.error === 'duplicate_round', '重复提交没有保持 409');
-    check('submission durability：legacy/arming 可提交、200 前落盘、重启读取、409 与 persisted 分层');
+    check('submission durability：无登录提交、固定 URL 重启恢复、200 前落盘、409 与 persisted 分层');
   });
 }
 
@@ -345,7 +345,7 @@ async function caseManualFallback() {
     const accepted = await postAnswer(earlyInfo, 'r1');
     assert(accepted.response.status === 200 && accepted.body.continuation.mode === 'current_turn_deferred', 'server 停止前未形成自动 persisted 回执');
     await stopServer(earlyInfo, earlyExit);
-    earlyInfo = startServer(earlyExit);
+    earlyInfo = startServer(earlyExit, earlyInfo.port);
     const projected = await publicState(earlyInfo);
     assert(projected.state.continuation.status === 'manual_recovery_required'
       && projected.state.continuation.reason === 'server_stopped', 'server 提前退出没有转人工恢复');
@@ -388,7 +388,7 @@ async function caseExactlyOnce() {
     const publicPayload = JSON.stringify(await publicState(info));
     assert(runtimeNonce && !publicPayload.includes(runtimeNonce) && !publicPayload.includes('owner_nonce')
       && !publicPayload.includes('owner_pid'), 'API/dossier 泄露 raw runtime capability');
-    const exportResponse = await fetch(keyUrl(info, '/export'));
+    const exportResponse = await fetch(plainUrl(info, '/export'));
     const exportHtml = await exportResponse.text();
     assert(exportResponse.ok && exportHtml.includes('current_turn_deferred')
       && !exportHtml.includes(runtimeNonce) && !exportHtml.includes('owner_nonce'), '静态 dossier 泄露 raw runtime capability');
@@ -491,7 +491,7 @@ async function caseHistoryWindow() {
     const invalid = await jsonFetch(info, '/api/history?before=bad%20cursor');
     assert(invalid.response.status === 400 && invalid.body.error === 'history_cursor_invalid', '非法历史 cursor 没有被拒绝');
 
-    const exportResponse = await fetch(keyUrl(info, '/export'));
+    const exportResponse = await fetch(plainUrl(info, '/export'));
     const exportHtml = await exportResponse.text();
     assert(exportResponse.ok && exportHtml.includes('continuation r1') && exportHtml.includes('continuation r10'), '完整 export 没有保留全量历史');
   });

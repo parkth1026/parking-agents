@@ -21,7 +21,6 @@ const evidenceDir = evidenceArgIndex >= 0 && process.argv[evidenceArgIndex + 1]
   : mkdtempSync(join(tmpdir(), 'workflow-interview-web-evidence-'));
 const workDir = mkdtempSync(join(tmpdir(), 'workflow-interview-web-browser-'));
 let browserSession = null;
-let browserToken = null;
 let checks = 0;
 let PLAYWRIGHT_CLI = null;
 const evidence = {
@@ -78,8 +77,8 @@ function recordEvidence(name, result) {
 }
 
 function redact(value) {
-  const output = String(value ?? '');
-  return browserToken ? output.replaceAll(browserToken, '<REDACTED>') : output;
+  // 免登录 plain URL 模型下 server 不再产生 token，证据输出无需脱敏。
+  return String(value ?? '');
 }
 
 function runNode(script, args, label) {
@@ -191,9 +190,7 @@ async function startServer(issueDir) {
 }
 
 async function submitRound(info, payload) {
-  const url = new URL('/api/submit', info.url);
-  url.searchParams.set('key', info.token);
-  const response = await fetch(url, {
+  const response = await fetch(new URL('/api/submit', info.url), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -227,8 +224,8 @@ function assertManualTabPreserved(issueDir, tabName, subtitle, publishName) {
 }
 
 async function stopServer(info) {
-  if (!info?.port || !info?.token) return;
-  const url = new URL(`/shutdown?key=${info.token}`, `http://127.0.0.1:${info.port}`);
+  if (!info?.port) return;
+  const url = new URL('/shutdown', `http://127.0.0.1:${info.port}`);
   const stoppedPath = join(info.web_dir, 'server-stopped');
   let shutdownError = null;
   if (!existsSync(stoppedPath)) {
@@ -264,14 +261,12 @@ async function cleanupCase(info, label) {
   }
   try { await stopServer(info); } catch (error) { errors.push(error); }
   browserSession = null;
-  browserToken = null;
   if (errors.length > 0) throw new Error(`${label} cleanup failed:\n${errors.map((error) => error.message).join('\n')}`);
 }
 
 async function withBrowserCase(issueDir, label, callback) {
   const info = await startServer(issueDir);
   browserSession = `workflow-browser-${basename(issueDir)}-${process.pid}`;
-  browserToken = info.token;
   try {
     browserRun([`-s=${browserSession}`, 'open', info.url], `${label} open`);
     await callback(info);
@@ -351,7 +346,6 @@ try {
     try { browserRun([`-s=${browserSession}`, 'close'], 'final browser cleanup'); }
     catch (error) { cleanupErrors.push(error); }
     browserSession = null;
-    browserToken = null;
   }
   await new Promise((resolve) => setTimeout(resolve, 200));
   try {

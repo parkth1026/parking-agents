@@ -28,6 +28,8 @@ category: productivity
 3. 按当前阶段完成事实调查、分诊或对照物/契约候选。把本轮声明式 JSON 原子发布到页面；
    原型文件作为附件发布，契约用 `view: "contract"` 的 round 发布。问题需要表达范围组合、
    数量、优先级、证据或长文本时，使用协议的结构化 response type，不把多选伪装成一串单选。
+   页面通过 WebSocket 收到状态变化后重新读取 state 并原地 render；Agent 用 `/api/state` 或当前 DOM
+   核验发布结果，不主动 reload 页面，避免打断用户正在编辑的草稿。
 4. 启动或复用 issue 自己的 loopback server；主路径在发布 Web round 后结束当前模型 turn，不启动
    模型等待器、不派 subagent 等待。兼容命令 `wait-submit.mjs --round <id>` 只负责 watch-first
    transport 与 `persisted`，不得 arm continuation。
@@ -74,8 +76,9 @@ flag 和环境变量不能声明 `current_turn_deferred`。runtime 文件不进�
 
 - `manifest.json` 只由家族 `session.mjs` 写；`rounds.jsonl` 只经 `session.mjs round` 追加。
 - runtime 脚本不 import 家族代码；浏览器不直接读写家族过程文件。
-- 每个 issue 独立 `web/` 目录。服务只绑定 loopback，所有 HTTP/WS 请求都经会话 key；key
-  只存在于 owner-only 会话文件和首次 URL，不写日志或 git。
+- 每个 issue 独立 `web/` 目录。服务只绑定 loopback，使用固定的 plain URL，不设 session key、cookie
+  或登录步骤；本技能面向单用户本机交互，状态完整性由 round revision/digest、原子 submission 和
+  exactly-once consumed 协议保证。server 重启复用 sticky port，页面直接从持久 state 恢复。
 - 确认版对照物保持只读。发布附件是复制到 `web/assets/`，不改源文件。
 - `decision-ledger.jsonl` 是带摘要链的 Web 事件证据；家族过程文件与 Goal Contract 的权威性
   高于 ledger，浏览器草稿最低。
