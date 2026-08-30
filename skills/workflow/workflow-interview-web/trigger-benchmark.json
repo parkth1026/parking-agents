@@ -31,7 +31,7 @@
   },
   "rounds": [
     {
-      "description": "workflow-interview 的本地 Web 双向入口与完整决策档案。仅当用户显式调用 $workflow-interview-web、明确选择 Web 入口时使用；把三阶段问题、原型质疑、结构化多选与契约确认放在同一浏览器单页完成，并支持提交唤醒、跨会话吸收和自包含静态导出。",
+      "description": "workflow-interview 的本地 Web 双向入口与完整决策档案。仅当用户显式调用 $workflow-interview-web、明确选择 Web 入口时使用；把三阶段问题、原型质疑、结构化多选与契约确认放在同一浏览器单页完成，并以 durable submission 与回 Agent 输入‘请继续’的人工 follow-up 为主路径，支持分层回执、跨会话吸收和自包含静态导出。",
       "valid_probes": 54,
       "train": {
         "queries": 13,
@@ -49,7 +49,7 @@
       }
     }
   ],
-  "best_description": "workflow-interview 的本地 Web 双向入口与完整决策档案。仅当用户显式调用 $workflow-interview-web、明确选择 Web 入口时使用；把三阶段问题、原型质疑、结构化多选与契约确认放在同一浏览器单页完成，并支持提交唤醒、跨会话吸收和自包含静态导出。",
+  "best_description": "workflow-interview 的本地 Web 双向入口与完整决策档案。仅当用户显式调用 $workflow-interview-web、明确选择 Web 入口时使用；把三阶段问题、原型质疑、结构化多选与契约确认放在同一浏览器单页完成，并以 durable submission 与回 Agent 输入‘请继续’的人工 follow-up 为主路径，支持分层回执、跨会话吸收和自包含静态导出。",
   "valid_probes": 54,
   "invalid_probes": 9
 }

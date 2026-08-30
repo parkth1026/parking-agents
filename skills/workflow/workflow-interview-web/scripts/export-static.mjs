@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 import { existsSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
-// 投影实现随家族分发（决策档案是核心逻辑，两载体共用同一份）；本脚本只是 web 侧 CLI 壳。
-import { exportDossier } from '../../workflow-interview/scripts/lib/dossier.mjs';
+import { exportDossier } from './lib/dossier.mjs';
 
 function fail(message, code = 1) {
   console.error(`export-static: ${message}`);

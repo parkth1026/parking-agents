@@ -12,7 +12,7 @@ import {
 } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { basename, dirname, extname, join, resolve } from 'node:path';
-import { appendLedgerEvent, sha256Json } from './lib/ledger.mjs';
+import { appendLedgerEvent, sha256Json } from './lib/dossier.mjs';
 
 const STAGES = ['1-interview', '2-prototype', '3-contract'];
 const TIERS = ['ask', 'default', 'confirm'];
@@ -271,6 +271,9 @@ const nextRound = {
   ...(attached.length > 0 ? { attachments: attached } : {}),
 };
 delete nextRound.final;
+// Continuation capability belongs to the host runtime, never to round-authored
+// data. Drop reserved projection fields before publishing the public state.
+for (const field of ['continuation', 'mode', 'receipt_stage', 'next_user_action', 'generation', 'lease']) delete nextRound[field];
 nextRound.digest = sha256Json({ ...nextRound, digest: undefined });
 const rounds = (previous?.rounds ?? []).filter((candidate) => candidate.id !== round.id);
 rounds.push(nextRound);

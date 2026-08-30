@@ -13,6 +13,10 @@ web/
 ├── .last-port                上次使用的端口，重启时复用（owner-only）
 ├── submissions/<round>.json  浏览器提交；一轮一个，不覆盖
 ├── consumed/<round>.json     已成功映射回家族 rounds 的标记
+├── runtime/                   宿主 continuation authority 私有状态
+│   ├── continuation-lease.json
+│   ├── continuation-receipt.json
+│   └── consumption-records.jsonl
 ├── assets/                    发布时复制的只读附件
 └── exports/                   可选的静态决策档案输出目录
 ```
@@ -31,11 +35,15 @@ node <this-skill>/scripts/publish.mjs round --issue-dir <issue> --file <round.js
   --attach <prototype-file>=mock.html
 ```
 
-等待、续跑扫描与吸收标记：
+兼容 transport、续跑扫描与吸收标记：
 
 ```bash
 node <this-skill>/scripts/wait-submit.mjs --issue-dir <issue> --round <round-id>
 node <this-skill>/scripts/wait-submit.mjs --issue-dir <issue> --scan
+node <this-skill>/scripts/wait-submit.mjs --issue-dir <issue> --scan --oldest
+node <this-skill>/scripts/wait-submit.mjs --issue-dir <issue> --recovery-payload <round-id>
+node <this-skill>/scripts/wait-submit.mjs --issue-dir <issue> --history <round-id> [--q-id <q-id>]
+node <this-skill>/scripts/wait-submit.mjs --issue-dir <issue> --claim-consume <round-id>
 node <this-skill>/scripts/wait-submit.mjs --issue-dir <issue> --mark-consumed <round-id>
 ```
 
@@ -45,15 +53,70 @@ node <this-skill>/scripts/wait-submit.mjs --issue-dir <issue> --mark-consumed <r
 node <this-skill>/scripts/export-static.mjs --issue-dir <issue> --output <report.html>
 ```
 
-投影实现随家族分发（`workflow-interview/scripts/lib/dossier.mjs`）：本命令与 `GET /export` 都复用
-同一投影库；纯对话载体走同源的 `workflow-interview/scripts/export-dossier.mjs`，两种载体产出的
-档案同构（家族侧多 web 提交证据，少则少一行账本）。
-
-运行中的页面也提供 `GET /export`。两种导出都把任务原文、全部轮次、所有候选及其优劣势、
+运行中的页面也提供 `GET /export`。`GET /api/state` 默认只投影当前 round 与上 3 个已锁定
+round；页面点击“加载更早历史”才会通过 `GET /api/history?before=<round>&limit=<n>` 分页读取
+旧轮次。两种导出都把任务原文、全部轮次、所有候选及其优劣势、
 已选答案、Goal Contract、来源/附件索引、事件账本和追溯关系写入同一个 HTML；不依赖 server、
 localStorage 或外部资源才能阅读。
 
-生产等待没有超时。`--timeout-ms` 只供 runtime 测试。
+`wait-submit.mjs --round` 是兼容的 watch-first transport 命令，只在发现 submission 后确认
+`persisted`，不获取 lease、不改变 continuation mode，也不自行宣称 Agent 已恢复。生产主路径不
+启动模型等待器；Web 提交后按 `manual_followup` 回当前 task 输入“请继续”。人工恢复的固定
+顺序是 `--scan --oldest` → `--recovery-payload <round>` → 吸收成功后
+`--mark-consumed <round>`。`--scan --oldest` 只返回最早 pending 的身份摘要和答案数量，实际答案
+只由 recovery payload 提供；普通 `--scan` 仍保留全量兼容输出，但不应作为 Agent 默认恢复载荷。
+`--history <round> [--q-id <q-id>]` 只在冲突、引用缺失或审计时定向读取；`--timeout-ms` 只供
+transport/runtime 测试。
+
+## Continuation authority
+
+`runtime/continuation-lease.json` 与 `runtime/continuation-receipt.json` 是独立于 `state.json`
+的可选宿主私有状态。manual 主路径不创建它们；若未来明确启用 host-owned authority，只有该 authority
+能写入它们。server、round JSON、浏览器请求、普通 CLI flag 和环境变量不能把公开模式变成
+`current_turn_deferred`。lease 以单调 `generation` 和 owner fencing 工作，旧 owner 的更新会被拒绝；
+过期、取消、建立失败和 server 停止都 fail closed 到 `manual_followup`。
+
+`GET /api/state` 和 dossier 只投影以下安全字段：`round`、`mode`、`status`、`receipt_stage`、
+`next_user_action`、有限的 `correlation`（session slug、round、revision、digest、generation）
+与 fallback `reason`。raw owner nonce、进程/cell/session identity、token 和完整 runtime 文件
+永不进入公开投影。
+
+transport 的顺序固定为：建立 `<issue>/web/submissions/` watch → 立即重查目标 submission → 命中后
+输出已落盘 submission。若未来启用宿主 pending tool，才由同一 authority 额外写
+`resuming/agent_resumed`；提交恰在 watch 边界发生也至少被事件或重查命中。
+`POST /api/submit` 永远先原子写 submission；它返回的 200 只证明 `persisted`，不提前声称 Agent
+已继续。
+
+### Agent recovery payload 与历史读取
+
+`--recovery-payload <round>` 的输出是 Agent 默认恢复输入，结构固定为：
+
+```json
+{
+  "schema_version": 1,
+  "kind": "agent-recovery-payload",
+  "session_slug": "session-slug",
+  "round": "interview-r7",
+  "revision": 2,
+  "digest": "sha256-or-round-digest",
+  "questions": [{"q_id":"Q1","tier":"ask","question":"当前问题"}],
+  "answers": [{"q_id":"Q1","type":"choice","choice":"A"}]
+}
+```
+
+它不包含 `rounds`、`submissions`、`ledger`、历史窗口或旧 round 列表，因此 round 数增加不会把
+完整 dossier 重新注入 Agent。当前 submission 中的答案原文按已持久化内容保留；若既有提交边界
+产生 `truncated` 标记，该标记是显式的输入校验结果，不由 recovery payload 再次静默摘要。
+
+`--history <round> [--q-id <q-id>]` 返回指定 round，或指定 round 内的单个问题及其答案；它
+不会修改 submission、consumed marker 或消费记录。发现历史冲突时保留当前 submission，定向读取
+双方事实并请求明确裁决，裁决前不得标记 consumed。多个 pending submission 始终按 round `no`
+从小到大逐个恢复。
+
+自动或人工消费共用 `consumption-records.jsonl` 的 `{session_slug, round, revision, digest}`
+幂等键。家族 round 写入前可运行 `--claim-consume` 建立 `processing` 记录；家族写入全部成功后
+运行 `--mark-consumed`，它追加一次 `committed` 记录、写 marker 并推进 `consumed`。重复通知、
+重复人工消息和崩溃重试复用同一键；恢复时只补 family round 中尚缺的行，再提交 marker。
 
 ## 发布 schema
 
@@ -138,10 +201,6 @@ localStorage 或外部资源才能阅读。
 和落在 100±2；其他响应类型不要求概率。默认项未显式翻掉时提交为 `accept`；ask 与 confirm
 是必答，除非 ask 明写 `required:false`。
 
-这套 response schema 与家族 `rounds.jsonl` 同源（字段表在 aes-interview 的 SKILL.md）：
-映射时 `response` 原样带回家族行，非 `single_select` 的选项不带 `pct` 也能落进家族真源——
-不需要再编百分比过校验。
-
 契约视图把 `round.view` 设成 `"contract"`，并增加 `final`。`final.round` 指向该 round：
 
 ```json
@@ -171,8 +230,7 @@ agent 必须用当时发布的 item 补齐家族 line。服务端返回的 `GET 
   options。若用户选的不是推荐项，设置 `overturned_recommendation:true`。
 - `ask + custom`：`user_choice:"custom"`，`user_verbatim` 原样写截断后的 text。
 - `ask + multi_select`：`choices` 保留有序 key 数组，`custom` 可选；映射时逐项保留候选文本、
-  covers/pros/cons，不能压缩成一句摘要。家族行用 `response` + `choices` 落盘（类型约束与结果
-  集），选项不带 `pct`。
+  covers/pros/cons，不能压缩成一句摘要。
 - `ask + boolean/number/date_time/ranking/evidence/text`：使用对应的结构字段；保留单位、顺序、
   空值语义与用户原文。
 - `default + accept`：家族 `item/why/cost/user` 中 `user` 写「未反对」。
@@ -188,12 +246,18 @@ agent 必须用当时发布的 item 补齐家族 line。服务端返回的 `GET 
 - 首次 URL `?key=` 校验后设置 HttpOnly、SameSite=Strict cookie，并 303 到无 key 的 `/`。
 - HTTP API 与静态资源始终鉴权。WS 除鉴权外还要求 loopback 同源 Origin。
 - `POST /api/submit`：成功 200；同 round 重复 409；必答缺失 422；非法 round 400。
-- `GET /api/state`：返回运行状态及完整 `dossier` 投影；已提交答案以服务器 submission 为准。
+- `GET /api/state`：返回运行状态、normalized `continuation` 及当前 round+上 3 个已锁定 round 的
+  dossier 投影；已提交答案以服务器 submission 为准。旧 state 没有 continuation 字段时，投影为
+  `manual_followup`，不改写旧文件。
+- `GET /api/history?before=<round>&limit=<n>`：显式读取 cursor 之前最多 20 个 round 的批次；
+  返回的 dossier 只包含该批次，不能替代默认 Agent recovery payload。
 - `GET /export`：下载自包含 HTML 决策档案；响应禁止缓存并使用收紧的 CSP。
 - `GET /files/<name>`：只读 `web/assets/` 的普通非符号链接 basename；其余统一 404。
 - `GET /shutdown?key=...`：先回执，再写 `server-stopped` 并退出。
 
-提交文件在 200 回执之前完成原子落盘；重复提交永远以第一份为准。
+提交文件在 200 回执之前完成原子落盘；重复提交永远以第一份为准。响应结构仍保持现有字段，成功时
+额外返回安全的 `continuation` 投影；manual 主路径为 `manual_recovery_required/persisted/send_message`，
+不因普通 transport waiter 而产生自动承诺。
 
 ## 决策账本与追溯
 

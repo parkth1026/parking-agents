@@ -1,16 +1,16 @@
 #!/usr/bin/env node
 import {
   chmodSync,
-  closeSync,
   createReadStream,
   existsSync,
+  linkSync,
   lstatSync,
   mkdirSync,
-  openSync,
   readFileSync,
   renameSync,
   rmSync,
   statSync,
+  unlinkSync,
   watch,
   writeFileSync,
 } from 'node:fs';
@@ -20,9 +20,13 @@ import { basename, dirname, extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
-import { appendLedgerEvent, sha256Json } from './lib/ledger.mjs';
-// 只读投影库随家族分发，是「runtime 不 import 家族代码」的唯一例外（见 SKILL.md 真源与安全边界）。
-import { buildDossier, renderDossierHtml } from '../../workflow-interview/scripts/lib/dossier.mjs';
+import { appendLedgerEvent, buildDossier, renderDossierHtml, sha256Json } from './lib/dossier.mjs';
+import {
+  projectHistoryWindow,
+  readHistoryPage,
+  readPublicContinuation,
+  sanitizeStateProjection,
+} from './lib/continuation.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const WEB_ASSETS = join(HERE, 'web');
@@ -72,6 +76,20 @@ function atomicText(pathname, value, mode = 0o600) {
   try { chmodSync(pathname, mode); } catch { /* Windows ACLs are the effective boundary. */ }
 }
 
+function atomicExclusiveJson(pathname, value, mode = 0o600) {
+  mkdirSync(dirname(pathname), { recursive: true });
+  const temporary = `${pathname}.${process.pid}.${randomBytes(4).toString('hex')}.tmp`;
+  writeFileSync(temporary, `${JSON.stringify(value, null, 2)}\n`, { encoding: 'utf8', mode });
+  try {
+    // Link the complete file into place with create-once semantics. A concurrent
+    // second submission receives EEXIST instead of a second successful 200.
+    linkSync(temporary, pathname);
+    try { chmodSync(pathname, mode); } catch { /* Windows ACLs are the effective boundary. */ }
+  } finally {
+    try { unlinkSync(temporary); } catch { /* The link or an earlier failure owns cleanup. */ }
+  }
+}
+
 function resolveIssueDir(input) {
   if (!input) fail('缺少 --issue-dir。', 2);
   const issueDir = resolve(input);
@@ -99,6 +117,45 @@ function reconcileState(state) {
   if (!state || !Array.isArray(state.rounds)) return state;
   if (!state.rounds.some((round) => round.status === 'pending')) state.open_ambiguities = 0;
   return state;
+}
+
+function projectPersistedSubmissions(issueDir, state) {
+  if (!state || !Array.isArray(state.rounds)) return state;
+  const submissionsDir = join(issueDir, 'web', 'submissions');
+  const rounds = state.rounds.map((round) => {
+    const submission = readJson(join(submissionsDir, `${round.id}.json`));
+    return submission
+      ? { ...round, status: 'submitted', submitted_at: round.submitted_at ?? submission.received_at }
+      : round;
+  });
+  return reconcileState({ ...state, rounds });
+}
+
+function readWorkflowState(issueDir) {
+  return projectPersistedSubmissions(issueDir, sanitizeStateProjection(readJson(join(issueDir, 'web', 'state.json'), {
+    schema_version: 2,
+    slug: basename(issueDir),
+    phases: [],
+    open_ambiguities: 0,
+    rounds: [],
+    locked: [],
+    final: null,
+  })));
+}
+
+function publicStateProjection(issueDir) {
+  const state = readWorkflowState(issueDir);
+  const continuation = readPublicContinuation(issueDir, state);
+  const publicState = projectHistoryWindow(state, continuation?.round);
+  if (continuation) {
+    publicState.schema_version = Math.max(state.schema_version ?? 2, 3);
+    publicState.continuation = continuation;
+  }
+  return { state, continuation, publicState };
+}
+
+function validRoundId(value) {
+  return /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/.test(String(value ?? ''));
 }
 
 async function probe(info) {
@@ -137,6 +194,7 @@ async function start(issueDir, flags) {
   mkdirSync(join(webDir, 'submissions'), { recursive: true });
   mkdirSync(join(webDir, 'consumed'), { recursive: true });
   mkdirSync(join(webDir, 'assets'), { recursive: true });
+  mkdirSync(join(webDir, 'runtime'), { recursive: true });
 
   const infoPath = join(webDir, 'server-info');
   const existing = readJson(infoPath);
@@ -148,7 +206,6 @@ async function start(issueDir, flags) {
   }
 
   rmSync(infoPath, { force: true });
-  rmSync(join(webDir, 'server-stopped'), { force: true });
   const token = randomBytes(32).toString('hex');
   const tokenPath = join(webDir, '.session-token');
   atomicText(tokenPath, `${token}\n`);
@@ -421,7 +478,7 @@ async function serve(issueDir, flags) {
   const clients = new Set();
   let actualPort = null;
   let idleTimer = null;
-  let watcher = null;
+  const watchers = [];
   let shuttingDown = false;
   let lastStateNotice = 0;
 
@@ -467,16 +524,49 @@ async function serve(issueDir, flags) {
     }
 
     if (request.method === 'GET' && url.pathname === '/api/state') {
-      const state = reconcileState(readJson(join(webDir, 'state.json'), {
-        schema_version: 2,
-        slug: basename(issueDir),
-        phases: [],
-        open_ambiguities: 0,
-        rounds: [],
-        locked: [],
-        final: null,
-      }));
-      jsonResponse(response, 200, { ok: true, state, dossier: buildDossier(issueDir) });
+      const { state, continuation, publicState } = publicStateProjection(issueDir);
+      const roundIds = new Set(publicState.rounds.map((round) => round.id));
+      jsonResponse(response, 200, {
+        ok: true,
+        state: publicState,
+        dossier: buildDossier(issueDir, {
+          continuation,
+          roundIds,
+          historyWindow: publicState.history_window,
+        }),
+      });
+      return;
+    }
+
+    if (request.method === 'GET' && url.pathname === '/api/history') {
+      const beforeValue = url.searchParams.get('before');
+      const before = beforeValue === null || beforeValue === '' ? undefined : beforeValue;
+      if (before !== undefined && !validRoundId(before)) {
+        jsonResponse(response, 400, { ok: false, error: 'history_cursor_invalid' });
+        return;
+      }
+      const limitValue = url.searchParams.get('limit');
+      const limit = limitValue === null || limitValue === '' ? undefined : Number(limitValue);
+      if (limitValue !== null && (limitValue === '' || !Number.isInteger(limit) || limit < 1 || limit > 20)) {
+        jsonResponse(response, 400, { ok: false, error: 'history_limit_invalid' });
+        return;
+      }
+      const { state, continuation } = publicStateProjection(issueDir);
+      if (before !== undefined && !state.rounds.some((round) => round.id === before)) {
+        jsonResponse(response, 404, { ok: false, error: 'history_cursor_not_found' });
+        return;
+      }
+      const history = readHistoryPage(state, { before, limit });
+      const roundIds = new Set(history.rounds.map((round) => round.id));
+      jsonResponse(response, 200, {
+        ok: true,
+        history,
+        dossier: buildDossier(issueDir, {
+          continuation,
+          roundIds,
+          historyWindow: history.history_window,
+        }),
+      });
       return;
     }
 
@@ -533,23 +623,45 @@ async function serve(issueDir, flags) {
         answers: result.answers,
         truncated: result.truncated,
       };
-      atomicJson(submissionPath, submission);
-      appendLedgerEvent(webDir, {
-        type: 'round_submitted',
-        actor: submission.actor,
-        entity: { kind: 'submission', id: body.round, revision: submission.round_revision, digest: sha256Json(submission) },
-        data: submission,
-      });
-      const roundInState = state.rounds.find((candidate) => candidate.id === body.round);
-      roundInState.status = 'submitted';
-      roundInState.submitted_at = receivedAt;
-      reconcileState(state);
-      atomicJson(statePath, state);
+      try {
+        atomicExclusiveJson(submissionPath, submission);
+      } catch (error) {
+        if (error.code !== 'EEXIST') throw error;
+        const first = readJson(submissionPath, {});
+        jsonResponse(response, 409, {
+          ok: false,
+          error: 'duplicate_round',
+          round: body.round,
+          first_received_at: first.received_at ?? null,
+        });
+        return;
+      }
+      let bookkeepingError = null;
+      try {
+        appendLedgerEvent(webDir, {
+          type: 'round_submitted',
+          actor: submission.actor,
+          entity: { kind: 'submission', id: body.round, revision: submission.round_revision, digest: sha256Json(submission) },
+          data: submission,
+        });
+        const roundInState = state.rounds.find((candidate) => candidate.id === body.round);
+        roundInState.status = 'submitted';
+        roundInState.submitted_at = receivedAt;
+        reconcileState(state);
+        atomicJson(statePath, state);
+      } catch (error) {
+        // The submission is already durable. A later scan/restart can repair the
+        // projection, so never turn a persisted answer into an apparent loss.
+        bookkeepingError = error.message;
+      }
       broadcast({ type: 'submitted', round: body.round });
+      const continuation = readPublicContinuation(issueDir, state);
       jsonResponse(response, 200, {
         ok: true,
         round: body.round,
         received_at: receivedAt,
+        continuation,
+        ...(bookkeepingError ? { warning: 'submission_persisted_projection_pending' } : {}),
         ...(result.truncated ? { truncated: true } : {}),
       });
       return;
@@ -606,7 +718,7 @@ async function serve(issueDir, flags) {
     if (shuttingDown) return;
     shuttingDown = true;
     clearTimeout(idleTimer);
-    watcher?.close();
+    for (const currentWatcher of watchers) currentWatcher.close();
     for (const socket of clients) socket.destroy();
     clients.clear();
     atomicJson(join(webDir, 'server-stopped'), { reason, stopped_at: new Date().toISOString(), pid: process.pid });
@@ -665,13 +777,21 @@ async function serve(issueDir, flags) {
       started_at: new Date().toISOString(),
     };
     atomicJson(join(webDir, 'server-info'), info);
-    watcher = watch(webDir, { persistent: false }, (_event, filename) => {
-      if (filename !== 'state.json') return;
+    const announceState = () => {
       const now = Date.now();
       if (now - lastStateNotice < 40) return;
       lastStateNotice = now;
       broadcast({ type: 'state-updated' });
-    });
+    };
+    watchers.push(watch(webDir, { persistent: false }, (_event, filename) => {
+      const name = Buffer.isBuffer(filename) ? filename.toString('utf8') : String(filename ?? '');
+      if (name === 'state.json' || name === 'server-stopped') announceState();
+    }));
+    watchers.push(watch(join(webDir, 'runtime'), { persistent: false }, (_event, filename) => {
+      const name = Buffer.isBuffer(filename) ? filename.toString('utf8') : String(filename ?? '');
+      if (!name || name === 'continuation-receipt.json' || name === 'continuation-lease.json') announceState();
+    }));
+    watchers.push(watch(join(webDir, 'consumed'), { persistent: false }, () => announceState()));
     touch();
   });
 

@@ -17,8 +17,37 @@
   Goal Contract 是交付契约；页面是这些事实的确定性投影，不另造结论。
 - 使用 loopback、会话 key、同源校验和原子落盘，使本地便利性不牺牲提交完整性。
 - 把 server 当可恢复的交互入口，不把它当 Agent 生命周期；跨会话恢复只依赖盘上状态。
-- 主路径依赖宿主后台任务退出通知；能力不足时显式降级，不用轮询或非标准 resume 模拟唤醒。
+- 主路径依赖 durable submission 与用户明确的“请继续”消息；不保持模型 turn，不用 subagent、模型轮询
+  或非标准 resume 模拟唤醒。未来宿主能力可以作为可选增强，但不改变人工主路径。
 - 页面和 runtime 使用 Node.js 内置能力与静态资源，保持零第三方运行时依赖。
+
+### 人工 follow-up continuation 边界
+
+submission 与人工恢复分属两个控制面：Web server 先把 submission 原子写入 durable inbox，再返回
+`persisted`；用户回当前 Codex task 输入“请继续”后，Agent 才执行 scan/consume。runtime 状态放在
+`<issue>/web/runtime/`，不与 `state.json` 做共享 read-modify-write。
+
+`wait-submit --round` 或其他 detached waiter 即使成功输出 JSON，也只证明 transport delivery，不
+获取 continuation lease，也不改变公开 mode。提交后的人工恢复失败时，submission 和消费记录保留，
+下一次“请继续”可以安全重试。
+
+lease 通过独立锁和单调 `generation` fencing 旧 owner。自动续接和人工恢复都先读同一持久幂等键
+`{session_slug, round, revision, digest}`，家族 round 写入与 consumed marker 仍保持原有权威顺序。
+
+### 增量恢复与有限历史窗口
+
+Agent 的默认恢复载荷只包含当前 round 的问题、已持久化答案和
+`{session_slug, round, revision, digest}`。它不携带完整 `rounds`、`submissions`、`ledger` 或旧
+round 列表；同尺寸问答下，10 round 与 1 round 的 payload 只允许增加固定元数据（当前回归硬断言
+为 512 bytes）。答案原文按 submission 中的 canonical 内容保留，消费失败不能借清理或摘要掩盖。
+
+页面的 `/api/state` 默认只携带当前 round 与上 3 个已锁定 round，并将当前 round 与已完成 round
+用不同视觉状态呈现；更早历史通过 `/api/history` 的 cursor 分页按需读取。完整 dossier 仍由
+`/export` / `export-static.mjs` 导出，因此“低增量恢复”不会牺牲审计能力。
+
+当恢复发现前序事实与当前 submission 冲突时，系统不静默覆盖，也不提前写 consumed；Agent 只定向
+读取相关 round/q_id，保留双方事实并等待明确裁决。多个 pending submission 以最早 round 为序，
+一次只恢复一轮。
 
 ### 单页设计约束
 
@@ -31,8 +60,9 @@
 - 访谈主列：只读任务陈述、按 round 一次展开的紧凑问题列表、默认区、确认区、附件 iframe、提交/锁定态。
 - 顶栏下方：横向 sticky 的已锁定结论摘要；不占固定右栏，长页面滚动时保持上下文。
 - 契约视图：分节正文、依据溯源、确认与需修改自由文本。
-- 完整轨迹：任务原文、每轮全部候选及优劣势、canonical 决策、Goal Contract、来源/附件、
-  摘要链 ledger 和导出 manifest。它不依赖 localStorage 才能成立。
+- 完整轨迹：默认显示当前+上 3 round，并可按需载入更早批次；任务原文、每轮全部候选及优劣势、
+  canonical 决策、Goal Contract、来源/附件、摘要链 ledger 和导出 manifest 仍由完整导出保留。
+  它不依赖 localStorage 才能成立。
 
 ask 选项以可换行 pill 一次平铺多个问题，默认只显示选项正文与 pct/推荐标记；覆盖、好处、代价
 紧贴在每道题自己的固定详情槽中。详情槽把该题所有 choice、Other 输入态叠在同一 CSS Grid
@@ -75,7 +105,7 @@ WS 基础形态与本地视觉 companion 的早期参考来自 Jesse Vincent 的
 | AC-2 | submission 先原子写入 `web/submissions/`；只有全部家族 round 写入成功后才生成 consumed marker，失败可重试且不丢输入。 |
 | AC-3 | server 只绑定 loopback；HTTP、WS 与附件访问均鉴权，会话 key 不写入日志或 git。 |
 | AC-4 | 单页完整呈现 ask/default/confirm、附件和契约确认；刷新、断线与重复提交均有确定行为。 |
-| AC-5 | 缺少后台任务、Node 或浏览器时按文档降级，且不改变三阶段范围与门禁。 |
+| AC-5 | 缺少 deferred pending tool、Node 或浏览器时按文档降级，且不改变三阶段范围与门禁。 |
 | AC-6 | 技能根部 `run-tests.mjs` 可一次执行 runtime 黑盒回归，覆盖启动、鉴权、发布、提交、恢复、附件隔离和关闭。 |
 | AC-7 | 最终确认吸收后调用家族 `finalize`，报告契约与交接证据并显式停止 server。 |
 | AC-8 | 在 pending round 中止本次 Web 交互时，可显式关闭 server，保留 state 与关闭标记，并清理会话凭据和 server-info。 |
@@ -83,12 +113,13 @@ WS 基础形态与本地视觉 companion 的早期参考来自 Jesse Vincent 的
 | AC-10 | ask 支持 single-select、multi-select、boolean、short/long text、number、date/time、ranking、evidence；多选互斥/min/max 同时由 UI 与 server 校验。 |
 | AC-11 | 已提交答案、发布 revision/digest、吸收状态与 ledger 都由服务器文件重建；刷新或跨会话时不依赖 localStorage 作为权威来源。 |
 | AC-12 | `/export` 与 `export-static.mjs` 生成单文件决策档案，包含任务原文、全部候选及优劣势、全部决定、Goal Contract、来源/附件索引、事件链、追溯与 digest，断开 server 后仍可阅读。 |
-| AC-13 | 决策档案投影实现随家族分发（`workflow-interview/scripts/lib/dossier.mjs`），本技能 runtime 复用同一投影，不复制第二份实现；家族写入器（session/校验器）不进 runtime。 |
 
 ## 迭代记录
 
 | 日期 | 改动 | 与上轮比较 | 拆分建议 |
 | --- | --- | --- | --- |
+| 2026-08-30 | 把 Agent recovery payload 与完整 dossier 分离：默认只回传当前问答和身份字段；页面默认当前+上3，旧历史用 `/api/history` 分页，`--scan --oldest` 保证多 pending 按序恢复。 | 长访谈恢复输入从随历史增长改为 O(1)；完整审计仍通过显式历史与 export 保留。 | 保持在本技能内；若未来改变宿主 turn 生命周期，另立契约。 |
+| 2026-08-30 | 切换到人工 follow-up 主路径：Web submission 先 durable persist，提交后明确提示回同一个 Codex task 输入“请继续”；默认不保持模型 turn，不用 subagent、轮询或 detached waiter 伪造自动续接。 | 等待期间从模型持续存活改为零模型等待；`wait-submit` 仅保留 transport/recovery 能力，不改变 continuation authority。 | 若未来引入自动续接，只能是明确 host-owned capability，并需另行补充契约与人工验收。 |
 | 2026-08-23 | 补齐标准 frontmatter、根部自测入口、设计依据与 AC 追溯锚点。 | 严格评测待运行 | 保持 Web 薄编排层，不进一步拆分。 |
 | 2026-08-23 | 完成 12 项 runtime 回归、真实打包、三 gate 输出评测与真实浏览器提交验收。 | 首次沉淀，无上轮可比；三 gate 均 5/5 | 建议评估抽取共享 Web transport；仅建议，用户未裁定。 |
 | 2026-08-23 | 参考用户提供的 Claude Design 截图，把卡片式双栏重构为一次展开多问题的紧凑 pill 问卷，并加入 sticky 锁定摘要与按需详情。 | runtime 契约不变；多尺寸视觉 QA 通过 | 不改变技能拆分建议。 |
@@ -99,4 +130,3 @@ WS 基础形态与本地视觉 companion 的早期参考来自 Jesse Vincent 的
 | 2026-08-23 | 把页面提升为 Goal Contract 全流程决策档案：新增九类结构化回答、多选固定解释表、canonical server 投影、摘要链 ledger、完整轨迹视图与自包含静态导出。 | 从“交互结束后只剩摘要”升级为可独立审计的需求轨迹；协议 schema v2 保持 v1 单选兼容 | 共享 dossier 投影已抽到 `scripts/lib/dossier.mjs`；仍属本技能内部，不拆新技能。 |
 | 2026-08-23 | 修复 issue #1/#2：pct 只对 single_select 强制；multi_select 接受文档 `min`/`max` 并在发布时正规化为 `min_selections`；boolean 支持 `true_label`/`false_label` 无 options 形态；sticky 端口迁入 `<issue>/web/.last-port`，不再向 issue 目录外写 `.aes-workflow`。 | 回归 16/16；按协议文档构造的 round 发布、边界强制、提交、导出全链复测通过 | 不改变。 |
 | 2026-08-24 | 首跑触发评测并沉淀题库与成绩：21 条 query（10 正 11 负，负例以 near-miss 为主）× 3 探针，同宿主 GLM-5.3 独立单轮会话；train/test 均 1.00 触发、0.00 误触发，description 无需迭代。 | 触发面首次有据；结构审查信号 4（误触发集中）由无数据变为不命中——零误触发 | 拆 transport 建议维持仅建议、用户未裁定；触发题库已定稿不再改。 |
-| 2026-08-29 | 按 #146 对齐裁决：`response` 结构化类型与 pct 规则（仅 single_select 强制）下沉家族 `rounds.jsonl` schema；决策档案投影库迁至家族 `workflow-interview/scripts/lib/dossier.mjs`，本技能 export-static/GET /export 复用同一投影，账本写入器留 web（`lib/ledger.mjs`）。 | runtime 回归 16/16；两载体档案同构由单一投影实现保证 | 不改变——投影库归家族后本技能更薄。 |

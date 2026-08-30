@@ -20,6 +20,11 @@ let reconnectAttempt = 0;
 let socket = null;
 let activeView = 'flow';
 const drafts = new Map();
+let loadedHistory = { rounds: [], submissions: {}, consumed: {}, ledger: [], traceability: [] };
+let historySlug = null;
+let historyCursor = null;
+let historyLoading = false;
+let historyError = null;
 
 function text(value) {
   return String(value ?? '');
@@ -35,6 +40,42 @@ function submittedKey(roundId) {
 
 function queueKey() {
   return `workflow-interview-web:queue:${state?.slug ?? 'unknown'}`;
+}
+
+function resetLoadedHistory(slug) {
+  if (historySlug === slug) return;
+  historySlug = slug;
+  loadedHistory = { rounds: [], submissions: {}, consumed: {}, ledger: [], traceability: [] };
+  historyCursor = null;
+  historyError = null;
+}
+
+function mergeById(left, right, key = (value) => value.id) {
+  const merged = new Map();
+  for (const value of [...left, ...right]) merged.set(key(value), value);
+  return [...merged.values()];
+}
+
+function dossierRecords() {
+  const rounds = mergeById(loadedHistory.rounds, state?.rounds ?? [], (round) => round.id)
+    .sort((left, right) => (left.no ?? 0) - (right.no ?? 0));
+  const traceability = mergeById(
+    loadedHistory.traceability,
+    dossierData?.traceability ?? [],
+    (row) => `${row.round ?? ''}:${row.id ?? ''}`,
+  );
+  const ledger = mergeById(
+    loadedHistory.ledger,
+    dossierData?.ledger ?? [],
+    (event) => event.event_id ?? `${event.at}:${event.type}:${event.entity?.id ?? ''}`,
+  ).sort((left, right) => String(left.at ?? '').localeCompare(String(right.at ?? '')));
+  return {
+    rounds,
+    submissions: { ...loadedHistory.submissions, ...(dossierData?.submissions ?? {}) },
+    consumed: { ...loadedHistory.consumed, ...(dossierData?.consumed ?? {}) },
+    traceability,
+    ledger,
+  };
 }
 
 function loadDraft(roundId) {
@@ -82,6 +123,85 @@ function updateRoundValidity(round) {
 function setConnection(label, status) {
   elements.connection.textContent = label;
   elements.connection.dataset.state = status;
+}
+
+function continuationFor(roundId = null) {
+  const continuation = state?.continuation;
+  if (!continuation || (roundId && continuation.round && continuation.round !== roundId)) return null;
+  return continuation;
+}
+
+function continuationPresentation(continuation) {
+  if (!continuation) return null;
+  const key = `${continuation.mode}:${continuation.status}`;
+  const presentations = {
+    'current_turn_deferred:arming': {
+      tone: 'arming', icon: '…', title: '正在建立自动续接',
+      copy: '宿主等待尚未确认，但可以立即保存答案；未就绪则转人工恢复。',
+    },
+    'current_turn_deferred:awaiting_submission': {
+      tone: 'ready', icon: '✓', title: '自动续接已建立',
+      copy: '提交后会继续当前 Codex task，无需另发消息。',
+    },
+    'current_turn_deferred:submitted': {
+      tone: 'submitted', icon: '✓', title: '答案已保存',
+      copy: 'POST 200 只确认持久化；正在等待宿主确认 Agent 恢复。',
+    },
+    'current_turn_deferred:resuming': {
+      tone: 'resuming', icon: '↻', title: 'Agent 已恢复，正在吸收本轮',
+      copy: '已收到宿主 agent_resumed 回执，可以确认当前回合已继续。',
+    },
+    'manual_followup:awaiting_submission': {
+      tone: 'manual', icon: '!', title: '等待你提交答案',
+      copy: '提交后会立即保存；完成后回 Codex task 输入“请继续”。',
+    },
+    'manual_followup:manual_recovery_required': {
+      tone: 'manual', icon: '!', title: '答案已保存，请回 Codex 继续',
+      copy: '请在当前 Codex task 输入“请继续”；Agent 会先 scan，再吸收本轮并发布下一轮。',
+    },
+  };
+  return presentations[key] ?? (continuation.status === 'consumed'
+    ? { tone: 'done', icon: '✓', title: '本轮已吸收', copy: '答案已进入家族 rounds，内容只读。' }
+    : { tone: 'manual', icon: '!', title: '答案仍可保存', copy: '当前回合自动续接能力未确认；提交后按页面提示恢复。' });
+}
+
+function continuationStatusNode(continuation = continuationFor()) {
+  const presentation = continuationPresentation(continuation);
+  if (!presentation) return null;
+  const publicFields = [
+    `mode=${continuation.mode}`,
+    `status=${continuation.status}`,
+    `next_user_action=${continuation.next_user_action}`,
+    ...(continuation.receipt_stage ? [`receipt_stage=${continuation.receipt_stage}`] : []),
+  ];
+  return node('section', {
+    class: `continuation-status ${presentation.tone}`,
+    'data-testid': 'continuation-status',
+    'data-continuation-mode': continuation.mode,
+    'data-continuation-status': continuation.status,
+    'aria-live': 'polite',
+  }, [
+    node('div', { class: 'continuation-icon', text: presentation.icon }),
+    node('div', { class: 'continuation-copy' }, [
+      node('strong', { text: presentation.title }),
+      node('span', { text: presentation.copy }),
+      ...(continuation.reason ? [node('small', { text: `原因：${continuation.reason}` })] : []),
+    ]),
+    node('code', { class: 'continuation-mode', text: `${continuation.mode} / ${continuation.status}` }),
+    node('div', { class: 'continuation-receipt', text: `公开回执：${publicFields.join(' · ')}` }),
+  ]);
+}
+
+function continuationNote(roundId) {
+  const continuation = continuationFor(roundId);
+  if (!continuation) return '提交后先入盘；请回当前 Codex task 输入“请继续”，Agent 将先 scan 再消费。';
+  if (continuation.status === 'arming') return '可以立即提交。答案不会等待 consumer；若 lease 尚未有效，页面会提示人工恢复。';
+  if (continuation.mode === 'current_turn_deferred' && continuation.status === 'awaiting_submission') return '无需切回 Codex。submission 会先入盘，再由当前 pending tool 返回。';
+  if (continuation.status === 'manual_recovery_required') return '答案已入盘；请回当前 Codex task 输入“请继续”，Agent 将先 scan 再消费。';
+  if (continuation.status === 'consumed') return '本轮已吸收，内容只读。';
+  if (continuation.status === 'resuming') return '已收到宿主恢复回执；当前 Agent 正在吸收本轮。';
+  if (continuation.mode === 'current_turn_deferred') return '答案会先持久化；页面只在收到真实宿主回执后确认 Agent 已继续。';
+  return '答案会先持久化；提交后请回当前 Codex task 输入“请继续”。';
 }
 
 function node(tag, attrs = {}, children = []) {
@@ -625,12 +745,15 @@ function renderRound(round) {
   }
   const note = node('span', {
     class: `submit-note ${locked ? 'submitted-note' : ''}`,
-    text: locked ? '本轮已经提交，内容只读。' : '提交后先入盘，再唤醒 Agent。',
+    text: locked ? '本轮已经提交，内容只读。' : continuationNote(round.id),
     'data-testid': `submit-note-${round.id}`,
   });
   if (!locked) {
+    const continuation = continuationFor(round.id);
     const submit = node('button', {
-      type: 'button', class: 'primary', text: '提交本轮，生成追问 →',
+      type: 'button', class: 'primary',
+      text: continuation?.mode === 'current_turn_deferred' && continuation.status === 'awaiting_submission'
+        ? '提交本轮，继续当前回合 →' : '保存本轮答案 →',
       disabled: missingRequired(round).length > 0,
       'data-testid': `submit-${round.id}`,
     });
@@ -646,7 +769,7 @@ function renderRound(round) {
       note.textContent = '正在落盘提交…';
       try {
         const result = await postSubmission(submissionFor(round));
-        note.textContent = result.queued ? '服务暂不可达；提交已保存在本机，重连后自动补发。' : '已提交并锁定；Agent 正在继续下一轮。';
+        note.textContent = result.queued ? '服务暂不可达；提交已保存在本机，重连后自动补发。' : continuationNote(round.id);
         note.className = 'submit-note submitted-note';
       } catch (error) {
         note.textContent = error.status === 409 ? '本轮此前已提交，首次内容为准。' : `提交失败：${error.result?.error ?? error.message}`;
@@ -782,11 +905,46 @@ function dossierDecision(round, item, answer) {
   return article;
 }
 
+async function loadOlderHistory() {
+  if (!historyCursor || historyLoading) return;
+  historyLoading = true;
+  historyError = null;
+  renderDossier();
+  try {
+    const params = new URLSearchParams({ before: historyCursor, limit: '3' });
+    const response = await fetch(`/api/history?${params.toString()}`, { cache: 'no-store' });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error ?? `history_${response.status}`);
+    loadedHistory.rounds = mergeById(loadedHistory.rounds, result.history?.rounds ?? [], (round) => round.id);
+    loadedHistory.submissions = { ...loadedHistory.submissions, ...(result.dossier?.submissions ?? {}) };
+    loadedHistory.consumed = { ...loadedHistory.consumed, ...(result.dossier?.consumed ?? {}) };
+    loadedHistory.ledger = mergeById(
+      loadedHistory.ledger,
+      result.dossier?.ledger ?? [],
+      (event) => event.event_id ?? `${event.at}:${event.type}:${event.entity?.id ?? ''}`,
+    );
+    loadedHistory.traceability = mergeById(
+      loadedHistory.traceability,
+      result.dossier?.traceability ?? [],
+      (row) => `${row.round ?? ''}:${row.id ?? ''}`,
+    );
+    historyCursor = result.history?.history_window?.older_before ?? null;
+  } catch (error) {
+    historyError = error.message;
+  } finally {
+    historyLoading = false;
+    renderDossier();
+  }
+}
+
 function renderDossier() {
   if (!dossierData) {
     elements.dossier.replaceChildren(node('div', { class: 'empty-card', text: '完整轨迹尚未生成。' }));
     return;
   }
+  const records = dossierRecords();
+  const currentRoundId = state.history_window?.current_round ?? state.rounds?.at(-1)?.id;
+  const currentWindowIds = new Set((state.rounds ?? []).map((round) => round.id));
   const parts = [node('section', { class: 'dossier-hero' }, [
     node('p', { class: 'eyebrow', text: 'GOAL CONTRACT · DECISION DOSSIER' }),
     node('h1', { text: dossierData.title ?? dossierData.slug }),
@@ -795,9 +953,18 @@ function renderDossier() {
       node('span', { text: `状态 ${dossierData.status}` }),
       node('span', { text: `开放歧义 ${state.open_ambiguities ?? 0}` }),
       node('span', { text: `State ${dossierData.state_digest.slice(0, 12)}` }),
-      node('span', { text: `Ledger ${dossierData.ledger.length}` }),
+      node('span', { text: `Ledger ${records.ledger.length}` }),
     ]),
   ])];
+
+  if (dossierData.continuation) {
+    const continuation = dossierData.continuation;
+    parts.push(node('section', { class: 'dossier-section continuation-dossier', 'data-testid': 'dossier-continuation' }, [
+      node('h2', { text: '当前回合续接' }),
+      node('p', { text: `${continuation.mode} · ${continuation.status} · 下一步：${continuation.next_user_action}` }),
+      ...(continuation.reason ? [node('p', { class: 'facts', text: `原因：${continuation.reason}` })] : []),
+    ]));
+  }
 
   const context = node('section', { class: 'dossier-section' }, [node('h2', { text: '原始请求与上下文' })]);
   context.append(dossierData.context_markdown
@@ -805,14 +972,36 @@ function renderDossier() {
     : node('p', { text: state.opening ?? '' }));
   parts.push(context);
 
-  const trajectory = node('section', { class: 'dossier-section' }, [node('h2', { text: '完整需求轨迹' })]);
-  for (const round of state.rounds ?? []) {
-    const submission = dossierData.submissions?.[round.id];
+  const trajectory = node('section', { class: 'dossier-section' }, [
+    node('h2', { text: '需求轨迹（当前 + 上 3 round）' }),
+    node('p', { class: 'facts', text: historyCursor
+      ? '页面默认只载入当前 round 与上 3 个已完成 round；更早记录按需分页读取。'
+      : loadedHistory.rounds.length > 0
+        ? '已载入当前窗口与此前按需读取的历史；所有已完成 round 均为只读。'
+        : '页面默认只载入当前 round 与上 3 个已完成 round；完整历史可按需读取或导出。' }),
+  ]);
+  if (historyCursor || historyLoading || historyError) {
+    const historyControls = node('div', { class: 'history-controls' });
+    if (historyCursor) historyControls.append(node('button', {
+      type: 'button', class: 'small-button', text: historyLoading ? '正在读取更早历史…' : '加载更早历史 →',
+      disabled: historyLoading, 'data-testid': 'load-older-history',
+    }));
+    if (historyError) historyControls.append(node('span', { class: 'error-note', text: `历史读取失败：${historyError}；当前已载入内容不受影响，可重试。` }));
+    trajectory.append(historyControls);
+    if (historyCursor) trajectory.querySelector('[data-testid="load-older-history"]')?.addEventListener('click', loadOlderHistory);
+  }
+  for (const round of records.rounds) {
+    const submission = records.submissions?.[round.id];
     const answerById = new Map((submission?.answers ?? []).map((answer) => [answer.q_id, answer]));
-    const roundSection = node('section', { class: 'dossier-round' }, [
+    const isCurrent = round.id === currentRoundId;
+    const isCurrentWindow = currentWindowIds.has(round.id);
+    const roundSection = node('section', {
+      class: `dossier-round ${isCurrent ? 'current-round' : isCurrentWindow ? 'recent-history-round' : 'older-history-round'}`,
+      'data-round': round.id,
+    }, [
       node('div', { class: 'round-heading' }, [
         node('h3', { text: `Round ${round.no} · ${round.title}` }),
-        node('span', { class: 'round-status', text: `${round.stage} · ${round.status}` }),
+        node('span', { class: 'round-status', text: `${isCurrent ? '当前' : isCurrentWindow ? '已锁定 · 近期' : '已锁定 · 旧档案'} · ${round.stage} · ${round.status}` }),
       ]),
     ]);
     for (const item of round.items ?? []) roundSection.append(dossierDecision(round, item, answerById.get(item.q_id)));
@@ -847,8 +1036,8 @@ function renderDossier() {
   if (!(dossierData.sources ?? []).length) sources.append(node('p', { class: 'facts', text: '没有已发布来源文件。' }));
   parts.push(sources);
 
-  const ledger = node('section', { class: 'dossier-section' }, [node('h2', { text: '溯源账本' })]);
-  ledger.append(node('div', { class: 'ledger-list' }, (dossierData.ledger ?? []).map((event) => node('div', { class: 'ledger-event' }, [
+  const ledger = node('section', { class: 'dossier-section' }, [node('h2', { text: '溯源账本（当前已载入范围）' })]);
+  ledger.append(node('div', { class: 'ledger-list' }, records.ledger.map((event) => node('div', { class: 'ledger-event' }, [
     node('time', { text: event.at }),
     node('strong', { text: event.type }),
     node('span', { text: `${event.actor?.id ?? 'unknown'} · ${event.entity?.id ?? ''}` }),
@@ -861,6 +1050,8 @@ function renderDossier() {
 
 function renderFlow() {
   const parts = [];
+  const continuation = continuationStatusNode();
+  if (continuation) parts.push(continuation);
   if (state.opening) parts.push(node('section', { class: 'opening', 'data-testid': 'opening' }, [
     node('small', { text: 'OPENING · 任务陈述（只读）' }),
     node('p', { text: state.opening }),
@@ -885,7 +1076,9 @@ async function loadState() {
   const response = await fetch('/api/state', { cache: 'no-store' });
   if (!response.ok) throw new Error(`state_${response.status}`);
   const result = await response.json();
+  resetLoadedHistory(result.state?.slug);
   state = result.state;
+  if (historyCursor === null && loadedHistory.rounds.length === 0) historyCursor = state.history_window?.older_before ?? null;
   dossierData = result.dossier;
   render();
 }
@@ -901,7 +1094,7 @@ function connect() {
   socket.addEventListener('message', async (event) => {
     let message;
     try { message = JSON.parse(event.data); } catch { return; }
-    if (['state-updated', 'submitted', 'reload'].includes(message.type)) await loadState();
+    if (['state-updated', 'submitted', 'continuation-updated', 'reload'].includes(message.type)) await loadState();
   });
   socket.addEventListener('close', () => {
     setConnection('离线 · 重连中', 'offline');

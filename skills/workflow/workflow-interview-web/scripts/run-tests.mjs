@@ -19,6 +19,7 @@ const SERVER = join(HERE, 'server.mjs');
 const PUBLISH = join(HERE, 'publish.mjs');
 const WAIT = join(HERE, 'wait-submit.mjs');
 const EXPORT = join(HERE, 'export-static.mjs');
+const CONTINUATION_TESTS = join(HERE, 'run-continuation-tests.mjs');
 const SKILL_ROOT = dirname(HERE);
 const workDir = mkdtempSync(join(tmpdir(), 'workflow-interview-web-'));
 const issueDir = join(workDir, '2026-08-23-runtime-test');
@@ -226,12 +227,17 @@ try {
   const immediateWait = run(WAIT, ['--issue-dir', issueDir, '--round', 'r1']);
   const waited = parseJsonOutput(immediateWait, 'wait existing');
   assert(waited.round === 'r1' && waited.answers.length === 3, 'wait-submit 没有打印提交 JSON');
+  const detachedProjection = await jsonFetch(keyUrl('/api/state'));
+  assert(detachedProjection.body?.state?.continuation?.mode === 'manual_followup'
+    && detachedProjection.body.state.continuation.status === 'manual_recovery_required'
+    && detachedProjection.body.state.continuation.receipt_stage === 'persisted'
+    && detachedProjection.body.state.continuation.next_user_action === 'send_message', 'manual wait-submit 没有诚实提示请继续');
   const duplicate = await jsonFetch(keyUrl('/api/submit'), {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ round: 'r1', answers: [{ q_id: 'Q1', type: 'choice', choice: 'A' }, { q_id: 'C1', type: 'confirm' }] }),
   });
   assert(duplicate.response.status === 409 && duplicate.body?.error === 'duplicate_round', '重复提交没有返回 409 duplicate_round');
-  check('wait-submit 立即输出；同 round 第二次提交固定 409');
+  check('wait-submit 立即输出但只确认 persisted；同 round 第二次提交固定 409');
 
   const scanBefore = parseJsonOutput(run(WAIT, ['--issue-dir', issueDir, '--scan']), 'scan before');
   assert(scanBefore.pending.some((entry) => entry.round === 'r1'), '未消化 submission 没被扫描到');
@@ -315,7 +321,7 @@ try {
   assert(typeSubmission.schema_version === 2 && typeSubmission.answers.find((answer) => answer.q_id === 'M1').choices[0] === 'WEB', 'v2 多选没有正规化落盘');
   assert(typeSubmission.answers.find((answer) => answer.q_id === 'N1').unit === '天', '数字回答没有保留单位');
   const dossierState = await jsonFetch(keyUrl('/api/state'));
-  assert(dossierState.body?.dossier?.submissions?.r3?.answers?.length === 8, '/api/state 没有返回权威决策档案');
+  assert(typeSubmission.answers.length === 8 && !dossierState.body?.dossier?.submissions?.r3, '/api/state 默认应只返回当前历史窗口；submission 仍由服务器文件保留');
   assert(dossierState.body.dossier.title === 'Goal Contract 决策档案 · runtime test', '决策档案没有保留发布标题');
   assert(dossierState.body.dossier.ledger.some((event) => event.type === 'round_published') && dossierState.body.dossier.ledger.some((event) => event.type === 'round_submitted'), '决策账本缺发布或提交事件');
   check('v2 多选、布尔、文本、数字、日期、排序与证据回答全链');
@@ -376,20 +382,17 @@ try {
   assert(docSubmit.response.status === 200, '文档契约形态提交失败');
   check('文档契约形态（无 pct 多选 + true_label 布尔）可发布，min/max 正规化且服务端强制');
 
-  const runtimeSources = ['server.mjs', 'publish.mjs', 'wait-submit.mjs', 'export-static.mjs'].map((name) => readFileSync(join(HERE, name), 'utf8'));
-  // 家族边界保护的是真源写入权：写入器（session/校验器）绝不能进 runtime；
-  // 只读决策档案投影库是两载体共用例外，钉死它的路径防例外扩大。
-  assert(runtimeSources.every((source) => !/from\s+['"][^'"]*workflow-interview[^'"]*(session|validate-goal-contract)/.test(source)), 'runtime import 了家族写入器（session/校验器）');
-  for (const name of ['server.mjs', 'export-static.mjs']) {
-    assert(/from\s+['"][^'"]*workflow-interview\/scripts\/lib\/dossier\.mjs['"]/.test(readFileSync(join(HERE, name), 'utf8')), `${name} 没有复用家族决策档案投影库`);
-  }
+  const runtimeSources = ['server.mjs', 'publish.mjs', 'wait-submit.mjs', 'export-static.mjs', 'lib/continuation.mjs'].map((name) => readFileSync(join(HERE, name), 'utf8'));
+  assert(runtimeSources.every((source) => !/from\s+['"][^'"]*workflow-interview/.test(source)), 'runtime import 了 workflow-interview 家族');
+  assert(!runtimeSources[2].includes('armDeferredContinuation') && runtimeSources[2].includes('waitForSubmissionTransport'), 'wait-submit 必须是 transport-only，不得 arm continuation');
   assert(!runtimeSources[0].includes('.aes-workflow') && !runtimeSources[0].includes('repoRootFrom'), 'server 仍向 issue 目录外写 .aes-workflow 或保留 repoRootFrom');
   const skill = readFileSync(join(SKILL_ROOT, 'SKILL.md'), 'utf8');
-  assert(skill.includes('宿主无后台任务能力 → 回合模式') && skill.includes('Node 不可用 → 纯文本') && skill.includes('浏览器不可用 → 纯文本'), 'SKILL.md 三级降级不完整');
+  assert(skill.includes('人工 follow-up 主路径') && skill.includes('Node 不可用 → 纯文本') && skill.includes('浏览器不可用 → 纯文本') && skill.includes('不启动') && skill.includes('模型等待器'), 'SKILL.md 降级或人工 follow-up 主路径不完整');
   assert(skill.includes('仅当用户显式调用 $workflow-interview-web') && !skill.includes('disable-model-invocation:'), 'SKILL.md 显式调用边界或标准 frontmatter 不正确');
   const openaiMetadata = readFileSync(join(SKILL_ROOT, 'agents', 'openai.yaml'), 'utf8');
   assert(/allow_implicit_invocation:\s*false/.test(openaiMetadata), 'openai.yaml 没有关闭隐式调用');
   const app = readFileSync(join(HERE, 'web', 'app.mjs'), 'utf8');
+  assert(existsSync(CONTINUATION_TESTS) && app.includes('continuation-status') && app.includes('agent_resumed') && app.includes('manual_recovery_required'), 'continuation runtime/七态页面未接入');
   assert(app.includes('localStorage') && app.includes('new WebSocket') && app.includes('contract-revision-input'), '单页缺草稿/WS/契约修改能力');
   assert(app.includes('renderSingleDetails') && app.includes('renderMultiChoice') && app.includes('decision-detail-stack'), '紧凑问卷缺逐题固定详情槽或多选能力');
   assert(app.includes('true_label') && app.includes('false_label'), 'boolean 无 options 时不读 true_label/false_label');
@@ -424,3 +427,13 @@ try {
   try { rmSync(workDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 }); }
   catch (error) { console.error(`cleanup warning: ${basename(workDir)}: ${error.message}`); }
 }
+
+const continuationResult = spawnSync(process.execPath, [CONTINUATION_TESTS, '--case', 'all'], {
+  cwd: process.cwd(),
+  encoding: 'utf8',
+  windowsHide: true,
+  timeout: 60_000,
+});
+if (continuationResult.stdout) process.stdout.write(continuationResult.stdout);
+if (continuationResult.stderr) process.stderr.write(continuationResult.stderr);
+if (continuationResult.status !== 0) process.exitCode = 1;
