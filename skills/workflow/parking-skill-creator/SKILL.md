@@ -7,8 +7,6 @@ description: 本机技能生产流水线：创建、校验、评测、迭代和�
 
 把一个想法变成经过评测验证、可分发的技能：创建 → 校验 → 输出评测与评审迭代 → 触发评测 → 打包，全链路在本机（Windows + Node）可跑，零外部依赖。
 
-**基线**：本技能融合两家官方 skill-creator——claude-skill-creator（输出评测管线与评审循环，2026-08 版）与 codex-skill-creator（脚手架与写作方法论，2026-08 版）。运行时只依赖本技能目录内的脚本、references、agents 和 eval-viewer；所有路径从本技能目录解析，不依赖宿主目录名。
-
 ## 你的角色
 
 判断用户在流程的哪一步，直接接手推进：
@@ -124,6 +122,8 @@ node scripts/quick-validate.mjs <技能目录>
 PASS 但缺 `run-tests.mjs` 或 `references/design.md` 时给警告、SKILL.md 仍含待办占位时给提示（都不挡退出码——存量老技能照常工作，升级时补上；新技能必须齐）。修完再跑直到 PASS。PASS 后跑 `node <技能目录>/run-tests.mjs`，自带测试全过才算过本步（主观无测试的技能除外）；此后每次升级改动，先跑它做回归。
 
 ## 第 6 步：输出评测循环
+
+题目依赖 Web、外部 API、快照或实时数据时，先读 `references/evidence.md`，再做 evidence preflight/materialize；创建或改进 skill 时，把文档风险写成质量假设并用相关 gate/runs 验证，静态审查不直接给质量 PASS。
 
 评测结果默认放 `<skill-dir>/../../evals/<技能名>-workspace/`——其中 `<skill-dir>` 指本技能目录，`evals/` 与 `skills/` 平行；workspace 在技能扫描根之外，评测产物/夹具里出现再多的 `SKILL.md` 也不会被宿主识别成技能。workspace 是 scratch、不入库（.gitignore 已忽略）——持久评测依据住技能目录，clean 前先把成绩沉淀进去（见「迭代依据的发现约定」）。若显式沿用扫描根内的旧 workspace，跑完 iteration 要用 `check-shadow-skills` 复查产物有没有冒充技能。按迭代组织（`iteration-1/`、`iteration-2/`…），每个测试用例一个 `eval-<描述性名>/` 目录。目录随用随建，不要预先全铺。
 
@@ -298,15 +298,15 @@ node scripts/package-skill.mjs <技能目录> [输出目录]
 - `references/gate-rules.md` — quick-validate 的支持子集、键分诊阈值与全仓复扫（改校验器或想知道某写法为何被拦时）
 - `references/repo-conventions.md` — 本仓库运行时/测试/git 约定与 `$SKILL_ENV` 解析链（在本仓库建技能、或技能要读环境值时）
 - `references/writing-guide.md` — 技能写作方法论（渐进披露、自由度分级、description 写法、中文术语克制、防泄漏纪律）
+- `references/evidence.md` — 外部证据 replay/record/live、provider seam 与质量假设流程（题目含外部时变输入时读取）
 - `references/headless-trigger-fallback.md` — 无嵌套 Agent 工具时的单轮 headless 探针、安全凭据与残留扫描契约
 - `references/schemas.md` — 全部 JSON 契约（eval_metadata 含 ac 字段/grading/timing/benchmark/feedback/history.json/structure-review/触发评测三契约）
-- `references/design.md` — 本技能的意图、设计取舍和 AC-1…AC-16 验收依据
+- `references/design.md` — 本技能的意图、设计取舍和 AC-1…AC-22 验收依据
 - `agents/openai.yaml` — 技能列表 UI 元数据，字段值不含宿主路径
 - `agents/grader.md` — grader subagent 指令（评分哲学与 grading.json 契约）
 - `agents/analyzer.md` — 基准分析指令（analyst pass：找聚合看不见的模式）
 - `scripts/` — init-skill / snapshot-skill / check-shadow-skills / quick-validate / aggregate-benchmark / aggregate-trigger / package-skill + lib/
 - `eval-viewer/` — generate-review.mjs（服务器与 --static 模式）+ viewer.html
-
 ---
 
-核心循环再念一遍：理解意图 → 规划资源 → 脚手架 → 写作 → 校验 → with/without 评测 → 浏览器评审 → 按反馈改进 → 触发评测收尾 → 打包。每步产物落 workspace，用户看得见、可逐条质疑。
+核心循环：意图 → 资源 → 脚手架 → 写作 → 校验 → 评测 → 反馈 → 触发 → 打包；每步产物落 workspace，用户可逐条质疑。

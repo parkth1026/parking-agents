@@ -1,0 +1,22 @@
+# verify @ 2026-08-30 post-live
+# cwd: G:\GIT\AI_WorkFlow\parking-agents-manual
+
+## [A] contract Verify
+
+- [PASS] AC-001：`run-tests.mjs` exit=0；215 passed, 0 failed；包含具名分组「外部证据·契约与物化：」
+- [PASS] AC-002：`run-tests.mjs` exit=0；215 passed, 0 failed；包含具名分组「外部证据·replay 失败关闭：」
+- [PASS] AC-003：`run-tests.mjs` exit=0；215 passed, 0 failed；包含具名分组「外部证据·record/live 生命周期：」
+- [PASS] AC-004：`run-tests.mjs` exit=0；215 passed, 0 failed；包含具名分组「Agent 文档质量假设与上下文预算：」
+- [PASS] AC-005：`run-tests.mjs` exit=0；215 passed, 0 failed；包含具名分组「质量 verdict 与 viewer：」
+
+## [C] shopping-deep-research 双阶段 pilot
+
+- [PASS] `pilot-replay.mjs`：四个 D-01 eval 均完成 preflight/materialize/replay；三 gate digest 逐题一致，`hits=2`、`misses=0`、`live_calls=0`、`network_isolation=verified`。
+- [PASS] 静态 viewer：生成成功；首屏包含 Evidence gate、Quality claim、replay digest、zero-live、`INCONCLUSIVE` 和 forbidden claims。
+- [PASS] 受控 live：四题逐题通过真实可执行 Node provider adapter；每题 `calls=2/16`、`concurrency=1`、`execution=live`、`real_provider_verified=true`；`query_plan/tool_path/source_reachability/freshness` 全部 PASS；`replay_comparison=incomparable`。
+- [PASS] D-03：`aggregate-benchmark.mjs --pilot-audit ... --pilot-phase live-acceptance` exit=0；追加 `shopping-deep-research-live-2026-08-30`，四 eval，`live_acceptance.status=PASS`；旧 replay 收据未回改。
+- [PASS] 生产路径：`skills/life/shopping-deep-research/SKILL.md` 未读取或引用 `eval-fixtures/`；fixture 仅存在于 eval harness 数据面。
+
+## 结果
+
+六条 AC 的 Verify 均通过。replay evidence gate 为 PASS；live acceptance 为 PASS；没有把 replay/live 分数相减，也没有把 shopping 的 Agent output quality 伪称为 SUPPORTED（pilot quality claim 仍诚实为 INCONCLUSIVE）。

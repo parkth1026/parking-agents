@@ -1,0 +1,20 @@
+{
+  "schema_version": 2,
+  "round": "prototype-steelman-r2",
+  "stage": "2-prototype",
+  "round_revision": 1,
+  "round_digest": "d8bc8c4ec50390a0a33345e1927a20d91fb78a909c49c453a38e99861edbdfad",
+  "received_at": "2026-08-30T08:39:54.873Z",
+  "actor": {
+    "type": "person",
+    "id": "local-user"
+  },
+  "answers": [
+    {
+      "q_id": "S1",
+      "type": "text",
+      "value": "当前仓库有 完整测试记录 你自己去查阅后 自己分析"
+    }
+  ],
+  "truncated": false
+}

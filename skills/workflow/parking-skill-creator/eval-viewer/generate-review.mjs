@@ -76,6 +76,8 @@ export function scanIteration(iterDir) {
     const evalDir = join(searchDir, evalName);
     const metadata = readJson(join(evalDir, "eval_metadata.json")) || {};
     const entry = { name: evalName, prompt: metadata.prompt ?? "", configs: {} };
+    if (metadata.evidence && typeof metadata.evidence === "object") entry.evidence = metadata.evidence;
+    if (metadata.quality && typeof metadata.quality === "object") entry.quality = metadata.quality;
 
     for (const cfgName of readdirSync(evalDir).sort()) {
       const cfgDir = join(evalDir, cfgName);

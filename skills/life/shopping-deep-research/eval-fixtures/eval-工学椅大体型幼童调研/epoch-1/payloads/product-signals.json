@@ -1,0 +1,8 @@
+{
+  "evidence_id": "chair-product-signals",
+  "captured_at": "2026-08-24T20:56:03+08:00",
+  "source_refs": [
+    { "ref": "hist-chair-products-01", "title": "历史检索中的大体型型号与安全线索", "source_kind": "historical-search" }
+  ],
+  "summary": "固定回放摘要：保存历史型号承重、尺寸和用户侧安全线索；不宣称当前仍新鲜或在售。"
+}

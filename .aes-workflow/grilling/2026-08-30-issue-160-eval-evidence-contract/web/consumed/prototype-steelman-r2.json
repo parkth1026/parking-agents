@@ -1,0 +1,10 @@
+{
+  "schema_version": 2,
+  "round": "prototype-steelman-r2",
+  "submission": "prototype-steelman-r2.json",
+  "consumed_at": "2026-08-30T08:41:45.751Z",
+  "session_slug": "2026-08-30-issue-160-eval-evidence-contract",
+  "revision": 1,
+  "digest": "d8bc8c4ec50390a0a33345e1927a20d91fb78a909c49c453a38e99861edbdfad",
+  "idempotency_key": "2a875147a80fc0dcdd6b12f2f9d160f3767cf27aba4273e1898b1d65446ea792"
+}

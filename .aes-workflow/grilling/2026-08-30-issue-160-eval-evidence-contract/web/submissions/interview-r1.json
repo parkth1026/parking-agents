@@ -1,0 +1,70 @@
+{
+  "schema_version": 2,
+  "round": "interview-r1",
+  "stage": "1-interview",
+  "round_revision": 1,
+  "round_digest": "b3f8d0405adeb28946baa65518b99363c9a7412b6b99bb0b14420e7ce466566e",
+  "received_at": "2026-08-30T08:22:47.838Z",
+  "actor": {
+    "type": "person",
+    "id": "local-user"
+  },
+  "answers": [
+    {
+      "q_id": "D1",
+      "type": "accept"
+    },
+    {
+      "q_id": "D2",
+      "type": "accept"
+    },
+    {
+      "q_id": "D3",
+      "type": "accept"
+    },
+    {
+      "q_id": "D4",
+      "type": "accept"
+    },
+    {
+      "q_id": "D5",
+      "type": "accept"
+    },
+    {
+      "q_id": "C1",
+      "type": "confirm"
+    },
+    {
+      "q_id": "Q1",
+      "type": "choice",
+      "choice": "A"
+    },
+    {
+      "q_id": "Q2",
+      "type": "choice",
+      "choice": "A"
+    },
+    {
+      "q_id": "Q3",
+      "type": "choice",
+      "choice": "A"
+    },
+    {
+      "q_id": "Q4",
+      "type": "multi",
+      "choices": [
+        "CREATOR_CONTRACT",
+        "PROVIDER",
+        "AUDIT",
+        "SHOPPING_PILOT",
+        "LIVE_ACCEPTANCE"
+      ]
+    },
+    {
+      "q_id": "Q5",
+      "type": "choice",
+      "choice": "A"
+    }
+  ],
+  "truncated": false
+}

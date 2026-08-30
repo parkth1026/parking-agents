@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "kind": "eval-evidence-manifest",
+  "eval": "eval-工学椅大体型幼童调研",
+  "epoch": 1,
+  "captured_at": "2026-08-24T20:56:03+08:00",
+  "sanitization": { "status": "passed", "ruleset": "external-evidence-v1" },
+  "entries": [
+    {
+      "id": "industry",
+      "intent": "大体型与幼童安全指标",
+      "query": "人体工学椅 195cm 110kg 幼童 安全 承重 座高",
+      "payload": "payloads/industry.json",
+      "sha256": "sha256:638b4345ffef5127a7758e1f71bdaa7c0c3c6f39759e49b237ff6a07d971638c",
+      "source_count": 1
+    },
+    {
+      "id": "product-signals",
+      "intent": "历史型号承重、尺寸与安全口碑线索",
+      "query": "人体工学椅 195cm 110kg 2000 4000 型号 口碑",
+      "payload": "payloads/product-signals.json",
+      "sha256": "sha256:8892b879d5d3bea77dc59be15f499f21f1e71d88f45dcad531194f3feeb551ac",
+      "source_count": 1
+    }
+  ],
+  "manifest_sha256": "sha256:8403f473771685bd17819ad35d7f1586bd1eb22794837be3d7a207ffd4d0c3e7"
+}

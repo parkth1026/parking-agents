@@ -13,7 +13,7 @@ import { buildStoreZip } from "./lib/zip.mjs";
 const EXCLUDE_DIRS = new Set(["__pycache__", "node_modules"]);
 const EXCLUDE_GLOBS = [/\.pyc$/];
 const EXCLUDE_FILES = new Set([".DS_Store"]);
-const ROOT_EXCLUDE_DIRS = new Set(["evals"]); // 仅技能根下排除
+const ROOT_EXCLUDE_DIRS = new Set(["evals", "eval-fixtures"]); // 仅技能根下排除；外部 evidence payload 留在仓库不进包
 
 function shouldExclude(relParts, name) {
   if (relParts.some((p) => EXCLUDE_DIRS.has(p))) return true;
@@ -26,14 +26,20 @@ function shouldExclude(relParts, name) {
 /** 递归收集文件（相对技能父目录的 posix 路径） */
 function collectFiles(dir) {
   const out = [];
-  const walk = (d) => {
+  const walk = (d, relParts) => {
     for (const entry of readdirSync(d, { withFileTypes: true })) {
       const full = join(d, entry.name);
-      if (entry.isDirectory()) walk(full);
+      const childParts = [...relParts, entry.name];
+      const rel = childParts.join("/");
+      if (shouldExclude(childParts, entry.name)) {
+        console.log(`  跳过: ${rel}${entry.isDirectory() ? "/" : ""}`);
+        continue;
+      }
+      if (entry.isDirectory()) walk(full, childParts);
       else if (entry.isFile()) out.push(full);
     }
   };
-  walk(dir);
+  walk(dir, [basename(dir)]);
   return out;
 }
 
@@ -103,10 +109,6 @@ for (const file of files) {
   const rel = relative(skillParent, file).split(sep).join("/");
   const parts = rel.split("/");
   const name = parts[parts.length - 1];
-  if (shouldExclude(parts, name)) {
-    console.log(`  跳过: ${rel}`);
-    continue;
-  }
   entries.push({ name: rel, data: readFileSync(file) });
   console.log(`  加入: ${rel}`);
 }

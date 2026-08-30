@@ -454,6 +454,38 @@
       text-align: center;
       padding: 3rem;
     }
+    .evidence-quality-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    .evidence-quality-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem;
+    }
+    .evidence-quality-card h2 {
+      font-family: 'Poppins', sans-serif;
+      font-size: 0.875rem;
+      margin-bottom: 0.5rem;
+    }
+    .evidence-quality-status {
+      font-family: 'Poppins', sans-serif;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+    .evidence-quality-card p,
+    .evidence-quality-card li {
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      line-height: 1.5;
+    }
+    .evidence-quality-card ul {
+      padding-left: 1.1rem;
+      margin-top: 0.35rem;
+    }
 
     /* ---- 历史轨迹 + 结构审查建议（新增区，结构对齐 2-prototype/mock.html） ---- */
     .track-badge {
@@ -1255,6 +1287,39 @@
 
       const container = document.getElementById("benchmark-content");
       let html = "";
+
+      // 首屏双声明：Evidence gate 描述输入与联网边界，Quality claim 描述
+      // 质量假设的证据强度；两者都不能由绝对 pass_rate 代替。
+      if (data) {
+        const evidence = data.evidence_audit || {};
+        const quality = data.quality_verdict || {};
+        const evidenceMode = evidence.mode || "unmanaged";
+        // The benchmarker owns the evidence PASS predicate.  The viewer only
+        // renders its normalized status; it must not turn a few green fields
+        // into a new domain conclusion.
+        const evidenceState = evidence.status || evidence.validation?.status || (evidenceMode === "unmanaged" ? "unmanaged / unknown" : "unknown");
+        html += '<div class="evidence-quality-grid">';
+        html += '<div class="evidence-quality-card" id="evidence-gate-card">';
+        html += '<h2>Evidence gate</h2>';
+        html += '<div class="evidence-quality-status">' + escapeHtml(evidenceState) + '</div>';
+        html += '<p>mode=' + escapeHtml(String(evidenceMode)) + ' · digest=' + escapeHtml(String(evidence.evidence_digest || "unknown")) + '</p>';
+        html += '<p>hits=' + escapeHtml(String(evidence.hits ?? "unknown")) + ' · misses=' + escapeHtml(String(evidence.misses ?? "unknown")) + ' · live_calls=' + escapeHtml(String(evidence.live_calls ?? "unknown")) + ' · isolation=' + escapeHtml(String(evidence.network_isolation || "unknown")) + '</p>';
+        html += '</div>';
+        html += '<div class="evidence-quality-card" id="quality-claim-card">';
+        html += '<h2>Quality claim</h2>';
+        html += '<div class="evidence-quality-status">' + escapeHtml(String(quality.status || "unassessed")) + '</div>';
+        if (Array.isArray(quality.reasons) && quality.reasons.length > 0) {
+          html += '<p>reasons</p><ul>';
+          for (const reason of quality.reasons) html += '<li>' + escapeHtml(String(reason)) + '</li>';
+          html += '</ul>';
+        }
+        if (Array.isArray(quality.forbidden_claims) && quality.forbidden_claims.length > 0) {
+          html += '<p style="margin-top:0.5rem;">forbidden claims</p><ul>';
+          for (const claim of quality.forbidden_claims) html += '<li>' + escapeHtml(String(claim)) + '</li>';
+          html += '</ul>';
+        }
+        html += '</div></div>';
+      }
 
       // 结构审查建议卡片（新增：评测循环结构审查步的产物；仅建议，未执行）
       if (sr) {

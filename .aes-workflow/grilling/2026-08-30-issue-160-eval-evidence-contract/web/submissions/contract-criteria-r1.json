@@ -1,0 +1,49 @@
+{
+  "schema_version": 2,
+  "round": "contract-criteria-r1",
+  "stage": "3-contract",
+  "round_revision": 1,
+  "round_digest": "5090da382bb9d432c8939c3b40199ea1bd8e9395753c0198472fb64018453bb5",
+  "received_at": "2026-08-30T09:56:57.773Z",
+  "actor": {
+    "type": "person",
+    "id": "local-user"
+  },
+  "answers": [
+    {
+      "q_id": "CD1",
+      "type": "accept"
+    },
+    {
+      "q_id": "ACQ-001",
+      "type": "choice",
+      "choice": "A"
+    },
+    {
+      "q_id": "ACQ-002",
+      "type": "choice",
+      "choice": "A"
+    },
+    {
+      "q_id": "ACQ-003",
+      "type": "choice",
+      "choice": "A"
+    },
+    {
+      "q_id": "ACQ-004",
+      "type": "choice",
+      "choice": "A"
+    },
+    {
+      "q_id": "ACQ-005",
+      "type": "choice",
+      "choice": "A"
+    },
+    {
+      "q_id": "ACQ-006",
+      "type": "choice",
+      "choice": "A"
+    }
+  ],
+  "truncated": false
+}

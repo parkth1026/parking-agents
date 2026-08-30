@@ -10,12 +10,15 @@
 // 用法: node aggregate-benchmark.mjs <iter-dir> [--skill-name <名>] [--output <路径>] [--history <技能目录>]
 // 退出码: 0 成功 / 1 无数据或目录不存在（含 --history 目标不可写，聚合产出不回滚）/ 2 用法错
 import { existsSync, readdirSync, statSync, renameSync, readFileSync } from "node:fs";
-import { join, basename, dirname, resolve } from "node:path";
+import { join, basename, dirname, isAbsolute, resolve } from "node:path";
 import { readJson, writeJson, writeText } from "./lib/jsonio.mjs";
 import { calcStats, round4 } from "./lib/stats.mjs";
+import { auditGateDigests, sha256Json, validateReplayAudit } from "./lib/evidence.mjs";
+import { buildQualityVerdict, harnessDigest, summarizeEvidence } from "./lib/quality.mjs";
 
 function usage() {
   console.log("用法: node aggregate-benchmark.mjs <iteration目录> [--skill-name <名>] [--output <路径>] [--history <技能目录>]");
+  console.log("      node aggregate-benchmark.mjs --pilot-audit <pilot iteration目录> --history <技能目录> [--pilot-id <id>] [--pilot-phase official-replay|live-acceptance] [--pilot-live-audit-dir <dir>]");
   console.log("示例: node aggregate-benchmark.mjs ../my-skill-workspace/iteration-1");
   process.exit(2);
 }
@@ -38,6 +41,7 @@ function loadRunMetrics(runDir, warnings) {
     passed,
     failed: total - passed,
     total,
+    results,
     time_ms: typeof timing.duration_ms === "number" ? timing.duration_ms : null,
     tokens: typeof timing.total_tokens === "number" ? timing.total_tokens : null,
   };
@@ -68,6 +72,10 @@ export function loadIteration(iterDir, warnings = []) {
   for (const evalName of evalNames) {
     const evalDir = join(searchDir, evalName);
     const metadata = readJson(join(evalDir, "eval_metadata.json")) || {};
+    const runEvidenceAudits = [];
+    const materializedDigests = [];
+    const expectedRuns = [];
+    const evalEvidenceAudit = readJson(join(evalDir, "evidence-audit.json"));
     const evalEntry = {
       name: evalName,
       prompt: metadata.prompt ?? "",
@@ -77,6 +85,8 @@ export function loadIteration(iterDir, warnings = []) {
         : [],
       configs: {},
     };
+    if (metadata.evidence && typeof metadata.evidence === "object") evalEntry.evidence = metadata.evidence;
+    if (metadata.quality && typeof metadata.quality === "object") evalEntry.quality = metadata.quality;
 
     // 配置目录动态发现：含 run-* 子目录的目录即为配置（白名单外也接受，原样进 configs）
     for (const cfgName of readdirSync(evalDir).sort()) {
@@ -86,7 +96,15 @@ export function loadIteration(iterDir, warnings = []) {
       if (runDirs.length === 0) continue;
 
       for (const runName of runDirs) {
-        const metrics = loadRunMetrics(join(cfgDir, runName), warnings);
+        const runDir = join(cfgDir, runName);
+        expectedRuns.push({ cfgName, runName });
+        const runAudit = readJson(join(runDir, "evidence-audit.json"));
+        if (runAudit && typeof runAudit === "object") runEvidenceAudits.push(runAudit);
+        if (metadata.evidence?.mode === "replay") {
+          const materializedPack = readJson(join(runDir, "inputs", "evidence-pack", "evidence-pack.json"));
+          if (typeof materializedPack?.manifest_sha256 === "string") materializedDigests.push({ cfgName, runName, digest: materializedPack.manifest_sha256 });
+        }
+        const metrics = loadRunMetrics(runDir, warnings);
         if (!metrics) continue;
         // 判罚对账：grading.results 条数应等于题库断言数（缺 manual 合并、多写标注条都会虚高/失真）；
         // 题库断言为空（metadata 未登记）时无从对账，跳过不告警
@@ -99,6 +117,44 @@ export function loadIteration(iterDir, warnings = []) {
         (evalEntry.configs[cfgName] ??= []).push({ run: runName, ...metrics });
       }
     }
+    if (metadata.evidence?.mode === "replay") {
+      const expectedDigest = evalEvidenceAudit?.evidence_digest;
+      const expectedHits = Number.isInteger(evalEvidenceAudit?.hits) ? evalEvidenceAudit.hits : undefined;
+      const gateNames = [...new Set(expectedRuns.map((item) => item.cfgName))];
+      const gateAudit = expectedRuns.length > 0 ? auditGateDigests({ evalDir, gates: gateNames }) : null;
+      const evalValidation = validateReplayAudit(evalEvidenceAudit, { expectedDigest, expectedHits });
+      const runValidations = runEvidenceAudits.map((audit) => validateReplayAudit(audit, { expectedDigest, expectedHits }));
+      const actualDigests = new Set(materializedDigests.map((item) => item.digest));
+      let evidenceFailure = null;
+      if (!evalValidation.ok) evidenceFailure = evalValidation;
+      else if (expectedRuns.length === 0) evidenceFailure = { ok: false, status: "BLOCKED", code: "BLOCKED_REPLAY_NOT_EXECUTED", reasons: ["没有发现任何可审计 run"] };
+      else if (runEvidenceAudits.length !== expectedRuns.length) evidenceFailure = { ok: false, status: "BLOCKED", code: "EVIDENCE_AUDIT_MISSING", reasons: [`${expectedRuns.length} 个 run 仅发现 ${runEvidenceAudits.length} 份 replay audit`] };
+      else if (materializedDigests.length !== expectedRuns.length) evidenceFailure = { ok: false, status: "BLOCKED", code: "BLOCKED_EVIDENCE_UNAVAILABLE", reasons: [`${expectedRuns.length} 个 run 仅发现 ${materializedDigests.length} 个 materialized pack`] };
+      else if (runValidations.some((validation) => !validation.ok)) evidenceFailure = runValidations.find((validation) => !validation.ok);
+      else if (!gateAudit?.ok) evidenceFailure = gateAudit ?? { ok: false, status: "BLOCKED", code: "EVIDENCE_DIGEST_MISMATCH", reasons: ["gate digest audit 未执行"] };
+      else if (actualDigests.size !== 1 || (expectedDigest && materializedDigests.some((item) => item.digest !== expectedDigest))) evidenceFailure = { ok: false, status: "BLOCKED", code: "EVIDENCE_DIGEST_MISMATCH", reasons: ["materialized pack 未使用同一 evidence digest"], gates: materializedDigests };
+
+      if (evidenceFailure) {
+        evalEntry.evidence_audit = {
+          status: evidenceFailure.status ?? "BLOCKED",
+          mode: "replay",
+          code: evidenceFailure.code ?? "EVIDENCE_AUDIT_FAILED",
+          reasons: evidenceFailure.reasons ?? [],
+          live_calls: 0,
+        };
+      } else {
+        evalEntry.evidence_audit = {
+          ...evalEvidenceAudit,
+          status: "PASS",
+          gate_digest_consistent: true,
+          replay_runs: runValidations.map((validation) => validation.audit),
+          gate_audit: gateAudit,
+        };
+      }
+      evalEntry.evidence_audits = runEvidenceAudits;
+      evalEntry.materialized_evidence = materializedDigests;
+    } else if (evalEvidenceAudit) evalEntry.evidence_audit = evalEvidenceAudit;
+    else if (runEvidenceAudits.length > 0) evalEntry.evidence_audit = runEvidenceAudits[0];
     evals.push(evalEntry);
   }
 
@@ -162,15 +218,33 @@ export function buildBenchmark(iterDir, skillName = "") {
       ? null : round4(a.tokens.mean - b.tokens.mean);
   }
 
+  const evidenceAudit = summarizeEvidence(loaded.evals);
+  // An opt-in replay is only a scoreable run after its own preflight/materialize
+  // audit is green. Do not emit a benchmark that a caller could mistake for a
+  // valid zero-live result.
+  if (evidenceAudit.blocking) {
+    return { error: `证据前置未通过: ${evidenceAudit.code ?? "EVIDENCE_AUDIT_FAILED"}`, evidence_audit: evidenceAudit };
+  }
+  const harness = evidenceAudit.managed ? harnessDigest(loaded.evals) : null;
+  const comparisonEpoch = evidenceAudit.managed
+    ? sha256Json({ mode: evidenceAudit.mode, evidence_epochs: evidenceAudit.evidence_epochs ?? [], evidence_digest: evidenceAudit.evidence_digest, evidence_digests: evidenceAudit.evidence_digests ?? [], harness_digest: harness })
+    : null;
+  const benchmarkBase = {
+    iteration: basename(resolve(iterDir)),
+    skill_name: skillName || "",
+    configs: configsOut,
+    delta,
+    evals: loaded.evals.map((e) => e.name),
+    warnings,
+    evidence_audit: evidenceAudit,
+    harness_digest: harness,
+    comparison_epoch: comparisonEpoch,
+    comparison_status: evidenceAudit.managed ? "comparable" : "unmanaged",
+  };
+  const quality = buildQualityVerdict({ evals: loaded.evals, benchmark: benchmarkBase, evidenceAudit });
+
   return {
-    benchmark: {
-      iteration: basename(resolve(iterDir)),
-      skill_name: skillName || "",
-      configs: configsOut,
-      delta,
-      evals: loaded.evals.map((e) => e.name),
-      warnings,
-    },
+    benchmark: { ...benchmarkBase, ...quality },
     evals: loaded.evals,
   };
 }
@@ -203,6 +277,17 @@ export function renderMarkdown(benchmark) {
   metricRow("pass_rate", (s) => `${(s.mean * 100).toFixed(0)}% ± ${(s.stddev * 100).toFixed(0)}%`);
   metricRow("time_ms", (s) => s.mean === null ? "未测量" : `${(s.mean / 1000).toFixed(1)}s ± ${(s.stddev / 1000).toFixed(1)}s`);
   metricRow("tokens", (s) => s.mean === null ? "未测量" : `${Math.round(s.mean)} ± ${Math.round(s.stddev)}`);
+
+  const evidence = benchmark.evidence_audit;
+  const quality = benchmark.quality_verdict;
+  if (evidence) {
+    lines.push("", `Evidence gate: ${evidence.mode ?? "unknown"} · digest ${evidence.evidence_digest ?? "unknown"} · live_calls ${evidence.live_calls ?? "unknown"} · isolation ${evidence.network_isolation ?? "unknown"}`);
+  }
+  if (quality) {
+    lines.push(`Quality claim: ${quality.status ?? "unassessed"}`);
+    for (const reason of quality.reasons ?? []) lines.push(`- reason: ${reason}`);
+    for (const claim of quality.forbidden_claims ?? []) lines.push(`- forbidden: ${claim}`);
+  }
 
   for (const c of cfgNames) {
     const sk = benchmark.configs[c].skipped;
@@ -247,7 +332,13 @@ export function detectHistoryGap(iterDir, historyDir) {
  *   防止部分场景轮把题库整写成子集（全量轮换代仍用默认整写）。
  */
 export function buildOutputEvals(evals, skillName, iterationName, keepExisting = null) {
-  const entries = evals.map((e) => ({ name: e.name, prompt: e.prompt, assertions: e.assertion_specs }));
+  const entries = evals.map((e) => ({
+    name: e.name,
+    prompt: e.prompt,
+    assertions: e.assertion_specs,
+    ...(e.quality ? { quality: e.quality } : {}),
+    ...(e.evidence ? { evidence: e.evidence } : {}),
+  }));
   if (keepExisting && Array.isArray(keepExisting.evals)) {
     const names = new Set(entries.map((e) => e.name));
     for (const old of keepExisting.evals) if (!names.has(old.name)) entries.push(old);
@@ -298,6 +389,25 @@ function evalPassMap(evals, gate) {
     map[ev.name] = runs.length > 0 ? runs.reduce((s, r) => s + r.pass_rate, 0) / runs.length === 1 : null;
   }
   return map;
+}
+
+/** Latest run per iteration is shared by managed and legacy best selection. */
+function latestCandidateIndices(history, newRunIdx, excludedRef, predicate) {
+  const latestByRef = new Map();
+  history.runs.forEach((run, index) => {
+    if (index !== newRunIdx) latestByRef.set(run.iteration_ref, index);
+  });
+  latestByRef.delete(excludedRef);
+  return [...latestByRef.values()].filter(predicate);
+}
+
+function chooseBestIndex(history, candidates, rateOf, incumbentIndex = -1) {
+  let best = candidates[0];
+  for (const index of candidates) {
+    if (rateOf(history.runs[index]) > rateOf(history.runs[best])
+      || (rateOf(history.runs[index]) === rateOf(history.runs[best]) && index === incumbentIndex)) best = index;
+  }
+  return best;
 }
 
 /**
@@ -367,6 +477,155 @@ function loadHistoryForAppend(historyPath) {
   }
 }
 
+function pilotEvalDirs(pilotDir) {
+  const direct = readdirSync(pilotDir).filter((name) => name.startsWith("eval-") && isDir(join(pilotDir, name)));
+  const searchDir = direct.length > 0 ? pilotDir : (existsSync(join(pilotDir, "runs")) ? join(pilotDir, "runs") : pilotDir);
+  return readdirSync(searchDir).filter((name) => name.startsWith("eval-") && isDir(join(searchDir, name))).sort().map((name) => join(searchDir, name));
+}
+
+function pilotRunEntries(evalDir) {
+  const entries = [];
+  for (const gate of readdirSync(evalDir).sort()) {
+    const gateDir = join(evalDir, gate);
+    if (!isDir(gateDir)) continue;
+    for (const run of readdirSync(gateDir).filter((name) => /^run-\d+$/.test(name)).sort(byRunNumber)) {
+      entries.push({ gate, run, audit: readJson(join(gateDir, run, "evidence-audit.json")) });
+    }
+  }
+  return entries;
+}
+
+function safePilotManifestRef(value) {
+  if (typeof value !== "string" || !value || isAbsolute(value)) return false;
+  const parts = value.replaceAll("\\", "/").split("/");
+  return parts.every((part) => part && part !== "..");
+}
+
+function defaultPilotQuality(status) {
+  return status === "PASS"
+    ? {
+        status: "INCONCLUSIVE",
+        reasons: ["本 pilot 只验证证据预检、按 gate 物化和 zero-live replay，未运行 Agent output gates；不能由 harness PASS 推导技能质量增益"],
+        forbidden_claims: ["不能把 replay PASS 当作当前价格/在售新鲜度证明", "不能把本次证据审计升级为 shopping skill 的 SUPPORTED"],
+      }
+    : {
+        status: "BLOCKED",
+        reasons: ["evidence pilot 未通过，不能推出质量结论"],
+        forbidden_claims: ["不能把失败或阻塞的 evidence pilot 当作技能质量证明"],
+      };
+}
+
+/**
+ * Append a pilot receipt from the evidence audits that were actually written
+ * by eval-evidence.  This is deliberately separate from score runs: a replay
+ * pilot may have no Agent output grading yet, but its evidence lifecycle still
+ * needs an auditable, append-only history entry.
+ */
+export function appendPilotAudit({ pilotDir, historyPath, skillName = "", pilotId, phase = "official-replay", liveAuditDir = null }) {
+  if (!existsSync(pilotDir) || !isDir(pilotDir)) return { error: `pilot 目录不存在: ${pilotDir}` };
+  if (!["official-replay", "live-acceptance"].includes(phase)) return { error: `pilot phase 无效: ${phase}` };
+  const evalDirs = pilotEvalDirs(pilotDir);
+  if (evalDirs.length === 0) return { error: `pilot 未发现 eval-* 目录: ${pilotDir}` };
+  const evaluations = [];
+  const providers = new Set();
+  const epochs = new Set();
+  let overallStatus = "PASS";
+  for (const evalDir of evalDirs) {
+    const evalName = basename(evalDir);
+    const metadata = readJson(join(evalDir, "eval_metadata.json")) || {};
+    const evidence = metadata.evidence;
+    const audit = readJson(join(evalDir, "evidence-audit.json"));
+    if (evidence?.provider) providers.add(evidence.provider);
+    if (audit?.evidence_epoch != null) epochs.add(audit.evidence_epoch);
+    const gates = pilotRunEntries(evalDir).map((entry) => entry.gate).filter((gate, index, all) => all.indexOf(gate) === index);
+    const gateAudit = gates.length > 0 ? auditGateDigests({ evalDir, gates }) : { ok: false, status: "BLOCKED", code: "BLOCKED_REPLAY_NOT_EXECUTED" };
+    const evalValidation = validateReplayAudit(audit, {
+      expectedDigest: audit?.evidence_digest,
+      expectedHits: Number.isInteger(audit?.hits) ? audit.hits : undefined,
+    });
+    const runEntries = pilotRunEntries(evalDir);
+    const runValidations = runEntries.map((entry) => ({
+      ...entry,
+      validation: validateReplayAudit(entry.audit, {
+        expectedDigest: audit?.evidence_digest,
+        expectedHits: Number.isInteger(audit?.hits) ? audit.hits : undefined,
+      }),
+    }));
+    const failure = !safePilotManifestRef(evidence?.manifest) ? { ok: false, status: "BLOCKED", code: "EVIDENCE_MANIFEST_INVALID", reasons: ["pilot 收据拒绝绝对或越界 manifest 引用"] }
+      : !evalValidation.ok ? evalValidation
+      : !gateAudit.ok ? gateAudit
+        : gateAudit.evidence_digest !== audit?.evidence_digest ? { ok: false, status: "BLOCKED", code: "EVIDENCE_DIGEST_MISMATCH", reasons: ["eval audit digest 与 materialized gate digest 不一致"] }
+        : runEntries.length === 0 ? { ok: false, status: "BLOCKED", code: "BLOCKED_REPLAY_NOT_EXECUTED", reasons: ["没有逐 gate/run replay audit"] }
+          : runValidations.length !== runEntries.length || runValidations.some((entry) => !entry.validation.ok)
+            ? (runValidations.find((entry) => !entry.validation.ok)?.validation ?? { ok: false, status: "BLOCKED", code: "EVIDENCE_AUDIT_MISSING" })
+            : null;
+    if (failure) overallStatus = failure.status === "FAIL" ? "FAIL" : (overallStatus === "FAIL" ? "FAIL" : "BLOCKED");
+    const evaluation = {
+      eval: evalName,
+      manifest: safePilotManifestRef(evidence?.manifest) ? evidence.manifest : null,
+      evidence_epoch: audit?.evidence_epoch ?? null,
+      evidence_digest: audit?.evidence_digest ?? null,
+      gates,
+      hits: audit?.hits ?? 0,
+      misses: audit?.misses ?? 0,
+      live_calls: 0,
+      network_isolation: audit?.network_isolation ?? "unknown",
+      gate_digest_consistent: failure ? false : true,
+      replay_runs: runValidations.map((entry) => ({ gate: entry.gate, run: entry.run, status: entry.validation.status, hits: entry.audit?.hits ?? 0, misses: entry.audit?.misses ?? 0, live_calls: entry.audit?.live_calls ?? 0 })),
+    };
+    if (failure) {
+      evaluation.status = failure.status ?? "BLOCKED";
+      evaluation.code = failure.code ?? "EVIDENCE_AUDIT_FAILED";
+      evaluation.reasons = failure.reasons ?? [];
+    }
+    evaluations.push(evaluation);
+  }
+
+  let liveAcceptance = {
+    status: "BLOCKED",
+    code: "EXTERNAL_SEARCH_QUOTA_UNAVAILABLE",
+    unblock_after: "2026-09-10",
+    required_authorization: "用户显式授权后逐 eval 运行",
+    concurrency: 1,
+    max_calls: 16,
+    required_checks: ["query_plan", "tool_path", "source_reachability", "freshness"],
+  };
+  if (phase === "live-acceptance") {
+    const liveAudits = evaluations.map((evaluation) => {
+      const path = liveAuditDir && existsSync(liveAuditDir) && statSync(liveAuditDir).isDirectory()
+        ? join(liveAuditDir, `${evaluation.eval}.json`) : liveAuditDir;
+      return readJson(path);
+    });
+    const invalid = liveAudits.find((audit) => !audit || audit.status !== "PASS" || audit.execution !== "live" || audit.real_provider_verified !== true || audit.concurrency !== 1 || !Number.isInteger(audit.calls) || audit.calls < 1 || audit.calls > 16 || audit.live_calls !== audit.calls || audit.replay_comparison !== "incomparable" || audit.query_plan !== "PASS" || audit.tool_path !== "PASS" || audit.source_reachability !== "PASS" || audit.freshness !== "PASS");
+    liveAcceptance = invalid
+      ? { status: invalid?.status === "BLOCKED" ? "BLOCKED" : "FAIL", code: invalid?.code ?? "LIVE_ACCEPTANCE_INCOMPLETE", concurrency: 1, max_calls: 16, required_checks: ["query_plan", "tool_path", "source_reachability", "freshness"] }
+      : { status: "PASS", execution: "live", concurrency: 1, max_calls: 16, required_checks: ["query_plan", "tool_path", "source_reachability", "freshness"] };
+    if (liveAcceptance.status !== "PASS") overallStatus = liveAcceptance.status === "FAIL" ? "FAIL" : "BLOCKED";
+  }
+
+  const loaded = loadHistoryForAppend(historyPath);
+  const history = loaded.history ?? { skill: skillName, runs: [] };
+  history.pilot_audits = Array.isArray(history.pilot_audits) ? history.pilot_audits : [];
+  const id = pilotId || `${skillName || history.skill || "skill"}-${phase}-${localIsoDate().slice(0, 10)}`;
+  if (history.pilot_audits.some((item) => item?.id === id)) return { error: `pilot audit 已存在: ${id}` };
+  const audit = {
+    id,
+    date: localIsoDate(),
+    phase,
+    status: overallStatus,
+    evidence_mode: "replay",
+    evidence_provider: providers.size === 1 ? [...providers][0] : providers.size > 1 ? "multiple" : "unknown",
+    evidence_epoch: epochs.size === 1 ? [...epochs][0] : null,
+    evidence_epochs: [...epochs].sort((a, b) => a - b),
+    evaluations,
+    quality_verdict: defaultPilotQuality(overallStatus),
+    live_acceptance: liveAcceptance,
+    source: "aggregate-benchmark --pilot-audit（消费 eval-evidence 生成的 evidence-audit）",
+  };
+  history.pilot_audits.push(audit);
+  return { history, audit, summary: { id, status: overallStatus, evaluations: evaluations.length, rebuilt: loaded.rebuilt ?? false } };
+}
+
 /**
  * 组装本轮 run 记录并追加进 history（只追加：既有 runs 任何字段不回改；顶层 current_best 为权威指针）。
  * current_best 口径：主 gate（with_skill 优先，否则字典序首个）pass_rate 严格更高才推进，平局不推进（防抖）；
@@ -383,6 +642,9 @@ export function appendHistoryRun({ result, iterDir, skillName, historyPath }) {
   const prevRun = history.runs.length > 0 ? history.runs[history.runs.length - 1] : null;
   const gates = buildGatesSummary(result.benchmark);
   const newRef = resolve(iterDir);
+  const managed = result.benchmark.quality_verdict?.status && result.benchmark.quality_verdict.status !== "unassessed";
+  const comparisonEpoch = result.benchmark.comparison_epoch ?? null;
+  const comparisonEpochChanged = managed && prevRun && prevRun.comparison_epoch !== comparisonEpoch;
 
   let vsPrevious = null;
   let vsNote = "首轮无对比";
@@ -390,6 +652,8 @@ export function appendHistoryRun({ result, iterDir, skillName, historyPath }) {
   if (prevRun) {
     if (prevRun.iteration_ref === newRef) {
       vsNote = "同 iteration 重复聚合，无对比";
+    } else if (comparisonEpochChanged) {
+      vsNote = "evidence/harness epoch 改变，跨纪元不可比";
     } else {
       const cmp = computeVsPrevious(result.evals, gates, prevRun);
       if (cmp.error) {
@@ -403,13 +667,17 @@ export function appendHistoryRun({ result, iterDir, skillName, historyPath }) {
 
   // 题库纪元：vs_previous 出现 new/dropped（题面换代）即换纪元。current_best 只认证同纪元成绩——
   // 跨纪元 pass_rate 不可比，星标钉在已汰换旧题库上会误导去留决策；换纪元首轮重置星标为本轮。
-  const epochChanged = !!(vsPrevious && vsPrevious.detail.some((d) => d.result === "new" || d.result === "dropped"));
+  const epochChanged = comparisonEpochChanged || !!(vsPrevious && vsPrevious.detail.some((d) => d.result === "new" || d.result === "dropped"));
   const prevEpoch = prevRun ? (prevRun.bank_epoch ?? 1) : 0;
   const epoch = prevRun ? (epochChanged ? prevEpoch + 1 : Math.max(prevEpoch, 1)) : 1;
   if (epochChanged) {
-    const n = vsPrevious.detail.filter((d) => d.result === "new").length;
-    const m = vsPrevious.detail.filter((d) => d.result === "dropped").length;
-    vsNote += `（题库换纪元：${n} new / ${m} dropped）`;
+    if (vsPrevious) {
+      const n = vsPrevious.detail.filter((d) => d.result === "new").length;
+      const m = vsPrevious.detail.filter((d) => d.result === "dropped").length;
+      vsNote += `（题库换纪元：${n} new / ${m} dropped）`;
+    } else if (comparisonEpochChanged) {
+      vsNote += "（evidence/harness epoch changed）";
+    }
   }
 
   const run = {
@@ -419,6 +687,13 @@ export function appendHistoryRun({ result, iterDir, skillName, historyPath }) {
     vs_previous: vsPrevious,
     bank_epoch: epoch,
   };
+  if (managed) {
+    run.comparison_epoch = comparisonEpoch;
+    run.comparison_status = comparisonEpochChanged ? "incomparable" : "comparable";
+    run.evidence_audit = result.benchmark.evidence_audit;
+    run.quality_audit = result.benchmark.quality_audit;
+    run.quality_verdict = result.benchmark.quality_verdict;
+  }
   if (duplicateOf >= 0) run.supersedes = `runs[${duplicateOf}]`; // 重复聚合=修正：指向被修正的旧条
   history.runs.push(run);
   const newRunIdx = history.runs.length - 1;
@@ -431,14 +706,65 @@ export function appendHistoryRun({ result, iterDir, skillName, historyPath }) {
   const rateOf = (r) => r.gates[primaryGate(r.gates)]?.pass_rate ?? 0;
   const reaggregated = history.runs.slice(0, newRunIdx).some((r) => r.iteration_ref === newRef);
 
+  if (managed) {
+    // Managed quality history only promotes a supported run, and only compares
+    // runs from the same evidence/harness epoch. An inconclusive or blocked
+    // run may remain in history but can never become current_best.
+    const candidates = latestCandidateIndices(history, newRunIdx, run.iteration_ref, (i) =>
+      history.runs[i].comparison_epoch === comparisonEpoch
+      && history.runs[i].quality_verdict?.status === "SUPPORTED"
+      && primaryGate(history.runs[i].gates) === newPrimary);
+    const currentBestMatch = typeof history.current_best === "string" ? history.current_best.match(/^runs\[(\d+)\]$/) : null;
+    const currentBestIdx = currentBestMatch ? Number(currentBestMatch[1]) : -1;
+    const currentBestIsComparable = currentBestIdx >= 0 && currentBestIdx < newRunIdx
+      && history.runs[currentBestIdx]?.comparison_epoch === comparisonEpoch
+      && history.runs[currentBestIdx]?.quality_verdict?.status === "SUPPORTED";
+    let managedAdvance = false;
+    let managedBest = currentBestIsComparable ? currentBestIdx : -1;
+    let managedReason;
+    if (run.quality_verdict?.status !== "SUPPORTED") {
+      managedBest = comparisonEpochChanged ? -1 : managedBest;
+      managedReason = run.quality_verdict?.status === "BLOCKED"
+        ? "quality=BLOCKED，不推进 current_best"
+        : `quality=${run.quality_verdict?.status ?? "unknown"}，不把高 pass_rate 当作质量证明`;
+    } else if (candidates.length === 0) {
+      managedAdvance = true;
+      managedBest = newRunIdx;
+      managedReason = comparisonEpochChanged ? "evidence/harness epoch 改变，current_best 在新纪元重置" : "首个 SUPPORTED 质量轮";
+    } else {
+      const best = chooseBestIndex(history, candidates, rateOf, currentBestIdx);
+      if (rateOf(run) > rateOf(history.runs[best])) {
+        managedAdvance = true;
+        managedBest = newRunIdx;
+        managedReason = `SUPPORTED 且 pass_rate ${rateOf(run)} > ${rateOf(history.runs[best])} 推进`;
+      } else {
+        managedBest = best;
+        managedReason = `SUPPORTED 但 pass_rate 未严格超过 runs[${best}]，持平不推进`;
+      }
+    }
+    if (managedAdvance) run.current_best = true;
+    history.current_best = managedBest >= 0 ? `runs[${managedBest}]` : null;
+    return {
+      history,
+      summary: {
+        index: history.runs.length,
+        vsNote,
+        advance: managedAdvance,
+        bestIdxAfter: managedBest,
+        reason: managedReason,
+        duplicateOf,
+        epochChanged,
+        epoch,
+        rebuilt: loaded.rebuilt ?? false,
+      },
+    };
+  }
+
   // 候选 = 其他 iteration_ref 各自的最新一条、主 gate 名与本轮一致、且与本轮同题库纪元；
   // 本轮 ref 的旧条目已被本轮取代（delete），不当候选——重复聚合=修正，防早期脏数据锁死上限
-  const lastIdxPerRef = new Map();
-  history.runs.forEach((r, i) => { if (i !== newRunIdx) lastIdxPerRef.set(r.iteration_ref, i); });
-  lastIdxPerRef.delete(run.iteration_ref);
-  const candidates = [...lastIdxPerRef.values()]
-    .filter((i) => primaryGate(history.runs[i].gates) === newPrimary)
-    .filter((i) => (history.runs[i].bank_epoch ?? 1) === epoch);
+  const candidates = latestCandidateIndices(history, newRunIdx, run.iteration_ref, (i) =>
+    primaryGate(history.runs[i].gates) === newPrimary
+    && (history.runs[i].bank_epoch ?? 1) === epoch);
 
   let advance, bestIdxAfter, reason;
   if (epochChanged && !reaggregated) {
@@ -456,11 +782,7 @@ export function appendHistoryRun({ result, iterDir, skillName, historyPath }) {
     bestIdxAfter = newRunIdx;
     reason = newRunIdx === 0 ? "首轮即最佳" : "同 iteration 重复聚合，最新成绩为该轮有效成绩";
   } else {
-    let best = candidates[0];
-    for (const i of candidates) {
-      if (rateOf(history.runs[i]) > rateOf(history.runs[best])
-        || (rateOf(history.runs[i]) === rateOf(history.runs[best]) && i === curBestIdx)) best = i;
-    }
+    const best = chooseBestIndex(history, candidates, rateOf, curBestIdx);
     const newRate = rateOf(run);
     const bestRate = rateOf(history.runs[best]);
     if (newRate > bestRate) {
@@ -496,6 +818,45 @@ export function appendHistoryRun({ result, iterDir, skillName, historyPath }) {
 
 // --- CLI ---
 const argv = process.argv.slice(2);
+const flagValue = (name) => {
+  const index = argv.indexOf(name);
+  return index === -1 ? undefined : argv[index + 1];
+};
+const pilotAuditDirArg = flagValue("--pilot-audit");
+if (pilotAuditDirArg) {
+  const pilotHistoryDirArg = flagValue("--history");
+  if (!pilotHistoryDirArg || !flagValue("--pilot-audit") || argv.includes("--help")) usage();
+  const pilotHistoryDir = resolve(pilotHistoryDirArg);
+  const pilotDir = resolve(pilotAuditDirArg);
+  const pilotHistoryPath = join(pilotHistoryDir, "history.json");
+  if (!existsSync(pilotHistoryDir) || !statSync(pilotHistoryDir).isDirectory()) {
+    console.log(`拒绝：--history 目标不是可写目录: ${pilotHistoryDir}`);
+    process.exit(1);
+  }
+  if (existsSync(pilotHistoryPath) && statSync(pilotHistoryPath).isDirectory()) {
+    console.log(`拒绝：history.json 是目录，不是历史文件: ${pilotHistoryPath}`);
+    process.exit(1);
+  }
+  const pilotResult = appendPilotAudit({
+    pilotDir,
+    historyPath: pilotHistoryPath,
+    skillName: flagValue("--skill-name") ?? "",
+    pilotId: flagValue("--pilot-id"),
+    phase: flagValue("--pilot-phase") ?? "official-replay",
+    liveAuditDir: flagValue("--pilot-live-audit-dir") ? resolve(flagValue("--pilot-live-audit-dir")) : null,
+  });
+  if (pilotResult.error) {
+    console.log(`拒绝：${pilotResult.error}`);
+    process.exit(1);
+  }
+  try { writeJson(pilotHistoryPath, pilotResult.history); } catch (error) {
+    console.log(`拒绝：history.json 写入失败: ${error.message}`);
+    process.exit(1);
+  }
+  console.log(`pilot: 追加 ${pilotResult.audit.phase} 收据 ${pilotResult.audit.id}，status=${pilotResult.audit.status}，evals=${pilotResult.audit.evaluations.length}`);
+  console.log(`pilot: → ${pilotHistoryPath}（pilot_audits 共 ${pilotResult.history.pilot_audits.length} 条，只追加）`);
+  process.exit(pilotResult.audit.status === "PASS" ? 0 : pilotResult.audit.status === "BLOCKED" ? 3 : 1);
+}
 const iterDirArg = argv.find((a) => !a.startsWith("--"));
 if (!iterDirArg || argv.includes("--help")) usage();
 
@@ -543,6 +904,14 @@ if (cfgNames.length >= 2) {
   );
 }
 for (const warning of b.warnings) console.log(`警告: ${warning}`);
+if (b.evidence_audit) {
+  console.log(`Evidence gate  ${b.evidence_audit.mode ?? "unknown"} digest=${b.evidence_audit.evidence_digest ?? "unknown"} live_calls=${b.evidence_audit.live_calls ?? "unknown"} isolation=${b.evidence_audit.network_isolation ?? "unknown"}`);
+}
+if (b.quality_verdict) {
+  console.log(`Quality claim  ${b.quality_verdict.status}`);
+  for (const reason of b.quality_verdict.reasons ?? []) console.log(`  reason: ${reason}`);
+  for (const claim of b.quality_verdict.forbidden_claims ?? []) console.log(`  forbidden: ${claim}`);
+}
 console.log(`→ ${outJson}, ${outJson.replace(/\.json$/, ".md")}`);
 
 // --history：评测数据反向沉淀进技能目录（唯一写入通道，须显式传参；失败不吞 benchmark 产出）

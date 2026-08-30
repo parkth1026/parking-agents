@@ -1,0 +1,8 @@
+{
+  "evidence_id": "purifier-product-signals",
+  "captured_at": "2026-08-24T20:56:03+08:00",
+  "source_refs": [
+    { "ref": "hist-purifier-products-01", "title": "历史检索中的型号与口碑线索", "source_kind": "historical-search" }
+  ],
+  "summary": "固定回放摘要：保存历史型号、评论口径和榜单局限线索；不宣称这些信息在当前仍新鲜。"
+}

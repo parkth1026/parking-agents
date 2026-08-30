@@ -1,0 +1,10 @@
+{
+  "schema_version": 2,
+  "round": "interview-r1",
+  "submission": "interview-r1.json",
+  "consumed_at": "2026-08-30T08:24:31.529Z",
+  "session_slug": "2026-08-30-issue-160-eval-evidence-contract",
+  "revision": 1,
+  "digest": "b3f8d0405adeb28946baa65518b99363c9a7412b6b99bb0b14420e7ce466566e",
+  "idempotency_key": "9ebf9f71e161c62c26e1e67eeab07668038dfa0e2966878a85919c8298cc8f07"
+}

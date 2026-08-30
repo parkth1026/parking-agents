@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "kind": "eval-evidence-manifest",
+  "eval": "eval-净化器榜单真伪调研",
+  "epoch": 1,
+  "captured_at": "2026-08-24T20:56:03+08:00",
+  "sanitization": { "status": "passed", "ruleset": "external-evidence-v1" },
+  "entries": [
+    {
+      "id": "industry",
+      "intent": "除醛行业指标与判据",
+      "query": "空气净化器 除甲醛 CADR CCM 活性炭 指标",
+      "payload": "payloads/industry.json",
+      "sha256": "sha256:049a84223b8b177729e6d41f99a3efae7abcf99a7f7a2bf681e6ac013fa69e01",
+      "source_count": 1
+    },
+    {
+      "id": "product-signals",
+      "intent": "历史型号在售与用户侧线索",
+      "query": "空气净化器 2026 型号 评论数 在售 口碑",
+      "payload": "payloads/product-signals.json",
+      "sha256": "sha256:be65807bfaeba5d0c107689b42c92cdd474265df10f5e2cf191db03a44b3312e",
+      "source_count": 1
+    }
+  ],
+  "manifest_sha256": "sha256:a68a00cd8fefcf1010ce2d87acf902d2e52cc1d73dc9b38cb2023602e8875728"
+}

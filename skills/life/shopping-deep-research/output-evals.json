@@ -60,7 +60,28 @@
           "type": "manual",
           "ac": "AC-11"
         }
-      ]
+      ],
+      "quality": {
+        "hypotheses": [{
+          "id": "QH-01",
+          "lever": "completion_criteria",
+          "risk": "历史检索事实可能没有传入最终报告",
+          "expected_behavior": "报告把指标、来源日期和限制与推荐依据成组带出",
+          "assertions": ["行业指标框架先行"],
+          "gates": ["with_skill", "old_skill"]
+        }],
+        "policy": { "stability_runs": 3, "required_comparators": ["old_skill"], "cost_budget": { "tokens_ratio_vs_old_max": 1.25 } }
+      },
+      "evidence": {
+        "schema_version": 1,
+        "mode": "replay",
+        "provider": "shopping-history-replay-v1",
+        "manifest": "eval-fixtures/eval-净化器榜单真伪调研/epoch-1/evidence-pack.json",
+        "manifest_sha256": "sha256:a68a00cd8fefcf1010ce2d87acf902d2e52cc1d73dc9b38cb2023602e8875728",
+        "epoch": 1,
+        "miss_policy": "fail",
+        "live_policy": { "trigger": "manual_or_stale", "concurrency": 1, "max_calls": 16, "freshness": "current listing requires live" }
+      }
     },
     {
       "name": "eval-升降桌小房间调研",
@@ -126,7 +147,28 @@
           "type": "manual",
           "ac": "AC-11"
         }
-      ]
+      ],
+      "quality": {
+        "hypotheses": [{
+          "id": "QH-01",
+          "lever": "completion_criteria",
+          "risk": "历史检索事实可能没有传入最终报告",
+          "expected_behavior": "报告把指标、来源日期和限制与推荐依据成组带出",
+          "assertions": ["行业指标框架先行"],
+          "gates": ["with_skill", "old_skill"]
+        }],
+        "policy": { "stability_runs": 3, "required_comparators": ["old_skill"], "cost_budget": { "tokens_ratio_vs_old_max": 1.25 } }
+      },
+      "evidence": {
+        "schema_version": 1,
+        "mode": "replay",
+        "provider": "shopping-history-replay-v1",
+        "manifest": "eval-fixtures/eval-升降桌小房间调研/epoch-1/evidence-pack.json",
+        "manifest_sha256": "sha256:0a96669770b5a26787a6d2917fffdbb9a18c25c6f7aacd9d00cc6cab57573c09",
+        "epoch": 1,
+        "miss_policy": "fail",
+        "live_policy": { "trigger": "manual_or_stale", "concurrency": 1, "max_calls": 16, "freshness": "current listing requires live" }
+      }
     },
     {
       "name": "eval-工学椅大体型幼童调研",
@@ -180,7 +222,28 @@
           "type": "manual",
           "ac": "AC-11"
         }
-      ]
+      ],
+      "quality": {
+        "hypotheses": [{
+          "id": "QH-01",
+          "lever": "completion_criteria",
+          "risk": "历史检索事实可能没有传入最终报告",
+          "expected_behavior": "报告把指标、来源日期和限制与推荐依据成组带出",
+          "assertions": ["行业指标框架先行"],
+          "gates": ["with_skill", "old_skill"]
+        }],
+        "policy": { "stability_runs": 3, "required_comparators": ["old_skill"], "cost_budget": { "tokens_ratio_vs_old_max": 1.25 } }
+      },
+      "evidence": {
+        "schema_version": 1,
+        "mode": "replay",
+        "provider": "shopping-history-replay-v1",
+        "manifest": "eval-fixtures/eval-工学椅大体型幼童调研/epoch-1/evidence-pack.json",
+        "manifest_sha256": "sha256:8403f473771685bd17819ad35d7f1586bd1eb22794837be3d7a207ffd4d0c3e7",
+        "epoch": 1,
+        "miss_policy": "fail",
+        "live_policy": { "trigger": "manual_or_stale", "concurrency": 1, "max_calls": 16, "freshness": "current listing requires live" }
+      }
     },
     {
       "name": "eval-电视双场景调研",
@@ -234,7 +297,28 @@
           "type": "manual",
           "ac": "AC-11"
         }
-      ]
+      ],
+      "quality": {
+        "hypotheses": [{
+          "id": "QH-01",
+          "lever": "completion_criteria",
+          "risk": "历史检索事实可能没有传入最终报告",
+          "expected_behavior": "报告把指标、来源日期和限制与推荐依据成组带出",
+          "assertions": ["行业指标框架先行"],
+          "gates": ["with_skill", "old_skill"]
+        }],
+        "policy": { "stability_runs": 3, "required_comparators": ["old_skill"], "cost_budget": { "tokens_ratio_vs_old_max": 1.25 } }
+      },
+      "evidence": {
+        "schema_version": 1,
+        "mode": "replay",
+        "provider": "shopping-history-replay-v1",
+        "manifest": "eval-fixtures/eval-电视双场景调研/epoch-1/evidence-pack.json",
+        "manifest_sha256": "sha256:4c77576a73fdc7798e3c648aa88f61fdf54eba82e733ba9d50f8f56a5f1130d3",
+        "epoch": 1,
+        "miss_policy": "fail",
+        "live_policy": { "trigger": "manual_or_stale", "concurrency": 1, "max_calls": 16, "freshness": "current listing requires live" }
+      }
     }
   ]
 }

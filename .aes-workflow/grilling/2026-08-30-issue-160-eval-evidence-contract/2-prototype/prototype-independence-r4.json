@@ -1,0 +1,75 @@
+{
+  "schema_version": 2,
+  "opening": "用户纠正了一个架构前提：parking-skill-creator 必须独立，不能依赖 writing-for-agents。本轮不重问既有 evidence/quality 决策，只确认独立方向，并把‘上下文不要过长’变成一个可验预算。",
+  "dossier": {
+    "title": "Goal Contract 决策档案 · Creator 独立性修正",
+    "summary": "writing-for-agents 降为设计调研来源；运行时只使用 Creator 自己已有的本地 writing-guide。唯一待定项是上下文预算的数字口径。"
+  },
+  "phases": [
+    {"id":"1-interview","label":"访谈·拷问","status":"done"},
+    {"id":"2-prototype","label":"原型确认·修正","status":"active"},
+    {"id":"3-contract","label":"交付标准·契约","status":"pending"}
+  ],
+  "open_ambiguities": 1,
+  "locked": [
+    {"ref":"USER-CORRECTION","q":"Creator 依赖边界","a":"独立安装、打包、运行；不能依赖 writing-for-agents","round":"direct-correction","tier":"confirm"},
+    {"ref":"QUALITY","q":"质量机制","a":"finding→假设→断言/gates/runs→quality verdict，静态检查不单独判质量 PASS","round":"steelman-verdict","tier":"default"},
+    {"ref":"EVIDENCE","q":"外部证据","a":"replay 失败关闭，record/live 独立且受控","round":"prototype-r1","tier":"ask"}
+  ],
+  "round": {
+    "id":"prototype-independence-r4",
+    "no":5,
+    "stage":"2-prototype",
+    "title":"修正依赖方向，只裁上下文预算",
+    "status":"pending",
+    "items":[
+      {
+        "q_id":"PI1",
+        "tier":"confirm",
+        "line":"parking-skill-creator 必须独立安装、独立打包、独立运行；不得读取、调用或要求安装 writing-for-agents。后者只保留为本轮设计来源，不进入产品依赖 — 代价：有用原则需压缩进 Creator 自己的本地 writing-guide，并独立维护",
+        "irreversible":true
+      },
+      {
+        "q_id":"PD-LOCAL",
+        "tier":"default",
+        "line":"复用 Creator 已有 `references/writing-guide.md`，不新增第二个 writing reference 或第二条常驻 pointer — 减少认知与上下文负担 — 代价：要先对本地 guide 做 pruning 再容纳新机制"
+      },
+      {
+        "q_id":"CTX1",
+        "tier":"ask",
+        "question":"‘尽量确保上下文不要过长’用什么可验预算？当前常驻 SKILL.md 是 31,415 UTF-8 bytes/312 行；创建或改写分支加载本地 writing-guide 后合计 40,364 bytes/475 行。",
+        "known_facts":"模型 token 数依宿主 tokenizer 变化，仓库没有稳定 tokenizer 基建；UTF-8 bytes+行数是零依赖且不会随模型切换漂移的代理。只限制主文件会允许把全部新增内容搬进 reference，分支总上下文仍膨胀。",
+        "irreversible":true,
+        "allow_custom":true,
+        "required":true,
+        "options":[
+          {
+            "key":"A",
+            "text":"主文件与分支双零增长",
+            "pct":60,
+            "recommended":true,
+            "covers":"SKILL.md 同时不超过 31,415 bytes/312 行；SKILL.md+本地 writing-guide 同时不超过 40,364 bytes/475 行。任一新增必须靠 pruning 抵消。",
+            "pros":["机械防止常驻和实际创建分支上下文膨胀","迫使复用现有指针与删除 no-op/重复内容"],
+            "cons":["字节/行不是精确 token","正常措辞改善也可能先触发 pruning 工作"]
+          },
+          {
+            "key":"B",
+            "text":"只锁主 SKILL 零增长",
+            "pct":30,
+            "covers":"SKILL.md 不超过 31,415 bytes/312 行；本地 writing-guide 只要求按需加载，不设硬上限。",
+            "pros":["保证每次触发的常驻成本不增","quality guide 有更大表达空间"],
+            "cons":["创建/改写分支可能持续膨胀","容易用搬文件绕过真正的上下文约束"]
+          },
+          {
+            "key":"C",
+            "text":"维持小于 500 行软约束",
+            "pct":10,
+            "covers":"沿用现有 SKILL.md <500 行与渐进披露原则，不新增数值回归门。",
+            "pros":["最灵活，不被当前快照数字绑定"],
+            "cons":["当前 312 行可增长约 60% 仍算合规","无法机械证明本次改动没有增加上下文负担"]
+          }
+        ]
+      }
+    ]
+  }
+}

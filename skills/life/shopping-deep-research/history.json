@@ -144,5 +144,419 @@
       "bank_epoch": 1
     }
   ],
-  "current_best": "runs[0]"
+  "current_best": "runs[0]",
+  "pilot_audits": [
+    {
+      "id": "shopping-deep-research-replay-2026-08-30",
+      "date": "2026-08-30T22:29:52+08:00",
+      "phase": "official-replay",
+      "status": "PASS",
+      "evidence_mode": "replay",
+      "evidence_provider": "shopping-history-replay-v1",
+      "evidence_epoch": 1,
+      "evidence_epochs": [
+        1
+      ],
+      "evaluations": [
+        {
+          "eval": "eval-净化器榜单真伪调研",
+          "manifest": "eval-fixtures/eval-净化器榜单真伪调研/epoch-1/evidence-pack.json",
+          "evidence_epoch": 1,
+          "evidence_digest": "sha256:a68a00cd8fefcf1010ce2d87acf902d2e52cc1d73dc9b38cb2023602e8875728",
+          "gates": [
+            "old_skill",
+            "with_skill",
+            "without_skill"
+          ],
+          "hits": 2,
+          "misses": 0,
+          "live_calls": 0,
+          "network_isolation": "verified",
+          "gate_digest_consistent": true,
+          "replay_runs": [
+            {
+              "gate": "old_skill",
+              "run": "run-1",
+              "status": "PASS",
+              "hits": 2,
+              "misses": 0,
+              "live_calls": 0
+            },
+            {
+              "gate": "with_skill",
+              "run": "run-1",
+              "status": "PASS",
+              "hits": 2,
+              "misses": 0,
+              "live_calls": 0
+            },
+            {
+              "gate": "without_skill",
+              "run": "run-1",
+              "status": "PASS",
+              "hits": 2,
+              "misses": 0,
+              "live_calls": 0
+            }
+          ]
+        },
+        {
+          "eval": "eval-升降桌小房间调研",
+          "manifest": "eval-fixtures/eval-升降桌小房间调研/epoch-1/evidence-pack.json",
+          "evidence_epoch": 1,
+          "evidence_digest": "sha256:0a96669770b5a26787a6d2917fffdbb9a18c25c6f7aacd9d00cc6cab57573c09",
+          "gates": [
+            "old_skill",
+            "with_skill",
+            "without_skill"
+          ],
+          "hits": 2,
+          "misses": 0,
+          "live_calls": 0,
+          "network_isolation": "verified",
+          "gate_digest_consistent": true,
+          "replay_runs": [
+            {
+              "gate": "old_skill",
+              "run": "run-1",
+              "status": "PASS",
+              "hits": 2,
+              "misses": 0,
+              "live_calls": 0
+            },
+            {
+              "gate": "with_skill",
+              "run": "run-1",
+              "status": "PASS",
+              "hits": 2,
+              "misses": 0,
+              "live_calls": 0
+            },
+            {
+              "gate": "without_skill",
+              "run": "run-1",
+              "status": "PASS",
+              "hits": 2,
+              "misses": 0,
+              "live_calls": 0
+            }
+          ]
+        },
+        {
+          "eval": "eval-工学椅大体型幼童调研",
+          "manifest": "eval-fixtures/eval-工学椅大体型幼童调研/epoch-1/evidence-pack.json",
+          "evidence_epoch": 1,
+          "evidence_digest": "sha256:8403f473771685bd17819ad35d7f1586bd1eb22794837be3d7a207ffd4d0c3e7",
+          "gates": [
+            "old_skill",
+            "with_skill",
+            "without_skill"
+          ],
+          "hits": 2,
+          "misses": 0,
+          "live_calls": 0,
+          "network_isolation": "verified",
+          "gate_digest_consistent": true,
+          "replay_runs": [
+            {
+              "gate": "old_skill",
+              "run": "run-1",
+              "status": "PASS",
+              "hits": 2,
+              "misses": 0,
+              "live_calls": 0
+            },
+            {
+              "gate": "with_skill",
+              "run": "run-1",
+              "status": "PASS",
+              "hits": 2,
+              "misses": 0,
+              "live_calls": 0
+            },
+            {
+              "gate": "without_skill",
+              "run": "run-1",
+              "status": "PASS",
+              "hits": 2,
+              "misses": 0,
+              "live_calls": 0
+            }
+          ]
+        },
+        {
+          "eval": "eval-电视双场景调研",
+          "manifest": "eval-fixtures/eval-电视双场景调研/epoch-1/evidence-pack.json",
+          "evidence_epoch": 1,
+          "evidence_digest": "sha256:4c77576a73fdc7798e3c648aa88f61fdf54eba82e733ba9d50f8f56a5f1130d3",
+          "gates": [
+            "old_skill",
+            "with_skill",
+            "without_skill"
+          ],
+          "hits": 2,
+          "misses": 0,
+          "live_calls": 0,
+          "network_isolation": "verified",
+          "gate_digest_consistent": true,
+          "replay_runs": [
+            {
+              "gate": "old_skill",
+              "run": "run-1",
+              "status": "PASS",
+              "hits": 2,
+              "misses": 0,
+              "live_calls": 0
+            },
+            {
+              "gate": "with_skill",
+              "run": "run-1",
+              "status": "PASS",
+              "hits": 2,
+              "misses": 0,
+              "live_calls": 0
+            },
+            {
+              "gate": "without_skill",
+              "run": "run-1",
+              "status": "PASS",
+              "hits": 2,
+              "misses": 0,
+              "live_calls": 0
+            }
+          ]
+        }
+      ],
+      "quality_verdict": {
+        "status": "INCONCLUSIVE",
+        "reasons": [
+          "本 pilot 只验证证据预检、按 gate 物化和 zero-live replay，未运行 Agent output gates；不能由 harness PASS 推导技能质量增益"
+        ],
+        "forbidden_claims": [
+          "不能把 replay PASS 当作当前价格/在售新鲜度证明",
+          "不能把本次证据审计升级为 shopping skill 的 SUPPORTED"
+        ]
+      },
+      "live_acceptance": {
+        "status": "BLOCKED",
+        "code": "EXTERNAL_SEARCH_QUOTA_UNAVAILABLE",
+        "unblock_after": "2026-09-10",
+        "required_authorization": "用户显式授权后逐 eval 运行",
+        "concurrency": 1,
+        "max_calls": 16,
+        "required_checks": [
+          "query_plan",
+          "tool_path",
+          "source_reachability",
+          "freshness"
+        ]
+      },
+      "source": "aggregate-benchmark --pilot-audit（消费 eval-evidence 生成的 evidence-audit）"
+    },
+    {
+      "id": "shopping-deep-research-live-2026-08-30",
+      "date": "2026-08-30T23:07:24+08:00",
+      "phase": "live-acceptance",
+      "status": "PASS",
+      "evidence_mode": "replay",
+      "evidence_provider": "shopping-history-replay-v1",
+      "evidence_epoch": 1,
+      "evidence_epochs": [
+        1
+      ],
+      "evaluations": [
+        {
+          "eval": "eval-净化器榜单真伪调研",
+          "manifest": "eval-fixtures/eval-净化器榜单真伪调研/epoch-1/evidence-pack.json",
+          "evidence_epoch": 1,
+          "evidence_digest": "sha256:a68a00cd8fefcf1010ce2d87acf902d2e52cc1d73dc9b38cb2023602e8875728",
+          "gates": [
+            "old_skill",
+            "with_skill",
+            "without_skill"
+          ],
+          "hits": 2,
+          "misses": 0,
+          "live_calls": 0,
+          "network_isolation": "verified",
+          "gate_digest_consistent": true,
+          "replay_runs": [
+            {
+              "gate": "old_skill",
+              "run": "run-1",
+              "status": "PASS",
+              "hits": 2,
+              "misses": 0,
+              "live_calls": 0
+            },
+            {
+              "gate": "with_skill",
+              "run": "run-1",
+              "status": "PASS",
+              "hits": 2,
+              "misses": 0,
+              "live_calls": 0
+            },
+            {
+              "gate": "without_skill",
+              "run": "run-1",
+              "status": "PASS",
+              "hits": 2,
+              "misses": 0,
+              "live_calls": 0
+            }
+          ]
+        },
+        {
+          "eval": "eval-升降桌小房间调研",
+          "manifest": "eval-fixtures/eval-升降桌小房间调研/epoch-1/evidence-pack.json",
+          "evidence_epoch": 1,
+          "evidence_digest": "sha256:0a96669770b5a26787a6d2917fffdbb9a18c25c6f7aacd9d00cc6cab57573c09",
+          "gates": [
+            "old_skill",
+            "with_skill",
+            "without_skill"
+          ],
+          "hits": 2,
+          "misses": 0,
+          "live_calls": 0,
+          "network_isolation": "verified",
+          "gate_digest_consistent": true,
+          "replay_runs": [
+            {
+              "gate": "old_skill",
+              "run": "run-1",
+              "status": "PASS",
+              "hits": 2,
+              "misses": 0,
+              "live_calls": 0
+            },
+            {
+              "gate": "with_skill",
+              "run": "run-1",
+              "status": "PASS",
+              "hits": 2,
+              "misses": 0,
+              "live_calls": 0
+            },
+            {
+              "gate": "without_skill",
+              "run": "run-1",
+              "status": "PASS",
+              "hits": 2,
+              "misses": 0,
+              "live_calls": 0
+            }
+          ]
+        },
+        {
+          "eval": "eval-工学椅大体型幼童调研",
+          "manifest": "eval-fixtures/eval-工学椅大体型幼童调研/epoch-1/evidence-pack.json",
+          "evidence_epoch": 1,
+          "evidence_digest": "sha256:8403f473771685bd17819ad35d7f1586bd1eb22794837be3d7a207ffd4d0c3e7",
+          "gates": [
+            "old_skill",
+            "with_skill",
+            "without_skill"
+          ],
+          "hits": 2,
+          "misses": 0,
+          "live_calls": 0,
+          "network_isolation": "verified",
+          "gate_digest_consistent": true,
+          "replay_runs": [
+            {
+              "gate": "old_skill",
+              "run": "run-1",
+              "status": "PASS",
+              "hits": 2,
+              "misses": 0,
+              "live_calls": 0
+            },
+            {
+              "gate": "with_skill",
+              "run": "run-1",
+              "status": "PASS",
+              "hits": 2,
+              "misses": 0,
+              "live_calls": 0
+            },
+            {
+              "gate": "without_skill",
+              "run": "run-1",
+              "status": "PASS",
+              "hits": 2,
+              "misses": 0,
+              "live_calls": 0
+            }
+          ]
+        },
+        {
+          "eval": "eval-电视双场景调研",
+          "manifest": "eval-fixtures/eval-电视双场景调研/epoch-1/evidence-pack.json",
+          "evidence_epoch": 1,
+          "evidence_digest": "sha256:4c77576a73fdc7798e3c648aa88f61fdf54eba82e733ba9d50f8f56a5f1130d3",
+          "gates": [
+            "old_skill",
+            "with_skill",
+            "without_skill"
+          ],
+          "hits": 2,
+          "misses": 0,
+          "live_calls": 0,
+          "network_isolation": "verified",
+          "gate_digest_consistent": true,
+          "replay_runs": [
+            {
+              "gate": "old_skill",
+              "run": "run-1",
+              "status": "PASS",
+              "hits": 2,
+              "misses": 0,
+              "live_calls": 0
+            },
+            {
+              "gate": "with_skill",
+              "run": "run-1",
+              "status": "PASS",
+              "hits": 2,
+              "misses": 0,
+              "live_calls": 0
+            },
+            {
+              "gate": "without_skill",
+              "run": "run-1",
+              "status": "PASS",
+              "hits": 2,
+              "misses": 0,
+              "live_calls": 0
+            }
+          ]
+        }
+      ],
+      "quality_verdict": {
+        "status": "INCONCLUSIVE",
+        "reasons": [
+          "本 pilot 只验证证据预检、按 gate 物化和 zero-live replay，未运行 Agent output gates；不能由 harness PASS 推导技能质量增益"
+        ],
+        "forbidden_claims": [
+          "不能把 replay PASS 当作当前价格/在售新鲜度证明",
+          "不能把本次证据审计升级为 shopping skill 的 SUPPORTED"
+        ]
+      },
+      "live_acceptance": {
+        "status": "PASS",
+        "execution": "live",
+        "concurrency": 1,
+        "max_calls": 16,
+        "required_checks": [
+          "query_plan",
+          "tool_path",
+          "source_reachability",
+          "freshness"
+        ]
+      },
+      "source": "aggregate-benchmark --pilot-audit（消费 eval-evidence 生成的 evidence-audit）"
+    }
+  ]
 }

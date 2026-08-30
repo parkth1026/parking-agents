@@ -1,0 +1,19 @@
+{
+  "schema_version": 2,
+  "round": "contract-final-r2",
+  "stage": "3-contract",
+  "round_revision": 1,
+  "round_digest": "d9bb2d5fc13feef5ef6d127158633e1c47ce4555d59098efd4f43a0d02d35e97",
+  "received_at": "2026-08-30T12:52:20.868Z",
+  "actor": {
+    "type": "person",
+    "id": "local-user"
+  },
+  "answers": [
+    {
+      "q_id": "C-FINAL",
+      "type": "confirm"
+    }
+  ],
+  "truncated": false
+}

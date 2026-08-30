@@ -1,0 +1,10 @@
+{
+  "schema_version": 2,
+  "round": "contract-final-r2",
+  "submission": "contract-final-r2.json",
+  "consumed_at": "2026-08-30T12:53:42.969Z",
+  "session_slug": "2026-08-30-issue-160-eval-evidence-contract",
+  "revision": 1,
+  "digest": "d9bb2d5fc13feef5ef6d127158633e1c47ce4555d59098efd4f43a0d02d35e97",
+  "idempotency_key": "fdd56614ebead10108f356efcf0027e2d27955b22557c89a086b6c2cbcf18d9b"
+}

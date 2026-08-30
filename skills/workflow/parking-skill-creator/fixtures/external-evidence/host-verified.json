@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "kind": "fake-host-adapter",
+  "host": "deterministic-replay-host",
+  "network_isolation": "verified",
+  "live_calls": 0
+}

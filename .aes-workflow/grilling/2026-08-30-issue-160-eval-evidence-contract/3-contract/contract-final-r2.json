@@ -1,0 +1,76 @@
+{
+  "schema_version": 2,
+  "opening": "候选 Goal Contract 已按用户纠偏重写：parking-skill-creator 零外部 skill 依赖，并锁定主文件与创建分支双零增长。请最后确认目标、范围、6 条 AC 与 2026-09-10 live blocker；确认后才会落盘为 contract.md 并 finalize。",
+  "dossier": {
+    "title": "最终 Goal Contract · Creator 可复现证据与独立质量门",
+    "summary": "Creator 独立单包；本地 writing-guide 承担最小质量内核；replay/record/live 机械分离；shopping 双阶段 pilot；合同在真实 live 前保持 Blocked。"
+  },
+  "phases": [
+    {"id":"1-interview","label":"访谈·拷问","status":"done"},
+    {"id":"2-prototype","label":"原型确认","status":"done"},
+    {"id":"3-contract","label":"交付标准·契约","status":"active"}
+  ],
+  "open_ambiguities": 0,
+  "locked": [
+    {"ref":"EVIDENCE","q":"replay/record/live","a":"replay 失败关闭；record/live 显式、串行、有预算","round":"prototype-r1","tier":"ask"},
+    {"ref":"QUALITY","q":"质量结论","a":"run 判罚与四种 quality verdict 分离","round":"steelman-verdict","tier":"default"},
+    {"ref":"INDEPENDENCE","q":"Creator 依赖","a":"独立安装/打包/运行，不依赖 writing-for-agents","round":"prototype-independence-r4","tier":"confirm"},
+    {"ref":"CONTEXT","q":"上下文预算","a":"31,415 bytes/312 行与 40,364 bytes/475 行双零增长","round":"prototype-independence-r4","tier":"ask"},
+    {"ref":"BLOCKER","q":"真实 live","a":"同合同两阶段，2026-09-10 前终态 Blocked","round":"contract-criteria-r1","tier":"ask"}
+  ],
+  "round": {
+    "id":"contract-final-r2",
+    "no":6,
+    "stage":"3-contract",
+    "title":"最终契约确认",
+    "status":"pending",
+    "view":"contract",
+    "items":[
+      {
+        "q_id":"C-FINAL",
+        "tier":"confirm",
+        "line":"确认附件 contract-v1.md 表达当前共同理解：Creator 独立零外部 skill 依赖、双零增长上下文预算、6 条 AC、shopping replay+live 双阶段验收，且真实 live 完成前 Status=Blocked",
+        "irreversible":true
+      }
+    ]
+  },
+  "final": {
+    "round":"contract-final-r2",
+    "title":"parking-skill-creator 可复现证据与独立质量门",
+    "subtitle":"6 条 AC · 等待最终确认",
+    "sections":[
+      {
+        "title":"1 · 目标",
+        "body":"Creator 用同一、可审计的固定证据公平评测技能，把本地 Agent 文档设计判断转成可证伪质量假设，并由 shopping replay+live pilot 证明全链可用。",
+        "basis":"需求轮、steelman 仓库证据与独立性修正轮"
+      },
+      {
+        "title":"2 · 核心边界",
+        "bullets":[
+          "Creator 独立安装、打包、运行；不读取、调用或要求安装 writing-for-agents。",
+          "只复用已有本地 writing-guide，不新增第二 reference/pointer。",
+          "SKILL.md ≤31,415 bytes/312 行；创建分支总量 ≤40,364 bytes/475 行。",
+          "shopping 生产路径保持实时搜索；fixture 只属于 eval harness。"
+        ],
+        "basis":"用户直接纠偏 + CTX1=A"
+      },
+      {
+        "title":"3 · 验收条件",
+        "bullets":[
+          "AC-001：题面/harness 分离、同 digest 物化、payload 不进分发包。",
+          "AC-002：official replay zero-live，BLOCKED/FAIL 失败关闭矩阵。",
+          "AC-003：record/live 授权、串行、预算、脱敏与 epoch 生命周期。",
+          "AC-004：独立包、本地质量假设、3/1 runs 与双上下文预算。",
+          "AC-005：四种 quality verdict、epoch/current_best 与首屏声明。",
+          "AC-006：shopping 四题历史 replay + 配额恢复后的受控 live。"
+        ],
+        "basis":"契约深度轮六项全部选择 A"
+      },
+      {
+        "title":"4 · 当前 blocker",
+        "body":"真实 live acceptance 要等用户提供的外部搜索配额于 2026-09-10 恢复，并由用户显式授权每 eval concurrency=1、max_calls=16；此前可实现其余内容，但整份合同不得宣告完成。",
+        "basis":"ACQ-006=A"
+      }
+    ]
+  }
+}

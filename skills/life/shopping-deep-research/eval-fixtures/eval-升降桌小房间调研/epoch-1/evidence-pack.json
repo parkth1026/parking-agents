@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "kind": "eval-evidence-manifest",
+  "eval": "eval-升降桌小房间调研",
+  "epoch": 1,
+  "captured_at": "2026-08-24T20:56:03+08:00",
+  "sanitization": { "status": "passed", "ruleset": "external-evidence-v1" },
+  "entries": [
+    {
+      "id": "industry",
+      "intent": "升降桌行业指标与人体工学判据",
+      "query": "电动升降桌 桌面高度 总宽 承重 稳定性 指标",
+      "payload": "payloads/industry.json",
+      "sha256": "sha256:5436ef7f35c7c72c56274cc5abc2c688f1067547ccbe8a4faaf8b4970c926d9b",
+      "source_count": 1
+    },
+    {
+      "id": "product-signals",
+      "intent": "历史整桌型号、价格与评论线索",
+      "query": "电动升降桌 3000 以内 在售 型号 评论数",
+      "payload": "payloads/product-signals.json",
+      "sha256": "sha256:857f691fb744297e87334f2c0400d1871d316dfabb88bf6f408c6e1d9f608556",
+      "source_count": 1
+    }
+  ],
+  "manifest_sha256": "sha256:0a96669770b5a26787a6d2917fffdbb9a18c25c6f7aacd9d00cc6cab57573c09"
+}

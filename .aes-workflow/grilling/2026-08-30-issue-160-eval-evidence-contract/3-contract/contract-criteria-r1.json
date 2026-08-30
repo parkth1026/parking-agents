@@ -1,0 +1,119 @@
+{
+  "schema_version": 2,
+  "opening": "确认版原型已聚成 6 条验收条件。每题先说明‘错了会怎样’，再让你选择与后果匹配的验证深度；这轮会直接决定最终 Goal Contract 的终止条件。",
+  "dossier": {
+    "title": "Goal Contract 决策档案 · Creator 可复现证据与持续质量门",
+    "summary": "已锁定 replay/record/live、fail-closed、共享 writing-for-agents 真源和 quality verdict；本轮只裁决每条 AC 的验证深度、数字门槛与 terminal blocker。"
+  },
+  "phases": [
+    {"id":"1-interview","label":"访谈·拷问","status":"done"},
+    {"id":"2-prototype","label":"原型确认","status":"done"},
+    {"id":"3-contract","label":"交付标准·契约","status":"active"}
+  ],
+  "open_ambiguities": 6,
+  "locked": [
+    {"ref":"EVIDENCE","q":"外部证据模式","a":"replay 失败关闭；record/live 独立、串行、有上限","round":"prototype-r1","tier":"ask"},
+    {"ref":"ISOLATION","q":"official replay","a":"host 不能机械禁用/审计 live 工具时 BLOCKED","round":"prototype-r1","tier":"ask"},
+    {"ref":"FRESHNESS","q":"新鲜度","a":"每个 eval/entry 自己声明 policy","round":"prototype-r1","tier":"ask"},
+    {"ref":"WRITING","q":"writing-for-agents 角色","a":"Creator 的一等设计内核和条件性必读单一真源；不复制全文、不静态判质量 PASS","round":"steelman-verdict","tier":"default"},
+    {"ref":"QUALITY","q":"质量裁决","a":"run 判罚与 SUPPORTED/INCONCLUSIVE/REGRESSED/BLOCKED 分离","round":"steelman-verdict","tier":"default"}
+  ],
+  "round": {
+    "id": "contract-criteria-r1",
+    "no": 4,
+    "stage": "3-contract",
+    "title": "六条 AC：后果与验证深度",
+    "status": "pending",
+    "items": [
+      {
+        "q_id":"CD1",
+        "tier":"default",
+        "line":"确认版例子聚为 6 条 AC；架构依赖方向进入强约束，不为 diagram 流程另建重复 AC — 避免同一行为判两次 — 代价：执行时必须同时守强约束和 AC"
+      },
+      {
+        "q_id":"ACQ-001",
+        "tier":"ask",
+        "question":"AC-001 要证明用户题面与 harness 分离、每个 gate 拿到同一最小 evidence pack。错了会怎样：with/old/without 可能比较不同输入，fixture/答案还可能泄漏进用户 prompt，benchmark 失去公平性；请确认这个后果并选择验证深度。",
+        "known_facts":"仓库已有 Node 零依赖 run-tests、临时目录 fixture、任意 gate 聚合与 package 回归；没有现成 external-evidence provider。shopping 的真实历史证据由 AC-006 单独覆盖。",
+        "irreversible":true,
+        "allow_custom":true,
+        "required":true,
+        "options":[
+          {"key":"A","text":"[A] 确定性契约矩阵","pct":65,"recommended":true,"covers":"在临时目录覆盖 prompt/evidence 分离、manifest/payload 摘要、各 gate 物化相同 digest、output-evals 持久化与 .skill 排除 payload。","pros":["每次改 Creator 都可零联网回归","同时拦输入不公平与打包泄漏"],"cons":["合成 provider 不能证明真实 WebSearch 结果形态","需要先建设通用 provider 与 fixture harness"]},
+          {"key":"B","text":"[B] shopping 黄金证据包","pct":25,"covers":"只用一份脱敏 shopping 历史 pack 与期望 manifest/digest 做黄金用例。","pros":["数据形态真实","直接贴近首个 pilot"],"cons":["覆盖面被 shopping 绑住","provider 通用性与多 gate 边界仍可能漏"]},
+          {"key":"C","text":"[C] 手工查看一次三 gate","pct":10,"covers":"人工检查三个 run 的 inputs 与最终 benchmark。","pros":["不用新增自动测试结构"],"cons":["后续回归无机械反证","无法稳定检查 prompt 泄漏与 package 排除"]}
+        ]
+      },
+      {
+        "q_id":"ACQ-002",
+        "tier":"ask",
+        "question":"AC-002 要证明 official replay 真正 zero-live 且失败关闭。错了会怎样：评测会再次偷偷触发高并发真实搜索、耗尽配额，或把环境缺证据误算成技能回归；请确认这个后果并选择验证深度。",
+        "known_facts":"已锁定预检缺 pack/host isolation 为 BLOCKED，运行中 query miss/integrity mismatch 为 FAIL；当前 Creator 只有文字流程，没有统一 host guard。",
+        "irreversible":true,
+        "allow_custom":true,
+        "required":true,
+        "options":[
+          {"key":"A","text":"[A] 负例全矩阵 + fake host","pct":75,"recommended":true,"covers":"用 fake host adapter 覆盖缺 payload、query miss、摘要错、无隔离能力、跨 gate digest 错；每例断言精确 code/status、live_calls=0 且不产主 benchmark。","pros":["机械证明 fail-closed 与终态分层","不用消耗真实搜索配额"],"cons":["需要新增 host adapter 契约和故障注入 fixture","真实宿主接线仍由 AC-006 验"]},
+          {"key":"B","text":"[A] 只测 replay miss/摘要","pct":20,"covers":"自动测 query miss 与 integrity mismatch，不测 host 隔离能力。","pros":["实现面较小","能拦最直接 fallback"],"cons":["仍不能证明真实联网工具被禁用或审计","official replay 声明有缺口"]},
+          {"key":"C","text":"[C] 人工监控一次网络","pct":5,"covers":"运行时由人观察搜索调用与日志。","pros":["贴近真实宿主"],"cons":["一次观察不能长期证明 zero-live","高并发事故可能先发生再被看见"]}
+        ]
+      },
+      {
+        "q_id":"ACQ-003",
+        "tier":"ask",
+        "question":"AC-003 要证明 record/live 只在显式授权下串行、有预算，并且只有完整脱敏 pack 才晋级 epoch。错了会怎样：凭据或无关历史可能入库，半成品会成为新真源，或 live 又无上限烧配额；请确认这个后果并选择验证深度。",
+        "known_facts":"仓库脚本约定 Node 内置模块、零依赖；用户已锁定逐 eval 串行、每题明确 max_calls、freshness per entry，record 不评分技能。真实 Provider 与配额在 AC-006 单独验。",
+        "irreversible":true,
+        "allow_custom":true,
+        "required":true,
+        "options":[
+          {"key":"A","text":"[A] fake provider 生命周期矩阵","pct":65,"recommended":true,"covers":"自动覆盖缺授权、并发>1、预算耗尽、脱敏命中、部分采集、同 digest 与新 digest；断言不完整不晋级、旧 epoch 不覆盖、record 不产 pass_rate。","pros":["所有危险边界可重复故障注入","不接触真实凭据或外部系统"],"cons":["不能证明真实 provider 可达与数据新鲜","需要实现可注入 provider seam"]},
+          {"key":"B","text":"[B] 一份真实 record 黄金用例","pct":25,"covers":"用受控真实采集生成一份脱敏 pack，再逐字段人工确认。","pros":["真实数据形态最可信"],"cons":["依赖配额和脱敏审批","很难反复覆盖预算耗尽等负例"]},
+          {"key":"C","text":"[C] 只跑成功 live 路径","pct":10,"covers":"配额恢复后手工跑一次成功采集。","pros":["最快看到主路径"],"cons":["失败关闭、半包与凭据泄漏均无回归保护"]}
+        ]
+      },
+      {
+        "q_id":"ACQ-004",
+        "tier":"ask",
+        "question":"AC-004 要证明 Creator 会把 writing-for-agents finding 变成可失败的质量假设、断言和定向 gate，而不是再加一张仪式性 checklist。错了会怎样：Creator 仍会产出结构合法但执行不稳定的技能，或为了过门不断堆文档。这里还含数字门槛：有随机性的 Agent 行为默认每 gate 跑几次？",
+        "known_facts":"UE 日志记录显示 old_skill 会偶发做对，iteration-2 notes 明确写要每臂≥3 runs 或换更弱模型才能区分结构保证与运气；确定性 script 断言没有重复采样价值。",
+        "irreversible":true,
+        "allow_custom":true,
+        "required":true,
+        "options":[
+          {"key":"A","text":"默认 3 runs，确定性 1","pct":60,"recommended":true,"covers":"行为/方差敏感假设每 gate 默认 3 runs，可按 eval 显式改；确定性 script 为 1。样本不足直接 INCONCLUSIVE。","pros":["与仓库已观察到的偶发通过相匹配","成本只花在有方差的假设上"],"cons":["行为评测成本约为单 run 的 3 倍","3 次仍不是统计学充分证明"]},
+          {"key":"B","text":"所有 gate 固定 2 runs","pct":25,"covers":"不区分确定性与行为断言，统一双采样。","pros":["规则最简单","比单 run 多一层稳定性"],"cons":["两次一对一错仍无法判断","确定性测试重复浪费"]},
+          {"key":"C","text":"不设默认，由每题声明","pct":15,"covers":"schema 要求作者显式写 stability_runs，没有全局建议。","pros":["完全按题定成本"],"cons":["作者最容易在贵的题上写 1","Creator 无法提供持续一致的质量底线"]}
+        ]
+      },
+      {
+        "q_id":"ACQ-005",
+        "tier":"ask",
+        "question":"AC-005 要证明聚合器/viewer 不再把高 pass_rate 自动包装成‘好用’，并正确展示 SUPPORTED/INCONCLUSIVE/REGRESSED/BLOCKED。错了会怎样：Creator 自身两臂 100% 或 karpathy 基线更高的轮次仍可能被误判为成功改进，错误候选会被推进 current_best；请确认这个后果并选择验证深度。",
+        "known_facts":"当前已有 benchmark/history/viewer 自动测试和任意 gate fixture；Creator 最近一轮 with/without 都 100%，workflow-interview-web 三臂都 100%，karpathy 最新轮 with 低于 without 且有 lost。",
+        "irreversible":true,
+        "allow_custom":true,
+        "required":true,
+        "options":[
+          {"key":"A","text":"[A] 四终态聚合 + 静态 viewer","pct":70,"recommended":true,"covers":"fixture 覆盖 SUPPORTED/全平 INCONCLUSIVE/关键回归 REGRESSED/前置 BLOCKED、成本预算、跨 epoch；静态 HTML 首屏必须同时出现 Evidence gate、Quality claim、reasons 与 forbidden claims。","pros":["机器语义与人看到的声明一起锁住","防止 JSON 正确但 UI 继续误导"],"cons":["聚合器、history、viewer 三处都要扩测试","视觉只锁信息结构不锁像素"]},
+          {"key":"B","text":"[A] 只锁 JSON，UI 人工看","pct":20,"covers":"自动测 benchmark/history schema，viewer 只做一次人工确认。","pros":["自动化改动较小","核心机器数据仍可靠"],"cons":["后续 UI 可把 INCONCLUSIVE 隐藏在折叠区","静态档案不一定自解释"]},
+          {"key":"C","text":"[C] 只按 mock 手工验","pct":10,"covers":"浏览器逐项核对确认版 mock。","pros":["直接看用户界面"],"cons":["聚合状态机和 epoch 断代没有自动反证","每轮都需人工"]}
+        ]
+      },
+      {
+        "q_id":"ACQ-006",
+        "tier":"ask",
+        "question":"AC-006 要用 shopping-deep-research 走一条真实 pilot：历史证据 replay 与配额恢复后的受控 live 都完成，同时生产技能仍按实时搜索工作。错了会怎样：我们可能只证明 fake provider，或反过来只跑 live 又没有可复现回归。当前配额要到 2026-09-10 才恢复；最终契约应如何处理这个 terminal blocker？",
+        "known_facts":"用户已在需求轮选中 shopping pilot 与配额重置后的 live acceptance；确认版示例锁定逐 eval concurrency=1、max_calls=16，record 不评分，live 不与 replay 分数直接比较。",
+        "irreversible":true,
+        "allow_custom":true,
+        "required":true,
+        "options":[
+          {"key":"A","text":"同一合同两阶段，终态先 BLOCKED","pct":60,"recommended":true,"covers":"现在完成脱敏历史 pack 与 official replay；2026-09-10 后再跑 concurrency=1/max_calls=16 的真实 live，二者全过才完成。合同 Status=Blocked，但不阻止先实现其余 AC。","pros":["不把 replay 冒充真实搜索能力","也不丢用户已选中的 live acceptance"],"cons":["合同在 9 月 10 日前不能宣告完成","需要人工回到同一合同解除 blocker"]},
+          {"key":"B","text":"本合同只验 replay，live 另开 follow-up","pct":30,"covers":"当前合同 Ready，shopping replay 全链完成即可；live acceptance 新开独立任务。","pros":["当前交付可更早终结","外部配额不阻塞实现"],"cons":["会翻掉需求轮已锁定的首份交付范围","后续任务可能被遗忘，replay 容易被误当完整验收"]},
+          {"key":"C","text":"等配额恢复后只跑 live","pct":10,"covers":"先不做历史 replay pack，9 月 10 日后用真实搜索验收。","pros":["只测真实路径"],"cons":["Issue #160 的 fixture-first 核心目标没有可复现证明","每次回归继续消耗配额"]}
+        ]
+      }
+    ]
+  }
+}

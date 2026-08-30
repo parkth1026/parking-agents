@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "slug": "2026-08-30-issue-160-eval-evidence-contract",
+  "created_at": "2026-08-30T08:14:05Z",
+  "updated_at": "2026-08-30T12:54:50Z",
+  "original_request": "基于上面的调研  [$parking-skills:workflow-interview-web](G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\skills\\workflow\\workflow-interview-web\\SKILL.md)  我们来进行  采访并最终获得改进goal contract",
+  "goal_oneline": "parking-skill-creator 能以固定、可审计、跨 gate 一致的证据评测技能，并以独立本地质量门产出诚实结论，最终由 shopping replay+live pilot 证明全链可用",
+  "target": "skills/workflow/parking-skill-creator; skills/life/shopping-deep-research",
+  "stage": "3-contract",
+  "next_action": "可先实现 AC-001 至 AC-005 和 AC-006 replay 半段；真实 live 完成前不得宣告合同完成",
+  "stage_gates": {
+    "1-interview": {
+      "status": "done",
+      "closed_at": "2026-08-30T10:05:33Z",
+      "self_assessment": {
+        "意图": "已定",
+        "结果": "已定",
+        "边界": "已定",
+        "约束": "已定",
+        "现状": "已定"
+      }
+    },
+    "2-prototype": {
+      "status": "done",
+      "closed_at": "2026-08-30T12:19:37Z",
+      "artifacts_confirmed": [
+        "mock",
+        "behavior",
+        "api-mock",
+        "example-run",
+        "diagram"
+      ],
+      "reason": "修订确认版架构与上下文预算"
+    },
+    "3-contract": {
+      "status": "done",
+      "reason": "用户新增强约束：parking-skill-creator 必须独立，不能依赖 writing-for-agents；常驻与质量分支上下文需设可验预算",
+      "closed_at": "2026-08-30T12:54:50Z"
+    }
+  },
+  "validation": {
+    "status": "valid",
+    "ac_count": 6,
+    "warnings": [],
+    "ran_at": "2026-08-30T12:54:02Z",
+    "verify_tiers": {
+      "A": 5,
+      "B": 0,
+      "C": 1,
+      "D": 0
+    }
+  },
+  "blocked": [
+    "AC-006 真实 live acceptance 等待 2026-09-10 外部搜索配额恢复与用户显式授权"
+  ],
+  "residual_risk": null,
+  "status": "ready"
+}

@@ -1,0 +1,8 @@
+{
+  "evidence_id": "purifier-industry",
+  "captured_at": "2026-08-24T20:56:03+08:00",
+  "source_refs": [
+    { "ref": "hist-purifier-industry-01", "title": "历史检索中的行业指标资料", "source_kind": "historical-search" }
+  ],
+  "summary": "固定回放摘要：甲醛 CADR、CCM 与活性炭滤芯是除醛比较维度；当前价格和在售状态必须由 live 重新确认。"
+}

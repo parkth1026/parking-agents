@@ -1,0 +1,8 @@
+{
+  "evidence_id": "desk-product-signals",
+  "captured_at": "2026-08-24T20:56:03+08:00",
+  "source_refs": [
+    { "ref": "hist-desk-products-01", "title": "历史检索中的整桌型号与用户侧线索", "source_kind": "historical-search" }
+  ],
+  "summary": "固定回放摘要：保存历史整桌 SKU、评论口径和尺寸线索；不宣称当前仍在售。"
+}

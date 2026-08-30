@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "kind": "eval-evidence-manifest",
+  "eval": "eval-电视双场景调研",
+  "epoch": 1,
+  "captured_at": "2026-08-24T20:56:03+08:00",
+  "sanitization": { "status": "passed", "ruleset": "external-evidence-v1" },
+  "entries": [
+    {
+      "id": "industry",
+      "intent": "观影与 PS5 游戏指标",
+      "query": "65 寸电视 观影 PS5 HDMI 2.1 120Hz VRR 指标",
+      "payload": "payloads/industry.json",
+      "sha256": "sha256:432e328d1345d48b7ae92e154b94f4de431e0cf61fff87722b103257a12ec9fb",
+      "source_count": 1
+    },
+    {
+      "id": "product-signals",
+      "intent": "历史型号、价格与游戏接口线索",
+      "query": "65 寸电视 5000 预算 在售 型号 PS5 口碑",
+      "payload": "payloads/product-signals.json",
+      "sha256": "sha256:d2f58ad1257dd78828a3be47b6aa6748cc21a357594381c71240382c54108106",
+      "source_count": 1
+    }
+  ],
+  "manifest_sha256": "sha256:4c77576a73fdc7798e3c648aa88f61fdf54eba82e733ba9d50f8f56a5f1130d3"
+}

@@ -1,0 +1,42 @@
+{
+  "schema_version": 2,
+  "opening": "钢人第一回合：不先裁决 Creator 是否应内建 writing-for-agents，只用一个经验问题判定真正的质量缺口。",
+  "dossier": {
+    "title": "Goal Contract 决策档案 · Creator 外部证据评测",
+    "summary": "新增目标：parking-skill-creator 不只可运行、可评测，还要持续产出真正好用的技能。当前 crux 是 writing-for-agents 应成为强制质量门还是独立参考。"
+  },
+  "phases": [
+    {"id": "1-interview", "label": "访谈·拷问", "status": "done"},
+    {"id": "2-prototype", "label": "原型确认", "status": "active"},
+    {"id": "3-contract", "label": "交付标准·契约", "status": "pending"}
+  ],
+  "open_ambiguities": 1,
+  "locked": [
+    {"ref": "P1", "q": "Evidence 可见性", "a": "Benchmark 首屏门禁卡", "round": "prototype-r1", "tier": "ask"},
+    {"ref": "P2", "q": "终态分层", "a": "前置不可用 BLOCKED，契约违反 FAIL", "round": "prototype-r1", "tier": "ask"},
+    {"ref": "P3", "q": "Host 隔离", "a": "无法机械证明时 official replay BLOCKED", "round": "prototype-r1", "tier": "ask"},
+    {"ref": "P4", "q": "新鲜度", "a": "每个 eval/entry 声明 freshness policy", "round": "prototype-r1", "tier": "ask"}
+  ],
+  "round": {
+    "id": "prototype-steelman-r2",
+    "no": 3,
+    "stage": "2-prototype",
+    "title": "钢人 crux：绿了以后为什么仍可能不好用",
+    "status": "pending",
+    "items": [
+      {
+        "q_id": "S1",
+        "tier": "ask",
+        "question": "回看最近 3–5 个由 parking-skill-creator 产出的技能，真正让你觉得“不好用”的主要失败，是评测本来就能抓到的触发/输出错误，还是评测已经绿了但 Agent 仍因信息层级、context pointer、完成判据、sprawl/no-op 等文档设计而执行不稳定？请按实际案例或大致占比回答。",
+        "known_facts": "Creator 已有脚手架、结构校验、with/without 输出评测、触发评测、历史与浏览器评审；writing-for-agents 则专门约束 context/cognitive load、信息层级、co-location、完成判据、leading words、no-op 与 pruning。若近期主要缺陷在前者，继续以 eval 为主更合理；若大量技能评测已绿却仍因后者不好用，writing 原则就需要进入 Creator 的一等质量门。",
+        "irreversible": true,
+        "required": true,
+        "response": {
+          "type": "long_text",
+          "placeholder": "例如：最近 5 个里，3 个是评测已绿但执行仍不稳定；主要表现为……"
+        },
+        "triggered_by": "用户在确认 prototype-r1 后新增目标：Creator 要持续产出真正好用的技能"
+      }
+    ]
+  }
+}

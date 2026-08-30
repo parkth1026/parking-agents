@@ -1,0 +1,28 @@
+{
+  "schema_version": 2,
+  "round": "prototype-independence-r4",
+  "stage": "2-prototype",
+  "round_revision": 1,
+  "round_digest": "602969b33b6b6065a7e80c2e3d79c324372ea5516eada3bac790dae1fe5c4877",
+  "received_at": "2026-08-30T12:13:50.034Z",
+  "actor": {
+    "type": "person",
+    "id": "local-user"
+  },
+  "answers": [
+    {
+      "q_id": "PI1",
+      "type": "confirm"
+    },
+    {
+      "q_id": "PD-LOCAL",
+      "type": "accept"
+    },
+    {
+      "q_id": "CTX1",
+      "type": "choice",
+      "choice": "A"
+    }
+  ],
+  "truncated": false
+}

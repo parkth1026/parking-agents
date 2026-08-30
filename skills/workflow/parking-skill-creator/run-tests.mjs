@@ -3,10 +3,12 @@
 // 惯例：check() 计数器 + 黑盒执行（execFileSync 跑脚本再比对输出），退出码 0=全过/1=有失败；
 //       夹具全部建在系统临时目录——本测试自身不能在技能扫描根下留下任何 SKILL.md。
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { buildQualityVerdict } from "./scripts/lib/quality.mjs";
 
 const SCRIPTS = join(dirname(fileURLToPath(import.meta.url)), "scripts");
 
@@ -34,6 +36,21 @@ function runNode(scriptPath, args = [], opts = {}) {
   }
 }
 const out = (r) => r.stdout + r.stderr;
+function lastJson(text) {
+  const lines = String(text).trim().split(/\r?\n/).reverse();
+  for (const line of lines) {
+    try { return JSON.parse(line); } catch { /* keep looking */ }
+  }
+  return null;
+}
+const sha256Text = (text) => `sha256:${createHash("sha256").update(text, "utf8").digest("hex")}`;
+const canonicalTestJson = (value) => Array.isArray(value)
+  ? `[${value.map(canonicalTestJson).join(",")}]`
+  : value && typeof value === "object"
+    ? `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalTestJson(value[key])}`).join(",")}}`
+    : JSON.stringify(value);
+const sha256Json = (value) => sha256Text(canonicalTestJson(value));
+
 const run = (args) => runFile("snapshot-skill.mjs", args);
 
 // ---- 中文 Prompt 术语边界·自身文档契约 ----
@@ -1198,6 +1215,568 @@ try {
     && httpResult.feedback?.reviews?.[0]?.comment === "ok");
 } finally {
   rmSync(root8, { recursive: true, force: true });
+}
+
+// ---- 外部证据·契约与物化（Issue #160 / AC-001） ----
+console.log("外部证据·契约与物化：");
+const evidenceRoot = mkdtempSync(join(tmpdir(), "evidence-contract-test-"));
+try {
+  const skillDir = join(evidenceRoot, "skill");
+  const fixtureDir = join(skillDir, "eval-fixtures", "eval-demo", "epoch-1");
+  const evalDir = join(evidenceRoot, "workspace", "iteration-1", "eval-demo");
+  const payloadDir = join(fixtureDir, "payloads");
+  mkdirSync(payloadDir, { recursive: true });
+  mkdirSync(evalDir, { recursive: true });
+  writeFileSync(join(skillDir, "SKILL.md"), "---\nname: demo-skill\ndescription: demo\n---\n", "utf8");
+  const payloadText = JSON.stringify({
+    sources: [{ url: "https://example.invalid/source", title: "脱敏来源", captured_at: "2026-08-30" }],
+    summary: "固定证据摘要，不含用户路径或凭据",
+  });
+  writeFileSync(join(payloadDir, "entry-a.json"), payloadText, "utf8");
+  const manifestBase = {
+    schema_version: 1,
+    kind: "eval-evidence-manifest",
+    eval: "eval-demo",
+    epoch: 1,
+    captured_at: "2026-08-30T10:00:00+08:00",
+    sanitization: { status: "passed", ruleset: "external-evidence-v1" },
+    entries: [{
+      id: "entry-a",
+      intent: "固定示例证据",
+      query: "示例证据查询",
+      payload: "payloads/entry-a.json",
+      sha256: sha256Text(payloadText),
+      source_count: 1,
+    }],
+  };
+  writeFileSync(join(fixtureDir, "evidence-pack.json"), JSON.stringify({
+    ...manifestBase,
+    manifest_sha256: sha256Json(manifestBase),
+  }, null, 2) + "\n", "utf8");
+  const metadata = {
+    prompt: "用户题面必须逐字保留",
+    assertions: [{ name: "固定证据可读", type: "script", ac: "AC-1" }],
+    evidence: {
+      schema_version: 1,
+      mode: "replay",
+      provider: "fake-evidence",
+      manifest: "eval-fixtures/eval-demo/epoch-1/evidence-pack.json",
+      manifest_sha256: sha256Json(manifestBase),
+      epoch: 1,
+      miss_policy: "fail",
+      live_policy: { trigger: "manual_or_stale", concurrency: 1, max_calls: 16, freshness: "declared" },
+    },
+  };
+  writeFileSync(join(evalDir, "eval_metadata.json"), JSON.stringify(metadata, null, 2) + "\n", "utf8");
+  const hostAdapter = join(evidenceRoot, "host-verified.json");
+  writeFileSync(hostAdapter, JSON.stringify({ network_isolation: "verified", live_calls: 0 }) + "\n", "utf8");
+
+  const preflight = runFile("eval-evidence.mjs", ["preflight", "--eval-metadata", join(evalDir, "eval_metadata.json"), "--skill-dir", skillDir, "--host-adapter", hostAdapter]);
+  const preflightJson = lastJson(out(preflight));
+  check("preflight 保留逐字 prompt 且验证 manifest/payload 摘要", preflight.code === 0
+    && preflightJson?.ok === true && preflightJson?.mode === "replay"
+    && preflightJson?.entries === 1 && preflightJson?.hits === 1 && preflightJson?.misses === 0
+    && preflightJson?.live_calls === 0 && preflightJson?.network_isolation === "verified"
+    && JSON.parse(readFileSync(join(evalDir, "eval_metadata.json"), "utf8")).prompt === metadata.prompt);
+
+  const materialized = runFile("eval-evidence.mjs", ["materialize", "--eval-dir", evalDir, "--skill-dir", skillDir, "--host-adapter", hostAdapter, "--gates", "with_skill,old_skill,without_skill"]);
+  const materializedJson = lastJson(out(materialized));
+  const digests = ["with_skill", "old_skill", "without_skill"].map((gate) => {
+    const pack = join(evalDir, gate, "run-1", "inputs", "evidence-pack", "evidence-pack.json");
+    return exists(pack) ? JSON.parse(readFileSync(pack, "utf8")).manifest_sha256 : null;
+  });
+  check("每个 gate 的 inputs/ 物化同一 evidence digest", materialized.code === 0
+    && materializedJson?.ok === true && materializedJson?.gate_digest_consistent === true
+    && digests.every((digest) => digest === metadata.evidence.manifest_sha256)
+    && new Set(digests).size === 1);
+  const materializedPayload = join(evalDir, "with_skill", "run-1", "inputs", "evidence-pack", "payloads", "entry-a.json");
+  const materializedPack = join(evalDir, "with_skill", "run-1", "inputs", "evidence-pack", "evidence-pack.json");
+  check("物化只携带 evidence pack，不把 harness 控制塞进用户题面", exists(materializedPayload) && exists(materializedPack)
+    && !readFileSync(materializedPayload, "utf8").includes(metadata.prompt)
+    && readFileSync(materializedPack, "utf8").includes("entry-a"));
+} finally {
+  rmSync(evidenceRoot, { recursive: true, force: true });
+}
+
+// ---- 外部证据·replay 失败关闭（Issue #160 / AC-002） ----
+console.log("外部证据·replay 失败关闭：");
+function setupEvidenceCase(base, payloadText = JSON.stringify({ summary: "脱敏固定证据" })) {
+  const skillDir = join(base, "skill");
+  const fixtureDir = join(skillDir, "eval-fixtures", "eval-demo", "epoch-1");
+  const payloadDir = join(fixtureDir, "payloads");
+  const evalDir = join(base, "workspace", "iteration-1", "eval-demo");
+  mkdirSync(payloadDir, { recursive: true });
+  mkdirSync(evalDir, { recursive: true });
+  writeFileSync(join(skillDir, "SKILL.md"), "---\nname: demo-skill\ndescription: demo\n---\n", "utf8");
+  const payloadPath = join(payloadDir, "entry-a.json");
+  writeFileSync(payloadPath, payloadText, "utf8");
+  const manifestBase = {
+    schema_version: 1,
+    kind: "eval-evidence-manifest",
+    eval: "eval-demo",
+    epoch: 1,
+    captured_at: "2026-08-30T10:00:00+08:00",
+    sanitization: { status: "passed", ruleset: "external-evidence-v1" },
+    entries: [{ id: "entry-a", intent: "固定示例证据", query: "示例证据查询", payload: "payloads/entry-a.json", sha256: sha256Text(payloadText), source_count: 1 }],
+  };
+  const manifest = { ...manifestBase, manifest_sha256: sha256Json(manifestBase) };
+  const manifestPath = join(fixtureDir, "evidence-pack.json");
+  writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n", "utf8");
+  const metadataPath = join(evalDir, "eval_metadata.json");
+  writeFileSync(metadataPath, JSON.stringify({
+    prompt: "用户题面",
+    assertions: [{ name: "固定证据可读", type: "script", ac: "AC-1" }],
+    evidence: {
+      schema_version: 1, mode: "replay", provider: "fake-evidence",
+      manifest: "eval-fixtures/eval-demo/epoch-1/evidence-pack.json",
+      manifest_sha256: manifest.manifest_sha256, epoch: 1, miss_policy: "fail",
+      live_policy: { trigger: "manual_or_stale", concurrency: 1, max_calls: 16, freshness: "declared" },
+    },
+  }, null, 2) + "\n", "utf8");
+  const hostAdapter = join(base, "host.json");
+  writeFileSync(hostAdapter, JSON.stringify({ network_isolation: "verified" }) + "\n", "utf8");
+  return { skillDir, fixtureDir, evalDir, payloadPath, manifestPath, metadataPath, hostAdapter };
+}
+
+const replayRoot = mkdtempSync(join(tmpdir(), "evidence-replay-test-"));
+try {
+  const missing = setupEvidenceCase(join(replayRoot, "missing"));
+  rmSync(missing.payloadPath);
+  const missingResult = runFile("eval-evidence.mjs", ["preflight", "--eval-metadata", missing.metadataPath, "--skill-dir", missing.skillDir, "--host-adapter", missing.hostAdapter]);
+  const missingJson = lastJson(out(missingResult));
+  check("缺 payload 在起跑前 BLOCKED 且 zero-live", missingResult.code === 3
+    && missingJson?.status === "BLOCKED" && missingJson?.code === "BLOCKED_EVIDENCE_UNAVAILABLE" && missingJson?.live_calls === 0
+    && !exists(join(missing.evalDir, "benchmark.json")));
+
+  const noIsolation = setupEvidenceCase(join(replayRoot, "no-isolation"));
+  writeFileSync(noIsolation.hostAdapter, JSON.stringify({ network_isolation: "unavailable" }) + "\n", "utf8");
+  const isolationResult = runFile("eval-evidence.mjs", ["preflight", "--eval-metadata", noIsolation.metadataPath, "--skill-dir", noIsolation.skillDir, "--host-adapter", noIsolation.hostAdapter]);
+  const isolationJson = lastJson(out(isolationResult));
+  check("host 无法隔离时 BLOCKED_NETWORK_ISOLATION_UNAVAILABLE", isolationResult.code === 3
+    && isolationJson?.status === "BLOCKED" && isolationJson?.code === "BLOCKED_NETWORK_ISOLATION_UNAVAILABLE"
+    && isolationJson?.live_calls === 0 && !exists(join(noIsolation.evalDir, "benchmark.json")));
+
+  const miss = setupEvidenceCase(join(replayRoot, "query-miss"));
+  const calls = join(replayRoot, "query-miss-calls.json");
+  writeFileSync(calls, JSON.stringify([{ intent: "未声明意图", query: "未声明查询" }]) + "\n", "utf8");
+  const queryMiss = runFile("eval-evidence.mjs", ["replay", "--eval-metadata", miss.metadataPath, "--skill-dir", miss.skillDir, "--host-adapter", miss.hostAdapter, "--calls", calls]);
+  const queryMissJson = lastJson(out(queryMiss));
+  check("运行中 query miss 判 FAIL 且不 fallback live", queryMiss.code === 1
+    && queryMissJson?.status === "FAIL" && queryMissJson?.code === "REPLAY_QUERY_MISS"
+    && queryMissJson?.live_calls === 0 && queryMissJson?.next_safe_action?.includes("record")
+    && !exists(join(miss.evalDir, "benchmark.json")));
+
+  const emptyReplay = setupEvidenceCase(join(replayRoot, "empty-calls"));
+  const emptyReplayResult = runFile("eval-evidence.mjs", ["replay", "--eval-metadata", emptyReplay.metadataPath, "--skill-dir", emptyReplay.skillDir, "--host-adapter", emptyReplay.hostAdapter]);
+  const emptyReplayJson = lastJson(out(emptyReplayResult));
+  check("没有执行 replay 不能以 hits=0 假装 PASS", emptyReplayResult.code === 1
+    && emptyReplayJson?.status === "FAIL" && emptyReplayJson?.code === "REPLAY_NOT_EXECUTED"
+    && emptyReplayJson?.live_calls === 0);
+
+  const tampered = setupEvidenceCase(join(replayRoot, "tampered"));
+  writeFileSync(tampered.payloadPath, "{\"summary\":\"被改写\"}\n", "utf8");
+  const integrity = runFile("eval-evidence.mjs", ["preflight", "--eval-metadata", tampered.metadataPath, "--skill-dir", tampered.skillDir, "--host-adapter", tampered.hostAdapter]);
+  const integrityJson = lastJson(out(integrity));
+  check("payload 摘要错判 FAIL 且不自动重签", integrity.code === 1
+    && integrityJson?.status === "FAIL" && integrityJson?.code === "EVIDENCE_INTEGRITY_MISMATCH"
+    && integrityJson?.live_calls === 0 && JSON.parse(readFileSync(tampered.manifestPath, "utf8")).entries[0].sha256 !== sha256Text(readFileSync(tampered.payloadPath, "utf8")));
+
+  const gates = setupEvidenceCase(join(replayRoot, "gate-drift"));
+  const materialized = runFile("eval-evidence.mjs", ["materialize", "--eval-dir", gates.evalDir, "--skill-dir", gates.skillDir, "--host-adapter", gates.hostAdapter, "--gates", "with_skill,old_skill,without_skill"]);
+  const driftPack = join(gates.evalDir, "old_skill", "run-1", "inputs", "evidence-pack", "evidence-pack.json");
+  const drift = JSON.parse(readFileSync(driftPack, "utf8"));
+  drift.manifest_sha256 = "sha256:" + "0".repeat(64);
+  writeFileSync(driftPack, JSON.stringify(drift) + "\n", "utf8");
+  const gateAudit = runFile("eval-evidence.mjs", ["audit-gates", "--eval-dir", gates.evalDir, "--gates", "with_skill,old_skill,without_skill"]);
+  const gateAuditJson = lastJson(out(gateAudit));
+  check("跨 gate digest 不一致整组 BLOCKED 且不产主成绩", materialized.code === 0 && gateAudit.code === 3
+    && gateAuditJson?.status === "BLOCKED" && gateAuditJson?.code === "EVIDENCE_DIGEST_MISMATCH"
+    && gateAuditJson?.live_calls === 0 && !exists(join(gates.evalDir, "benchmark.json")));
+} finally {
+  rmSync(replayRoot, { recursive: true, force: true });
+}
+
+const pilotWriterRoot = mkdtempSync(join(tmpdir(), "pilot-writer-test-"));
+try {
+  const pilotCase = setupEvidenceCase(join(pilotWriterRoot, "case"));
+  const pilotIteration = join(pilotWriterRoot, "case", "workspace", "iteration-1");
+  const pilotCalls = join(pilotWriterRoot, "calls.json");
+  writeFileSync(pilotCalls, JSON.stringify([{ entry_id: "entry-a", query: "示例证据查询" }]) + "\n", "utf8");
+  const pilotMaterialize = runFile("eval-evidence.mjs", ["materialize", "--eval-dir", pilotCase.evalDir, "--skill-dir", pilotCase.skillDir, "--host-adapter", pilotCase.hostAdapter, "--gates", "with_skill,old_skill,without_skill"]);
+  const pilotReplay = ["with_skill", "old_skill", "without_skill"].map((gate) => runFile("eval-evidence.mjs", [
+    "replay", "--eval-metadata", pilotCase.metadataPath, "--skill-dir", pilotCase.skillDir, "--host-adapter", pilotCase.hostAdapter,
+    "--calls", pilotCalls, "--run-dir", join(pilotCase.evalDir, gate, "run-1"),
+  ]));
+  const pilotHistoryDir = join(pilotWriterRoot, "history-skill");
+  mkdirSync(pilotHistoryDir, { recursive: true });
+  const pilotWrite = runFile("aggregate-benchmark.mjs", [
+    "--pilot-audit", pilotIteration, "--history", pilotHistoryDir, "--skill-name", "pilot-demo", "--pilot-id", "pilot-replay-1",
+  ]);
+  const pilotHistory = exists(join(pilotHistoryDir, "history.json")) ? JSON.parse(readFileSync(join(pilotHistoryDir, "history.json"), "utf8")) : {};
+  const pilotReceipt = pilotHistory.pilot_audits?.[0];
+  check("pilot 收据由 aggregate history writer 消费真实 replay audit 追加", pilotMaterialize.code === 0
+    && pilotReplay.every((result) => result.code === 0) && pilotWrite.code === 0
+    && pilotReceipt?.status === "PASS" && pilotReceipt?.source?.includes("aggregate-benchmark")
+    && pilotReceipt.evaluations?.[0]?.gates?.length === 3
+    && pilotReceipt.evaluations?.[0]?.hits === 1 && pilotReceipt.evaluations?.[0]?.live_calls === 0
+    && pilotReceipt.live_acceptance?.status === "BLOCKED");
+} finally {
+  rmSync(pilotWriterRoot, { recursive: true, force: true });
+}
+
+// ---- 外部证据·record/live 生命周期（Issue #160 / AC-003） ----
+console.log("外部证据·record/live 生命周期：");
+const lifecycleRoot = mkdtempSync(join(tmpdir(), "evidence-lifecycle-test-"));
+try {
+  const good = setupEvidenceCase(join(lifecycleRoot, "good"));
+  const providerPath = join(lifecycleRoot, "provider.json");
+  const provider = {
+    entries: {
+      "entry-a": {
+        payload: { summary: "受控 provider 的脱敏结果", sources: [{ url: "https://example.invalid/a", reachable: true }] },
+        query: "示例证据查询",
+        tool: "fake-web-search",
+        sources: [{ url: "https://example.invalid/a", reachable: true, published_at: "2026-08-30" }],
+        captured_at: "2026-08-30T10:00:00+08:00",
+        freshness_ok: true,
+      },
+    },
+  };
+  writeFileSync(providerPath, JSON.stringify(provider, null, 2) + "\n", "utf8");
+  const outputDir = join(good.skillDir, "eval-fixtures", "eval-demo");
+
+  const noAuth = runFile("eval-evidence.mjs", ["record", "--eval-metadata", good.metadataPath, "--skill-dir", good.skillDir, "--output-dir", outputDir, "--provider-fixture", providerPath, "--concurrency", "1", "--max-calls", "16"]);
+  const noAuthJson = lastJson(out(noAuth));
+  check("record 缺显式授权 BLOCKED 且不调用 provider", noAuth.code === 3
+    && noAuthJson?.code === "LIVE_AUTHORIZATION_REQUIRED" && noAuthJson?.live_calls === 0
+    && !exists(join(outputDir, "epoch-2")));
+
+  const unsafeConcurrency = runFile("eval-evidence.mjs", ["record", "--eval-metadata", good.metadataPath, "--skill-dir", good.skillDir, "--output-dir", outputDir, "--provider-fixture", providerPath, "--authorize-live", "--concurrency", "2", "--max-calls", "16"]);
+  const unsafeConcurrencyJson = lastJson(out(unsafeConcurrency));
+  check("record 并发不为 1 BLOCKED", unsafeConcurrency.code === 3
+    && unsafeConcurrencyJson?.code === "LIVE_CONCURRENCY_UNSAFE" && unsafeConcurrencyJson?.live_calls === 0
+    && !exists(join(outputDir, "epoch-2")));
+
+  const policyMissingFreshness = setupEvidenceCase(join(lifecycleRoot, "missing-freshness"));
+  const policyMetadata = JSON.parse(readFileSync(policyMissingFreshness.metadataPath, "utf8"));
+  delete policyMetadata.evidence.live_policy.freshness;
+  writeFileSync(policyMissingFreshness.metadataPath, JSON.stringify(policyMetadata) + "\n", "utf8");
+  const policyResult = runFile("eval-evidence.mjs", ["record", "--eval-metadata", policyMissingFreshness.metadataPath, "--skill-dir", policyMissingFreshness.skillDir, "--output-dir", join(policyMissingFreshness.skillDir, "eval-fixtures", "eval-demo"), "--provider-fixture", providerPath, "--authorize-live", "--concurrency", "1", "--max-calls", "16"]);
+  const policyJson = lastJson(out(policyResult));
+  check("record 缺 freshness policy BLOCKED", policyResult.code === 3 && policyJson?.code === "LIVE_POLICY_UNDECLARED");
+
+  const budgetCase = setupEvidenceCase(join(lifecycleRoot, "budget"));
+  const budgetManifest = JSON.parse(readFileSync(budgetCase.manifestPath, "utf8"));
+  const budgetProvider = { entries: {} };
+  for (let i = 2; i <= 17; i++) {
+    budgetManifest.entries.push({ id: `entry-${i}`, intent: `固定证据 ${i}`, query: `示例证据查询 ${i}`, payload: `payloads/entry-${i}.json`, sha256: "sha256:" + "1".repeat(64), source_count: 1 });
+    budgetProvider.entries[`entry-${i}`] = { payload: { summary: `结果 ${i}` }, captured_at: "2026-08-30" };
+  }
+  writeFileSync(budgetCase.manifestPath, JSON.stringify(budgetManifest) + "\n", "utf8");
+  writeFileSync(join(lifecycleRoot, "budget-provider.json"), JSON.stringify(budgetProvider) + "\n", "utf8");
+  const budget = runFile("eval-evidence.mjs", ["record", "--eval-metadata", budgetCase.metadataPath, "--skill-dir", budgetCase.skillDir, "--output-dir", join(budgetCase.skillDir, "eval-fixtures", "eval-demo"), "--provider-fixture", join(lifecycleRoot, "budget-provider.json"), "--authorize-live", "--concurrency", "1", "--max-calls", "16"]);
+  const budgetJson = lastJson(out(budget));
+  check("record 预算耗尽 BLOCKED 且不晋级", budget.code === 3 && budgetJson?.code === "LIVE_BUDGET_EXHAUSTED"
+    && budgetJson?.epoch_promoted === false && !exists(join(budgetCase.skillDir, "eval-fixtures", "eval-demo", "epoch-2")));
+
+  const incompleteProvider = join(lifecycleRoot, "incomplete.json");
+  writeFileSync(incompleteProvider, JSON.stringify({ entries: {} }) + "\n", "utf8");
+  const incomplete = runFile("eval-evidence.mjs", ["record", "--eval-metadata", good.metadataPath, "--skill-dir", good.skillDir, "--output-dir", outputDir, "--provider-fixture", incompleteProvider, "--authorize-live", "--concurrency", "1", "--max-calls", "16"]);
+  const incompleteJson = lastJson(out(incomplete));
+  check("record 部分采集不晋级 epoch", incomplete.code === 3
+    && incompleteJson?.code === "LIVE_CAPTURE_INCOMPLETE" && incompleteJson?.epoch_promoted === false
+    && !exists(join(outputDir, "epoch-2")));
+
+  const secretProvider = join(lifecycleRoot, "secret.json");
+  writeFileSync(secretProvider, JSON.stringify({ entries: { "entry-a": { payload: { api_key: "sk-test-only" }, captured_at: "2026-08-30" } } }) + "\n", "utf8");
+  const secret = runFile("eval-evidence.mjs", ["record", "--eval-metadata", good.metadataPath, "--skill-dir", good.skillDir, "--output-dir", outputDir, "--provider-fixture", secretProvider, "--authorize-live", "--concurrency", "1", "--max-calls", "16"]);
+  const secretJson = lastJson(out(secret));
+  check("record 脱敏失败不覆盖旧 epoch", secret.code === 3
+    && secretJson?.code === "EVIDENCE_SANITIZATION_FAILED" && secretJson?.epoch_promoted === false
+    && !exists(join(outputDir, "epoch-2")));
+
+  const record = runFile("eval-evidence.mjs", ["record", "--eval-metadata", good.metadataPath, "--skill-dir", good.skillDir, "--output-dir", outputDir, "--provider-fixture", providerPath, "--authorize-live", "--concurrency", "1", "--max-calls", "16"]);
+  const recordJson = lastJson(out(record));
+  check("record 成功只建立可审计 epoch，不生成 pass_rate", record.code === 0
+    && recordJson?.ok === true && recordJson?.mode === "record" && recordJson?.epoch_promoted === true
+    && recordJson?.calls === 1 && !Object.prototype.hasOwnProperty.call(recordJson, "pass_rate")
+    && exists(join(outputDir, "epoch-1", "evidence-pack.json")));
+
+  const repeatRecord = runFile("eval-evidence.mjs", ["record", "--eval-metadata", good.metadataPath, "--skill-dir", good.skillDir, "--output-dir", outputDir, "--provider-fixture", providerPath, "--authorize-live", "--concurrency", "1", "--max-calls", "16"]);
+  const repeatJson = lastJson(out(repeatRecord));
+  check("相同 evidence 内容只复用 epoch，不制造重复纪元", repeatRecord.code === 0
+    && repeatJson?.epoch_promoted === false && repeatJson?.reused_epoch === true
+    && !exists(join(outputDir, "epoch-2")));
+
+  const liveAudit = join(lifecycleRoot, "live-audit.json");
+  const live = runFile("eval-evidence.mjs", ["live", "--eval-metadata", good.metadataPath, "--skill-dir", good.skillDir, "--provider-fixture", providerPath, "--authorize-live", "--concurrency", "1", "--max-calls", "16", "--audit-path", liveAudit]);
+  const liveJson = lastJson(out(live));
+  check("fixture live 只产 simulated PASS，不冒充真实 provider", live.code === 0
+    && liveJson?.ok === true && liveJson?.mode === "live" && liveJson?.status === "SIMULATED_PASS"
+    && liveJson?.execution === "simulated" && liveJson?.real_provider_verified === false
+    && liveJson?.concurrency === 1
+    && liveJson?.calls <= 16 && liveJson?.query_plan === "PASS" && liveJson?.tool_path === "PASS"
+    && liveJson?.source_reachability === "PASS" && liveJson?.freshness === "PASS"
+    && liveJson?.replay_comparison === "incomparable" && exists(liveAudit));
+
+  const adapterPath = join(lifecycleRoot, "provider-adapter.mjs");
+  writeFileSync(adapterPath, `
+const request = JSON.parse(await new Promise((resolve, reject) => {
+  let text = ""; process.stdin.setEncoding("utf8"); process.stdin.on("data", chunk => text += chunk);
+  process.stdin.on("end", () => resolve(text)); process.stdin.on("error", reject);
+}));
+console.log(JSON.stringify({ entries: Object.fromEntries(request.requests.map(item => [item.entry_id, {
+  query: item.query, tool: "adapter-web-search", sources: [{ url: "https://example.invalid/adapter", reachable: true }], freshness_ok: true,
+  captured_at: "2026-08-30T10:00:00+08:00", payload: { summary: "adapter result" }
+}])) }));
+`, "utf8");
+  const adapterLive = runFile("eval-evidence.mjs", ["live", "--eval-metadata", good.metadataPath, "--skill-dir", good.skillDir, "--provider-adapter", adapterPath, "--authorize-live", "--concurrency", "1", "--max-calls", "16"]);
+  const adapterLiveJson = lastJson(out(adapterLive));
+  check("可执行 provider adapter 才能产出真实 live PASS", adapterLive.code === 0
+    && adapterLiveJson?.status === "PASS" && adapterLiveJson?.execution === "live"
+    && adapterLiveJson?.real_provider_verified === true);
+} finally {
+  rmSync(lifecycleRoot, { recursive: true, force: true });
+}
+
+// ---- Agent 文档质量假设与上下文预算（Issue #160 / AC-004） ----
+console.log("Agent 文档质量假设与上下文预算：");
+const qualityRoot = mkdtempSync(join(tmpdir(), "quality-plan-test-"));
+try {
+  const qualitySkill = join(qualityRoot, "demo-skill");
+  mkdirSync(join(qualitySkill, "references"), { recursive: true });
+  mkdirSync(join(qualitySkill, "eval-fixtures", "private-pack"), { recursive: true });
+  writeFileSync(join(qualitySkill, "SKILL.md"), "---\nname: demo-skill\ndescription: demo\n---\n", "utf8");
+  writeFileSync(join(qualitySkill, "references", "writing-guide.md"), "completion criteria\nprogressive disclosure\n", "utf8");
+  writeFileSync(join(qualitySkill, "run-tests.mjs"), "process.exit(0);\n", "utf8");
+  writeFileSync(join(qualitySkill, "output-evals.json"), "{}\n", "utf8");
+  writeFileSync(join(qualitySkill, "eval-fixtures", "private-pack", "payload.json"), "secret fixture payload\n", "utf8");
+  const metadataPath = join(qualityRoot, "eval_metadata.json");
+  writeFileSync(metadataPath, JSON.stringify({
+    prompt: "原始用户题面",
+    assertions: [{ name: "报告带出脚本事实", type: "manual", ac: "AC-10" }],
+    quality: { policy: { required_comparators: ["old_skill"], cost_budget: { tokens_ratio_vs_old_max: 1.25 } } },
+  }, null, 2) + "\n", "utf8");
+  const findingsPath = join(qualityRoot, "findings.json");
+  writeFileSync(findingsPath, JSON.stringify({
+    findings: [{
+      id: "QH-01",
+      lever: "completion_criteria",
+      risk: "脚本已算出事实但报告可能漏带",
+      expected_behavior: "报告将事实与上下文成组呈现",
+      assertions: ["报告带出脚本事实"],
+      gates: ["with_skill", "old_skill"],
+    }],
+    not_applicable: [{ lever: "leading_words", reason: "当前失败是结果传导，不是术语召回" }],
+  }, null, 2) + "\n", "utf8");
+  const plan = runFile("quality-plan.mjs", ["plan", "--skill-dir", qualitySkill, "--eval-metadata", metadataPath, "--findings-file", findingsPath]);
+  const planJson = lastJson(out(plan));
+  check("finding 转成 risk→expected→assertion→gate 的质量假设", plan.code === 0
+    && planJson?.verdict === "FINDINGS_RECORDED_NOT_PROVEN"
+    && planJson?.quality_hypotheses?.length === 1
+    && planJson.quality_hypotheses[0].risk.includes("脚本")
+    && planJson.quality_hypotheses[0].expected_behavior.includes("成组")
+    && planJson.quality_hypotheses[0].assertions.includes("报告带出脚本事实")
+    && planJson.quality_hypotheses[0].gates.includes("old_skill")
+    && planJson.not_applicable?.[0]?.reason.includes("结果传导"));
+
+  const badFindingsPath = join(qualityRoot, "bad-findings.json");
+  writeFileSync(badFindingsPath, JSON.stringify({ findings: [{ id: "QH-BAD", lever: "completion_criteria", risk: "没有绑定验证" }] }) + "\n", "utf8");
+  const badPlan = runFile("quality-plan.mjs", ["plan", "--skill-dir", qualitySkill, "--eval-metadata", metadataPath, "--findings-file", badFindingsPath]);
+  const badPlanJson = lastJson(out(badPlan));
+  check("未绑定 finding 失败关闭，不冒充质量计划", badPlan.code === 1
+    && badPlanJson?.code === "UNBOUND_QUALITY_FINDING" && badPlanJson?.verdict !== "SUPPORTED");
+
+  const scriptMeta = join(qualityRoot, "script-metadata.json");
+  writeFileSync(scriptMeta, JSON.stringify({
+    prompt: "确定性脚本题面",
+    assertions: [{ name: "脚本输出可复算", type: "script", ac: "AC-1" }],
+  }) + "\n", "utf8");
+  const scriptFindings = join(qualityRoot, "script-findings.json");
+  writeFileSync(scriptFindings, JSON.stringify({ findings: [{ id: "QH-SCRIPT", lever: "completion_criteria", risk: "脚本输出缺失", expected_behavior: "输出字段完整", assertions: ["脚本输出可复算"], gates: ["with_skill", "without_skill"] }] }) + "\n", "utf8");
+  const scriptPlan = runFile("quality-plan.mjs", ["plan", "--skill-dir", qualitySkill, "--eval-metadata", scriptMeta, "--findings-file", scriptFindings]);
+  const scriptJson = lastJson(out(scriptPlan));
+  check("确定性 script 断言默认 1 run，Agent 行为默认 3 runs", scriptPlan.code === 0
+    && scriptJson?.quality_policy?.stability_runs === 1 && planJson?.quality_policy?.stability_runs === 3);
+
+  const context = runFile("quality-plan.mjs", ["audit-context", "--creator-dir", CREATOR_DIR]);
+  const contextJson = lastJson(out(context));
+  const externalWritingName = ["writing", "for", "agents"].join("-");
+  check("Creator 独立且双零增长预算固定", context.code === 0
+    && contextJson?.status === "PASS" && contextJson?.independence?.external_skill_dependencies?.length === 0
+    && contextJson?.always_loaded?.max_utf8_bytes === 31415 && contextJson?.always_loaded?.max_lines === 312
+    && contextJson?.create_or_edit_branch?.max_utf8_bytes === 40364 && contextJson?.create_or_edit_branch?.max_lines === 475
+    && contextJson?.create_or_edit_branch?.files?.includes("references/writing-guide.md")
+    && !JSON.stringify(contextJson).includes(externalWritingName));
+
+  const dist = join(qualityRoot, "dist");
+  const packed = runFile("package-skill.mjs", [qualitySkill, dist]);
+  const packagePath = join(dist, "demo-skill.skill");
+  const packageBytes = exists(packagePath) ? readFileSync(packagePath) : Buffer.alloc(0);
+  check("独立包可打包且排除 eval-fixtures payload", packed.code === 0 && exists(packagePath)
+    && packageBytes.includes(Buffer.from("demo-skill/output-evals.json"))
+    && !packageBytes.includes(Buffer.from("demo-skill/eval-fixtures/private-pack/payload.json")));
+} finally {
+  rmSync(qualityRoot, { recursive: true, force: true });
+}
+
+// ---- 质量 verdict 与 viewer（Issue #160 / AC-005） ----
+console.log("质量 verdict 与 viewer：");
+function writeQualityIteration(rootDir, iterationName, withValues, oldValues, options = {}) {
+  const iterationDir = join(rootDir, iterationName);
+  const evalDir = join(iterationDir, "eval-quality");
+  const skillDir = options.skillDir ?? join(rootDir, "skill");
+  mkdirSync(evalDir, { recursive: true });
+  mkdirSync(skillDir, { recursive: true });
+  const fixtureDir = join(evalDir, "fixture");
+  const payloadDir = join(fixtureDir, "payloads");
+  mkdirSync(payloadDir, { recursive: true });
+  const payloadText = JSON.stringify({ summary: "quality test replay payload", marker: options.digest ?? "default" }) + "\n";
+  writeFileSync(join(payloadDir, "entry-a.json"), payloadText, "utf8");
+  const manifestBase = {
+    schema_version: 1,
+    kind: "eval-evidence-manifest",
+    eval: "eval-quality",
+    epoch: options.epoch ?? 1,
+    captured_at: "2026-08-30T10:00:00+08:00",
+    sanitization: { status: "passed", ruleset: "external-evidence-v1" },
+    entries: [{ id: "entry-a", intent: "质量假设固定证据", query: "质量假设固定查询", payload: "payloads/entry-a.json", sha256: sha256Text(payloadText), source_count: 1 }],
+  };
+  const manifest = { ...manifestBase, manifest_sha256: sha256Json(manifestBase) };
+  writeFileSync(join(fixtureDir, "evidence-pack.json"), JSON.stringify(manifest, null, 2) + "\n", "utf8");
+  const digest = manifest.manifest_sha256;
+  const metadata = {
+    prompt: "质量假设题面保持原话",
+    assertions: [{ name: "关键行为", text: "关键行为文本", type: "manual", ac: "AC-1" }],
+    quality: {
+      hypotheses: [{ id: "QH-01", lever: "completion_criteria", risk: "结果可能未传导", expected_behavior: "报告带出关键行为", assertions: ["关键行为"], gates: ["with_skill", "old_skill"] }],
+      policy: { stability_runs: 3, required_comparators: ["old_skill"], cost_budget: { tokens_ratio_vs_old_max: 1.25 } },
+    },
+    evidence: {
+      schema_version: 1, mode: "replay", provider: "fake-evidence", manifest: "fixture/evidence-pack.json",
+      manifest_sha256: digest, epoch: options.epoch ?? 1, miss_policy: "fail",
+      live_policy: { trigger: "manual_or_stale", concurrency: 1, max_calls: 16, freshness: "declared" },
+    },
+  };
+  writeFileSync(join(evalDir, "eval_metadata.json"), JSON.stringify(metadata, null, 2) + "\n", "utf8");
+  writeFileSync(join(evalDir, "evidence-audit.json"), JSON.stringify({
+    schema_version: 1, status: "PASS", mode: "replay", evidence_epoch: options.epoch ?? 1,
+    evidence_digest: digest, hits: 1, misses: 0, live_calls: 0, network_isolation: "verified", gate_digest_consistent: true,
+    gates: { with_skill: { evidence_digest: digest }, old_skill: { evidence_digest: digest } },
+  }, null, 2) + "\n", "utf8");
+  const makeRuns = (gate, values, tokens) => values.forEach((value, index) => {
+    const runDir = join(evalDir, gate, `run-${index + 1}`);
+    mkdirSync(join(runDir, "outputs"), { recursive: true });
+    mkdirSync(join(runDir, "inputs", "evidence-pack", "payloads"), { recursive: true });
+    cpSync(join(fixtureDir, "payloads", "entry-a.json"), join(runDir, "inputs", "evidence-pack", "payloads", "entry-a.json"));
+    cpSync(join(fixtureDir, "evidence-pack.json"), join(runDir, "inputs", "evidence-pack", "evidence-pack.json"));
+    writeFileSync(join(runDir, "evidence-audit.json"), JSON.stringify({
+      schema_version: 1, status: "PASS", mode: "replay", evidence_epoch: options.epoch ?? 1,
+      evidence_digest: digest, hits: 1, misses: 0, live_calls: 0, network_isolation: "verified", gate_digest_consistent: true,
+    }) + "\n", "utf8");
+    writeFileSync(join(runDir, "grading.json"), JSON.stringify({ results: [{ name: "关键行为", text: "关键行为文本", passed: value, evidence: value ? "命中" : "未命中" }] }) + "\n", "utf8");
+    writeFileSync(join(runDir, "timing.json"), JSON.stringify({ duration_ms: 1000 + index, total_tokens: tokens }) + "\n", "utf8");
+    writeFileSync(join(runDir, "outputs", "result.md"), value ? "关键行为\n" : "", "utf8");
+  });
+  makeRuns("with_skill", withValues, options.withTokens ?? 100);
+  makeRuns("old_skill", oldValues, options.oldTokens ?? 100);
+  return { iterationDir, skillDir, evalDir, evidenceDigest: digest };
+}
+
+const verdictRoot = mkdtempSync(join(tmpdir(), "quality-verdict-test-"));
+try {
+  const inconclusive = writeQualityIteration(join(verdictRoot, "inconclusive"), "iteration-1", [true, true, true], [true, true, true]);
+  const incAgg = runFile("aggregate-benchmark.mjs", [inconclusive.iterationDir, "--skill-name", "quality-demo"]);
+  const incBenchmark = exists(join(inconclusive.iterationDir, "benchmark.json")) ? JSON.parse(readFileSync(join(inconclusive.iterationDir, "benchmark.json"), "utf8")) : {};
+  check("全平高分保留 run PASS 但 quality=INCONCLUSIVE", incAgg.code === 0
+    && incBenchmark.quality_verdict?.status === "INCONCLUSIVE"
+    && incBenchmark.quality_verdict.reasons.some((reason) => reason.includes("全平"))
+    && incBenchmark.quality_verdict.forbidden_claims.length > 0);
+
+  const supported = writeQualityIteration(join(verdictRoot, "supported"), "iteration-1", [true, true, true], [false, false, false]);
+  const supAgg = runFile("aggregate-benchmark.mjs", [supported.iterationDir, "--skill-name", "quality-demo"]);
+  const supBenchmark = JSON.parse(readFileSync(join(supported.iterationDir, "benchmark.json"), "utf8"));
+  check("足量同 epoch 的关键 assertion 改善才 SUPPORT", supAgg.code === 0
+    && supBenchmark.quality_verdict?.status === "SUPPORTED"
+    && supBenchmark.quality_audit?.hypotheses_covered === 1
+    && supBenchmark.evidence_audit?.live_calls === 0
+    && supBenchmark.comparison_epoch);
+
+  const regressed = writeQualityIteration(join(verdictRoot, "regressed"), "iteration-1", [true, true, false], [true, true, true]);
+  const regAgg = runFile("aggregate-benchmark.mjs", [regressed.iterationDir, "--skill-name", "quality-demo"]);
+  const regBenchmark = JSON.parse(readFileSync(join(regressed.iterationDir, "benchmark.json"), "utf8"));
+  check("关键 assertion 退步时 quality=REGRESSED 且不通过", regAgg.code === 0
+    && regBenchmark.quality_verdict?.status === "REGRESSED"
+    && regBenchmark.quality_verdict.reasons.some((reason) => reason.includes("退步")));
+
+  const blockedBase = join(verdictRoot, "blocked");
+  const blocked = writeQualityIteration(blockedBase, "iteration-1", [true, true, true], [false, false, false]);
+  writeFileSync(join(blocked.evalDir, "evidence-audit.json"), JSON.stringify({ status: "BLOCKED", mode: "replay", code: "BLOCKED_NETWORK_ISOLATION_UNAVAILABLE", live_calls: 0 }) + "\n", "utf8");
+  const blockedAgg = runFile("aggregate-benchmark.mjs", [blocked.iterationDir, "--skill-name", "quality-demo"]);
+  check("证据前置 BLOCKED 时不创建主 benchmark", blockedAgg.code === 1
+    && !exists(join(blocked.iterationDir, "benchmark.json")));
+
+  const legacy = writeQualityIteration(join(verdictRoot, "legacy"), "iteration-1", [true], [false]);
+  rmSync(join(legacy.evalDir, "evidence-audit.json"));
+  const legacyMeta = JSON.parse(readFileSync(join(legacy.evalDir, "eval_metadata.json"), "utf8"));
+  delete legacyMeta.evidence;
+  delete legacyMeta.quality;
+  writeFileSync(join(legacy.evalDir, "eval_metadata.json"), JSON.stringify({ prompt: legacyMeta.prompt, assertions: legacyMeta.assertions }) + "\n", "utf8");
+  const legacyAgg = runFile("aggregate-benchmark.mjs", [legacy.iterationDir, "--skill-name", "quality-demo"]);
+  const legacyBenchmark = JSON.parse(readFileSync(join(legacy.iterationDir, "benchmark.json"), "utf8"));
+  check("legacy eval 标 unmanaged/unassessed 而不回填", legacyAgg.code === 0
+    && legacyBenchmark.evidence_audit?.mode === "unmanaged"
+    && legacyBenchmark.quality_verdict?.status === "unassessed");
+
+  const epochBase = join(verdictRoot, "epochs");
+  const epochSkill = join(epochBase, "skill");
+  const epoch1 = writeQualityIteration(epochBase, "iteration-1", [true, true, true], [false, false, false], { skillDir: epochSkill, digest: "sha256:" + "2".repeat(64) });
+  const epoch2 = writeQualityIteration(epochBase, "iteration-2", [true, true, true], [false, false, false], { skillDir: epochSkill, digest: "sha256:" + "3".repeat(64), epoch: 2 });
+  const e1 = runFile("aggregate-benchmark.mjs", [epoch1.iterationDir, "--skill-name", "quality-demo", "--history", epochSkill]);
+  const e2 = runFile("aggregate-benchmark.mjs", [epoch2.iterationDir, "--skill-name", "quality-demo", "--history", epochSkill]);
+  const epochHistory = JSON.parse(readFileSync(join(epochSkill, "history.json"), "utf8"));
+  check("evidence/harness epoch 改变标 incomparable，不制造 won/lost", e1.code === 0 && e2.code === 0
+    && epochHistory.runs.length === 2 && epochHistory.runs[1].comparison_status === "incomparable"
+    && epochHistory.runs[1].vs_previous === null && epochHistory.runs[1].evidence_audit.evidence_digest === epoch2.evidenceDigest);
+
+  const viewerHtmlPath = join(verdictRoot, "quality-review.html");
+  const view = runFile("../eval-viewer/generate-review.mjs", [supported.iterationDir, "--skill-name", "quality-demo", "--static", viewerHtmlPath, "--no-open"]);
+  const viewerHtml = exists(viewerHtmlPath) ? readFileSync(viewerHtmlPath, "utf8") : "";
+  check("viewer 首屏展示 Evidence gate/Quality claim/reasons/forbidden claims", view.code === 0
+    && viewerHtml.includes("Evidence gate") && viewerHtml.includes("Quality claim")
+    && viewerHtml.includes("SUPPORTED") && viewerHtml.includes("forbidden")
+    && viewerHtml.includes("本轮 replay"));
+
+  const managedEvidence = { managed: true, blocking: false, mode: "replay", evidence_digest: "sha256:" + "4".repeat(64), evidence_epochs: [1], live_calls: 0 };
+  const qualityEval = (name, maxRatio, withTokens, oldTokens, withPassed, oldPassed) => ({
+    name,
+    quality: {
+      hypotheses: [{ id: `QH-${name}`, lever: "completion_criteria", risk: "结果可能未传导", expected_behavior: "结果完整", assertions: ["A"], gates: ["with_skill", "old_skill"] }],
+      policy: { stability_runs: 1, required_comparators: ["old_skill"], cost_budget: { tokens_ratio_vs_old_max: maxRatio } },
+    },
+    configs: {
+      with_skill: [{ tokens: withTokens, results: [{ name: "A", passed: withPassed }] }],
+      old_skill: [{ tokens: oldTokens, results: [{ name: "A", passed: oldPassed }] }],
+    },
+  });
+  const heterogeneousBudget = buildQualityVerdict({
+    evals: [qualityEval("strict", 1.1, 150, 100, true, false), qualityEval("wide", 2.0, 200, 100, true, false)],
+    benchmark: { configs: { with_skill: {}, old_skill: {} } },
+    evidenceAudit: managedEvidence,
+  });
+  check("异构题目逐题应用 token budget，不取最宽预算", heterogeneousBudget.quality_verdict.status === "REGRESSED"
+    && heterogeneousBudget.quality_audit.cost_budget_status === "exceeded"
+    && heterogeneousBudget.quality_audit.cost_budget_details.some((item) => item.eval === "strict" && item.status === "exceeded"));
+
+  const crossEvalRegression = buildQualityVerdict({
+    evals: [qualityEval("positive", 2.0, 100, 100, true, false), qualityEval("negative", 2.0, 100, 100, false, true)],
+    benchmark: { configs: { with_skill: {}, old_skill: {} } },
+    evidenceAudit: managedEvidence,
+  });
+  check("同名 assertion 跨 eval 不互相平均抵消回归", crossEvalRegression.quality_verdict.status === "REGRESSED"
+    && Object.keys(crossEvalRegression.quality_audit.assertion_delta).length === 2);
+} finally {
+  rmSync(verdictRoot, { recursive: true, force: true });
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

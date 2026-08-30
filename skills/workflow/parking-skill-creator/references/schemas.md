@@ -57,6 +57,65 @@ Per-eval metadata written by the orchestrating agent. Located at `<iteration-dir
   - `type`: `manual` or `script`
   - `ac`: **Optional** — references an acceptance-condition id (`AC-1`, `AC-2`, …) from this skill's `references/design.md`, tying the assertion back to its design rationale. Format-checked only (`AC-<n>`), reference existence is not validated. Assertions without `ac` remain fully valid (legacy skills need zero migration); graders never reject on a missing `ac`.
 
+### 外部证据与质量计划（opt-in）
+
+`prompt` 只保存用户原话。外部证据、provider、网络边界和评判口径放在同级
+`evidence` / `quality` 对象，不能拼接进 prompt。没有 `evidence` 的旧题正规化为
+`{ mode: "unmanaged", audit: "unknown", compatibility: "legacy" }`。
+
+```json
+{
+  "quality": {
+    "hypotheses": [{
+      "id": "QH-01",
+      "lever": "completion_criteria",
+      "risk": "步骤完成但关键事实没有进入最终报告",
+      "expected_behavior": "报告把事实与前置上下文成组呈现",
+      "assertions": ["报告带出脚本事实"],
+      "gates": ["with_skill", "old_skill"]
+    }],
+    "policy": {
+      "stability_runs": 3,
+      "required_comparators": ["old_skill"],
+      "cost_budget": { "tokens_ratio_vs_old_max": 1.25 }
+    }
+  },
+  "evidence": {
+    "schema_version": 1,
+    "mode": "replay",
+    "provider": "external-evidence-v1",
+    "manifest": "eval-fixtures/eval-demo/epoch-1/evidence-pack.json",
+    "manifest_sha256": "sha256:<64 hex>",
+    "epoch": 1,
+    "miss_policy": "fail",
+    "live_policy": { "trigger": "manual_or_stale", "concurrency": 1, "max_calls": 16, "freshness": "declared" }
+  }
+}
+```
+
+质量 hypothesis 是可失败计划，不是静态文档评分：每项必须把 `risk`、
+`expected_behavior`、已登记 `assertions` 和至少两个 `gates` 绑定起来。
+行为/方差敏感题默认 `stability_runs=3`；纯确定性 `script` 断言可为 1。
+
+Evidence manifest 位于技能仓库的 `eval-fixtures/<eval>/epoch-<N>/`，其
+`manifest_sha256` 是删除自身摘要字段后 canonical JSON 的 SHA-256；每个 entry
+的 `sha256` 是 payload 原始字节摘要。成功 replay 的 eval 目录另有
+`evidence-audit.json`：必须是 `status=PASS`、`misses=0`、`live_calls=0`、
+`network_isolation=verified`，且 gate 摘要完全一致。预检缺 evidence/host 能力是
+`BLOCKED`；运行中 query miss 或摘要损坏是 `FAIL`；两者都不允许 fallback live。
+
+`record` 只建立完整、脱敏的新 evidence epoch，不产生 `pass_rate`；`live` 只
+证明真实 query/tool/source/freshness，和 replay 分数标记 `incomparable`。用
+`--provider-fixture` 的离线矩阵只能得到 `SIMULATED_PASS`，只有可执行
+`--provider-adapter` 的 `execution=live` 收据才能作为真实 live acceptance。
+
+质量结论与单次 run 判罚分离：`quality_verdict.status` 为
+`SUPPORTED | INCONCLUSIVE | REGRESSED | BLOCKED`；无新 schema 的旧记录为
+`unassessed`。只有高风险 hypothesis 全覆盖、足量 runs、相关 comparator、同一
+evidence/harness epoch 和已声明成本预算同时满足时，才允许 `SUPPORTED`。
+全平、样本不足、关键回归、预算越界和前置阻塞必须分别保留 `reasons` 与
+`forbidden_claims`，绝不由绝对高 `pass_rate` 自动升级。
+
 ---
 
 ## history.json（技能目录，已实现）
@@ -107,6 +166,13 @@ Append-only eval score ledger. Located at `<skill-dir>/history.json`, distribute
 
 **Boundary behavior:** corrupt JSON is backed up as `history.json.corrupt-<YYYYMMDD-HHmmss>` then rebuilt (parse failure / broken top level → rebuild from empty; individual malformed runs → backup, keep the valid ones). `history.json` being a directory, or `--history` pointing at a non-directory / unwritable target: the run is refused with exit code 1, benchmark outputs already written are not rolled back. Writes go through temp-file + atomic rename. Without `--history`, output is byte-identical to the flagless behavior and no history.json is created.
 
+`pilot_audits[]` 是 append-only 的 evidence-plane 记录，不是评分 `runs[]`：可记录
+shopping 等外部技能的 replay 四题审计、quality claim 和尚未执行的 live blocker。
+它必须使用相对 manifest 引用，不携带 payload、凭据或本机绝对路径；live acceptance
+通过后追加新对象，不改写旧 replay 记录。用
+`aggregate-benchmark.mjs --pilot-audit <iteration-pilot> --history <skill-dir>` 写入；
+该 writer 只消费 eval-evidence 已生成的 eval/run audit，不接受手工 digest 作为来源。
+
 ---
 
 ## output-evals.json（技能目录，已实现）
@@ -139,6 +205,9 @@ Output-eval case set — the prompts and assertions of the current evaluation ro
   - `assertions[]`: Verbatim from that eval's eval_metadata.json (`name` / `type` / optional `ac`); legacy string assertions are normalized to `{ "name": <string> }`
 
 **Boundary behavior:** written after the history append within the same `--history` run; if the write fails (or the path is a directory) the script refuses with exit code 1 — the already-written benchmark and history.json are not rolled back. Without `--history` the file is never created or touched. `--keep-evals` (focused probe rounds running only a subset of the bank): entries in the existing bank that this round did not run are preserved; this round's entries overwrite same-name ones — stdout reports how many were kept. Without the flag the default whole-file overwrite stands (full rounds intentionally retiring old scenarios rely on it). To rebuild a comparable round after cloning: read this file, recreate each `iteration-N/eval-<name>/eval_metadata.json` from it, then follow SKILL.md 6.1 — same prompts and assertions are what make `vs_previous` comparable across machines.
+
+`evals[]` 还可原样携带 opt-in 题的 `evidence` 与 `quality` 对象；legacy 题不补这两个
+字段。这样 clone 接收方可重建证据声明和质量假设，而不会把 payload 复制进 `.skill`。
 
 ---
 
@@ -300,6 +369,9 @@ Output from `scripts/aggregate-benchmark.mjs`. Located at `<iteration-dir>/bench
 - `evals`: Eval directory names in order
 - `warnings`: Non-fatal scan issues (missing grading.json etc.)
 - `notes`: Optional string array appended by the analyst pass (SKILL.md 6.4 step 3); the viewer renders it as Analysis Notes. Absent when no analyst pass ran — consumers must not require it
+- `evidence_audit`: Optional evidence-plane summary. Managed replay requires every declared eval's audit to be `PASS`, `misses=0`, `live_calls=0`, `network_isolation=verified`, and per-eval gate digests consistent. Multiple evals use `evidence_digests`/`per_eval`; `evidence_digest` is `multiple` rather than a fake single digest.
+- `harness_digest` / `comparison_epoch` / `comparison_status`: Content-addressed comparison identity and whether this round is comparable to the previous history round. A changed evidence, harness, or quality plan is `incomparable`.
+- `quality_audit` / `quality_verdict`: Hypothesis coverage and the independent `SUPPORTED | INCONCLUSIVE | REGRESSED | BLOCKED` claim. Legacy benchmark data uses `unassessed`.
 
 `benchmark.md` is a human-readable rendering of the same data, field for field.
 

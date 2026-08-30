@@ -1,0 +1,10 @@
+{
+  "schema_version": 2,
+  "round": "contract-criteria-r1",
+  "submission": "contract-criteria-r1.json",
+  "consumed_at": "2026-08-30T09:59:32.674Z",
+  "session_slug": "2026-08-30-issue-160-eval-evidence-contract",
+  "revision": 1,
+  "digest": "5090da382bb9d432c8939c3b40199ea1bd8e9395753c0198472fb64018453bb5",
+  "idempotency_key": "b7ae632a9626fc3152eda60c618a7df5f34c5c3be1e2034e7bf0a0aa8ea3ade5"
+}

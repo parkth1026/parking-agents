@@ -1,0 +1,8 @@
+{
+  "evidence_id": "tv-product-signals",
+  "captured_at": "2026-08-24T20:56:03+08:00",
+  "source_refs": [
+    { "ref": "hist-tv-products-01", "title": "历史检索中的电视型号与用户侧线索", "source_kind": "historical-search" }
+  ],
+  "summary": "固定回放摘要：保存历史型号、游戏接口与用户侧线索；不宣称当前仍在售或价格有效。"
+}

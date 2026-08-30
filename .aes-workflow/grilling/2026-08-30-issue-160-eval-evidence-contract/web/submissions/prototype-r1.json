@@ -1,0 +1,51 @@
+{
+  "schema_version": 2,
+  "round": "prototype-r1",
+  "stage": "2-prototype",
+  "round_revision": 1,
+  "round_digest": "950cd38ee81dce7cb5729bccfd182ce18fec3895c58f0ccef8170e7069312cb4",
+  "received_at": "2026-08-30T08:34:12.354Z",
+  "actor": {
+    "type": "person",
+    "id": "local-user"
+  },
+  "answers": [
+    {
+      "q_id": "PD1",
+      "type": "accept"
+    },
+    {
+      "q_id": "PD2",
+      "type": "accept"
+    },
+    {
+      "q_id": "PC1",
+      "type": "confirm"
+    },
+    {
+      "q_id": "P1",
+      "type": "choice",
+      "choice": "A"
+    },
+    {
+      "q_id": "P2",
+      "type": "choice",
+      "choice": "A"
+    },
+    {
+      "q_id": "P3",
+      "type": "choice",
+      "choice": "A"
+    },
+    {
+      "q_id": "P4",
+      "type": "choice",
+      "choice": "A"
+    },
+    {
+      "q_id": "PC2",
+      "type": "confirm"
+    }
+  ],
+  "truncated": false
+}

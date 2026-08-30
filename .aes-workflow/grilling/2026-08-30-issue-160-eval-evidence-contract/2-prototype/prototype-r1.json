@@ -1,0 +1,196 @@
+{
+  "schema_version": 2,
+  "opening": "访谈已收口。请对照 v1 行为、报文、运行样例、viewer mock 与架构图，裁决原型阶段撞出的四个语义。",
+  "dossier": {
+    "title": "Goal Contract 决策档案 · Creator 外部证据评测",
+    "summary": "本轮锁定用户可见审计、FAIL/BLOCKED 分层、host 隔离门和 live 新鲜度策略；附件是下一阶段 AC 的例子池。"
+  },
+  "phases": [
+    {"id": "1-interview", "label": "访谈·拷问", "status": "done"},
+    {"id": "2-prototype", "label": "原型确认", "status": "active"},
+    {"id": "3-contract", "label": "交付标准·契约", "status": "pending"}
+  ],
+  "open_ambiguities": 4,
+  "locked": [
+    {"ref": "Q1", "q": "能力范围", "a": "通用外部可变证据契约", "round": "interview-r1", "tier": "ask"},
+    {"ref": "Q2", "q": "replay miss", "a": "失败关闭，转独立 record/live 补库", "round": "interview-r1", "tier": "ask"},
+    {"ref": "Q3", "q": "持久化", "a": "仓库跟踪每题最小证据包，分发包只带 manifest", "round": "interview-r1", "tier": "ask"},
+    {"ref": "Q4", "q": "首份交付", "a": "Creator contract + provider + audit + shopping pilot + live acceptance", "round": "interview-r1", "tier": "ask"},
+    {"ref": "Q5", "q": "live 纪律", "a": "人工/过期触发，逐 eval 串行并设上限", "round": "interview-r1", "tier": "ask"}
+  ],
+  "round": {
+    "id": "prototype-r1",
+    "no": 2,
+    "stage": "2-prototype",
+    "title": "逐处质疑 v1：四个会改变验收语义的点",
+    "status": "pending",
+    "items": [
+      {
+        "q_id": "PD1",
+        "tier": "default",
+        "line": "evidence pack 先物化到每个 gate 自己的 inputs/，Agent 不读取 workspace 根的全局库 — 修复现有 sandbox 与 replay 文档冲突 — 代价：每轮多一次裁剪/复制与摘要核对"
+      },
+      {
+        "q_id": "PD2",
+        "tier": "default",
+        "line": "record 只负责建证据 epoch，不评分技能；replay 与 live 才产出各自声明范围内的验收结果 — 防止采集质量与技能能力混成一个分数 — 代价：一次完整刷新至少有 record 和 live/replay 两类产物"
+      },
+      {
+        "q_id": "PC1",
+        "tier": "confirm",
+        "line": "旧 eval 没有 evidence 字段时继续按旧行为运行并显式标 unmanaged；首次迁入 replay 开新纪元，不与旧 unmanaged 分数直接比较 — 代价：迁移当轮历史曲线断代",
+        "irreversible": true
+      },
+      {
+        "q_id": "P1",
+        "tier": "ask",
+        "question": "Evidence 审计在 eval viewer 中应放到什么可见层级？",
+        "known_facts": "若 mode/digest/live_calls 只在 JSON，普通评审人很容易只看 pass rate；若首屏展示，会占据现有 Benchmark 版面但能阻止 replay 冒充 live。附件 mock.html 展示了首屏 Evidence gate 候选。",
+        "irreversible": false,
+        "allow_custom": true,
+        "required": true,
+        "options": [
+          {
+            "key": "A",
+            "text": "Benchmark 首屏门禁卡",
+            "pct": 55,
+            "recommended": true,
+            "covers": "首屏显示 mode、epoch/digest、hits/misses/live_calls、isolation、gate 一致性与不可推出的声明。",
+            "pros": ["评审无需开日志即可判断结果有效性", "BLOCKED/NOT_RUN 不会被 pass rate 掩盖"],
+            "cons": ["Benchmark 首屏信息密度增加", "需要 viewer/静态导出同步改"]
+          },
+          {
+            "key": "B",
+            "text": "首屏摘要 + 折叠审计详情",
+            "pct": 30,
+            "covers": "首屏只放 mode/status/digest 一致性，调用计数与报文放 details。",
+            "pros": ["版面较轻", "关键风险仍可见"],
+            "cons": ["评审人可能不展开调用细节", "异常定位多一步"]
+          },
+          {
+            "key": "C",
+            "text": "只进 JSON/终端，不改 viewer",
+            "pct": 15,
+            "covers": "机器数据完整，但浏览器只维持现有 pass/time/token。",
+            "pros": ["UI 零改动"],
+            "cons": ["普通评审容易误读", "静态档案不能独立解释评测声明"]
+          }
+        ]
+      },
+      {
+        "q_id": "P2",
+        "tier": "ask",
+        "question": "replay 缺口应如何区分 FAIL 与 BLOCKED？",
+        "known_facts": "预检缺 payload 或 host 无隔离能力时，被测技能尚未真正运行；运行中请求未声明 query 或 payload 摘要不匹配时，固定输入契约已被违反。api-mock.md 给出了四种报文。",
+        "irreversible": true,
+        "allow_custom": true,
+        "required": true,
+        "options": [
+          {
+            "key": "A",
+            "text": "前置不可用 BLOCKED，契约违反 FAIL",
+            "pct": 65,
+            "recommended": true,
+            "covers": "缺 pack/host isolation → BLOCKED；运行中 query miss/摘要不匹配 → FAIL。",
+            "pros": ["不把环境债算成技能回归", "也不把运行偏离降级成无害阻塞"],
+            "cons": ["实现和报告要维护两类终态", "需要在运行前后划清边界"]
+          },
+          {
+            "key": "B",
+            "text": "所有缺口都 FAIL",
+            "pct": 20,
+            "covers": "任何 replay 不完整都使 gate 变红。",
+            "pros": ["判罚最简单", "CI 统一红"],
+            "cons": ["缺本地 payload 也被误判成技能缺陷", "跨机结果失真"]
+          },
+          {
+            "key": "C",
+            "text": "所有缺口都 BLOCKED",
+            "pct": 15,
+            "covers": "只要没有完整回放就不判技能。",
+            "pros": ["避免误伤技能"],
+            "cons": ["Agent 请求未声明 query 也逃过 FAIL", "契约违反被环境语义掩盖"]
+          }
+        ]
+      },
+      {
+        "q_id": "P3",
+        "tier": "ask",
+        "question": "Host 不能机械禁用或审计真实联网工具时，official replay 怎么办？",
+        "known_facts": "当前 Creator 的输出 eval 是文字流程 + subagent，不拥有统一工具拦截层；仅靠 prompt 无法证明 live_calls=0。diagram.html 把 host guard 放进新增 Evidence Plane。",
+        "irreversible": true,
+        "allow_custom": true,
+        "required": true,
+        "options": [
+          {
+            "key": "A",
+            "text": "official replay 必须 BLOCKED",
+            "pct": 65,
+            "recommended": true,
+            "covers": "只有 host 能 disable/proxy/audit 外部工具时才计主 benchmark；否则只允许 exploratory。",
+            "pros": ["zero-live 声明可辩护", "跨 host 能力差异不会静默污染成绩"],
+            "cons": ["部分现有宿主暂时跑不了 official replay", "需建设 host adapter 或明确降级"]
+          },
+          {
+            "key": "B",
+            "text": "允许 UNVERIFIED 继续计分",
+            "pct": 25,
+            "covers": "以 prompt 约束运行，报告 isolation=unverified。",
+            "pros": ["现有宿主立即可跑", "不阻塞 pilot 探索"],
+            "cons": ["仍可能偷跑真实搜索", "主成绩不再能保证成本与可复现性"]
+          },
+          {
+            "key": "C",
+            "text": "不建 host guard，只写 fixture-first",
+            "pct": 10,
+            "covers": "沿用 Issue #160 当前提示词方案。",
+            "pros": ["改动最少"],
+            "cons": ["无法机械证明", "重现本次问题的概率高"]
+          }
+        ]
+      },
+      {
+        "q_id": "P4",
+        "tier": "ask",
+        "question": "live 新鲜度触发应由统一天数还是每个 eval 自己声明？",
+        "known_facts": "价格、在售、法规、API 文档的变化速度不同；用户已选择人工/过期触发，但尚未决定“过期”的定义。统一 30 天简单，却会让价格太旧、稳定标准过度刷新。",
+        "irreversible": false,
+        "allow_custom": true,
+        "required": true,
+        "options": [
+          {
+            "key": "A",
+            "text": "每个 eval/entry 声明 freshness policy",
+            "pct": 60,
+            "recommended": true,
+            "covers": "manifest 按证据意图声明 stale trigger；未声明时只人工触发，不猜全局天数。",
+            "pros": ["匹配不同证据变化速度", "购物价格与稳定标准可分开刷新"],
+            "cons": ["题库维护者多一个判断", "需要 viewer 展示部分过期状态"]
+          },
+          {
+            "key": "B",
+            "text": "全局统一 30 天",
+            "pct": 25,
+            "covers": "所有外部证据 30 天后触发 live。",
+            "pros": ["规则最简单", "容易自动化"],
+            "cons": ["不同证据被错误同质化", "可能浪费配额或放过陈旧价格"]
+          },
+          {
+            "key": "C",
+            "text": "只人工触发，不设过期",
+            "pct": 15,
+            "covers": "fixture 永不自动 stale，用户/发布人决定何时 live。",
+            "pros": ["零自动配额压力"],
+            "cons": ["长期不运行的技能可能永久陈旧", "“过期触发”失去机械定义"]
+          }
+        ]
+      },
+      {
+        "q_id": "PC2",
+        "tier": "confirm",
+        "line": "除 P1-P4 的待裁点外，接受 v1 的行为变化、不变清单、schema/错误形态、运行场景和架构依赖方向作为确认版基础；可在自定义意见中逐项否决 — 代价：下一阶段将直接从这些具体例子提炼 AC，不再重新发明另一套形态",
+        "irreversible": true
+      }
+    ]
+  }
+}

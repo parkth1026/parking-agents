@@ -39,6 +39,11 @@
 | AC-14 | frontmatter 键分诊：未知键只警告不挡退出码；与已知键编辑距离 ≤2 且 ≤ 键长/3 的未知键判拼写错误并给出建议键名；已知键按 kebab/snake/camel 归一后比对；`run-tests.mjs` 含全仓复扫（进程内调用），本仓任一技能不过门禁即测试失败，非本仓布局跳过 | script |
 | AC-13 | frontmatter 解析器有显式支持子集：子集内构造与宿主 YAML 语义逐字一致（多行 plain 折叠、双引号转义含 `\uNNNN`、行尾注释剥离、块标量 `|`/`>`）；越界构造（flow 集合、跨行引号标量、单引号双写、keep chomping）不猜值，落在 name/description/compatibility 上时以退出码 3 报「无法判定」，落在不被校验的键上不阻塞；打包门同样拒绝无法判定 | script |
 | AC-12 | 无嵌套 Agent 工具时，headless 触发探针固定逐字 prompt 和单轮调用；只从进程环境接收凭据，不读写共享 CLI 配置、不输出或落盘 key；失败不自答；清理私有 Temp 后对授权扫描根的内容、文件名和路径做前缀残留检查，命中路径输出不得泄漏前缀 | script/manual |
+| AC-18 | opt-in 外部 evidence 的 prompt/harness 分离、manifest/payload 摘要校验、按 gate 物化和审计字段保持一致 | script |
+| AC-19 | replay 对缺证据、host 隔离不足、query miss、摘要错和跨 gate digest 漂移失败关闭；不 fallback live、不产主 benchmark | script |
+| AC-20 | record/live 只在显式授权、串行、有预算和 freshness policy 下访问 provider；record 不评分，失败不晋级或覆盖 epoch | script |
+| AC-21 | 本地 writing guide 的静态 finding 转为绑定 risk/expected behavior/assertion/gates 的 hypothesis；静态审查不直接产生质量 PASS | script |
+| AC-22 | benchmark/history/viewer 分离 run 判罚与 `SUPPORTED | INCONCLUSIVE | REGRESSED | BLOCKED` quality verdict；跨 evidence/harness epoch 不制造比较 | script |
 
 ## 迭代记录
 
@@ -63,3 +68,5 @@
 | 2026-08-26 | issue #55：`best_description` 加 test 样本下限。此前 test 只有 2 条也照样选出一个冠军——一轮赢另一轮往往只差一条 query，那是噪声不是证据。判定基数取 `test.evaluated`（真正有有效探针的 query 数）而非切分声明条数，因为 8 条里 6 条没探针时实际证据仍是 2 条。不足时置 null 并写明原因，其余指标照常产出；放宽需显式 `--min-test-queries`。注：`beats()` 的四级字典序本就比官方 run_loop（只比 correct、平局取先）更严，本轮不动它 | 180 项自测通过（+9）；双向验证：4 条题库(test=2) 拒绝宣告并给原因，20 条题库(test=8) 正常宣告 | 未命中；保持单一流水线技能 |
 | 2026-08-26 | issue #57：条件性内容下沉。正文 41520 → 31727 字节（-23.6%）。判据是**条件性**而非篇幅——触发评测是 SKILL.md 自己声明的独立入口（走创建主线的人不读它，进来做触发评测的人不读那六步），门禁判定细则只在改校验器或追查 UNDECIDABLE 时需要，宿主/仓库约定只对本仓与需读环境值的技能成立；中文术语节是 writing-guide 的浓缩重复件，压成指针。**明确不动第 6 步输出评测循环（38.9%）**——它对任何走到第 6 步的人都是无条件需要的，下沉只会多一次往返并诱发「凭骨架开跑」 | 181 项自测通过（+1，fallback 路由契约拆成 SKILL.md 可发现 + trigger-eval.md 完整两层）；内容守恒逐条命题核验，发现并补回 writing-guide 缺失的 4 条（bilingualize / provider name / context-dependent / unverified） | 未命中；保持单一流水线技能 |
 | 2026-08-27 | issue #58 参考轮：触发题库定稿 20 条（正10/负10，负例走 near-miss——用既有技能做事、写普通脚本、非 .skill 打包、接口评测、CI 触发、SKILL.md 翻译、概念咨询、飞书机器人、点名 ps1-creator、写分享大纲），同宿主 Agent 探针 60 个分 7 批跑完（119 条会话可见技能清单；清单插槽文件化以绕开编排上下文体积限制）；输出评测 iteration-3 双臂 with/without 各 3 断言，timing 首次全数值抓齐（来源：subagent 完成通知的 usage 字段） | 181 项自测通过；触发评测 train 12/12、test 8/8（应触发率 1.00、误触发率 0.00，best_description 首次非空，test.evaluated=8 过下限 6；53 valid / 7 中文协议变体探针记 invalid 不猜）；输出评测两臂 3/3 平手（断言对强模型区分度不足，双侧 grader 的 eval_feedback 均已点名），with 263.2s/800.6k vs without 166.8s/242.2k tokens；--history 聚合产出 output-evals.json 首版、history 追加第 3 条（vs_previous 因上轮 iteration 目录已清记不可比） | 未命中；保持单一流水线技能 |
+| 2026-08-30 | Issue #160：增加本地 evidence provider seam、replay 失败关闭、record/live 生命周期、质量假设计划、双零增长审计和 Evidence/Quality viewer 首屏；shopping 四题建立脱敏 epoch-1 pack 与 replay pilot 审计 | Creator 自测 215 项通过；shopping replay 四题三 gate 均 digest 一致、misses=0、live_calls=0、isolation=verified；live acceptance 按合同在 2026-09-10 前保持 BLOCKED | 未命中；保持单一流水线技能 |
+| 2026-08-30 | Issue #160 受控 live acceptance：用户明确授权提前消耗真实搜索额度；shopping 四题沿用 epoch-1 replay manifest，逐题通过可执行 Node provider adapter 实际搜索并探测来源，所有 entry `query/tool/source/freshness` 通过，live 与 replay 保持不可比 | 四题 live audit 均 `execution=live`、`real_provider_verified=true`、2 calls/题、`concurrency=1`、`max_calls=16`；history 追加 `shopping-deep-research-live-2026-08-30` PASS，viewer 首屏核对通过 | 未命中；保持单一流水线技能 |

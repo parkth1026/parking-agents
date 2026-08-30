@@ -1,0 +1,8 @@
+{
+  "evidence_id": "chair-industry",
+  "captured_at": "2026-08-24T20:56:03+08:00",
+  "source_refs": [
+    { "ref": "hist-chair-industry-01", "title": "历史检索中的工学椅指标资料", "source_kind": "historical-search" }
+  ],
+  "summary": "固定回放摘要：承重、座高/靠背覆盖、稳定防夹和气压棒安全是比较维度；当前合规与在售状态必须由 live 重新确认。"
+}

@@ -1,0 +1,8 @@
+{
+  "evidence_id": "desk-industry",
+  "captured_at": "2026-08-24T20:56:03+08:00",
+  "source_refs": [
+    { "ref": "hist-desk-industry-01", "title": "历史检索中的升降桌指标资料", "source_kind": "historical-search" }
+  ],
+  "summary": "固定回放摘要：桌面高度、总宽、承重和稳定性是比较维度；价格与当前库存必须由 live 重新确认。"
+}

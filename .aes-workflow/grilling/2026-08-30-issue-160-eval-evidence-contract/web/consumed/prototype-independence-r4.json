@@ -1,0 +1,10 @@
+{
+  "schema_version": 2,
+  "round": "prototype-independence-r4",
+  "submission": "prototype-independence-r4.json",
+  "consumed_at": "2026-08-30T12:14:40.015Z",
+  "session_slug": "2026-08-30-issue-160-eval-evidence-contract",
+  "revision": 1,
+  "digest": "602969b33b6b6065a7e80c2e3d79c324372ea5516eada3bac790dae1fe5c4877",
+  "idempotency_key": "4b389993a474f8bb3d478abf399f769182d24bc0b9f692cd8739ea0e1dd7b47f"
+}
