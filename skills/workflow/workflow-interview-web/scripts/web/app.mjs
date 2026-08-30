@@ -1072,15 +1072,28 @@ function render() {
   renderDossier();
 }
 
+function latestPendingRound(snapshot) {
+  return [...(snapshot?.rounds ?? [])].reverse().find((round) => round.status === 'pending') ?? null;
+}
+
+function enteredContractRound(previousState, nextState) {
+  const previousRound = latestPendingRound(previousState);
+  const nextRound = latestPendingRound(nextState);
+  return nextRound?.view === 'contract'
+    && (previousRound?.id !== nextRound.id || previousRound?.view !== nextRound.view);
+}
+
 async function loadState() {
   const response = await fetch('/api/state', { cache: 'no-store' });
   if (!response.ok) throw new Error(`state_${response.status}`);
   const result = await response.json();
+  const previousState = state;
   resetLoadedHistory(result.state?.slug);
   state = result.state;
   if (historyCursor === null && loadedHistory.rounds.length === 0) historyCursor = state.history_window?.older_before ?? null;
   dossierData = result.dossier;
   render();
+  if (enteredContractRound(previousState, state)) showView('contract');
 }
 
 function connect() {
