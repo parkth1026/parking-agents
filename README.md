@@ -1,17 +1,6 @@
 # parking-agents
 
-> 个人自用的跨平台 skill 开发与发布仓库 + VS Code Copilot agent 工具箱。`skills/` 单树分类、junction 即时生效，`.agents/skills/` 是新技能孵化位。
-
-## 这个仓库有两半
-
-它们**互不依赖**，规则也不同：
-
-| | `skills/` | `.copilot/agents/` |
-|---|---|---|
-| 是什么 | 跨平台技能库，9 个 harness 共享 | VS Code Copilot 专用 agent |
-| 交付方式 | 各平台原生插件机制 / 本机 junction 安装器 | 目录 junction 挂到 `~/.copilot/` |
-| 正文能否写工具名 | **不能**（`npm test` 会拦） | 能，本来就只跑在 Copilot 上 |
-| 开发文档 | [docs/porting-to-a-new-harness.md](./docs/porting-to-a-new-harness.md) | 各 agent 文件头部 + `eval/`、`insight/` 内 README |
+> 个人自用的跨平台 skill 开发与发布仓库。`skills/` 单树分类、junction 即时生效，`.agents/skills/` 是新技能孵化位。
 
 ## 目录结构
 
@@ -26,16 +15,18 @@ skills/                  # ★ 唯一安装源：分类=顶层目录，63 个技
 AGENTS.md                # ★ 仓库 Agent 约定（.mjs 脚本规则、目录约定、issue/标签/领域文档入口）
 CLAUDE.md / GEMINI.md    # 指令文件（@-include AGENTS.md；hooks/session-start 每会话注入它）
 CONTEXT.md               # 领域术语表（单一上下文，决策记录在 docs/adr/，见 docs/agents/domain.md）
+CHANGELOG.md             # 面向使用者的可感知变化记录
 
 install-skills.cmd       # 双击进安装菜单（junction 本机技能目录，见下节）
 uninstall-skills.cmd     # 双击进卸载菜单（全清指向本仓 skills/ 的链接）
 scripts/                 # skill-links.mjs 安装核心库 + install/uninstall 入口 + 版本锁步 + evals
 hooks/                   # SessionStart 注入器（注入 AGENTS.md；Claude Code / Cursor / Copilot CLI 共用）
 tests/                   # 结构断言 + 工具名 lint + 安装器测试 + 各平台契约测试
+evals/                   # 评测运行工作台（with/without 对照产物；gitignored 临时区，耐久记录在各技能目录）
 
 docs/
-├── agents/              # issue-tracker / triage-labels / domain 三份约定
-├── design/ research/ retrospectives/
+├── agents/              # issue-tracker / triage-labels / domain / skill-release 四份约定
+├── adr/ research/ retrospectives/
 ├── install-layout.md / porting-to-a-new-harness.md / testing.md
 ├── eval-gates-best-practices.md / GOALCONTRACT-GUIDE.md
 └── reports/             # 运行生成的报告/审计产物（gitignored）
@@ -44,13 +35,8 @@ docs/
 .pi/ .opencode/          # 各平台插件清单与扩展
 gemini-extension.json    # Gemini CLI 扩展清单
 
-.copilot/agents/         # 另一半：VS Code Copilot agent
-├── *.agent.md           # 编排器 + 工具链 subagent
-├── eval/                # 行为评估脚本
-└── insight/             # 使用行为洞察分析
-
 .aes-workflow/           # 工作流技能族运行时目录（有意入库）
-.aes-worktree-board/     # worktree 看板运行时目录
+.aes-worktree-board/     # worktree 看板（仅 board.config.json 入库，运行时数据 gitignored）
 ```
 
 ## 安装
@@ -203,43 +189,12 @@ marketplace 安装，或 `/plugins install` 加 GitHub URL。工具映射由 `.k
 | Skill | 说明 | 触发 |
 |---|---|---|
 | gh | GitHub CLI 调用模式（[cli/cli](https://github.com/cli/cli)） | 模型 |
-| glab | GitLab CLI（自建实例）认证与 issue/MR 使用范式 | 模型 |
+| aes-glab | glab CLI（自建 GitLab 实例）：安装、钥匙串认证与 issue/MR 使用范式 | 模型 |
 | playwright-cli | 浏览器自动化 | 模型 |
 | shadcn | shadcn/ui 组件管理 | 模型 |
 | simplify | 审查当前 diff 的复用/质量/效率，按需窄幅修复 | 模型 |
 
 > matt-skills/ 的 engineering 与 productivity 子组出自 [Matt Pocock 的 skills](https://github.com/mattpocock/skills)，迁移时**保持正文原文**便于将来同步上游。ue/、workflow/、life/ 的技能说明见各自 SKILL.md。
-
-## Agents（VS Code Copilot 专用）
-
-**编排器**
-
-| Agent | 说明 |
-|-------|------|
-| Master | 编排者，琐碎自干 + 实质任务走 Worker→Evaluator 三角验证 |
-| Worker | 全能执行器，按契约回报 Result/Claims |
-| Evaluator | 只读第二只眼睛，独立验证 Worker 产出 |
-| Parking | 薄编排器，全部委派给 Worker |
-| SuperPower | skill 驱动编排器，按技能路由 |
-| SuperPowerSub | SuperPower 的执行子代理 |
-| Karpathy | 遵循 Karpathy 准则的代码 agent |
-| Debug | REPRODUCE→ISOLATE→FIX→PROVE 系统化除虫 |
-| Simplify | 薄入口，转发到 simplify 技能（避免同一套流程维护两份） |
-
-**工具链 subagent**（`parking-agent-*`）
-
-| Subagent | 说明 |
-|----------|------|
-| parking-agent-creator | 创建 / 脚手架新的 agent / skill |
-| parking-agent-eval | 只读评估：lint、校验、排错 customization 文件 |
-| parking-agent-insight | Insight 分析编排：3-phase 管线（提取→语义→报告）|
-| parking-agent-analytics | 脚本执行 + 定量分析 + 错误诊断 |
-
-## 工具链
-
-**eval**（`.copilot/agents/eval/`）— 从 Copilot debug-logs 提取行为数据，用声明式 YAML 断言验证 agent 合规性。详见该目录 `README.md`。
-
-**insight**（`.copilot/agents/insight/`）— 三阶段管线：定量提取 → LLM 语义分析 → HTML 报告。详见该目录 `README.md`。
 
 ## 开发
 
@@ -247,7 +202,7 @@ marketplace 安装，或 `/plugins install` 加 GitHub URL。工具映射由 `.k
 npm test
 ```
 
-零依赖纯 Node。跑：技能发现与结构断言、安装器夹具（套装排除/套装外清除/选装/卸载全清）、**工具名 lint**、session-start hook 的三种 JSON 形状、Pi 扩展注入与去重、各平台 manifest 契约、跨 manifest 版本一致性（`--check` / `--audit`）、`check:repo` 跨平台结构检查器。
+零依赖纯 Node。跑：aes-qa 截图证据契约、技能发现与结构断言、安装器夹具（套装排除/套装外清除/选装/卸载全清）、**工具名 lint**、session-start hook 的三种 JSON 形状、Pi 扩展注入与去重、各平台 manifest 契约、跨 manifest 版本一致性（`--check` / `--audit`）、`check:repo` 跨平台结构检查器。
 
 **这些测试的价值在于把静默失败变成响亮失败** —— 技能加载在所有平台上都无报错、无警告，出错时技能只是不出现。详见 [docs/testing.md](./docs/testing.md)。
 
