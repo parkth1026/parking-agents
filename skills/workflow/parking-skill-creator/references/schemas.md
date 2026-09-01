@@ -354,6 +354,8 @@ Written by `scripts/run-headless-eval-arm.mjs` into `<run-dir>/run-meta.json`. N
 - `host_version` / `exit_code` / `timed_out` / `trace_id`: reproducibility anchors; invalid model or unsupported effort must fail fast
 - `effective_model` / `effective_effort`: 宿主或 provider 实际回显；没有回显就保持 null
 - `model_evidence` / `effort_evidence`: `provider_reported | host_reported | requested_only`，禁止把请求参数写成有效模型实锤
+- `completed_by`: `process_exit | completion_marker`；marker 必须由 Agent 在产物与验证之后最后写入
+- `completion_seen_at` / `terminated_after_completion`: 标记观察时间，以及宽限后是否由 launcher 终止仍未退出的进程
 - `started_at` / `duration_ms` / `prompt_file`: Run provenance
 
 **Boundary behavior:** the launcher never accepts credentials as arguments and never writes fabricated outputs on failure. Codex/Claude use their existing CLI authentication; zcode additionally requires `ZCODE_API_KEY` in the process environment. Requested values are not provider-side attestation; alias substitution or an unknown effective model must be recorded honestly. See `references/eval-models.md`.
@@ -365,6 +367,12 @@ Written by `scripts/run-headless-eval-arm.mjs` into `<run-dir>/run-meta.json`. N
 `scripts/resolve-eval-profile.mjs` 在每轮起跑前写入 iteration 根目录。默认来源是随包 `eval-profiles.json` 的 `economy`；记录 host、execution/trigger/grader 的 requested model/effort、fallback policy 与 `harness_profile_digest`。`resolved_at` 不进入 digest，保证同配置重复解析身份稳定。
 
 `strict` 缺显式 model、未知 host/profile、内置文件缺失或 headless 收到 `inherit` 时失败关闭。resolved 文件是请求证据，不伪造 effective model；它的 digest 必须进入本轮 harness identity。
+
+---
+
+## batch plan
+
+`scripts/plan-eval-batches.mjs` 输出 `kind/max_in_flight/adaptive_concurrency/group_size/groups_per_batch/batches[]`。`max_in_flight` 固定 4、adaptive=false；每个 batch 的 `in_flight=groups×group_size`。单个比较组超过 4 时退出 1，不拆组。
 
 ---
 

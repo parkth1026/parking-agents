@@ -30,7 +30,7 @@ description 决定技能会不会被调用。技能做完（或触发不准）�
 
 ### 分批并行 spawn 探针
 
-对每条 query spawn 探针 subagent（同宿主、每条默认 3 个探针；宿主支持无工具 agent 类型时探针优先用无工具类型）。探针按**整条 query 分批**：默认每批 3 条 query（=9 个探针同回合并发，对齐官方 run_eval.py worker-pool 默认 10 并发的量级），同 query 的 3 个探针同批发、一批收完再发下一批；并发受限的宿主按比例调小批。批怎么切不影响聚合（聚合按 query 多数表决），但别为凑并发把全部约 20 条 × 3 探针一次推出去。探针 prompt 模板：
+对每条 query spawn 3 个探针 subagent。先运行 `node scripts/plan-eval-batches.mjs --kind trigger --items <query数> --group-size 3`；固定每批 1 条 query（3 个探针），整组同批发、一批收完再发下一批。全局硬上限 4、不自适应，不能拆散同 query 的 3 个探针。探针 prompt 模板：
 
 ```
 你是一个技能路由判断器。你不需要、也不允许实际执行任务、调用任何工具或浏览任何文件——你只做一件事：从下面的技能清单里选出会用到的技能。

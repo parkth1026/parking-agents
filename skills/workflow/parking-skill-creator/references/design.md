@@ -46,6 +46,8 @@
 | AC-22 | benchmark/history/viewer 分离 run 判罚与 `SUPPORTED | INCONCLUSIVE | REGRESSED | BLOCKED` quality verdict；跨 evidence/harness epoch 不制造比较 | script |
 | AC-23 | 评测起跑问询含 host/model/effort profile；Codex/Claude 优先逐 run 原生传参，统一 headless launcher 支持 codex/claude/zcode fallback；同 eval 各 gate profile 不同则不可归因，跨 profile 轮不进 vs_previous | script |
 | AC-24 | Creator 随包提供零配置 economy，Codex/Claude 新机器可直接解析；strict 缺显式模型、未知宿主或 headless inherit 失败关闭；resolved profile 生成稳定 digest 且禁止昂贵隐式 fallback | script |
+| AC-25 | execution、trigger、grader 共用固定 max_in_flight=4 且关闭自适应；同 eval gates 与同 query probes 保持原子组，组大小超过 4 失败关闭；2/3/4/5 gate 边界均有回归 | script |
+| AC-26 | headless run 支持 run-dir 内显式 completion marker；标记稳定并经过退出宽限后可终止仍挂住的进程并记录 completed_by，不把已完成产物误判 timeout；无标记保持旧进程退出语义 | script/live |
 
 ## 迭代记录
 
@@ -80,3 +82,5 @@
 | 2026-09-01 | Codex/Claude 模型控制升级：模型配置提升为 host/model/effort profile；Codex Desktop 逐次传 model/reasoning_effort，Claude Agent 逐次 model + subagent effort；headless launcher 统一支持 codex/claude/zcode，并记录统一 run-meta | 239/239 自测、quick-validate、diff-check 通过；Codex CLI 0.151.0 与 Claude Code 2.1.250 参数面已核对；为避免额外 token，本轮未跑真实模型成功臂，账号可用性待首轮最小冒烟 | 未命中；保持单一流水线技能 |
 | 2026-09-01 | 零配置评测 profile：随包内置 economy/representative/strict，新增 resolver 与稳定 digest；economy 自动路由 Codex Luna low / Claude Haiku，strict 和 headless inherit 失败关闭 | 245/245 自测、quick-validate、diff-check 通过；真实 Codex Luna low 37.1s 与 Claude Haiku 13.3s smoke 均生成逐字 PROFILE_SMOKE_OK 和 run-meta；未把 smoke 冒充完整质量评测 | 未命中；保持单一流水线技能 |
 | 2026-09-01 | 用户裁决主力 profile 改为 Codex Luna high 与 Claude Sonnet medium；launcher 增 effective identity 取证等级，区分 provider_reported / host_reported / requested_only | 245/245 自测通过；真实 smoke：Codex runtime 回显 Luna/high（host_reported）并完成，Claude modelUsage 回显 canonicalModel=claude-sonnet-5/provider=firstParty（provider_reported）并完成；Claude effective effort 未回显，保持 requested_only | 未命中；保持单一流水线技能 |
+| 2026-09-01 | 并发策略固定为跨宿主 max_in_flight=4、关闭自适应；新增确定性 batch planner，输出 eval/trigger query 比较组不可拆，grader 同上限 | 2 gate 峰值4、3 gate峰值3、4 gate峰值4、5 gate失败关闭、trigger峰值3、grader峰值4均固化回归 | 未命中；保持单一流水线技能 |
+| 2026-09-01 | 修复 headless 只认进程退出导致已完成产物误判超时：新增 completion marker 监控、稳定检查、退出宽限与证据字段，无 marker 保持旧语义 | 假 CLI 完成后挂住回归通过；真实 Luna/high 原任务在正式 600s 配置下 253.3s 完成，marker/provider 产物齐、timed_out=false；253/253 自测通过 | 未命中；保持单一流水线技能 |

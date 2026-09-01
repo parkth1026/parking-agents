@@ -9,6 +9,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildQualityVerdict } from "./scripts/lib/quality.mjs";
+import { runUntilComplete } from "./scripts/lib/run-until-complete.mjs";
 
 const SCRIPTS = join(dirname(fileURLToPath(import.meta.url)), "scripts");
 
@@ -1887,6 +1888,22 @@ console.log("模型控制 profile 与 fallback：");
   const strictExplicit = runFile("resolve-eval-profile.mjs", ["--host", "codex", "--profile", "strict", "--model", "target-cheap"]);
   check("strict 显式模型可解析且不造默认 grader", strictExplicit.code === 0
     && JSON.parse(strictExplicit.stdout).execution.model_requested === "target-cheap");
+  const plan = (kind, items, groupSize) => runFile("plan-eval-batches.mjs", ["--kind", kind, "--items", String(items), "--group-size", String(groupSize)]);
+  const output2 = JSON.parse(plan("output", 5, 2).stdout);
+  check("2 gate 每批 2 eval，峰值固定 4", output2.groups_per_batch === 2 && output2.batches.every((b) => b.in_flight <= 4)
+    && output2.batches[0].in_flight === 4);
+  const output3 = JSON.parse(plan("output", 5, 3).stdout);
+  check("3 gate 每批 1 eval，峰值 3", output3.groups_per_batch === 1 && output3.batches.every((b) => b.in_flight === 3));
+  const output4 = JSON.parse(plan("output", 2, 4).stdout);
+  check("4 gate 保持完整比较组且峰值 4", output4.groups_per_batch === 1 && output4.batches.every((b) => b.in_flight === 4));
+  const output5 = plan("output", 1, 5);
+  check("5 gate 超过硬上限时失败关闭", output5.code === 1 && out(output5).includes("不得拆散比较组"));
+  const triggerPlan = JSON.parse(plan("trigger", 7, 3).stdout);
+  check("trigger 固定每批 1 query×3 probes", triggerPlan.groups_per_batch === 1 && triggerPlan.batches.length === 7
+    && triggerPlan.batches.every((b) => b.in_flight === 3));
+  const graderPlan = JSON.parse(plan("grader", 9, 1).stdout);
+  check("grader 每批最多 4", graderPlan.groups_per_batch === 4 && graderPlan.batches.every((b) => b.in_flight <= 4));
+  check("所有调度计划关闭自适应", [output2, output3, output4, triggerPlan, graderPlan].every((p) => p.adaptive_concurrency === false && p.max_in_flight === 4));
   const runner = (args, env = process.env) => runFile("run-headless-eval-arm.mjs", args, { env });
   const missing = runner(["--host", "codex", "--prompt-file", promptPath, "--run-dir", join(fx, "run")]);
   check("统一 launcher 缺 model 时退出码 2", missing.code === 2 && out(missing).includes("用法"));
@@ -1902,6 +1919,17 @@ console.log("模型控制 profile 与 fallback：");
   check("headless 禁止 representative 隐式继承", inherit.code === 2 && out(inherit).includes("没有可执行的具体模型"));
   const syntax = spawnSync(process.execPath, ["--check", join(SCRIPTS, "run-headless-eval-arm.mjs")], { encoding: "utf8" });
   check("统一 launcher Node 语法通过", syntax.status === 0);
+  const fakeHang = join(fx, "fake-complete-then-hang.mjs");
+  const completionPath = join(fx, "run", "outputs", "completion.json");
+  mkdirSync(dirname(completionPath), { recursive: true });
+  writeFileSync(fakeHang, `import { writeFileSync } from "node:fs"; writeFileSync(process.env.PSC_COMPLETION, '{"status":"complete"}\\n'); setInterval(() => {}, 1000);`, "utf8");
+  const markerRun = await runUntilComplete({
+    command: process.execPath, args: [fakeHang], cwd: fx,
+    env: { ...process.env, PSC_COMPLETION: completionPath }, timeoutMs: 10_000,
+    completionFile: completionPath, completionGraceMs: 250
+  });
+  check("完成标记稳定后终止挂住进程且不判 timeout", markerRun.completedBy === "completion_marker"
+    && markerRun.terminationRequested && markerRun.durationMs < 5_000);
   rmSync(fx, { recursive: true, force: true });
 }
 {

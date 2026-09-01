@@ -1,6 +1,11 @@
 {
   "schema_version": 1,
   "default_profile": "economy",
+  "scheduling": {
+    "max_in_flight": 4,
+    "adaptive_concurrency": false,
+    "keep_comparison_group_atomic": true
+  },
   "profiles": {
     "economy": {
       "description": "大量日常回归默认档：弱模型执行，平衡模型评分。",

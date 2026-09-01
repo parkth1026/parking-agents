@@ -134,7 +134,7 @@ PASS 但缺 `run-tests.mjs` 或 `references/design.md` 时给警告、SKILL.md �
 - 新建技能（建议默认）：`with_skill` + `without_skill`
 - 改进既有技能（建议默认）：`with_skill` + `old_skill` + `without_skill`；自定义例 `with_skill_no_refs`（不带 references 跑一组）——任意配置目录名聚合器都按名动态发现
 
-按解析结果把全部 eval × gate **分批** spawn。同一个 eval 的各 gate 必须同批同 profile；默认每批 2 个 eval，收完 timing 与产物再发下一批，并发受限时降到 1 个。别先跑 with 再补 baseline。
+先运行 `node scripts/plan-eval-batches.mjs --kind output --items <eval数> --group-size <gate数>`，逐批按计划 spawn。全局硬上限 4、不自适应；同一 eval 的各 gate 是不可拆比较组，gate 超 4 失败关闭。收完 timing 与产物再发下一批，别先跑 with 再补 baseline。
 
 带技能 run 的 prompt 模板：
 
@@ -145,8 +145,10 @@ PASS 但缺 `run-tests.mjs` 或 `references/design.md` 时给警告、SKILL.md �
 - 输入文件: <有则列出，无则 "none">
 - 产物保存到: <workspace>/iteration-<N>/eval-<名>/<gate>/run-1/outputs/
 - 要保存的产物: <用户关心的东西，如 "最终的 .docx 文件">
+- 完成标记: 全部产物与验证完成后，最后写 outputs/completion.json，内容为 {"status":"complete"}
 - 沙箱纪律: 仅可读写本 run 目录，workspace 其余内容（其他轮次产物、评分器、技能快照）禁读禁写
 ```
+headless run 传 `--completion-file outputs/completion.json`；launcher 等标记稳定并给 15 秒退出宽限，避免产物已完成但 Agent 收尾不退出被误判 TIMEOUT。没有标记仍以进程退出为准。
 
 沙箱纪律一行不得省略：without_skill 臂一旦读到 workspace 里其他轮次的评分器或技能快照，就等于提前知道判罚口径、借用被测技能的工具——基线被污染，delta 失真（karpathy 技能 iteration-8/13 两次实证）。评分侧对 without 臂 process-log 抽查 `grader|snapshot|评分方式` 关键词，发现借用痕迹该臂判罚标注污染、不计入 won-lost 依据。
 
@@ -185,7 +187,7 @@ PASS 但缺 `run-tests.mjs` 或 `references/design.md` 时给警告、SKILL.md �
 
 ### 6.4 评分与聚合
 
-1. **评分**：spawn grader subagent（读 `agents/grader.md`）逐断言对照产物，把 `grading.json` 写进每个 run 目录（逐断言 `name/text/passed/evidence`，外加对断言集本身的 `eval_feedback`）。多个 grader 同样分批发，同批 ≤4 个在飞（口径同 6.1）。可编程验证的断言写脚本判，别肉眼——更快更稳还能跨迭代复用。
+1. **评分**：先用 `node scripts/plan-eval-batches.mjs --kind grader --items <run数>` 规划，再 spawn grader subagent（读 `agents/grader.md`）逐断言对照产物，把 `grading.json` 写进每个 run 目录。同批最多 4 个；可编程验证的断言写脚本判。
 2. **聚合**：
 
    ```bash
@@ -303,7 +305,7 @@ node scripts/package-skill.mjs <技能目录> [输出目录]
 - `agents/grader.md` — grader subagent 指令（评分哲学与 grading.json 契约）
 - `agents/analyzer.md` — 基准分析指令（analyst pass：找聚合看不见的模式）
 - `eval-profiles.json` — 随包分发的零配置 `economy` 默认和显式 `representative`/`strict` profile
-- `scripts/` — init-skill / snapshot-skill / resolve-eval-profile / run-headless-eval-arm / check-shadow-skills / quick-validate / aggregate-benchmark / aggregate-trigger / package-skill + lib/
+- `scripts/` — init-skill / snapshot-skill / resolve-eval-profile / plan-eval-batches / run-headless-eval-arm / check-shadow-skills / quick-validate / aggregate-benchmark / aggregate-trigger / package-skill + lib/
 - `eval-viewer/` — generate-review.mjs（服务器与 --static 模式）+ viewer.html
 ---
 

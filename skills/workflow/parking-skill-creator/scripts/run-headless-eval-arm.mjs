@@ -2,12 +2,13 @@
 // 为 Codex / Claude / zcode 按 run 指定模型与推理强度。失败硬报，不代写产物。
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { isAbsolute, relative, resolve } from "node:path";
+import { runUntilComplete } from "./lib/run-until-complete.mjs";
 
 const USAGE = `用法:
   node scripts/run-headless-eval-arm.mjs --host <codex|claude|zcode> \\
     (--model <模型> [--effort <强度>] | --profile-file <resolved.json> --role <execution|trigger|grader>) \\
-    --prompt-file <文件> --run-dir <目录> [--timeout-ms <毫秒>]
+    --prompt-file <文件> --run-dir <目录> [--completion-file <run内相对路径>] [--completion-grace-ms <毫秒>] [--timeout-ms <毫秒>]
 
 认证由宿主 CLI 自己管理；本脚本不接受 credential 参数。zcode 兼容通道仍要求进程环境提供 ZCODE_API_KEY。
 退出码: 0=完成；1=宿主执行失败；2=参数或前置条件拒绝。`;
@@ -18,7 +19,7 @@ function fail(message, code = 1) {
 }
 
 function parseArgs(argv) {
-  const parsed = { timeoutMs: 600_000 };
+  const parsed = { timeoutMs: 600_000, completionGraceMs: 15_000 };
   for (let i = 0; i < argv.length; i++) {
     const flag = argv[i];
     if (flag === "--help" || flag === "-h") {
@@ -34,6 +35,8 @@ function parseArgs(argv) {
     else if (flag === "--role") parsed.role = value;
     else if (flag === "--prompt-file") parsed.promptFile = resolve(value);
     else if (flag === "--run-dir") parsed.runDir = resolve(value);
+    else if (flag === "--completion-file") parsed.completionFile = value;
+    else if (flag === "--completion-grace-ms") parsed.completionGraceMs = Number(value);
     else if (flag === "--timeout-ms") parsed.timeoutMs = Number(value);
     else fail(`${USAGE}\n未知参数: ${flag}`, 2);
   }
@@ -41,6 +44,8 @@ function parseArgs(argv) {
   if (!["codex", "claude", "zcode"].includes(parsed.host)) fail("拒绝: --host 只接受 codex、claude、zcode", 2);
   if (parsed.profileFile && !["execution", "trigger", "grader"].includes(parsed.role)) fail("拒绝: --profile-file 必须同时提供合法 --role", 2);
   if (!Number.isInteger(parsed.timeoutMs) || parsed.timeoutMs < 1_000 || parsed.timeoutMs > 3_600_000) fail("拒绝: --timeout-ms 必须是 1000..3600000 的整数", 2);
+  if (!Number.isInteger(parsed.completionGraceMs) || parsed.completionGraceMs < 0 || parsed.completionGraceMs > 60_000) fail("拒绝: --completion-grace-ms 必须是 0..60000 的整数", 2);
+  if (parsed.completionFile && isAbsolute(parsed.completionFile)) fail("拒绝: --completion-file 必须是 run-dir 内相对路径", 2);
   return parsed;
 }
 
@@ -59,6 +64,8 @@ const prompt = readFileSync(args.promptFile, "utf8");
 if (!prompt.trim()) fail("拒绝: prompt 文件为空", 2);
 
 mkdirSync(args.runDir, { recursive: true });
+const completionFile = args.completionFile ? resolve(args.runDir, args.completionFile) : null;
+if (completionFile && relative(args.runDir, completionFile).startsWith("..")) fail("拒绝: --completion-file 不得逃逸 run-dir", 2);
 const command = args.host === "codex" ? "codex" : args.host === "claude" ? "claude" : "zcode";
 const commandArgs = args.host === "codex"
   ? ["exec", "--ephemeral", "--skip-git-repo-check", "--sandbox", "workspace-write", "--model", args.model,
@@ -70,11 +77,11 @@ const commandArgs = args.host === "codex"
 const childEnv = args.host === "zcode" ? { ...process.env, ZCODE_MODEL: args.model } : process.env;
 const startedAt = new Date().toISOString();
 const t0 = Date.now();
-const result = spawnSync(command, commandArgs, {
-  encoding: "utf8", timeout: args.timeoutMs, env: childEnv, cwd: args.runDir,
-  windowsHide: true, maxBuffer: 32 * 1024 * 1024,
+const result = await runUntilComplete({
+  command, args: commandArgs, cwd: args.runDir, env: childEnv,
+  timeoutMs: args.timeoutMs, completionFile, completionGraceMs: args.completionGraceMs
 });
-const durationMs = Date.now() - t0;
+const durationMs = result.durationMs ?? (Date.now() - t0);
 const versionOut = spawnSync(command, ["--version"], { encoding: "utf8", timeout: 30_000 });
 const combined = (result.stdout ?? "") + (result.stderr ?? "");
 const traceId = (combined.match(/traceId[: ]+([0-9a-f-]{8,})/i) || [])[1] ?? null;
@@ -98,11 +105,16 @@ const meta = {
   effort_requested: args.effort ?? null, host_version: (versionOut.stdout || "").trim() || null,
   effective_model: effectiveModel, effective_effort: effectiveEffort,
   model_evidence: modelEvidence, effort_evidence: effectiveEffort ? "host_reported" : "requested_only",
-  exit_code: result.status, timed_out: result.signal === "SIGTERM" || result.error?.code === "ETIMEDOUT",
+  exit_code: result.status,
+  timed_out: !result.completionSeenAt && result.terminationRequested && durationMs >= args.timeoutMs,
+  completed_by: result.completedBy,
+  completion_file: completionFile,
+  completion_seen_at: result.completionSeenAt,
+  terminated_after_completion: result.completedBy === "completion_marker" && result.terminationRequested,
   trace_id: traceId, started_at: startedAt, duration_ms: durationMs, prompt_file: args.promptFile,
 };
 writeFileSync(resolve(args.runDir, "run-meta.json"), JSON.stringify(meta, null, 2) + "\n", "utf8");
 
 if (result.error) fail(`headless 启动失败: ${result.error.message}（host=${args.host}, model=${args.model}）`, 1);
-if (result.status !== 0) fail(`headless 退出码 ${result.status}（host=${args.host}, model=${args.model}, effort=${args.effort ?? "default"}）。请核对模型可用性、强度支持和宿主认证。`, 1);
+if (result.status !== 0 && result.completedBy !== "completion_marker") fail(`headless 退出码 ${result.status}（host=${args.host}, model=${args.model}, effort=${args.effort ?? "default"}）。请核对模型可用性、强度支持和宿主认证。`, 1);
 process.stdout.write(`OK host=${args.host} model=${args.model} effort=${args.effort ?? "default"} duration_ms=${durationMs}\nrun-meta.json 已写入 ${args.runDir}\n`);
