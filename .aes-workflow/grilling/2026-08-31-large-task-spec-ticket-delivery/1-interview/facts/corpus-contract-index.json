@@ -1,0 +1,867 @@
+{
+  "capturedAt": "2026-08-31T15:23:55.639Z",
+  "method": "read-only structural inventory; NOT validator run; historical verify text not current product verdict",
+  "cases": [
+    {
+      "case": "2026-08-16-jenkins-learning-nas-scope",
+      "stage": "3-contract",
+      "status": "ready",
+      "validation": {
+        "status": "valid",
+        "ac_count": 7,
+        "warnings": [],
+        "ran_at": "2026-08-15T17:19:00Z",
+        "verify_tiers": {
+          "A": 5,
+          "B": 0,
+          "C": 2,
+          "D": 0
+        }
+      },
+      "contracts": [
+        {
+          "path": "3-contract/contract.md",
+          "acIds": [
+            "AC-001",
+            "AC-002",
+            "AC-003",
+            "AC-004",
+            "AC-005",
+            "AC-006",
+            "AC-007"
+          ],
+          "statusLine": "- Status: Ready",
+          "mixedVerifyRows": 0,
+          "tiers": [
+            "A",
+            "C",
+            "A",
+            "A",
+            "A",
+            "A",
+            "C"
+          ],
+          "verifyLines": [
+            "  - Verify: [A] `node -e \"const fs=require('fs');const c=JSON.parse(fs.readFileSync('C:/Users/Administrator/.config/parking-agents/skill-env.json','utf8'));const N='//nas.51vr.local/PaaS/UE5/ue-llm-wiki/';let ok=c.jenkins.baseUrl==='http://10.66.12.40'&&c.gitRepos==='D:/Git'&&c.knowledgeBase.rawDir===N+'raw'&&c.knowledgeBase.wikiDir===N+'wiki'&&c.trackFile===N+'raw/analyzed-builds.json'&&c.workflowFile===N+'raw/workflow.json'&&c.tmpDir===N+'raw/tmp/ue-error';const en=c.jobs.filter(j=>j.enabled===true).map(j=>j.name).sort().join(',');ok=ok&&en==='aes6-ue-runtime-ci,twe-ue5.5-installed,twe-ue5.5-linux-ci'&&c.jobs.filter(j=>j.enabled!==true).length===4;ok=ok&&fs.existsSync('C:/Users/Administrator/.claude/skill-env.json');const t=fs.readFileSync('D:/GIT_dev/parking-agents/.claude/skills/jenkins-log-auto-learning/config.example.json','utf8');ok=ok&&t.includes(N+'raw')&&t.includes('http://10.66.12.40')&&t.includes('aes6-ue-runtime-ci')&&t.includes('twe-ue5.5-installed')&&t.includes('twe-ue5.5-linux-ci');process.exit(ok?0:1)\"` → 退出码 0",
+            "  - Verify: [C] 照 example-run 场景 1/2/3/9 操作，观察来源行、fallback 标注、引导三要素与退出码",
+            "  - Verify: [A] `node -e \"const fs=require('fs'),os=require('os'),path=require('path'),cp=require('child_process');const f=path.join(os.tmpdir(),'nas-failfast-env.json');fs.writeFileSync(f,JSON.stringify({jenkins:{baseUrl:'http://10.66.12.40'},gitRepos:'D:/Git',knowledgeBase:{rawDir:'//nas.invalid.invalid/x/raw',wikiDir:'//nas.invalid.invalid/x/wiki'},trackFile:'//nas.invalid.invalid/x/raw/t.json',tmpDir:'//nas.invalid.invalid/x/tmp',jobs:[{enabled:true,name:'t',path:'job/t/job/t'}]}));const r=cp.spawnSync(process.execPath,['D:/GIT_dev/parking-agents/.claude/skills/jenkins-log-auto-learning/scripts/session.mjs','status'],{env:Object.assign({},process.env,{SKILL_ENV:f}),encoding:'utf8'});const out=(r.stdout||'')+(r.stderr||'');console.log(out);process.exit(r.status!==0&&/不可达/.test(out)&&/建议/.test(out)?0:1)\"` → 退出码 0",
+            "  - Verify: [A] `node -e \"const fs=require('fs');const R='//nas.51vr.local/PaaS/UE5/ue-llm-wiki/';const files=[R+'raw/scratch/twe-114-DiskSpaceExhausted.md',R+'raw/scratch/twe-40-UAT-PluginDirNotFound.md',R+'wiki/SCHEMA.md',R+'wiki/index.md',R+'wiki/linux-ld-duplicate-symbol-FAesEditorToolTypeIdGenerator.md',R+'wiki/ue55-iwyu-fpaths-fapp-fassetdata.md'];const dirs=[R+'wiki/entities',R+'wiki/concepts'];process.exit(files.every(f=>fs.existsSync(f))&&dirs.every(d=>fs.existsSync(d))?0:1)\"` → 退出码 0",
+            "  - Verify: [A] `node -e \"const fs=require('fs');const L='C:/Users/Administrator/memory/jenkins-learnings-raw/';const t=JSON.parse(fs.readFileSync(L+'analyzed-builds.json','utf8'));process.exit(Object.keys(t.analyzed).some(k=>k==='job/wdp-ue/job/Earth/job/twe-ue5.5#115')&&fs.existsSync(L+'scratch/twe-114-DiskSpaceExhausted.md')&&fs.existsSync(L+'scratch/twe-40-UAT-PluginDirNotFound.md')&&!fs.existsSync('//nas.51vr.local/PaaS/UE5/ue-llm-wiki/raw/analyzed-builds.json')?0:1)\"` → 退出码 0",
+            "  - Verify: [A] `node -e \"const fs=require('fs'),path=require('path');const roots=['D:/GIT_dev/parking-agents/.claude/skills/jenkins-log-auto-learning','D:/GIT_dev/parking-agents/.claude/skills/ue-error-solver','D:/GIT_dev/parking-agents/.claude/skills/karpathy-llm-wiki'];let bad=[];(function walk(d){for(const e of fs.readdirSync(d,{withFileTypes:true})){const p=path.join(d,e.name);if(e.isDirectory())walk(p);else if(/\\.(ps1|psm1)$/i.test(e.name))bad.push(p);}})('D:/GIT_dev/parking-agents/.claude/skills/jenkins-log-auto-learning/scripts');(function walk(d){for(const e of fs.readdirSync(d,{withFileTypes:true})){const p=path.join(d,e.name);if(e.isDirectory())walk(p);else if(/\\.(ps1|psm1)$/i.test(e.name))bad.push(p);}})('D:/GIT_dev/parking-agents/.claude/skills/ue-error-solver/scripts');(function walk(d){for(const e of fs.readdirSync(d,{withFileTypes:true})){const p=path.join(d,e.name);if(e.isDirectory())walk(p);else if(/\\.(ps1|psm1)$/i.test(e.name))bad.push(p);}})('D:/GIT_dev/parking-agents/.claude/skills/karpathy-llm-wiki/scripts');process.exit(bad.length===0&&!fs.existsSync('D:/GIT_dev/parking-agents/.claude/skills/jenkins-log-auto-learning/tmp')&&fs.existsSync('D:/GIT_dev/parking-agents/.claude/skills/jenkins-log-auto-learning/scripts/scan-pairs.mjs')?0:1)\"` → 退出码 0",
+            "  - Verify: [C] 照 example-run 场景 4/5 操作，检查 NAS pending-pairs 内容（依据 scan-pairs.mjs 只迭代 enabled，AC-001 已机械锁定配置层）"
+          ]
+        }
+      ],
+      "verifyTail": [
+        "[FAIL] AC-004  exit=1  $ node -e \"const fs=require('fs');const R='//nas.51vr.local/PaaS/UE5/ue-llm-wiki/';const files=[R+'raw/scratch/twe-114-DiskSpaceExhausted.md',R+'raw/scratch/twe-40-UAT-PluginDirNotFound.md',R+'wiki/SCHEMA.md',R+'wiki/index.md',R+'wiki/linux-ld-duplicate-symbol-FAesEditorToolTypeIdGenerator.md',R+'wiki/ue55-iwyu-fpaths-fapp-fassetdata.md'];const dirs=[R+'wiki/entities',R+'wiki/concepts'];process.exit(files.every(f=>fs.existsSync(f))&&dirs.every(d=>fs.existsSync(d))?0:1)\"",
+        "[PASS] AC-005  exit=0  $ node -e \"const fs=require('fs');const L='C:/Users/Administrator/memory/jenkins-learnings-raw/';const t=JSON.parse(fs.readFileSync(L+'analyzed-builds.json','utf8'));process.exit(Object.keys(t.analyzed).some(k=>k==='job/wdp-ue/job/Earth/job/twe-ue5.5#115')&&fs.existsSync(L+'scratch/twe-114-DiskSpaceExhausted.md')&&fs.existsSync(L+'scratch/twe-40-UAT-PluginDirNotFound.md')&&!fs.existsSync('//nas.51vr.local/PaaS/UE5/ue-llm-wiki/raw/analyzed-builds.json')?0:1)\"",
+        "[FAIL] AC-006  exit=1  $ node -e \"const fs=require('fs'),path=require('path');const roots=['D:/GIT_dev/parking-agents/.claude/skills/jenkins-log-auto-learning','D:/GIT_dev/parking-agents/.claude/skills/ue-error-solver','D:/GIT_dev/parking-agents/.claude/skills/karpathy-llm-wiki'];let bad=[];(function walk(d){for(const e of fs.readdirSync(d,{withFileTypes:true})){const p=path.join(d,e.name);if(e.isDirectory())walk(p);else if(/\\.(ps1|psm1)$/i.test(e.name))bad.push(p);}})('D:/GIT_dev/parking-agents/.claude/skills/jenkins-log-auto-learning/scripts');(function walk(d){for(const e of fs.readdirSync(d,{withFileTypes:true})){const p=path.join(d,e.name);if(e.isDirectory())walk(p);else if(/\\.(ps1|psm1)$/i.test(e.name))bad.push(p);}})('D:/GIT_dev/parking-agents/.claude/skills/ue-error-solver/scripts');(function walk(d){for(const e of fs.readdirSync(d,{withFileTypes:true})){const p=path.join(d,e.name);if(e.isDirectory())walk(p);else if(/\\.(ps1|psm1)$/i.test(e.name))bad.push(p);}})('D:/GIT_dev/parking-agents/.claude/skills/karpathy-llm-wiki/scripts');process.exit(bad.length===0&&!fs.existsSync('D:/GIT_dev/parking-agents/.claude/skills/jenkins-log-auto-learning/tmp')&&fs.existsSync('D:/GIT_dev/parking-agents/.claude/skills/jenkins-log-auto-learning/scripts/scan-pairs.mjs')?0:1)\"",
+        "绿 1 / 红 4 / 跑不起来 0",
+        "另有 2 条非 [A] 档没跑：AC-002 [C]、AC-007 [C]"
+      ]
+    },
+    {
+      "case": "2026-08-16-scoring-system-fixes",
+      "stage": "3-contract",
+      "status": "ready",
+      "validation": {
+        "status": "valid",
+        "ac_count": 7,
+        "warnings": [],
+        "ran_at": "2026-08-16T17:05:44Z",
+        "verify_tiers": {
+          "A": 6,
+          "B": 0,
+          "C": 1,
+          "D": 0
+        }
+      },
+      "contracts": [
+        {
+          "path": "3-contract/contract.md",
+          "acIds": [
+            "AC-001",
+            "AC-002",
+            "AC-003",
+            "AC-004",
+            "AC-005",
+            "AC-006",
+            "AC-007"
+          ],
+          "statusLine": "- Status: Ready",
+          "mixedVerifyRows": 1,
+          "tiers": [
+            "A",
+            "A",
+            "A",
+            "A",
+            "A",
+            "A",
+            "C"
+          ],
+          "verifyLines": [
+            "  - Verify: [A] `node -e \"const fs=require('fs');const S=fs.readFileSync('D:/GIT_dev/parking-agents/.claude/skills/jenkins-pair-analyze/references/scoring.md','utf8');const C=fs.readFileSync('D:/GIT_dev/parking-agents/.claude/skills/jenkins-log-auto-learning/references/config.md','utf8');const K=fs.readFileSync('D:/GIT_dev/parking-agents/.claude/skills/jenkins-pair-analyze/references/knowledge-format.md','utf8');process.exit(S.includes('等效强归因链')&&S.includes('校准触发')&&!S.includes('This is acceptable')&&!C.includes('Diff 评分维度计 0 分')&&!C.includes('而非推断')&&!K.includes('twe-linux-114-DiskSpaceExhausted.md')?0:1)\"` → 退出码 0",
+            "  - Verify: [A] `node -e \"const s=require('fs').readFileSync('D:/GIT_dev/parking-agents/.claude/skills/jenkins-pair-analyze/references/scoring.md','utf8');process.exit(s.includes('修复侧')&&s.includes('配置变更')?0:1)\"` → 退出码 0",
+            "  - Verify: [A] `node -e \"const fs=require('fs');const N='//nas.51vr.local/x.public/UE5/ue-llm-wiki/raw/';const a=fs.readFileSync(N+'details/aes6-329-StageFileMissing-runtimeversion-not-in-repo.md','utf8');const b=fs.readFileSync(N+'scratch/aes6-56-EnvironmentStateLag-datapath-split-build-race.md','utf8');const m=t=>t.match(/^score:\\s*(\\d+)/m),r=t=>t.match(/^result:\\s*(\\S+)/m);process.exit(m(a)&&+m(a)[1]===8&&r(a)&&r(a)[1].startsWith('failure:score=8')&&m(b)&&+m(b)[1]===7&&r(b)&&r(b)[1].startsWith('failure:infra')?0:1)\"` → 退出码 0",
+            "  - Verify: [A] `node D:/GIT_dev/parking-agents/.claude/skills/jenkins-log-auto-learning/scripts/validate-raw.mjs` → 退出码 0；[C] 负例按 example-run 场景 1 手工复现（构造生效后缺节文件报 ERROR，验后删除）",
+            "  - Verify: [A] `node -e \"const fs=require('fs');const A=fs.readFileSync('D:/GIT_dev/parking-agents/.claude/skills/jenkins-pair-analyze/references/analyze.md','utf8');const K=fs.readFileSync('D:/GIT_dev/parking-agents/.claude/skills/jenkins-pair-analyze/references/knowledge-format.md','utf8');process.exit(/- \\[ \\].*see=/.test(A)&&K.includes('Warning Trend')&&K.includes('必填')?0:1)\"` → 退出码 0",
+            "  - Verify: [A] `node -e \"const fs=require('fs'),path=require('path');const B='D:/GIT_dev/parking-agents/docs/reports/scoring-audit-2026-08-16/blind-review/';if(!fs.existsSync(B+'set')||!fs.existsSync(B+'scoring-sheet.md')||!fs.existsSync(B+'procedure.md')||!fs.existsSync(B+'key.md')||!fs.existsSync('D:/GIT_dev/parking-agents/.claude/skills/jenkins-pair-analyze/references/blind-review.md'))process.exit(1);const set=fs.readdirSync(B+'set').filter(f=>f.endsWith('.md'));const keyRows=(fs.readFileSync(B+'key.md','utf8').match(/^\\| BR-/gm)||[]).length;const leaked=set.some(f=>/(^score:|\\*\\*Score\\*\\*|\\*\\*Scoring\\*\\*)/m.test(fs.readFileSync(path.join(B+'set',f),'utf8')));console.log('set:',set.length,'| key rows:',keyRows,'| leaked:',leaked);process.exit(set.length===keyRows&&keyRows>0&&!leaked?0:1)\"` → 退出码 0（2026-08-17 更正：数量对齐基准从活语料改为 key.md 快照行数——外部驱动每小时新增文件，原判据存在永不可过的竞态；意图不变）",
+            "  - Verify: [C] 照 example-run 场景 6 操作（操作者=用户，约半天；执行 Agent 负责包生成与指标计算，不代填）"
+          ]
+        }
+      ],
+      "verifyTail": [
+        "         [WARN]  \\\\nas.51vr.local\\x.public\\UE5\\ue-llm-wiki\\raw\\scratch\\aes6-295-304-ContainsNaN-degenerate-mesh-tangents.md: 账本缺键 job/wdp-ue/job/Earth/job/aes6-ue-runtime-ci#299（未落账或会话进行中）",
+        "[FAIL] AC-005  exit=1  $ node -e \"const fs=require('fs');const A=fs.readFileSync('D:/GIT_dev/parking-agents/.claude/skills/jenkins-pair-analyze/references/analyze.md','utf8');const K=fs.readFileSync('D:/GIT_dev/parking-agents/.claude/skills/jenkins-pair-analyze/references/knowledge-format.md','utf8');process.exit(/- \\[ \\].*see=/.test(A)&&K.includes('Warning Trend')&&K.includes('必填')?0:1)\"",
+        "[FAIL] AC-006  exit=1  $ node -e \"const fs=require('fs'),path=require('path');const B='D:/GIT_dev/parking-agents/scoring-audit-2026-08-16/blind-review/';const N='//nas.51vr.local/x.public/UE5/ue-llm-wiki/raw/';if(!fs.existsSync(B+'set')||!fs.existsSync(B+'scoring-sheet.md')||!fs.existsSync(B+'procedure.md')||!fs.existsSync('D:/GIT_dev/parking-agents/.claude/skills/jenkins-pair-analyze/references/blind-review.md'))process.exit(1);const set=fs.readdirSync(B+'set').filter(f=>f.endsWith('.md'));const count=['details','scratch'].reduce((n,d)=>n+fs.readdirSync(N+d).filter(f=>f.endsWith('.md')).length,0);const leaked=set.some(f=>/(^score:|\\*\\*Score\\*\\*|\\*\\*Scoring\\*\\*)/m.test(fs.readFileSync(path.join(B+'set',f),'utf8')));process.exit(set.length===count&&!leaked?0:1)\"",
+        "绿 2 / 红 4 / 跑不起来 0",
+        "另有 1 条非 [A] 档没跑：AC-007 [C]"
+      ]
+    },
+    {
+      "case": "2026-08-17-bpr-skill-improve",
+      "stage": "2-prototype",
+      "status": "in_progress",
+      "validation": null,
+      "contracts": []
+    },
+    {
+      "case": "2026-08-17-diagram-artifact",
+      "stage": "3-contract",
+      "status": "ready",
+      "validation": {
+        "status": "valid",
+        "ac_count": 7,
+        "warnings": [],
+        "ran_at": "2026-08-16T18:52:06Z",
+        "verify_tiers": {
+          "A": 7,
+          "B": 0,
+          "C": 0,
+          "D": 0
+        }
+      },
+      "contracts": [
+        {
+          "path": "3-contract/contract.md",
+          "acIds": [
+            "AC-001",
+            "AC-002",
+            "AC-003",
+            "AC-004",
+            "AC-005",
+            "AC-006",
+            "AC-007"
+          ],
+          "statusLine": "- Status: Ready",
+          "mixedVerifyRows": 0,
+          "tiers": [
+            "A",
+            "A",
+            "A",
+            "A",
+            "A",
+            "A",
+            "A"
+          ],
+          "verifyLines": [
+            "  - Verify: [A] `bash -c 'node .claude/skills/workflow-interview/scripts/session.test.mjs && grep -q 架构与依赖 .claude/skills/workflow-interview/scripts/session.test.mjs'` → 退出码 0",
+            "  - Verify: [A] `bash -c '! grep -rn 六面 .claude/skills/workflow-interview .claude/skills/aes-interview .claude/skills/aes-prototype .claude/skills/aes-goal-contract'` → 退出码 0",
+            "  - Verify: [A] `bash -c 'grep -q diagram.html .claude/skills/aes-prototype/SKILL.md && grep -q diagram.html .claude/skills/aes-goal-contract/SKILL.md && grep -q \"mock|diagram\" .claude/skills/workflow-interview/scripts/validate-goal-contract.mjs'` → 退出码 0",
+            "  - Verify: [A] `bash -c 'grep -q 色板 .claude/skills/aes-prototype/references/diagram.md && grep -q 复杂度预算 .claude/skills/aes-prototype/references/diagram.md && grep -q fidelity .claude/skills/aes-prototype/references/diagram.md && grep -q .changed .claude/skills/aes-prototype/references/diagram.md && grep -q 提取 .claude/skills/aes-prototype/references/diagram.md && grep -q MIT .claude/skills/aes-prototype/references/diagram.md'` → 退出码 0",
+            "  - Verify: [A] `bash -c 'grep -rq 架构与依赖 .aes-workflow/grilling/2026-08-16-jenkins-learning-nas-scope/2-prototype/'` → 退出码 0",
+            "  - Verify: [A] `bash -c 'grep -q 2026-08-17 \"../parking-agents/docs/research/diagram-design-能力分析与workflow-interview优化机会.md\"'` → 退出码 0",
+            "  - Verify: [A] `bash -c 'grep -q diagram .claude/skills/workflow-interview/evals/evals.json'` → 退出码 0"
+          ]
+        }
+      ],
+      "verifyTail": [
+        "         grep: .claude/skills/aes-prototype/references/diagram.md: No such file or directory",
+        "[FAIL] AC-005  exit=1  $ bash -c 'grep -rq 架构与依赖 .aes-workflow/grilling/2026-08-16-jenkins-learning-nas-scope/2-prototype/'",
+        "[FAIL] AC-006  exit=1  $ bash -c 'grep -q 2026-08-17 \"../parking-agents/docs/research/diagram-design-能力分析与workflow-interview优化机会.md\"'",
+        "[FAIL] AC-007  exit=1  $ bash -c 'grep -q diagram .claude/skills/workflow-interview/evals/evals.json'",
+        "绿 0 / 红 7 / 跑不起来 0"
+      ]
+    },
+    {
+      "case": "2026-08-17-skill-creator-design-review",
+      "stage": "3-contract",
+      "status": "ready",
+      "validation": {
+        "status": "valid",
+        "ac_count": 6,
+        "warnings": [
+          "WARNING: 正文句子里出现 TODO、TBD 或 FIXME，确认它是内容本身，不是没做完的标记。"
+        ],
+        "ran_at": "2026-08-17T05:51:08Z",
+        "verify_tiers": {
+          "A": 3,
+          "B": 0,
+          "C": 1,
+          "D": 2
+        }
+      },
+      "contracts": [
+        {
+          "path": "3-contract/contract.md",
+          "acIds": [
+            "AC-001",
+            "AC-002",
+            "AC-003",
+            "AC-004",
+            "AC-005",
+            "AC-006"
+          ],
+          "statusLine": "- Status: Ready",
+          "mixedVerifyRows": 3,
+          "tiers": [
+            "A",
+            "D",
+            "A",
+            "D",
+            "A",
+            "C"
+          ],
+          "verifyLines": [
+            "  - Verify: [A] `grep -q \"design.md\" \"G:\\GIT\\AI_WorkFlow\\parking-agents\\.claude\\skills\\parking-skill-creator\\scripts\\init-skill.mjs\" && node \"G:\\GIT\\AI_WorkFlow\\parking-agents\\.claude\\skills\\parking-skill-creator\\run-tests.mjs\"` → 退出码 0(探针现在红:init 尚不生成;run-tests 须含新断言并全过)",
+            "  - Verify: [D] SKILL.md 相应段落内容检查 + [A] `grep -q \"AC-\" \"G:\\GIT\\AI_WorkFlow\\parking-agents\\.claude\\skills\\parking-skill-creator\\SKILL.md\"` → 退出码 0",
+            "  - Verify: [A] `grep -q \"跑哪些 gate\" \"G:\\GIT\\AI_WorkFlow\\parking-agents\\.claude\\skills\\parking-skill-creator\\SKILL.md\"` → 退出码 0;run-tests 含自定义 gate 名聚合断言",
+            "  - Verify: [D] SKILL.md checklist 段内容检查 + [C] 示范中观察建议产出且未执行",
+            "  - Verify: [A] `grep -q \"history\" \"G:\\GIT\\AI_WorkFlow\\parking-agents\\.claude\\skills\\parking-skill-creator\\scripts\\aggregate-benchmark.mjs\"` → 退出码 0;run-tests 含 history 契约边界断言(首轮/次轮/防抖/dropped/损坏/无参数不变) + [C] viewer 对照 mock.html 结构核验",
+            "  - Verify: [C] 示范全程可复现操作,用户观察四个新能力(设计文档/gate 问询/审查建议/历史轨迹)全部真实出现"
+          ]
+        }
+      ],
+      "verifyTail": [
+        "[FAIL] AC-001  exit=1  $ grep -q \"design.md\" \"G:\\GIT\\AI_WorkFlow\\parking-agents\\.claude\\skills\\parking-skill-creator\\scripts\\init-skill.mjs\" && node \"G:\\GIT\\AI_WorkFlow\\parking-agents\\.claude\\skills\\parking-skill-creator\\run-tests.mjs\"",
+        "[FAIL] AC-003  exit=1  $ grep -q \"跑哪些 gate\" \"G:\\GIT\\AI_WorkFlow\\parking-agents\\.claude\\skills\\parking-skill-creator\\SKILL.md\"",
+        "[FAIL] AC-005  exit=1  $ grep -q \"history\" \"G:\\GIT\\AI_WorkFlow\\parking-agents\\.claude\\skills\\parking-skill-creator\\scripts\\aggregate-benchmark.mjs\"",
+        "绿 0 / 红 3 / 跑不起来 0",
+        "另有 3 条非 [A] 档没跑：AC-002 [D]、AC-004 [D]、AC-006 [C]"
+      ]
+    },
+    {
+      "case": "2026-08-20-workflow-interview-web",
+      "stage": "3-contract",
+      "status": "ready",
+      "validation": {
+        "status": "valid",
+        "ac_count": 6,
+        "warnings": [],
+        "ran_at": "2026-08-22T15:27:26Z",
+        "verify_tiers": {
+          "A": 3,
+          "B": 1,
+          "C": 1,
+          "D": 1
+        }
+      },
+      "contracts": [
+        {
+          "path": "3-contract/contract.md",
+          "acIds": [
+            "AC-001",
+            "AC-002",
+            "AC-003",
+            "AC-004",
+            "AC-005",
+            "AC-006"
+          ],
+          "statusLine": "- Status: Ready",
+          "mixedVerifyRows": 0,
+          "tiers": [
+            "A",
+            "A",
+            "A",
+            "B",
+            "C",
+            "D"
+          ],
+          "verifyLines": [
+            "  - Verify: [A] `node .agents/skills/workflow-interview-web/scripts/run-tests.mjs` → 退出码 0（含上述检查）",
+            "  - Verify: [A] `node .agents/skills/workflow-interview-web/scripts/run-tests.mjs` → 退出码 0（含上述检查）",
+            "  - Verify: [A] `node .agents/skills/workflow-interview-web/scripts/run-tests.mjs` → 退出码 0（含上述检查）",
+            "  - Verify: [B] `web/evidence/ac-004/steps.md`（实点步骤记录）→ 匹配 `web/evidence/ac-004/expected.md`（期望观察清单；截图/录屏同目录）",
+            "  - Verify: [C] 杀 wait-submit → 浏览器提交 200 → 检查 `web/submissions/` 文件存在 → 运行吸收检查步骤 → 全部可观察结果落 D-02",
+            "  - Verify: [D] `.agents/skills/workflow-interview-web/SKILL.md` 降级节内容检查"
+          ]
+        }
+      ],
+      "verifyTail": [
+        "         check 11  薄层依赖断言、三级降级和单页关键能力静态检查",
+        "         check 12  shutdown 回执、进程收尾与 server-stopped 标记",
+        "         12/12 passed",
+        "绿 3 / 红 0 / 跑不起来 0",
+        "另有 3 条非 [A] 档没跑：AC-004 [B]、AC-005 [C]、AC-006 [D]"
+      ]
+    },
+    {
+      "case": "2026-08-23-worktree-board",
+      "stage": "3-contract",
+      "status": "ready",
+      "validation": {
+        "status": "valid",
+        "ac_count": 6,
+        "warnings": [],
+        "ran_at": "2026-08-23T12:38:29Z",
+        "verify_tiers": {
+          "A": 4,
+          "B": 0,
+          "C": 2,
+          "D": 0
+        }
+      },
+      "contracts": [
+        {
+          "path": "3-contract/contract.md",
+          "acIds": [
+            "AC-001",
+            "AC-002",
+            "AC-003",
+            "AC-004",
+            "AC-005",
+            "AC-006"
+          ],
+          "statusLine": "- Status: Ready",
+          "mixedVerifyRows": 1,
+          "tiers": [
+            "A",
+            "C",
+            "A",
+            "A",
+            "A",
+            "C"
+          ],
+          "verifyLines": [
+            "  - Verify: [A] `node .claude/skills/aes-worktree-board/scripts/selftest.mjs collect` → 0（断言至少含：schemaVersion=2；issues 数 = gh 全量数；derived.status 闭集且抽样复算一致；degree=无向边数；warn 仅出现在有 reopen 历史的 CLOSED；mode 三态推导；position 闭集 issue|none；stale 时间戳规则；stats 计数与节点一致；写入旧 assessment 后重采仍在）",
+            "  - Verify: [C] 起 server 后对照 `../2-prototype/mock.html`（含其文末变更清单）与 handoff README「Interactions & Behavior」1-7 逐项检查；每项记录通过/不通过（第 7 轮 Q1 裁决：人工对照，主 agent 可用内置浏览器半自动执行）",
+            "  - Verify: [A] `node .claude/skills/aes-worktree-board/scripts/selftest.mjs dispatch` → 0（用 test agent 与临时未跟踪文件模拟，断言上述五点与报文字段=api-mock 形态）",
+            "  - Verify: [A] `node .claude/skills/aes-worktree-board/scripts/selftest.mjs server` → 0（临时端口起服断言三端点与 fast 语义）；[C] 双击 board.html 确认快照模式徽标与只读降级",
+            "  - Verify: [A] `node .claude/skills/aes-worktree-board/scripts/selftest.mjs layout` → 0",
+            "  - Verify: [C] 演练一次巡检对话对照场景 2；抽查 status.json 的 assessment 与表格一致；构造（或口述模拟）一个无 issue 分支场景确认降档措辞"
+          ]
+        }
+      ],
+      "verifyTail": [
+        "[FAIL] AC-005  exit=1  $ node .claude/skills/aes-worktree-board/scripts/selftest.mjs layout",
+        "         }",
+        "         Node.js v24.19.0",
+        "绿 0 / 红 4 / 跑不起来 0",
+        "另有 2 条非 [A] 档没跑：AC-002 [C]、AC-006 [C]"
+      ]
+    },
+    {
+      "case": "2026-08-24-aes-gate",
+      "stage": "3-contract",
+      "status": "ready",
+      "validation": {
+        "status": "valid",
+        "ac_count": 5,
+        "warnings": [],
+        "ran_at": "2026-08-24T18:46:44Z",
+        "verify_tiers": {
+          "A": 2,
+          "B": 0,
+          "C": 3,
+          "D": 0
+        }
+      },
+      "contracts": [
+        {
+          "path": "3-contract/contract.md",
+          "acIds": [
+            "AC-001",
+            "AC-002",
+            "AC-003",
+            "AC-004",
+            "AC-005"
+          ],
+          "statusLine": "- Status: Ready",
+          "mixedVerifyRows": 3,
+          "tiers": [
+            "C",
+            "A",
+            "C",
+            "A",
+            "C"
+          ],
+          "verifyLines": [
+            "  - Verify: [C] 照 `../2-prototype/example-run.md` 场景 D 用 ps1-BOM 坑实操，检查三件产出；加 [A] `node scripts/gate/check-ps1-bom.mjs --self-test` → 退出码 0（正反样例均判对）",
+            "  - Verify: [A] `node .agents/skills/aes-gate/scripts/collect.mjs` → 退出码 0 且 `gate-registry.json` 更新（`history` 新增一行）；加 [C] 报告节构对照 behavior.md 变化行 2",
+            "  - Verify: [C] 照场景 B 实操：selftest 全绿（逐件退出码 0）、确认门前 `git status` 与生成前一致、G1 完成后 registry 中该门 `protection=ci-protected`",
+            "  - Verify: [A] `node .agents/skills/aes-gate/scripts/collect.mjs --self-test` → 退出码 0（schema 自校验）；加 [D] 断网双击打开 `board.html` 呈现 mock 所列六区块且无外链请求",
+            "  - Verify: [C] 模拟 aes-qa 调用一轮：回传结构与 `../2-prototype/api-mock.md` 结局 1 逐字段一致，且 `.aes-gate/` 下无新增 `report-*` 文件（真机联调归 #19 自举）"
+          ]
+        }
+      ],
+      "verifyTail": [
+        "[FAIL] AC-004  exit=1  $ node .agents/skills/aes-gate/scripts/collect.mjs --self-test",
+        "         }",
+        "         Node.js v24.19.0",
+        "绿 0 / 红 2 / 跑不起来 0",
+        "另有 3 条非 [A] 档没跑：AC-001 [C]、AC-003 [C]、AC-005 [C]"
+      ]
+    },
+    {
+      "case": "2026-08-24-aes-worktree-board-upgrade",
+      "stage": "3-contract",
+      "status": "ready",
+      "validation": {
+        "status": "valid",
+        "ac_count": 7,
+        "warnings": [],
+        "ran_at": "2026-08-24T09:31:13Z",
+        "verify_tiers": {
+          "A": 6,
+          "B": 0,
+          "C": 1,
+          "D": 0
+        }
+      },
+      "contracts": [
+        {
+          "path": "3-contract/contract.md",
+          "acIds": [
+            "AC-001",
+            "AC-002",
+            "AC-003",
+            "AC-004",
+            "AC-005",
+            "AC-006",
+            "AC-007"
+          ],
+          "statusLine": "- Status: Ready",
+          "mixedVerifyRows": 0,
+          "tiers": [
+            "A",
+            "A",
+            "A",
+            "A",
+            "C",
+            "A",
+            "A"
+          ],
+          "verifyLines": [
+            "  - Verify: [A] `node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration --scenario storage` → 退出 0",
+            "  - Verify: [A] `node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration --scenario lifecycle` → 退出 0",
+            "  - Verify: [A] `node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration --scenario governance` → 退出 0",
+            "  - Verify: [A] `node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration --scenario boundary` → 退出 0（场景内起真实 server 探测 401/403 与错配拒绝）",
+            "  - Verify: [C] 打开 LIVE 看板按 `../2-prototype/mock.html` 六挂点逐处人工对照（含 v2 旧快照打开时的降级条）；星图节点/名牌旗/图例与升级前无差异",
+            "  - Verify: [A] `node .agents/skills/aes-worktree-board/scripts/check-issue-graph.mjs` → 退出 0（gh 读图与 #5 正文断言；联网条目，是离线验收主力的唯一例外）",
+            "  - Verify: [A] `node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration --scenario contract` → 退出 0"
+          ]
+        }
+      ],
+      "verifyTail": [
+        "         Node.js v24.19.0",
+        "[FAIL] AC-007  exit=2  $ node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration --scenario contract",
+        "         用法: node selftest.mjs <collect|fixture|dispatch|server|repo-root|layout|windows-hide>",
+        "绿 0 / 红 6 / 跑不起来 0",
+        "另有 1 条非 [A] 档没跑：AC-005 [C]"
+      ]
+    },
+    {
+      "case": "2026-08-24-对标mattpocock仓库差距",
+      "stage": "3-contract",
+      "status": "ready",
+      "validation": {
+        "status": "valid",
+        "ac_count": 7,
+        "warnings": [],
+        "ran_at": "2026-08-24T17:01:55Z",
+        "verify_tiers": {
+          "A": 3,
+          "B": 0,
+          "C": 1,
+          "D": 3
+        }
+      },
+      "contracts": [
+        {
+          "path": "3-contract/contract.md",
+          "acIds": [
+            "AC-001",
+            "AC-002",
+            "AC-003",
+            "AC-004",
+            "AC-005",
+            "AC-006",
+            "AC-007"
+          ],
+          "statusLine": "- Status: Ready",
+          "mixedVerifyRows": 0,
+          "tiers": [
+            "A",
+            "A",
+            "C",
+            "D",
+            "A",
+            "D",
+            "D"
+          ],
+          "verifyLines": [
+            "  - Verify: [A] `bash -c 'grep -q build-release package.json && npm test'` → exit 0",
+            "  - Verify: [A] `bash -c 'grep -q -- \"--only\" scripts/install-skills.mjs && npm test'` → exit 0",
+            "  - Verify: [C] 先跑 `npm run evals --list` → exit 0 且含产物齐全度列;再真跑一轮 `npm run evals`,汇总表逐技能行与该技能 run-tests 手跑结果一致(真模型耗 key,由用户执行)",
+            "  - Verify: [D] README.md/AGENTS.md/CONTEXT.md 三处断言清单逐项核对",
+            "  - Verify: [A] `bash -c 'git rev-parse --verify v0.2.0 && test -s CHANGELOG.md'` → exit 0",
+            "  - Verify: [D] 标准文档内容检查(五步标题+门槛句)",
+            "  - Verify: [D] 报告章节清单逐项核对"
+          ]
+        }
+      ],
+      "verifyTail": [
+        "[FAIL] AC-002  exit=1  $ bash -c 'grep -q -- \"--only\" scripts/install-skills.mjs && npm test'",
+        "[FAIL] AC-005  exit=128  $ bash -c 'git rev-parse --verify v0.2.0 && test -s CHANGELOG.md'",
+        "         fatal: Needed a single revision",
+        "绿 0 / 红 3 / 跑不起来 0",
+        "另有 4 条非 [A] 档没跑：AC-003 [C]、AC-004 [D]、AC-006 [D]、AC-007 [D]"
+      ]
+    },
+    {
+      "case": "2026-08-25-aes-worktree-board-session-evolution",
+      "stage": "3-contract",
+      "status": "ready",
+      "validation": {
+        "status": "valid",
+        "ac_count": 7,
+        "warnings": [],
+        "ran_at": "2026-08-26T08:26:14Z",
+        "verify_tiers": {
+          "A": 6,
+          "B": 0,
+          "C": 1,
+          "D": 0
+        }
+      },
+      "contracts": [
+        {
+          "path": "3-contract/contract.md",
+          "acIds": [
+            "AC-001",
+            "AC-002",
+            "AC-003",
+            "AC-004",
+            "AC-005",
+            "AC-006",
+            "AC-007"
+          ],
+          "statusLine": "- Status: Ready",
+          "mixedVerifyRows": 0,
+          "tiers": [
+            "A",
+            "A",
+            "A",
+            "A",
+            "A",
+            "A",
+            "C"
+          ],
+          "verifyLines": [
+            "  - Verify: [A] `node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration --scenario runner-lifecycle` → 退出码 0",
+            "  - Verify: [A] `node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration --scenario recovery` → 退出码 0",
+            "  - Verify: [A] `node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration --scenario trajectory-replay` → 退出码 0",
+            "  - Verify: [A] `node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration --scenario discovered-work` → 退出码 0",
+            "  - Verify: [A] `node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration --scenario delivery-merge` → 退出码 0",
+            "  - Verify: [A] `node .agents/skills/aes-worktree-board/scripts/selftest.mjs board-ui --baseline 700x1000` → 退出码 0（截图 diff 基建随本契约新建）",
+            "  - Verify: [C] 按 (a)(b) 步骤各执行一次，产出绑定 commit/mock SHA 的运行与截图 receipt（D-02）；(a) 的意外用户消息数 = 0"
+          ]
+        }
+      ],
+      "verifyTail": [
+        "         {\"ok\":false,\"domain\":\"orchestration\",\"error\":\"AssertionError [ERR_ASSERTION]: 未知 orchestration scenario: delivery-merge; 可用 storage|lifecycle|governance|continuous|boundary|contract\\n    at Object.orchestrationDomain [as orchestration] (file:///G:/GIT/AI_WorkFlow/parking-agents-manual/.agents/skills/aes-worktree-board/scripts/selftest.mjs:3772:10)\\n    at file:///G:/GIT/AI_WorkFlow/parking-agents-manual/.agents/skills/aes-worktree-board/scripts/selftest.mjs:3888:39\"}",
+        "[FAIL] AC-006  exit=2  $ node .agents/skills/aes-worktree-board/scripts/selftest.mjs board-ui --baseline 700x1000",
+        "         用法: node selftest.mjs <collect|collect-live|fixture|dispatch|server|identity|repo-root|layout|windows-hide|orchestration>",
+        "绿 0 / 红 6 / 跑不起来 0",
+        "另有 1 条非 [A] 档没跑：AC-007 [C]"
+      ]
+    },
+    {
+      "case": "2026-08-27-aes-issue-worker-流程重梳",
+      "stage": "3-contract",
+      "status": "ready",
+      "validation": {
+        "status": "valid",
+        "ac_count": 5,
+        "warnings": [],
+        "ran_at": "2026-08-27T06:20:32Z",
+        "verify_tiers": {
+          "A": 4,
+          "B": 0,
+          "C": 0,
+          "D": 1
+        }
+      },
+      "contracts": [
+        {
+          "path": "3-contract/contract.md",
+          "acIds": [
+            "AC-001",
+            "AC-002",
+            "AC-003",
+            "AC-004",
+            "AC-005"
+          ],
+          "statusLine": "- Status: Ready",
+          "mixedVerifyRows": 0,
+          "tiers": [
+            "A",
+            "A",
+            "A",
+            "D",
+            "A"
+          ],
+          "verifyLines": [
+            "  - Verify: [A] `node -e \"const s=require('fs').readFileSync('.agents/skills/aes-issue-worker/SKILL.md','utf8');process.exit(s.includes('循环轮')&&s.includes('最终轮')&&s.includes('aes-merge-worker')&&!s.includes('在本 session 内修')&&!s.includes('实现 → 只读 review')?0:1)\"` → 退出码 0",
+            "  - Verify: [A] `node -e \"const s=require('fs').readFileSync('.agents/skills/aes-qa/SKILL.md','utf8');process.exit(s.includes('循环轮')&&s.includes('最终轮')&&!s.includes('review 通过后')?0:1)\"` → 退出码 0",
+            "  - Verify: [A] `node -e \"const f=require('fs');const a=f.readFileSync('.agents/skills/aes-worktree-board/SKILL.md','utf8');const b=f.readFileSync('.agents/skills/aes-worktree-board/references/design.md','utf8');process.exit(a.includes('aes-merge-worker')&&a.includes('review-return')&&b.includes('aes-merge-worker')?0:1)\"` → 退出码 0",
+            "  - Verify: [D] `.agents/skills/aes-issue-worker/SKILL.md` 内容检查：含 for-human 模式角色位声明、humanRequest 暂停协议引用、与「不实现」边界句。",
+            "  - Verify: [A] `npm test && node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration` → 退出码 0"
+          ]
+        }
+      ],
+      "verifyTail": [
+        "[PASS] AC-005  exit=0  $ npm test && node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration",
+        "         warning: name clash — shared: C:\\Users\\parking\\AppData\\Local\\Temp\\install-skills-test-54bZ02\\select-release\\productivity\\shared skipped, first source wins",
+        "         ERROR: 未知技能: missing-skill",
+        "绿 1 / 红 3 / 跑不起来 0",
+        "另有 1 条非 [A] 档没跑：AC-004 [D]"
+      ]
+    },
+    {
+      "case": "2026-08-28-aes-merge-worker-落地",
+      "stage": "3-contract",
+      "status": "in_progress",
+      "validation": null,
+      "contracts": []
+    },
+    {
+      "case": "2026-08-28-issue70-loop-first-ruling",
+      "stage": "2-prototype",
+      "status": "in_progress",
+      "validation": null,
+      "contracts": []
+    },
+    {
+      "case": "2026-08-28-outbox-close-解耦",
+      "stage": "3-contract",
+      "status": "ready",
+      "validation": {
+        "status": "valid",
+        "ac_count": 5,
+        "warnings": [],
+        "ran_at": "2026-08-28T11:19:20Z",
+        "verify_tiers": {
+          "A": 4,
+          "B": 0,
+          "C": 1,
+          "D": 0
+        }
+      },
+      "contracts": [
+        {
+          "path": "3-contract/contract.md",
+          "acIds": [
+            "AC-001",
+            "AC-002",
+            "AC-003",
+            "AC-004",
+            "AC-005"
+          ],
+          "statusLine": "- Status: Ready",
+          "mixedVerifyRows": 0,
+          "tiers": [
+            "A",
+            "A",
+            "A",
+            "A",
+            "C"
+          ],
+          "verifyLines": [
+            "  - Verify: [A] `node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration --scenario outbox-close` → 退出码 0",
+            "  - Verify: [A] `node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration --scenario outbox-flush` → 退出码 0",
+            "  - Verify: [A] `node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration --scenario outbox-ack` → 退出码 0",
+            "  - Verify: [A] `node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration --scenario outbox-gate && node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration --scenario delivery-merge` → 退出码 0",
+            "  - Verify: [C] 在 `G:/GIT/AI_WorkFlow/parking-agents` 依次执行："
+          ]
+        }
+      ],
+      "verifyTail": [
+        "[PASS] AC-004  exit=0  $ node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration --scenario outbox-gate && node .agents/skills/aes-worktree-board/scripts/selftest.mjs orchestration --scenario delivery-merge",
+        "         {\"ok\":true,\"domain\":\"orchestration\",\"scenario\":\"outbox-gate\",\"scenarios\":1,\"passed\":1,\"skipped\":[],\"scenarioIds\":[]}",
+        "         {\"ok\":true,\"domain\":\"orchestration\",\"scenario\":\"delivery-merge\",\"scenarios\":1,\"passed\":1,\"skipped\":[],\"scenarioIds\":[]}",
+        "绿 4 / 红 0 / 跑不起来 0",
+        "另有 1 条非 [A] 档没跑：AC-005 [C]"
+      ]
+    },
+    {
+      "case": "2026-08-29-aes-glab-skill改进",
+      "stage": "3-contract",
+      "status": "ready",
+      "validation": {
+        "status": "valid",
+        "ac_count": 5,
+        "warnings": [],
+        "ran_at": "2026-08-29T14:01:35Z",
+        "verify_tiers": {
+          "A": 3,
+          "B": 1,
+          "C": 0,
+          "D": 1
+        }
+      },
+      "contracts": [
+        {
+          "path": "3-contract/contract.md",
+          "acIds": [
+            "AC-001",
+            "AC-002",
+            "AC-003",
+            "AC-004",
+            "AC-005"
+          ],
+          "statusLine": "- Status: Ready",
+          "mixedVerifyRows": 0,
+          "tiers": [
+            "B",
+            "A",
+            "A",
+            "D",
+            "A"
+          ],
+          "verifyLines": [
+            "  - Verify: [B] 输入 = `D:\\GIT_dev\\parking-agents\\.agents\\skills\\aes-glab\\output-evals.json` 的 eval prompt → 产出的安装指引匹配同文件全部六条断言，门槛 6/6",
+            "  - Verify: [A] `bash -c 'S=\"/d/GIT_dev/parking-agents/.agents/skills/aes-glab/SKILL.md\"; grep -qF \"winget install GLab.GLab\" \"$S\" && grep -qF \"AppData\\Local\\Programs\\glab\" \"$S\" && grep -qF \"AppData\\Local\\glab-cli\\config.yml\" \"$S\" && grep -qE \"新开(一个)?终端\" \"$S\" && grep -qE \"Uninstall|winget list\" \"$S\" && grep -qF \"command not found\" \"$S\" && grep -qE \"噪音|模板块\" \"$S\" && grep -qE \"GITLAB_TOKEN\" \"$S\"'` → 退出码 0",
+            "  - Verify: [A] `bash -c 'S=\"/d/GIT_dev/parking-agents/.agents/skills/aes-glab/SKILL.md\"; grep -m1 \"^description:\" \"$S\" | grep -qE \"安装|从零\" && node /d/GIT_dev/parking-agents/.agents/skills/parking-skill-creator/scripts/quick-validate.mjs /d/GIT_dev/parking-agents/.agents/skills/aes-glab'` → 退出码 0",
+            "  - Verify: [D] `D:\\GIT_dev\\parking-agents\\.agents\\skills\\aes-glab\\references\\evidence-usage.md`（D-01）存在且四个组每条候选都有实测命令+输出摘要+去留裁决；SKILL.md 使用面节只含 evidence-usage.md 判「入节」的条目",
+            "  - Verify: [A] `bash -c 'D=\"/d/GIT_dev/parking-agents/.agents/skills/aes-glab/references/design.md\"; grep -qE \"AC-6\" \"$D\" && grep -qE \"AC-7\" \"$D\" && grep -qF \"AC-1\" \"$D\" && grep -qF \"relates_to\" \"$D\"'` → 退出码 0"
+          ]
+        }
+      ],
+      "verifyTail": [
+        "[FAIL] AC-002  exit=1  $ bash -c 'S=\"/d/GIT_dev/parking-agents/.agents/skills/aes-glab/SKILL.md\"; grep -qF \"winget install GLab.GLab\" \"$S\" && grep -qF \"AppData\\Local\\Programs\\glab\" \"$S\" && grep -qF \"AppData\\Local\\glab-cli\\config.yml\" \"$S\" && grep -qE \"新开(一个)?终端\" \"$S\" && grep -qE \"Uninstall|winget list\" \"$S\" && grep -qF \"command not found\" \"$S\" && grep -qE \"噪音|模板块\" \"$S\" && grep -qE \"GITLAB_TOKEN\" \"$S\"'",
+        "[FAIL] AC-003  exit=1  $ bash -c 'S=\"/d/GIT_dev/parking-agents/.agents/skills/aes-glab/SKILL.md\"; grep -m1 \"^description:\" \"$S\" | grep -qE \"安装|从零\" && node /d/GIT_dev/parking-agents/.agents/skills/parking-skill-creator/scripts/quick-validate.mjs /d/GIT_dev/parking-agents/.agents/skills/aes-glab'",
+        "[FAIL] AC-005  exit=1  $ bash -c 'D=\"/d/GIT_dev/parking-agents/.agents/skills/aes-glab/references/design.md\"; grep -qE \"AC-6\" \"$D\" && grep -qE \"AC-7\" \"$D\" && grep -qF \"AC-1\" \"$D\" && grep -qF \"relates_to\" \"$D\"'",
+        "绿 0 / 红 3 / 跑不起来 0",
+        "另有 2 条非 [A] 档没跑：AC-001 [B]、AC-004 [D]"
+      ]
+    },
+    {
+      "case": "2026-08-30-issue-147-steelman-rerun",
+      "stage": "2-prototype",
+      "status": "in_progress",
+      "validation": null,
+      "contracts": []
+    },
+    {
+      "case": "2026-08-30-issue-160-eval-evidence-contract",
+      "stage": "3-contract",
+      "status": "ready",
+      "validation": {
+        "status": "valid",
+        "ac_count": 6,
+        "warnings": [],
+        "ran_at": "2026-08-30T12:54:02Z",
+        "verify_tiers": {
+          "A": 5,
+          "B": 0,
+          "C": 1,
+          "D": 0
+        }
+      },
+      "contracts": [
+        {
+          "path": "3-contract/contract.md",
+          "acIds": [
+            "AC-001",
+            "AC-002",
+            "AC-003",
+            "AC-004",
+            "AC-005",
+            "AC-006"
+          ],
+          "statusLine": "- Status: Ready",
+          "mixedVerifyRows": 0,
+          "tiers": [
+            "A",
+            "A",
+            "A",
+            "A",
+            "A",
+            "C"
+          ],
+          "verifyLines": [
+            "  - Verify: [A] `node -e \"const {spawnSync}=require('node:child_process');const r=spawnSync(process.execPath,['skills/workflow/parking-skill-creator/run-tests.mjs'],{encoding:'utf8'});const o=(r.stdout||'')+(r.stderr||'');process.stdout.write(o);process.exit(r.status===0&&o.includes('外部证据·契约与物化：')?0:1)\"` → 退出码 0，具名分组覆盖 prompt/evidence 分离、摘要、同 digest 物化、持久化和 package 排除矩阵",
+            "  - Verify: [A] `node -e \"const {spawnSync}=require('node:child_process');const r=spawnSync(process.execPath,['skills/workflow/parking-skill-creator/run-tests.mjs'],{encoding:'utf8'});const o=(r.stdout||'')+(r.stderr||'');process.stdout.write(o);process.exit(r.status===0&&o.includes('外部证据·replay 失败关闭：')?0:1)\"` → 退出码 0，fake host 负例全矩阵逐例断言 code/status/live_calls 和无主成绩",
+            "  - Verify: [A] `node -e \"const {spawnSync}=require('node:child_process');const r=spawnSync(process.execPath,['skills/workflow/parking-skill-creator/run-tests.mjs'],{encoding:'utf8'});const o=(r.stdout||'')+(r.stderr||'');process.stdout.write(o);process.exit(r.status===0&&o.includes('外部证据·record/live 生命周期：')?0:1)\"` → 退出码 0，fake provider 生命周期矩阵覆盖授权、串行、预算、脱敏、部分包、同/新 digest 和 record 无 pass_rate",
+            "  - Verify: [A] `node -e \"const {spawnSync}=require('node:child_process');const r=spawnSync(process.execPath,['skills/workflow/parking-skill-creator/run-tests.mjs'],{encoding:'utf8'});const o=(r.stdout||'')+(r.stderr||'');process.stdout.write(o);process.exit(r.status===0&&o.includes('Agent 文档质量假设与上下文预算：')?0:1)\"` → 退出码 0，覆盖独立包零外部 skill 依赖、hypothesis 完整性、not_applicable、不绑定 finding 拒绝、定向 gate、3/1 runs，以及 31,415/312 与 40,364/475 双预算",
+            "  - Verify: [A] `node -e \"const {spawnSync}=require('node:child_process');const r=spawnSync(process.execPath,['skills/workflow/parking-skill-creator/run-tests.mjs'],{encoding:'utf8'});const o=(r.stdout||'')+(r.stderr||'');process.stdout.write(o);process.exit(r.status===0&&o.includes('质量 verdict 与 viewer：')?0:1)\"` → 退出码 0，fixture 覆盖四终态、成本、跨 epoch、current_best 与静态 HTML 的 Evidence/Quality/reasons/forbidden claims",
+            "  - Verify: [C] 先对四个 D-01 pack 运行确认版 example-run 的 preflight/materialize/replay 并在静态 viewer 核对 digest/zero-live/quality claim；外部配额恢复且用户显式授权后，再逐 eval 运行 live acceptance，观察每题调用数不超过 16、无并发、query/tool/source/freshness 全部 PASS，D-03 追加 live 审计且生产路径未读取 `eval-fixtures/`"
+          ]
+        }
+      ],
+      "verifyTail": [
+        "- [PASS] 受控 live：四题逐题通过真实可执行 Node provider adapter；每题 `calls=2/16`、`concurrency=1`、`execution=live`、`real_provider_verified=true`；`query_plan/tool_path/source_reachability/freshness` 全部 PASS；`replay_comparison=incomparable`。",
+        "- [PASS] D-03：`aggregate-benchmark.mjs --pilot-audit ... --pilot-phase live-acceptance` exit=0；追加 `shopping-deep-research-live-2026-08-30`，四 eval，`live_acceptance.status=PASS`；旧 replay 收据未回改。",
+        "- [PASS] 生产路径：`skills/life/shopping-deep-research/SKILL.md` 未读取或引用 `eval-fixtures/`；fixture 仅存在于 eval harness 数据面。",
+        "## 结果",
+        "六条 AC 的 Verify 均通过。replay evidence gate 为 PASS；live acceptance 为 PASS；没有把 replay/live 分数相减，也没有把 shopping 的 Agent output quality 伪称为 SUPPORTED（pilot quality claim 仍诚实为 INCONCLUSIVE）。"
+      ]
+    },
+    {
+      "case": "2026-08-30-psc-layout-regression-fix",
+      "stage": "3-contract",
+      "status": "ready",
+      "validation": {
+        "status": "valid",
+        "ac_count": 6,
+        "warnings": [],
+        "ran_at": "2026-08-30T17:28:29Z",
+        "verify_tiers": {
+          "A": 6,
+          "B": 0,
+          "C": 0,
+          "D": 0
+        }
+      },
+      "contracts": [
+        {
+          "path": "3-contract/contract.md",
+          "acIds": [
+            "AC-001",
+            "AC-002",
+            "AC-003",
+            "AC-004",
+            "AC-005",
+            "AC-006"
+          ],
+          "statusLine": "- Status: Ready",
+          "mixedVerifyRows": 0,
+          "tiers": [
+            "A",
+            "A",
+            "A",
+            "A",
+            "A",
+            "A"
+          ],
+          "verifyLines": [
+            "  - Verify: [A] `node skills/workflow/parking-skill-creator/run-tests.mjs | grep -c \"ok  快照缺省: 分类\"` → ≥2",
+            "  - Verify: [A] `node skills/workflow/parking-skill-creator/run-tests.mjs | grep -c \"ok  快照回退\"` → ≥1",
+            "  - Verify: [A] `node skills/workflow/parking-skill-creator/run-tests.mjs | grep -c \"ok  影子判据\"` → ≥2",
+            "  - Verify: [A] `node skills/workflow/parking-skill-creator/run-tests.mjs | grep -c \"ok  影子派生\"` → ≥1",
+            "  - Verify: [A] `node skills/workflow/parking-skill-creator/run-tests.mjs` → 退出码 0",
+            "  - Verify: [A] `grep -qE \"^/evals/?$\" .gitignore && grep -q \"skills 祖先\" skills/workflow/parking-skill-creator/SKILL.md && grep -q \"skills 祖先\" skills/workflow/parking-skill-creator/references/repo-conventions.md` → 退出码 0"
+          ]
+        }
+      ],
+      "verifyTail": [
+        "         拒绝：C:\\Users\\parking\\AppData\\Local\\Temp\\advtest-smcHnD\\sk2\\bad\\SKILL.md 不存在或不是文件，不是技能目录",
+        "         拒绝打包：C:\\Users\\parking\\AppData\\Local\\Temp\\fm54-myYNjt\\flow-desc 的 frontmatter 含解析器支持子集外的构造，校验无法判定",
+        "           - description: flow 集合 → [a, b, c]",
+        "[FAIL] AC-006  exit=1  $ grep -qE \"^/evals/?$\" .gitignore && grep -q \"skills 祖先\" skills/workflow/parking-skill-creator/SKILL.md && grep -q \"skills 祖先\" skills/workflow/parking-skill-creator/references/repo-conventions.md",
+        "绿 1 / 红 5 / 跑不起来 0"
+      ]
+    }
+  ]
+}

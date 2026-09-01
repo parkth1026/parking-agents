@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "slug": "2026-08-31-large-task-spec-ticket-delivery",
+  "created_at": "2026-08-31T12:34:25Z",
+  "updated_at": "2026-08-31T15:37:26Z",
+  "original_request": "既然我们已经深度调研完毕了   那我们开始 [$parking-skills:workflow-interview](G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\skills\\workflow\\workflow-interview\\SKILL.md)  来锁定  制作目标把 。",
+  "goal_oneline": "基于19例研究锁定大任务交付能力：任务适配、总体承诺、依赖、有效版本与分层验收（制作范围未确认）",
+  "target": "G:/GIT/AI_WorkFlow/parking-agents-manual@f4e37757b9f3d5627c7636626f579d87d523bc37",
+  "stage": "1-interview",
+  "next_action": "先回读跨案例既有裁决的继承/冲突与本次新增范围；Q1原题暂停，不从零重问，不进入原型或契约。",
+  "stage_gates": {
+    "1-interview": {
+      "status": "in_progress"
+    },
+    "2-prototype": {
+      "status": "pending"
+    },
+    "3-contract": {
+      "status": "pending"
+    }
+  },
+  "validation": null,
+  "blocked": [],
+  "residual_risk": null,
+  "status": "in_progress"
+}

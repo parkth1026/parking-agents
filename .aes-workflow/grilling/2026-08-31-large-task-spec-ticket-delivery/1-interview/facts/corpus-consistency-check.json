@@ -1,0 +1,144 @@
+{
+  "capturedAt": "2026-08-31T15:36:09.886Z",
+  "historicalCases": 19,
+  "addedCases": [],
+  "keyFilesChecked": 89,
+  "changedKeyFiles": [],
+  "addedHistoricalFiles": [],
+  "removedHistoricalFiles": [],
+  "comparisons": [
+    {
+      "case": "2026-08-16-jenkins-learning-nas-scope",
+      "keyFilesChecked": 5,
+      "changedKeyFiles": [],
+      "addedFiles": [],
+      "removedFiles": []
+    },
+    {
+      "case": "2026-08-16-scoring-system-fixes",
+      "keyFilesChecked": 5,
+      "changedKeyFiles": [],
+      "addedFiles": [],
+      "removedFiles": []
+    },
+    {
+      "case": "2026-08-17-bpr-skill-improve",
+      "keyFilesChecked": 3,
+      "changedKeyFiles": [],
+      "addedFiles": [],
+      "removedFiles": []
+    },
+    {
+      "case": "2026-08-17-diagram-artifact",
+      "keyFilesChecked": 5,
+      "changedKeyFiles": [],
+      "addedFiles": [],
+      "removedFiles": []
+    },
+    {
+      "case": "2026-08-17-skill-creator-design-review",
+      "keyFilesChecked": 5,
+      "changedKeyFiles": [],
+      "addedFiles": [],
+      "removedFiles": []
+    },
+    {
+      "case": "2026-08-20-workflow-interview-web",
+      "keyFilesChecked": 5,
+      "changedKeyFiles": [],
+      "addedFiles": [],
+      "removedFiles": []
+    },
+    {
+      "case": "2026-08-23-worktree-board",
+      "keyFilesChecked": 5,
+      "changedKeyFiles": [],
+      "addedFiles": [],
+      "removedFiles": []
+    },
+    {
+      "case": "2026-08-24-aes-gate",
+      "keyFilesChecked": 5,
+      "changedKeyFiles": [],
+      "addedFiles": [],
+      "removedFiles": []
+    },
+    {
+      "case": "2026-08-24-aes-worktree-board-upgrade",
+      "keyFilesChecked": 5,
+      "changedKeyFiles": [],
+      "addedFiles": [],
+      "removedFiles": []
+    },
+    {
+      "case": "2026-08-24-对标mattpocock仓库差距",
+      "keyFilesChecked": 5,
+      "changedKeyFiles": [],
+      "addedFiles": [],
+      "removedFiles": []
+    },
+    {
+      "case": "2026-08-25-aes-worktree-board-session-evolution",
+      "keyFilesChecked": 5,
+      "changedKeyFiles": [],
+      "addedFiles": [],
+      "removedFiles": []
+    },
+    {
+      "case": "2026-08-27-aes-issue-worker-流程重梳",
+      "keyFilesChecked": 5,
+      "changedKeyFiles": [],
+      "addedFiles": [],
+      "removedFiles": []
+    },
+    {
+      "case": "2026-08-28-aes-merge-worker-落地",
+      "keyFilesChecked": 3,
+      "changedKeyFiles": [],
+      "addedFiles": [],
+      "removedFiles": []
+    },
+    {
+      "case": "2026-08-28-issue70-loop-first-ruling",
+      "keyFilesChecked": 3,
+      "changedKeyFiles": [],
+      "addedFiles": [],
+      "removedFiles": []
+    },
+    {
+      "case": "2026-08-28-outbox-close-解耦",
+      "keyFilesChecked": 5,
+      "changedKeyFiles": [],
+      "addedFiles": [],
+      "removedFiles": []
+    },
+    {
+      "case": "2026-08-29-aes-glab-skill改进",
+      "keyFilesChecked": 5,
+      "changedKeyFiles": [],
+      "addedFiles": [],
+      "removedFiles": []
+    },
+    {
+      "case": "2026-08-30-issue-147-steelman-rerun",
+      "keyFilesChecked": 3,
+      "changedKeyFiles": [],
+      "addedFiles": [],
+      "removedFiles": []
+    },
+    {
+      "case": "2026-08-30-issue-160-eval-evidence-contract",
+      "keyFilesChecked": 7,
+      "changedKeyFiles": [],
+      "addedFiles": [],
+      "removedFiles": []
+    },
+    {
+      "case": "2026-08-30-psc-layout-regression-fix",
+      "keyFilesChecked": 5,
+      "changedKeyFiles": [],
+      "addedFiles": [],
+      "removedFiles": []
+    }
+  ]
+}

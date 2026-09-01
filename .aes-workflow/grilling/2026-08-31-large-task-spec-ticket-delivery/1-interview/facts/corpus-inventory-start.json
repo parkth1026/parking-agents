@@ -1,0 +1,2128 @@
+{
+  "capturedAt": "2026-08-31T15:20:55.460Z",
+  "root": "G:/GIT/AI_WorkFlow/parking-agents-manual/.aes-workflow/grilling",
+  "cases": [
+    {
+      "case": "2026-08-16-jenkins-learning-nas-scope",
+      "role": "historical-case",
+      "files": [
+        "1-interview/context.md",
+        "1-interview/rounds.jsonl",
+        "2-prototype/behavior.md",
+        "2-prototype/drafts/v1-behavior.md",
+        "2-prototype/drafts/v1-example-run.md",
+        "2-prototype/drafts/v2-behavior.md",
+        "2-prototype/drafts/v2-example-run.md",
+        "2-prototype/drafts/v3-behavior.md",
+        "2-prototype/drafts/v3-example-run.md",
+        "2-prototype/drafts/v4-behavior.md",
+        "2-prototype/drafts/v4-example-run.md",
+        "2-prototype/drafts/v5-behavior.md",
+        "2-prototype/example-run.md",
+        "2-prototype/impact-surface.md",
+        "3-contract/contract.md",
+        "3-contract/verify.txt",
+        "manifest.json"
+      ],
+      "fileCount": 17,
+      "bytes": 91038,
+      "manifest": {
+        "stage": "3-contract",
+        "status": "ready",
+        "goal_oneline": "把本机 jenkins-log-auto-learning 的知识库与运行时状态整体迁到 NAS ue-llm-wiki（raw/wiki/账本/tmp 全上 NAS，raw 拷 2 份旧 scratch、wiki 整体拷既有内容、账本空起步），扫描范围收窄到 Earth 下 3 个 job；同时把技能环境配置迁到工具中立的 ~/.config/parking-agents/skill-env.json（保留 SKILL_ENV 覆盖与旧路径回退），仓库模板填真实 NAS 值，并给 NAS 不可达加 fail-fast 现状报告",
+        "target": null,
+        "stage_gates": {
+          "1-interview": {
+            "status": "done",
+            "closed_at": "2026-08-15T17:10:30Z",
+            "self_assessment": {
+              "意图": "已定",
+              "结果": "已定",
+              "边界": "已定",
+              "约束": "已定",
+              "现状": "已定"
+            }
+          },
+          "2-prototype": {
+            "status": "done",
+            "reason": "Q5 并入使已确认对照物过时，需更新影响面并重出行为/示例对照物",
+            "closed_at": "2026-08-15T17:15:46Z",
+            "artifacts_confirmed": [
+              "behavior",
+              "example-run"
+            ]
+          },
+          "3-contract": {
+            "status": "done",
+            "reason": "契约摘要处用户提出 skill-env.json 放 NAS 需重议——疑为误读（文件留本地、仅路径值指 NAS）或重议 Q1，回访谈澄清",
+            "closed_at": "2026-08-15T17:19:14Z"
+          }
+        },
+        "validation": {
+          "status": "valid",
+          "ac_count": 7,
+          "warnings": [],
+          "ran_at": "2026-08-15T17:19:00Z",
+          "verify_tiers": {
+            "A": 5,
+            "B": 0,
+            "C": 2,
+            "D": 0
+          }
+        },
+        "blocked": [],
+        "next_action": "契约就绪待交接：用 finalize 生成的 /goal 指令启动执行 Agent；有阻塞项才不启动"
+      },
+      "keyFiles": [
+        {
+          "path": "1-interview/context.md",
+          "bytes": 6669,
+          "lines": 78,
+          "sha256": "9635845a50e192866bfa247677af4ded22052f9e682b7d44f48d064c3962a54c"
+        },
+        {
+          "path": "1-interview/rounds.jsonl",
+          "bytes": 8706,
+          "lines": 19,
+          "sha256": "64571c25b42779455ffd9b6ec9be13bedab89ab47275fee4cf8c076e6e458b53"
+        },
+        {
+          "path": "3-contract/contract.md",
+          "bytes": 17805,
+          "lines": 171,
+          "sha256": "6b40f6bffcda7525bcba25204359839ae21fe91fb8ca14e673dbdc3e372065d9"
+        },
+        {
+          "path": "3-contract/verify.txt",
+          "bytes": 4567,
+          "lines": 17,
+          "sha256": "af5ccc2c15e7125cb0ed2f14b611e8d63c1a4ff506421dc23a50e971ba093a9c"
+        },
+        {
+          "path": "manifest.json",
+          "bytes": 2187,
+          "lines": 54,
+          "sha256": "ad49eb6ce6265d898e0f4663769e0053eccf06126eb0d62044a08e1f9f3b9c0c"
+        }
+      ]
+    },
+    {
+      "case": "2026-08-16-scoring-system-fixes",
+      "role": "historical-case",
+      "files": [
+        "1-interview/context.md",
+        "1-interview/rounds.jsonl",
+        "2-prototype/behavior.md",
+        "2-prototype/drafts/v1-behavior.md",
+        "2-prototype/drafts/v1-example-run.md",
+        "2-prototype/example-run.md",
+        "2-prototype/impact-surface.md",
+        "3-contract/contract.md",
+        "3-contract/verify.txt",
+        "manifest.json"
+      ],
+      "fileCount": 10,
+      "bytes": 42181,
+      "manifest": {
+        "stage": "3-contract",
+        "status": "ready",
+        "goal_oneline": "修复评分体系对抗审查实锤的全部 9 项缺陷：统一 diff 语义（含等效强归因链）、定义 Commit 维度语义、Warning Trend 独立验证信号、:see=/Recurrences 落账纪律、盲评工具与执行、小项勘误；权重与 8/5 阈值不动（只接仪表+写校准触发条件），向后兼容不动存量 14 份",
+        "target": null,
+        "stage_gates": {
+          "1-interview": {
+            "status": "done",
+            "closed_at": "2026-08-16T15:20:57Z",
+            "self_assessment": {
+              "意图": "已定",
+              "结果": "已定",
+              "边界": "已定",
+              "约束": "已定",
+              "现状": "已定"
+            }
+          },
+          "2-prototype": {
+            "status": "done",
+            "closed_at": "2026-08-16T17:00:29Z",
+            "artifacts_confirmed": [
+              "behavior",
+              "example-run"
+            ]
+          },
+          "3-contract": {
+            "status": "done",
+            "closed_at": "2026-08-16T17:05:52Z"
+          }
+        },
+        "validation": {
+          "status": "valid",
+          "ac_count": 7,
+          "warnings": [],
+          "ran_at": "2026-08-16T17:05:44Z",
+          "verify_tiers": {
+            "A": 6,
+            "B": 0,
+            "C": 1,
+            "D": 0
+          }
+        },
+        "blocked": [],
+        "next_action": "契约就绪待交接：/goal 指令已生成；盲评（AC-007）需用户半天投入"
+      },
+      "keyFiles": [
+        {
+          "path": "1-interview/context.md",
+          "bytes": 4982,
+          "lines": 60,
+          "sha256": "b204e8e59ff9d29aa972b3ce1fee2ea6b793c1c33d60ed8f96fa61d9c9c5aa85"
+        },
+        {
+          "path": "1-interview/rounds.jsonl",
+          "bytes": 3468,
+          "lines": 10,
+          "sha256": "e695d269a145b89d21ce8e30c29793503589f9df53578df579cc483abf2004b9"
+        },
+        {
+          "path": "3-contract/contract.md",
+          "bytes": 13143,
+          "lines": 133,
+          "sha256": "148f395007cc0bf373e6a6905ad005fe7f48756d598bb89f3428d066cd6ac78a"
+        },
+        {
+          "path": "3-contract/verify.txt",
+          "bytes": 3094,
+          "lines": 14,
+          "sha256": "dfe8e6882542e70f13ccbbe353816ea33024bb274e05fa903c50c4700d6fad7d"
+        },
+        {
+          "path": "manifest.json",
+          "bytes": 1619,
+          "lines": 52,
+          "sha256": "39fb6c569a522bc8c82d4f49c6447fc673645d3e5cbc3357cac9fd3232c0638b"
+        }
+      ]
+    },
+    {
+      "case": "2026-08-17-bpr-skill-improve",
+      "role": "historical-case",
+      "files": [
+        "1-interview/context.md",
+        "1-interview/rounds.jsonl",
+        "2-prototype/drafts/v1-api-mock.md",
+        "2-prototype/drafts/v1-behavior.md",
+        "2-prototype/drafts/v1-example-run.md",
+        "2-prototype/drafts/v1-references-report-template.md",
+        "2-prototype/drafts/v1-references-source-quality.md",
+        "2-prototype/drafts/v1-skill.md",
+        "2-prototype/impact-surface.md",
+        "manifest.json"
+      ],
+      "fileCount": 10,
+      "bytes": 36751,
+      "manifest": {
+        "stage": "2-prototype",
+        "status": "in_progress",
+        "goal_oneline": "把两轮调研+iteration-2 FAIL 证据转化为 best-practice-research 修订：中文正文+references 细则+scripts 引用验证，含 D1-D8+C1-C3 共 11 项机制，以 iteration-3 对抗 eval（复用 3 案例、修 CRA prompt 埋点）验收",
+        "target": null,
+        "stage_gates": {
+          "1-interview": {
+            "status": "done",
+            "closed_at": "2026-08-16T17:42:14Z",
+            "self_assessment": {
+              "意图": "已定",
+              "结果": "已定",
+              "边界": "已定",
+              "约束": "已定",
+              "现状": "已定"
+            }
+          },
+          "2-prototype": {
+            "status": "pending"
+          },
+          "3-contract": {
+            "status": "pending"
+          }
+        },
+        "validation": null,
+        "blocked": [],
+        "next_action": "进入 aes-prototype：扫影响面并产出确认版对照物（修订版 SKILL.md 草稿+references 清单+scripts 设计）"
+      },
+      "keyFiles": [
+        {
+          "path": "1-interview/context.md",
+          "bytes": 7074,
+          "lines": 64,
+          "sha256": "8cf05ca87924f37e64b3036779af1f68d4a2b200fc6251ebd38edbd62b3cee9e"
+        },
+        {
+          "path": "1-interview/rounds.jsonl",
+          "bytes": 5010,
+          "lines": 15,
+          "sha256": "5be3b91fea23164676116dd5e04f5691ad65e0297c54be71d028e0dfb5caecf2"
+        },
+        {
+          "path": "manifest.json",
+          "bytes": 1127,
+          "lines": 35,
+          "sha256": "8c6cd5ce4f5de9e10c09bf90ee42318fe2ca6e88b687c2a6a9240eefc9e70b47"
+        }
+      ]
+    },
+    {
+      "case": "2026-08-17-diagram-artifact",
+      "role": "historical-case",
+      "files": [
+        "1-interview/context.md",
+        "1-interview/facts/diagram-design-内核.md",
+        "1-interview/facts/家族闸门与产物机制.md",
+        "1-interview/rounds.jsonl",
+        "2-prototype/behavior.md",
+        "2-prototype/diagram.html",
+        "2-prototype/drafts/v1-behavior.md",
+        "2-prototype/drafts/v1-diagram.html",
+        "2-prototype/drafts/v1-example-run.md",
+        "2-prototype/example-run.md",
+        "2-prototype/impact-surface.md",
+        "3-contract/contract.md",
+        "3-contract/verify.txt",
+        "manifest.json"
+      ],
+      "fileCount": 14,
+      "bytes": 70365,
+      "manifest": {
+        "stage": "3-contract",
+        "status": "ready",
+        "goal_oneline": "给 workflow-interview 家族引入图表对照物 diagram.html（架构视图+流程视图，自包含 SVG）与第七影响面「架构与依赖」：表格仍为契约源，图做决策面与架构面事实源，全家族闸门/文档/测试同步",
+        "target": null,
+        "stage_gates": {
+          "1-interview": {
+            "status": "done",
+            "closed_at": "2026-08-16T17:47:25Z",
+            "self_assessment": {
+              "意图": "已定",
+              "结果": "已定",
+              "边界": "已定",
+              "约束": "已定",
+              "现状": "已定"
+            }
+          },
+          "2-prototype": {
+            "status": "done",
+            "closed_at": "2026-08-16T18:43:11Z",
+            "artifacts_confirmed": [
+              "diagram",
+              "behavior",
+              "example-run"
+            ]
+          },
+          "3-contract": {
+            "status": "done",
+            "closed_at": "2026-08-16T18:52:27Z"
+          }
+        },
+        "validation": {
+          "status": "valid",
+          "ac_count": 7,
+          "warnings": [],
+          "ran_at": "2026-08-16T18:52:06Z",
+          "verify_tiers": {
+            "A": 7,
+            "B": 0,
+            "C": 0,
+            "D": 0
+          }
+        },
+        "blocked": [],
+        "next_action": "契约 Ready，按交接指令交给执行 Agent 实现；七条 [A] 全绿即完成"
+      },
+      "keyFiles": [
+        {
+          "path": "1-interview/context.md",
+          "bytes": 5604,
+          "lines": 86,
+          "sha256": "f1e04516e0a6a827b18824aeda9d9f927320816fe675cbff6ec2ea739840edd6"
+        },
+        {
+          "path": "1-interview/rounds.jsonl",
+          "bytes": 6668,
+          "lines": 16,
+          "sha256": "d9539766ceb5c7c9e3e07bc40579e38d210df1851575c7fb21ad1423e640c34c"
+        },
+        {
+          "path": "3-contract/contract.md",
+          "bytes": 11611,
+          "lines": 186,
+          "sha256": "6d73b9a62be9a9e044bca01c4432dbf5ba5c1b58e256b96dbde0692e8f3a6533"
+        },
+        {
+          "path": "3-contract/verify.txt",
+          "bytes": 2097,
+          "lines": 19,
+          "sha256": "e0d5aa220714b543013f051ddb22bc7e023f7bc1f08394a1d552ef45b9099b86"
+        },
+        {
+          "path": "manifest.json",
+          "bytes": 1841,
+          "lines": 53,
+          "sha256": "017db3a768bc4a71dad4a21b144e2945be39e18e05f3c677a4d4cbf5addf87d0"
+        }
+      ]
+    },
+    {
+      "case": "2026-08-17-skill-creator-design-review",
+      "role": "historical-case",
+      "files": [
+        "1-interview/context.md",
+        "1-interview/facts/eval对比能力现状.md",
+        "1-interview/facts/设计文档先例与拆分样板.md",
+        "1-interview/rounds.jsonl",
+        "2-prototype/api-mock.md",
+        "2-prototype/behavior.md",
+        "2-prototype/diagram.html",
+        "2-prototype/drafts/v1-api-mock.md",
+        "2-prototype/drafts/v1-behavior.md",
+        "2-prototype/drafts/v1-diagram.html",
+        "2-prototype/drafts/v1-example-run.md",
+        "2-prototype/drafts/v1-mock.html",
+        "2-prototype/example-run.md",
+        "2-prototype/impact-surface.md",
+        "2-prototype/mock.html",
+        "3-contract/contract.md",
+        "3-contract/verify.txt",
+        "manifest.json"
+      ],
+      "fileCount": 18,
+      "bytes": 109907,
+      "manifest": {
+        "stage": "3-contract",
+        "status": "ready",
+        "goal_oneline": "parking-skill-creator 升级为带质量证据链的技能生产线:新技能自包含设计文档(意图/取舍/验收编号/迭代记录,随包分发),评测循环含结构审查步(拆分建议只建议不执行,判据 checklist 固化),评测配置改为 gate 可选制(跑前问用户),历史对比覆盖跨 workspace 与跨 iteration 趋势(history.json 契约落地,成绩沉淀进技能)",
+        "target": null,
+        "stage_gates": {
+          "1-interview": {
+            "status": "done",
+            "closed_at": "2026-08-17T05:27:44Z",
+            "self_assessment": {
+              "意图": "已定",
+              "结果": "已定",
+              "边界": "已定",
+              "约束": "已定",
+              "现状": "已定"
+            }
+          },
+          "2-prototype": {
+            "status": "done",
+            "closed_at": "2026-08-17T05:41:22Z",
+            "artifacts_confirmed": [
+              "behavior",
+              "api-mock",
+              "example-run",
+              "mock",
+              "diagram"
+            ]
+          },
+          "3-contract": {
+            "status": "done",
+            "closed_at": "2026-08-17T05:51:08Z"
+          }
+        },
+        "validation": {
+          "status": "valid",
+          "ac_count": 6,
+          "warnings": [
+            "WARNING: 正文句子里出现 TODO、TBD 或 FIXME，确认它是内容本身，不是没做完的标记。"
+          ],
+          "ran_at": "2026-08-17T05:51:08Z",
+          "verify_tiers": {
+            "A": 3,
+            "B": 0,
+            "C": 1,
+            "D": 2
+          }
+        },
+        "blocked": [],
+        "next_action": "契约就绪,等用户发起 /goal 交接执行"
+      },
+      "keyFiles": [
+        {
+          "path": "1-interview/context.md",
+          "bytes": 6138,
+          "lines": 69,
+          "sha256": "5d1494e8f95fefef5747a088a615b5d27b93e2ff143152e6dd17f04dd4a32c7f"
+        },
+        {
+          "path": "1-interview/rounds.jsonl",
+          "bytes": 13439,
+          "lines": 33,
+          "sha256": "57943fa7f077146b5b87c6d69d25ef43581a4bac38eadff0359270e2d5630516"
+        },
+        {
+          "path": "3-contract/contract.md",
+          "bytes": 11409,
+          "lines": 151,
+          "sha256": "fea1726ac11239ed779d2922e6504843cd2947415ce10bc6b77270ca70234ac4"
+        },
+        {
+          "path": "3-contract/verify.txt",
+          "bytes": 700,
+          "lines": 10,
+          "sha256": "cdf4994751a90f8f8e90dd4db8ffbdb99f87b9c036d8b10a50bc01314b747d0a"
+        },
+        {
+          "path": "manifest.json",
+          "bytes": 1721,
+          "lines": 57,
+          "sha256": "2db92a8147b1127b2ee29436b2cdd4e0210c275857b91087de205c5369988b21"
+        }
+      ]
+    },
+    {
+      "case": "2026-08-20-workflow-interview-web",
+      "role": "historical-case",
+      "files": [
+        "1-interview/context.md",
+        "1-interview/facts/aes-grilling-web-runtime.md",
+        "1-interview/facts/deep-research-wakeup-and-persistence.md",
+        "1-interview/facts/web-interaction-references.md",
+        "1-interview/facts/workflow-interview-family.md",
+        "1-interview/rounds.jsonl",
+        "2-prototype/api-mock.md",
+        "2-prototype/behavior.md",
+        "2-prototype/diagram.html",
+        "2-prototype/drafts/v1-api-mock.md",
+        "2-prototype/drafts/v1-behavior.md",
+        "2-prototype/drafts/v1-diagram.html",
+        "2-prototype/drafts/v1-example-run.md",
+        "2-prototype/drafts/v1-mock.html",
+        "2-prototype/example-run.md",
+        "2-prototype/impact-surface.md",
+        "2-prototype/mock.html",
+        "3-contract/contract.md",
+        "3-contract/verify.txt",
+        "manifest.json",
+        "web/assets/diagram.html",
+        "web/assets/mock.html",
+        "web/consumed/browser-contract-r2.json",
+        "web/consumed/browser-r1.json",
+        "web/consumed/overnight-r3.json",
+        "web/evidence/ac-004/01-three-tiers-other.png",
+        "web/evidence/ac-004/02-submitted-locked.png",
+        "web/evidence/ac-004/03-contract-revise-draft.png",
+        "web/evidence/ac-004/04-contract-confirmed.png",
+        "web/evidence/ac-004/expected.md",
+        "web/evidence/ac-004/round-contract.json",
+        "web/evidence/ac-004/round-r1.json",
+        "web/evidence/ac-004/steps.md",
+        "web/evidence/ac-005/01-submit-without-waiter.png",
+        "web/evidence/ac-005/02-restart-restored-current.png",
+        "web/evidence/ac-005/round-overnight.json",
+        "web/evidence/ac-005/steps.md",
+        "web/server-stopped",
+        "web/state.json",
+        "web/submissions/browser-contract-r2.json",
+        "web/submissions/browser-r1.json",
+        "web/submissions/overnight-r3.json"
+      ],
+      "fileCount": 42,
+      "bytes": 1190653,
+      "manifest": {
+        "stage": "3-contract",
+        "status": "ready",
+        "goal_oneline": "workflow-interview-web：workflow-interview 的 Web 入口薄层——三阶段访谈全部在本地浏览器单页双向进行，提交经后台任务退出即时唤醒 agent，detached server 48h 缓冲支持隔天提交，session.mjs/rounds.jsonl 保持唯一真源",
+        "target": null,
+        "stage_gates": {
+          "1-interview": {
+            "status": "done",
+            "closed_at": "2026-08-20T15:02:36Z",
+            "self_assessment": {
+              "意图": "已定",
+              "结果": "已定",
+              "边界": "已定",
+              "约束": "已定",
+              "现状": "已定"
+            }
+          },
+          "2-prototype": {
+            "status": "done",
+            "closed_at": "2026-08-20T16:59:10Z",
+            "artifacts_confirmed": [
+              "mock",
+              "behavior",
+              "api-mock",
+              "example-run",
+              "diagram"
+            ]
+          },
+          "3-contract": {
+            "status": "done",
+            "closed_at": "2026-08-22T15:27:26Z"
+          }
+        },
+        "validation": {
+          "status": "valid",
+          "ac_count": 6,
+          "warnings": [],
+          "ran_at": "2026-08-22T15:27:26Z",
+          "verify_tiers": {
+            "A": 3,
+            "B": 1,
+            "C": 1,
+            "D": 1
+          }
+        },
+        "blocked": [],
+        "next_action": "契约就绪，可交执行 Agent 实现 workflow-interview-web 技能（交接指令由 finalize 现场生成）"
+      },
+      "keyFiles": [
+        {
+          "path": "1-interview/context.md",
+          "bytes": 6020,
+          "lines": 92,
+          "sha256": "ae150a7414d46d4624427915b4ab2a1e495e62480e9b1b4eb136e8fe6bcca3cc"
+        },
+        {
+          "path": "1-interview/rounds.jsonl",
+          "bytes": 8804,
+          "lines": 22,
+          "sha256": "aa4dba6c1623b78804e573ade544fa81bfb40d1acb9eb232ef94dfbd7375c8fc"
+        },
+        {
+          "path": "3-contract/contract.md",
+          "bytes": 13826,
+          "lines": 187,
+          "sha256": "a4922a0381a05a82c17d0f020cfbb6357fbbb5423d451fb9243164445069d598"
+        },
+        {
+          "path": "3-contract/verify.txt",
+          "bytes": 1012,
+          "lines": 19,
+          "sha256": "7c053f06bba6a7eb784382f177413e65bc6072aa2700c543add5398f5714835b"
+        },
+        {
+          "path": "manifest.json",
+          "bytes": 1767,
+          "lines": 55,
+          "sha256": "2526c86cca52a0c48318e972b8194128f247ed6dfcf33bf9ee9c82106ced8970"
+        }
+      ]
+    },
+    {
+      "case": "2026-08-23-worktree-board",
+      "role": "historical-case",
+      "files": [
+        "1-interview/context.md",
+        "1-interview/rounds.jsonl",
+        "2-prototype/api-mock.md",
+        "2-prototype/behavior.md",
+        "2-prototype/design-brief-prompt.md",
+        "2-prototype/design-canvas/Main.dc.html",
+        "2-prototype/diagram.html",
+        "2-prototype/drafts/v1-api-mock.md",
+        "2-prototype/drafts/v1-behavior.md",
+        "2-prototype/drafts/v1-diagram.html",
+        "2-prototype/drafts/v1-example-run.md",
+        "2-prototype/drafts/v1-mock.html",
+        "2-prototype/drafts/v2-api-mock.md",
+        "2-prototype/drafts/v2-behavior.md",
+        "2-prototype/drafts/v2-diagram.html",
+        "2-prototype/drafts/v2-example-run.md",
+        "2-prototype/drafts/v2-mock.html",
+        "2-prototype/drafts/v3-mock.html",
+        "2-prototype/drafts/v4-mock.html",
+        "2-prototype/example-run.md",
+        "2-prototype/impact-surface.md",
+        "2-prototype/mock.html",
+        "3-contract/contract.md",
+        "3-contract/verify.txt",
+        "manifest.json"
+      ],
+      "fileCount": 25,
+      "bytes": 347617,
+      "manifest": {
+        "stage": "3-contract",
+        "status": "ready",
+        "goal_oneline": "主脑作战系统：主仓对话+一张wayfinder风格issue全景作战图，worktree作为地图上的队员；巡检状态、frontier派活、headless派发、评估与合并建议，两个界面消化全部需求",
+        "target": null,
+        "stage_gates": {
+          "1-interview": {
+            "status": "done",
+            "closed_at": "2026-08-22T16:37:05Z",
+            "self_assessment": {
+              "意图": "已定",
+              "结果": "已定",
+              "边界": "已定",
+              "约束": "已定",
+              "现状": "已定"
+            }
+          },
+          "2-prototype": {
+            "status": "done",
+            "closed_at": "2026-08-23T12:31:27Z",
+            "artifacts_confirmed": [
+              "mock",
+              "behavior",
+              "api-mock",
+              "example-run",
+              "diagram"
+            ]
+          },
+          "3-contract": {
+            "status": "done",
+            "closed_at": "2026-08-23T12:38:35Z"
+          }
+        },
+        "validation": {
+          "status": "valid",
+          "ac_count": 6,
+          "warnings": [],
+          "ran_at": "2026-08-23T12:38:29Z",
+          "verify_tiers": {
+            "A": 4,
+            "B": 0,
+            "C": 2,
+            "D": 0
+          }
+        },
+        "blocked": [],
+        "next_action": "契约就绪，用交接指令启动执行 Agent 实施"
+      },
+      "keyFiles": [
+        {
+          "path": "1-interview/context.md",
+          "bytes": 5815,
+          "lines": 61,
+          "sha256": "fdb839cfc2683ea38616838be91eba9794c9d9a1dd4edf4d02c10fe49ac3e7f1"
+        },
+        {
+          "path": "1-interview/rounds.jsonl",
+          "bytes": 12637,
+          "lines": 37,
+          "sha256": "5dc4bbd3c16a0c0fdd2be93c58f44c17d009ee4a5073bd09eaa6db83adebcd6b"
+        },
+        {
+          "path": "3-contract/contract.md",
+          "bytes": 16121,
+          "lines": 173,
+          "sha256": "cea9a389a1a008b7d81d93b11d6f6a63dd3c54397463db0389e43b680a919e47"
+        },
+        {
+          "path": "3-contract/verify.txt",
+          "bytes": 698,
+          "lines": 19,
+          "sha256": "a8bcd8286fd6de272cfa4731764322ec5fc1208d053643605794747dbbf71570"
+        },
+        {
+          "path": "manifest.json",
+          "bytes": 2478,
+          "lines": 55,
+          "sha256": "a2b3e7cdb51ce7928fb14093e2a39ef110f01219d10d33f5062259568d12b91b"
+        }
+      ]
+    },
+    {
+      "case": "2026-08-24-aes-gate",
+      "role": "historical-case",
+      "files": [
+        "1-interview/context.md",
+        "1-interview/rounds.jsonl",
+        "2-prototype/api-mock.md",
+        "2-prototype/behavior.md",
+        "2-prototype/diagram.html",
+        "2-prototype/drafts/v1-api-mock.md",
+        "2-prototype/drafts/v1-behavior.md",
+        "2-prototype/drafts/v1-diagram.html",
+        "2-prototype/drafts/v1-example-run.md",
+        "2-prototype/drafts/v1-mock.html",
+        "2-prototype/drafts/v2-api-mock.md",
+        "2-prototype/drafts/v2-behavior.md",
+        "2-prototype/drafts/v2-diagram.html",
+        "2-prototype/drafts/v2-example-run.md",
+        "2-prototype/example-run.md",
+        "2-prototype/impact-surface.md",
+        "2-prototype/mock.html",
+        "3-contract/contract.md",
+        "3-contract/verify.txt",
+        "manifest.json"
+      ],
+      "fileCount": 20,
+      "bytes": 115298,
+      "manifest": {
+        "stage": "3-contract",
+        "status": "ready",
+        "goal_oneline": "落地 aes-gate 门禁技能：检测（盘点+六维评分+缺口清单，供 aes-qa 调用与独立体检双通道）+组装（仅显式会话按模式库生成最小门禁+selftest，经确认落地），不对齐 gate/v1 协议",
+        "target": null,
+        "stage_gates": {
+          "1-interview": {
+            "status": "done",
+            "closed_at": "2026-08-24T11:06:00Z",
+            "self_assessment": {
+              "意图": "已定",
+              "结果": "已定",
+              "边界": "已定",
+              "约束": "已定",
+              "现状": "已定"
+            }
+          },
+          "2-prototype": {
+            "status": "done",
+            "closed_at": "2026-08-24T18:40:36Z",
+            "artifacts_confirmed": [
+              "behavior",
+              "api-mock",
+              "example-run",
+              "mock",
+              "diagram"
+            ]
+          },
+          "3-contract": {
+            "status": "done",
+            "closed_at": "2026-08-24T18:46:54Z"
+          }
+        },
+        "validation": {
+          "status": "valid",
+          "ac_count": 5,
+          "warnings": [],
+          "ran_at": "2026-08-24T18:46:44Z",
+          "verify_tiers": {
+            "A": 2,
+            "B": 0,
+            "C": 3,
+            "D": 0
+          }
+        },
+        "blocked": [],
+        "next_action": "契约就绪：按交接指令启动实现（wayfinder #42），finalize 生成的启动指令见 manifest/verify.txt"
+      },
+      "keyFiles": [
+        {
+          "path": "1-interview/context.md",
+          "bytes": 4917,
+          "lines": 60,
+          "sha256": "7aa709fa7bda55f5d5230720da5e7945678c4ed6458121d230ce19b52f60d4a9"
+        },
+        {
+          "path": "1-interview/rounds.jsonl",
+          "bytes": 15500,
+          "lines": 29,
+          "sha256": "fba0c7f0e29e4aa15441b6fb11cd050a10568094c630fa35e4ad6f21d8e37052"
+        },
+        {
+          "path": "3-contract/contract.md",
+          "bytes": 14158,
+          "lines": 176,
+          "sha256": "1937af8adf2defc587e0a1e5c4ad3229534311add53ed098210683277880fc3a"
+        },
+        {
+          "path": "3-contract/verify.txt",
+          "bytes": 421,
+          "lines": 13,
+          "sha256": "84193104ad45f74373017576ba98342d5f090f11970ebf3fa802cc74b04d911d"
+        },
+        {
+          "path": "manifest.json",
+          "bytes": 1593,
+          "lines": 55,
+          "sha256": "f36800beeab80e66106619280ba76dd9de95069c9695525bef5af980e21196af"
+        }
+      ]
+    },
+    {
+      "case": "2026-08-24-aes-worktree-board-upgrade",
+      "role": "historical-case",
+      "files": [
+        "1-interview/context.md",
+        "1-interview/facts/issue-tracker.md",
+        "1-interview/facts/runtime-state.md",
+        "1-interview/facts/skill-current-state.md",
+        "1-interview/facts/verification-infra.md",
+        "1-interview/rounds.jsonl",
+        "2-prototype/api-mock.md",
+        "2-prototype/behavior.md",
+        "2-prototype/diagram.html",
+        "2-prototype/drafts/v1-api-mock.md",
+        "2-prototype/drafts/v1-behavior.md",
+        "2-prototype/drafts/v1-diagram.html",
+        "2-prototype/drafts/v1-example-run.md",
+        "2-prototype/drafts/v1-mock.html",
+        "2-prototype/drafts/v2-mock.html",
+        "2-prototype/example-run.md",
+        "2-prototype/impact-surface.md",
+        "2-prototype/mock.html",
+        "3-contract/contract.md",
+        "3-contract/verify.txt",
+        "manifest.json"
+      ],
+      "fileCount": 21,
+      "bytes": 179526,
+      "manifest": {
+        "stage": "3-contract",
+        "status": "ready",
+        "goal_oneline": "把 aes-worktree-board 升级为 #5 协议的产品化控制平面：实现 P0 六项+修控制面 bug #22/#23/#24/#25，离线编排回归域验收，同步 SKILL.md/#5/运行时三处契约，并以 wayfinder 依赖图全量建 issue（#5 转父节点，P1/P2 建而不做）",
+        "target": null,
+        "stage_gates": {
+          "1-interview": {
+            "status": "done",
+            "closed_at": "2026-08-24T09:00:50Z",
+            "self_assessment": {
+              "意图": "已定",
+              "结果": "已定",
+              "边界": "已定",
+              "约束": "已定",
+              "现状": "已定"
+            }
+          },
+          "2-prototype": {
+            "status": "done",
+            "closed_at": "2026-08-24T09:22:09Z",
+            "artifacts_confirmed": [
+              "mock",
+              "behavior",
+              "api-mock",
+              "example-run",
+              "diagram"
+            ]
+          },
+          "3-contract": {
+            "status": "done",
+            "closed_at": "2026-08-24T09:31:19Z"
+          }
+        },
+        "validation": {
+          "status": "valid",
+          "ac_count": 7,
+          "warnings": [],
+          "ran_at": "2026-08-24T09:31:13Z",
+          "verify_tiers": {
+            "A": 6,
+            "B": 0,
+            "C": 1,
+            "D": 0
+          }
+        },
+        "blocked": [],
+        "next_action": "契约已就绪，可用交接指令启动实现"
+      },
+      "keyFiles": [
+        {
+          "path": "1-interview/context.md",
+          "bytes": 7135,
+          "lines": 75,
+          "sha256": "185517e164f831378797fc111aa0b470e6014a2d68a28f57815a7dcded6c4f47"
+        },
+        {
+          "path": "1-interview/rounds.jsonl",
+          "bytes": 9695,
+          "lines": 21,
+          "sha256": "b55e7f31dbc342eb0e3def3d491751c7ee816b6cc99ff3d4cb82940b53dc2d39"
+        },
+        {
+          "path": "3-contract/contract.md",
+          "bytes": 14734,
+          "lines": 148,
+          "sha256": "6cd7b9453a42b08400dfff14677c9d11f61413690d723b08efdefa5e12e51904"
+        },
+        {
+          "path": "3-contract/verify.txt",
+          "bytes": 1391,
+          "lines": 20,
+          "sha256": "53d6da338ed752ae820197c35be85f8634282fcaee6f22dba4751c4586d48254"
+        },
+        {
+          "path": "manifest.json",
+          "bytes": 1701,
+          "lines": 55,
+          "sha256": "ba43721eabbb102d1b965bbccd99ee2b5fe9519d2806a7e11de14aa1087d7895"
+        }
+      ]
+    },
+    {
+      "case": "2026-08-24-对标mattpocock仓库差距",
+      "role": "historical-case",
+      "files": [
+        "1-interview/context.md",
+        "1-interview/facts/mattpocock-skills-基准.md",
+        "1-interview/facts/parking-agents-现状.md",
+        "1-interview/rounds.jsonl",
+        "2-prototype/behavior.md",
+        "2-prototype/diagram.html",
+        "2-prototype/drafts/report-v1.md",
+        "2-prototype/drafts/report-v2.md",
+        "2-prototype/example-run.md",
+        "2-prototype/impact-surface.md",
+        "3-contract/contract.md",
+        "3-contract/verify.txt",
+        "manifest.json"
+      ],
+      "fileCount": 13,
+      "bytes": 93098,
+      "manifest": {
+        "stage": "3-contract",
+        "status": "ready",
+        "goal_oneline": "产出两轴分层的对标 mattpocock-skills 差距报告,并将用户圈定的高优差距立项改造(自用消费口径)",
+        "target": null,
+        "stage_gates": {
+          "1-interview": {
+            "status": "done",
+            "closed_at": "2026-08-24T10:31:25Z",
+            "self_assessment": {
+              "意图": "已定",
+              "结果": "已定",
+              "边界": "已定",
+              "约束": "已定",
+              "现状": "已定"
+            }
+          },
+          "2-prototype": {
+            "status": "done",
+            "closed_at": "2026-08-24T16:54:53Z",
+            "artifacts_confirmed": [
+              "behavior",
+              "example-run",
+              "diagram"
+            ]
+          },
+          "3-contract": {
+            "status": "done",
+            "closed_at": "2026-08-24T17:01:56Z"
+          }
+        },
+        "validation": {
+          "status": "valid",
+          "ac_count": 7,
+          "warnings": [],
+          "ran_at": "2026-08-24T17:01:55Z",
+          "verify_tiers": {
+            "A": 3,
+            "B": 0,
+            "C": 1,
+            "D": 3
+          }
+        },
+        "blocked": [],
+        "next_action": "契约 Ready:可按交接指令启动执行(生成式发布树+差距报告)"
+      },
+      "keyFiles": [
+        {
+          "path": "1-interview/context.md",
+          "bytes": 6068,
+          "lines": 65,
+          "sha256": "04fe684e4cb17b18dc8bebdc8cabc2644405b1e07ed8f66cea571c87d183de89"
+        },
+        {
+          "path": "1-interview/rounds.jsonl",
+          "bytes": 11462,
+          "lines": 29,
+          "sha256": "9508de7bca391c3cb9e83c2275fedc485552728d99feb4d6d6658e02eb8c73d8"
+        },
+        {
+          "path": "3-contract/contract.md",
+          "bytes": 14108,
+          "lines": 179,
+          "sha256": "37c8751cd69a7b0177d0bd8236a0528088849a75015e527a3df1957a1811e253"
+        },
+        {
+          "path": "3-contract/verify.txt",
+          "bytes": 506,
+          "lines": 11,
+          "sha256": "c3e243f9b33abe8ac321a87ecfc43228acbd4b8bc27ec480291a2a2749f3b416"
+        },
+        {
+          "path": "manifest.json",
+          "bytes": 1322,
+          "lines": 53,
+          "sha256": "4448c1d643e488733277385004482ddd8587ac706a4f752165606a5e798eef92"
+        }
+      ]
+    },
+    {
+      "case": "2026-08-25-aes-worktree-board-session-evolution",
+      "role": "historical-case",
+      "files": [
+        "1-interview/context.md",
+        "1-interview/facts/current-skill-coverage.md",
+        "1-interview/facts/session-evidence-and-publication.md",
+        "1-interview/facts/session-runtime-failures.md",
+        "1-interview/rounds.jsonl",
+        "2-prototype/api-mock.md",
+        "2-prototype/behavior.md",
+        "2-prototype/design-qa-390-history.md",
+        "2-prototype/design-qa.md",
+        "2-prototype/diagram.html",
+        "2-prototype/drafts/v1-mock.html",
+        "2-prototype/example-run.md",
+        "2-prototype/impact-surface.md",
+        "2-prototype/mock.html",
+        "2-prototype/qa/.gitkeep",
+        "2-prototype/qa/00-reference-desktop.png",
+        "2-prototype/qa/01-mobile-overview.png",
+        "2-prototype/qa/02-mobile-one-hop-peek.png",
+        "2-prototype/qa/03-mobile-human-full.png",
+        "2-prototype/qa/04-mobile-list.png",
+        "2-prototype/qa/05-mobile-runners.png",
+        "2-prototype/qa/06-compact-portrait.png",
+        "2-prototype/qa/07-desktop-preview-shell.png",
+        "2-prototype/qa/08-compact-overview.png",
+        "2-prototype/qa-700/.gitkeep",
+        "2-prototype/qa-700/00-desktop-reference.png",
+        "2-prototype/qa-700/01-portrait-overview.png",
+        "2-prototype/qa-700/02-one-hop-peek.png",
+        "2-prototype/qa-700/02b-one-hop-peek-final.png",
+        "2-prototype/qa-700/03-human-full.png",
+        "2-prototype/qa-700/04-list.png",
+        "2-prototype/qa-700/05-runners.png",
+        "2-prototype/qa-700/06-adjacent-640x960.png",
+        "2-prototype/qa-700/07-adjacent-768x1024.png",
+        "3-contract/contract.md",
+        "3-contract/verify.txt",
+        "manifest.json"
+      ],
+      "fileCount": 37,
+      "bytes": 1524635,
+      "manifest": {
+        "stage": "3-contract",
+        "status": "ready",
+        "goal_oneline": "把 aes-worktree-board 定义为 Wayfinder Issue 的 GitHub Actions 式消化控制面，并在既有高保真需求星图界面内增量呈现确定性 runner、job/attempt、双层 Goal、review/QA、discovery 与 delivery。",
+        "target": null,
+        "stage_gates": {
+          "1-interview": {
+            "status": "done",
+            "closed_at": "2026-08-25T10:29:14Z",
+            "self_assessment": {
+              "意图": "已定",
+              "结果": "已定",
+              "边界": "已定",
+              "约束": "已定",
+              "现状": "已定"
+            }
+          },
+          "2-prototype": {
+            "status": "done",
+            "reason": "用户纠正视觉目标为 700x1000 竖屏工作台；v4 已实现并完成本地 QA，等待独立复审与用户确认",
+            "closed_at": "2026-08-26T08:22:11Z",
+            "artifacts_confirmed": [
+              "behavior",
+              "api-mock",
+              "example-run",
+              "mock",
+              "diagram"
+            ]
+          },
+          "3-contract": {
+            "status": "done",
+            "closed_at": "2026-08-26T08:26:20Z"
+          }
+        },
+        "validation": {
+          "status": "valid",
+          "ac_count": 7,
+          "warnings": [],
+          "ran_at": "2026-08-26T08:26:14Z",
+          "verify_tiers": {
+            "A": 6,
+            "B": 0,
+            "C": 1,
+            "D": 0
+          }
+        },
+        "blocked": [],
+        "next_action": "执行 Agent 按 contract.md 实现；AC-007 为人工门，live 半需用户提供 3 个 fresh Issue"
+      },
+      "keyFiles": [
+        {
+          "path": "1-interview/context.md",
+          "bytes": 15009,
+          "lines": 181,
+          "sha256": "7443d723db9784f73819b5f0aaf190a1576fb8ad1abb7a9694de9311dc14898d"
+        },
+        {
+          "path": "1-interview/rounds.jsonl",
+          "bytes": 47200,
+          "lines": 79,
+          "sha256": "8ab6fefa57bc54e8a03fb7408ca6d22c836bec7775e575129009c69840d65883"
+        },
+        {
+          "path": "3-contract/contract.md",
+          "bytes": 17880,
+          "lines": 215,
+          "sha256": "56cfcec7514e67e09e0414fcd31eec0c195e61fd5c4dc70044ee44796e8f5f04"
+        },
+        {
+          "path": "3-contract/verify.txt",
+          "bytes": 3475,
+          "lines": 19,
+          "sha256": "b1dfd70d7c5c0a6e6c104bcc9d3220fbd2940fc5a164d55396982cdcdee94437"
+        },
+        {
+          "path": "manifest.json",
+          "bytes": 1840,
+          "lines": 56,
+          "sha256": "c7d5e5070077db8758b4c6bad0f71cc140a1ffeb13dd2ad0cdc47b331eeba355"
+        }
+      ]
+    },
+    {
+      "case": "2026-08-27-aes-issue-worker-流程重梳",
+      "role": "historical-case",
+      "files": [
+        "1-interview/context.md",
+        "1-interview/rounds.jsonl",
+        "2-prototype/api-mock.md",
+        "2-prototype/behavior.md",
+        "2-prototype/diagram.html",
+        "2-prototype/drafts/v1-api-mock.md",
+        "2-prototype/drafts/v1-behavior.md",
+        "2-prototype/drafts/v1-diagram.html",
+        "2-prototype/drafts/v2-api-mock.md",
+        "2-prototype/drafts/v2-behavior.md",
+        "2-prototype/drafts/v2-diagram.html",
+        "2-prototype/drafts/v3-behavior.md",
+        "2-prototype/drafts/v3-diagram.html",
+        "2-prototype/drafts/v4-behavior.md",
+        "2-prototype/drafts/v4-diagram.html",
+        "2-prototype/drafts/v5-behavior.md",
+        "2-prototype/drafts/v5-diagram.html",
+        "2-prototype/drafts/v6-behavior.md",
+        "2-prototype/drafts/v6-diagram.html",
+        "2-prototype/drafts/v7-behavior.md",
+        "2-prototype/impact-surface.md",
+        "3-contract/contract.md",
+        "3-contract/verify.txt",
+        "manifest.json"
+      ],
+      "fileCount": 24,
+      "bytes": 195204,
+      "manifest": {
+        "stage": "3-contract",
+        "status": "ready",
+        "goal_oneline": "把五个流程裁定（路由契约锁定、review→QA 顺序、simplify 条件触发进 implement 尾部、review 按 risk 分档深度、单 session 模型）落成 aes-issue-worker SKILL.md 修订 + work-order 带 declaredRisk 的 additive schema 扩展",
+        "target": null,
+        "stage_gates": {
+          "1-interview": {
+            "status": "done",
+            "closed_at": "2026-08-27T04:15:06Z",
+            "self_assessment": {
+              "意图": "已定",
+              "结果": "已定",
+              "边界": "已定",
+              "约束": "已定",
+              "现状": "已定"
+            }
+          },
+          "2-prototype": {
+            "status": "done",
+            "closed_at": "2026-08-27T05:40:19Z",
+            "artifacts_confirmed": [
+              "behavior",
+              "api-mock",
+              "diagram"
+            ]
+          },
+          "3-contract": {
+            "status": "done",
+            "closed_at": "2026-08-27T06:23:12Z"
+          }
+        },
+        "validation": {
+          "status": "valid",
+          "ac_count": 5,
+          "warnings": [],
+          "ran_at": "2026-08-27T06:20:32Z",
+          "verify_tiers": {
+            "A": 4,
+            "B": 0,
+            "C": 0,
+            "D": 1
+          }
+        },
+        "blocked": [],
+        "next_action": "契约 v3（冷读探针修订）锁定，交接就绪"
+      },
+      "keyFiles": [
+        {
+          "path": "1-interview/context.md",
+          "bytes": 4663,
+          "lines": 57,
+          "sha256": "007acab519eb54e423418741f81f89657f0a555edf55cadd9e3cdc7528623394"
+        },
+        {
+          "path": "1-interview/rounds.jsonl",
+          "bytes": 11340,
+          "lines": 19,
+          "sha256": "07c565af187dff3e783da3b1001411ebe6f346db376cf6671440cb71c97e6ed7"
+        },
+        {
+          "path": "3-contract/contract.md",
+          "bytes": 13647,
+          "lines": 196,
+          "sha256": "589f3cd44ba2e45bdce86286789b30a94ae1af449b5517f354d4ed5a471ed653"
+        },
+        {
+          "path": "3-contract/verify.txt",
+          "bytes": 1330,
+          "lines": 13,
+          "sha256": "6b20b0c5fc0bd44570977b6f06999212463972aaab60cc49d74c0af0db16728c"
+        },
+        {
+          "path": "manifest.json",
+          "bytes": 1698,
+          "lines": 53,
+          "sha256": "14ae953a6ab60cfab5d22315b8a7710c3ca88ecfb6faf3c503baa0822b0f9b5f"
+        }
+      ]
+    },
+    {
+      "case": "2026-08-28-aes-merge-worker-落地",
+      "role": "historical-case",
+      "files": [
+        "1-interview/context.md",
+        "1-interview/rounds.jsonl",
+        "2-prototype/api-mock.md",
+        "2-prototype/behavior.md",
+        "2-prototype/diagram.html",
+        "2-prototype/drafts/v1-api-mock.md",
+        "2-prototype/drafts/v1-behavior.md",
+        "2-prototype/drafts/v1-diagram.html",
+        "2-prototype/drafts/v1-example-run.md",
+        "2-prototype/example-run.md",
+        "2-prototype/impact-surface.md",
+        "manifest.json"
+      ],
+      "fileCount": 12,
+      "bytes": 95612,
+      "manifest": {
+        "stage": "3-contract",
+        "status": "in_progress",
+        "goal_oneline": "#126 范围锁定：SKILL.md prose + 三机械增量 + close 完整解耦（通用出站队列只接 close、显式 flush）；happy path live 一轮留本票 AC，MUST_FIX+#114 拆 live 票；偏差8/7 外置",
+        "target": null,
+        "stage_gates": {
+          "1-interview": {
+            "status": "done",
+            "closed_at": "2026-08-28T09:06:10Z",
+            "self_assessment": {
+              "意图": "已定",
+              "结果": "已定",
+              "边界": "已定",
+              "约束": "已定",
+              "现状": "已定"
+            }
+          },
+          "2-prototype": {
+            "status": "done",
+            "closed_at": "2026-08-28T09:37:19Z",
+            "artifacts_confirmed": [
+              "behavior",
+              "api-mock",
+              "example-run",
+              "diagram"
+            ]
+          },
+          "3-contract": {
+            "status": "pending"
+          }
+        },
+        "validation": null,
+        "blocked": [],
+        "next_action": "aes-goal-contract：从四份确认版对照物聚验收条件，逐条问清「这条错了会怎样、那就怎么验」"
+      },
+      "keyFiles": [
+        {
+          "path": "1-interview/context.md",
+          "bytes": 3184,
+          "lines": 47,
+          "sha256": "e8102d1378426e73f9b66714bcea3e8c5d97ebdb451c00818734ffdac30c39df"
+        },
+        {
+          "path": "1-interview/rounds.jsonl",
+          "bytes": 9356,
+          "lines": 18,
+          "sha256": "570a9f2f14952533352f4e977ef20d0306ca7848d32b267e5daffbb047e94710"
+        },
+        {
+          "path": "manifest.json",
+          "bytes": 1375,
+          "lines": 42,
+          "sha256": "db7283d5d7e7949fbf277e9e68926e90d29ded148fcdad6688f6ff42e87f8bb1"
+        }
+      ]
+    },
+    {
+      "case": "2026-08-28-issue70-loop-first-ruling",
+      "role": "historical-case",
+      "files": [
+        "1-interview/context.md",
+        "1-interview/rounds.jsonl",
+        "manifest.json"
+      ],
+      "fileCount": 3,
+      "bytes": 8580,
+      "manifest": {
+        "stage": "2-prototype",
+        "status": "in_progress",
+        "goal_oneline": "裁定 #70 为修改后采纳：下一轮入口=回路证明轮（混合三段串行），行为防御实测反哺，硬化立票门槛定为长期原则",
+        "target": null,
+        "stage_gates": {
+          "1-interview": {
+            "status": "done",
+            "closed_at": "2026-08-27T17:38:49Z",
+            "self_assessment": {
+              "意图": "已定",
+              "结果": "已定",
+              "边界": "已定",
+              "约束": "已定",
+              "现状": "已定"
+            }
+          },
+          "2-prototype": {
+            "status": "pending"
+          },
+          "3-contract": {
+            "status": "pending"
+          }
+        },
+        "validation": null,
+        "blocked": [],
+        "next_action": "执行 wayfinder resolution：#70 落 resolution 并 close，刷新 map 与受影响票，建证伪段新票并接线"
+      },
+      "keyFiles": [
+        {
+          "path": "1-interview/context.md",
+          "bytes": 3758,
+          "lines": 50,
+          "sha256": "1beadd4143f72645665faa348f5fb67284149b0e72bc9c1f1c9f1aaa9c7ef5cd"
+        },
+        {
+          "path": "1-interview/rounds.jsonl",
+          "bytes": 3678,
+          "lines": 8,
+          "sha256": "9f56c5579d695b5bedccd34214d7fd460ca863e3d6a81d97773c680c6fed91b9"
+        },
+        {
+          "path": "manifest.json",
+          "bytes": 1144,
+          "lines": 35,
+          "sha256": "8137028fefbbe15bc3aeebbfe5966f2d5da1683b47f801393340928c1a9d64d8"
+        }
+      ]
+    },
+    {
+      "case": "2026-08-28-outbox-close-解耦",
+      "role": "historical-case",
+      "files": [
+        "1-interview/context.md",
+        "1-interview/rounds.jsonl",
+        "2-prototype/api-mock.md",
+        "2-prototype/behavior.md",
+        "2-prototype/diagram.html",
+        "2-prototype/example-run.md",
+        "2-prototype/impact-surface.md",
+        "3-contract/contract.md",
+        "3-contract/verify.txt",
+        "manifest.json"
+      ],
+      "fileCount": 10,
+      "bytes": 76827,
+      "manifest": {
+        "stage": "3-contract",
+        "status": "ready",
+        "goal_oneline": null,
+        "target": null,
+        "stage_gates": {
+          "1-interview": {
+            "status": "done",
+            "closed_at": "2026-08-28T09:49:01Z",
+            "self_assessment": {
+              "意图": "已定",
+              "结果": "已定",
+              "边界": "已定",
+              "约束": "已定",
+              "现状": "已定"
+            }
+          },
+          "2-prototype": {
+            "status": "done",
+            "closed_at": "2026-08-28T09:49:05Z",
+            "artifacts_confirmed": [
+              "behavior",
+              "api-mock",
+              "example-run",
+              "diagram"
+            ]
+          },
+          "3-contract": {
+            "status": "done",
+            "closed_at": "2026-08-28T10:22:43Z"
+          }
+        },
+        "validation": {
+          "status": "valid",
+          "ac_count": 5,
+          "warnings": [],
+          "ran_at": "2026-08-28T11:19:20Z",
+          "verify_tiers": {
+            "A": 4,
+            "B": 0,
+            "C": 1,
+            "D": 0
+          }
+        },
+        "blocked": [],
+        "next_action": "契约已就绪，把交接指令发给执行 Agent。契约：G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\.aes-workflow\\grilling\\2026-08-28-outbox-close-解耦\\3-contract\\contract.md"
+      },
+      "keyFiles": [
+        {
+          "path": "1-interview/context.md",
+          "bytes": 4496,
+          "lines": 72,
+          "sha256": "fb26f6916fa7159b99bb66e8f80d5b5e4bd5ef979abaafcf02b04e8aa7eb1fb0"
+        },
+        {
+          "path": "1-interview/rounds.jsonl",
+          "bytes": 9356,
+          "lines": 18,
+          "sha256": "570a9f2f14952533352f4e977ef20d0306ca7848d32b267e5daffbb047e94710"
+        },
+        {
+          "path": "3-contract/contract.md",
+          "bytes": 15033,
+          "lines": 219,
+          "sha256": "5b8eb4f55911a8176de0a3a71223833de15d72808c5b406827073cd8499f3385"
+        },
+        {
+          "path": "3-contract/verify.txt",
+          "bytes": 1397,
+          "lines": 16,
+          "sha256": "8fa2f8fabe6df079a9705fbd968f3a7b1d06fc008368ba43cd6612a0ad73e134"
+        },
+        {
+          "path": "manifest.json",
+          "bytes": 1323,
+          "lines": 54,
+          "sha256": "701189b8748c8a111e83a1aae122f524d68fa7525b49fac19c7dc71558faf952"
+        }
+      ]
+    },
+    {
+      "case": "2026-08-29-aes-glab-skill改进",
+      "role": "historical-case",
+      "files": [
+        "1-interview/context.md",
+        "1-interview/rounds.jsonl",
+        "2-prototype/behavior.md",
+        "2-prototype/diagram.html",
+        "2-prototype/drafts/v1-skill-draft.md",
+        "2-prototype/example-run.md",
+        "2-prototype/impact-surface.md",
+        "3-contract/contract.md",
+        "3-contract/verify.txt",
+        "manifest.json"
+      ],
+      "fileCount": 10,
+      "bytes": 49046,
+      "manifest": {
+        "stage": "3-contract",
+        "status": "ready",
+        "goal_oneline": "把 aes-glab 扩成安装+配置+使用全覆盖的教程型技能：新增安装节与一次性配置事实、使用面逐条实测后扩到 gh 级广度，经完整输出评测循环验收并沉淀 history",
+        "target": null,
+        "stage_gates": {
+          "1-interview": {
+            "status": "done",
+            "closed_at": "2026-08-29T11:56:00Z",
+            "self_assessment": {
+              "意图": "已定",
+              "结果": "已定",
+              "边界": "已定",
+              "约束": "已定",
+              "现状": "已定"
+            }
+          },
+          "2-prototype": {
+            "status": "done",
+            "closed_at": "2026-08-29T13:56:10Z",
+            "artifacts_confirmed": [
+              "behavior",
+              "example-run",
+              "diagram"
+            ]
+          },
+          "3-contract": {
+            "status": "done",
+            "closed_at": "2026-08-29T14:01:43Z"
+          }
+        },
+        "validation": {
+          "status": "valid",
+          "ac_count": 5,
+          "warnings": [],
+          "ran_at": "2026-08-29T14:01:35Z",
+          "verify_tiers": {
+            "A": 3,
+            "B": 1,
+            "C": 0,
+            "D": 1
+          }
+        },
+        "blocked": [],
+        "next_action": "契约已 finalize 通过，可交接执行 Agent 开始实现"
+      },
+      "keyFiles": [
+        {
+          "path": "1-interview/context.md",
+          "bytes": 6673,
+          "lines": 69,
+          "sha256": "2a38f20d10434f5889faa40f77a99d42939ff11e0fa33bd901e6041d48227f17"
+        },
+        {
+          "path": "1-interview/rounds.jsonl",
+          "bytes": 6509,
+          "lines": 17,
+          "sha256": "fe782312a8941782987eda0cb09f109432a153d978ae786adc0a28864f8ca612"
+        },
+        {
+          "path": "3-contract/contract.md",
+          "bytes": 10381,
+          "lines": 141,
+          "sha256": "6d7eda4792637c1c0e08acd3866c002c3b2e895d221a07b2c364e6a0d6f8ecae"
+        },
+        {
+          "path": "3-contract/verify.txt",
+          "bytes": 1101,
+          "lines": 10,
+          "sha256": "98ea34fe9f9f0471c792e379a1b34395bf3ed8b920c4490f07c4b2448dd0b74f"
+        },
+        {
+          "path": "manifest.json",
+          "bytes": 1383,
+          "lines": 53,
+          "sha256": "27588918510081be155fcf3adf13f7099ec64c9be36c7070e24c6e6c7775a45e"
+        }
+      ]
+    },
+    {
+      "case": "2026-08-30-issue-147-steelman-rerun",
+      "role": "historical-case",
+      "files": [
+        "1-interview/context.md",
+        "1-interview/facts/aes-workflow-web-interaction-model.md",
+        "1-interview/facts/aes-workflow-web-visual-system.md",
+        "1-interview/facts/aesagent-workflow-surface-seams.md",
+        "1-interview/facts/agent-isolation.md",
+        "1-interview/facts/agent-skill-role-ontology.md",
+        "1-interview/facts/backend-interface-durable-service.md",
+        "1-interview/facts/backend-interface-hybrid.md",
+        "1-interview/facts/backend-interface-minimal-kernel.md",
+        "1-interview/facts/board-human-status-ux.md",
+        "1-interview/facts/dual-host-workflow-surface-options.md",
+        "1-interview/facts/generic-web-agent-module-audit.md",
+        "1-interview/facts/interview-gap-audit.md",
+        "1-interview/facts/issue-147-real-data.md",
+        "1-interview/facts/logic-prototype-p7-p9-gap-audit.md",
+        "1-interview/facts/mock-v2-product-audit.md",
+        "1-interview/facts/prototype-logic-closeout-audit.md",
+        "1-interview/facts/role-carrier-topology-options.md",
+        "1-interview/facts/role-vs-skill-critique.md",
+        "1-interview/facts/router-ambiguity-failure-analysis.md",
+        "1-interview/facts/router-escalation-policy.md",
+        "1-interview/facts/skill-composition-chain.md",
+        "1-interview/facts/verification-topology.md",
+        "1-interview/facts/web-operator-visualization-patterns.md",
+        "1-interview/facts/web-prototype-fixture-provenance.md",
+        "1-interview/facts/web-v4-dual-map-domain-audit.md",
+        "1-interview/facts/web-v4-dual-map-sample-plan.md",
+        "1-interview/facts/web-v4-map-first-visual-patterns.md",
+        "1-interview/facts/web-v5-business-alignment-audit.md",
+        "1-interview/facts/web-v5-real-story-dataset.md",
+        "1-interview/facts/web-v5-reference-console-patterns.md",
+        "1-interview/facts/web-v5-v3-v4-preservation-audit.md",
+        "1-interview/facts/web-v6-provenance-audit.md",
+        "1-interview/facts/workflow-module-promotion-options.md",
+        "1-interview/rounds.jsonl",
+        "2-prototype/api-mock.md",
+        "2-prototype/behavior.md",
+        "2-prototype/design-qa.md",
+        "2-prototype/diagram-detail.html",
+        "2-prototype/diagram.html",
+        "2-prototype/drafts/design-qa.md",
+        "2-prototype/drafts/v1-api-mock.md",
+        "2-prototype/drafts/v1-behavior.md",
+        "2-prototype/drafts/v1-diagram.html",
+        "2-prototype/drafts/v1-example-run.md",
+        "2-prototype/drafts/v1-mock.html",
+        "2-prototype/drafts/v2-diagram.html",
+        "2-prototype/drafts/v2-mock.html",
+        "2-prototype/drafts/v2-orchestration-example.md",
+        "2-prototype/drafts/v2-skill-chain.md",
+        "2-prototype/drafts/v2-web-projection-api.md",
+        "2-prototype/drafts/v3-product-design-rationale.md",
+        "2-prototype/drafts/v3-product-prototype.html",
+        "2-prototype/drafts/v3-role-runtime-diagram.html",
+        "2-prototype/drafts/v3-role-skill-carrier-model.md",
+        "2-prototype/drafts/v4-dual-host-example-run.md",
+        "2-prototype/drafts/v4-map-first-prototype.html",
+        "2-prototype/drafts/v4-map-first-rationale.md",
+        "2-prototype/drafts/v4-shared-workflow-module-diagram.html",
+        "2-prototype/drafts/v4-shared-workflow-module-model.md",
+        "2-prototype/drafts/v4-surface-protocol.md",
+        "2-prototype/drafts/v5-design-qa.md",
+        "2-prototype/drafts/v5-dual-tab-selected-target.png",
+        "2-prototype/drafts/v5-story-work-graph-rationale.md",
+        "2-prototype/drafts/v5-story-work-graph.html",
+        "2-prototype/drafts/v6-business-api-mock.md",
+        "2-prototype/drafts/v6-business-behavior.md",
+        "2-prototype/drafts/v6-business-diagram-detail.html",
+        "2-prototype/drafts/v6-business-diagram.html",
+        "2-prototype/drafts/v6-business-example-run.md",
+        "2-prototype/drafts/v6-story-work-graph-rationale.md",
+        "2-prototype/drafts/v6-story-work-graph.html",
+        "2-prototype/drafts/webp10-product-restart-audit.md",
+        "2-prototype/drafts/webp12-business-alignment-audit.md",
+        "2-prototype/drafts/webp8-product-audit.md",
+        "2-prototype/drafts/webp9-v4-product-audit.md",
+        "2-prototype/evidence/webp10-product-restart/01-v3-current-status-workbench.png",
+        "2-prototype/evidence/webp10-product-restart/02-v3-scenario-action-first.png",
+        "2-prototype/evidence/webp10-product-restart/03-v3-scenario-map.png",
+        "2-prototype/evidence/webp10-product-restart/04-v4-current-map-first.png",
+        "2-prototype/evidence/webp10-product-restart/05-v4-scenario-raw-global-graph.png",
+        "2-prototype/evidence/webp10-product-restart/audit-results.json",
+        "2-prototype/evidence/webp11-v5/01-delivery-default.png",
+        "2-prototype/evidence/webp11-v5/02-delivery-web-qa-selected.png",
+        "2-prototype/evidence/webp11-v5/03-delivery-one-hop-focus.png",
+        "2-prototype/evidence/webp11-v5/04-delivery-list.png",
+        "2-prototype/evidence/webp11-v5/05-evidence-modal.png",
+        "2-prototype/evidence/webp11-v5/06-discovery-real-graph.png",
+        "2-prototype/evidence/webp11-v5/07-discovery-153-selected.png",
+        "2-prototype/evidence/webp11-v5/08-discovery-author-progression.png",
+        "2-prototype/evidence/webp11-v5/09-discovery-search.png",
+        "2-prototype/evidence/webp11-v5/10-cross-graph-return.png",
+        "2-prototype/evidence/webp11-v5/11-source-boundary.png",
+        "2-prototype/evidence/webp11-v5/12-responsive-480.png",
+        "2-prototype/evidence/webp11-v5/13-responsive-1440.png",
+        "2-prototype/evidence/webp11-v5/audit-results.json",
+        "2-prototype/evidence/webp12-business-alignment/01-delivery-default.png",
+        "2-prototype/evidence/webp12-business-alignment/01-delivery-default.yaml",
+        "2-prototype/evidence/webp12-business-alignment/02-evidence-modal.png",
+        "2-prototype/evidence/webp12-business-alignment/02-evidence-modal.yaml",
+        "2-prototype/evidence/webp12-business-alignment/03-before-discovery.yaml",
+        "2-prototype/evidence/webp12-business-alignment/03-discovery-default.png",
+        "2-prototype/evidence/webp12-business-alignment/03-discovery-default.yaml",
+        "2-prototype/evidence/webp12-business-alignment/04-discovery-selected.png",
+        "2-prototype/evidence/webp12-business-alignment/04-discovery-selected.yaml",
+        "2-prototype/evidence/webp12-business-alignment/05-discovery-inspector.png",
+        "2-prototype/evidence/webp12-business-alignment/05-discovery-inspector.yaml",
+        "2-prototype/evidence/webp12-business-alignment/06-before-source.yaml",
+        "2-prototype/evidence/webp12-business-alignment/06-source-boundary.png",
+        "2-prototype/evidence/webp12-business-alignment/06-source-boundary.yaml",
+        "2-prototype/evidence/webp12-business-alignment/07-before-return.yaml",
+        "2-prototype/evidence/webp12-business-alignment/07-cross-graph-return.png",
+        "2-prototype/evidence/webp12-business-alignment/07-cross-graph-return.yaml",
+        "2-prototype/evidence/webp13-business-logic/01-overview.png",
+        "2-prototype/evidence/webp13-business-logic/01-overview.yaml",
+        "2-prototype/evidence/webp13-business-logic/02-domain-detail.png",
+        "2-prototype/evidence/webp13-business-logic/02-domain-detail.yaml",
+        "2-prototype/evidence/webp13-business-logic/p13-detail.png",
+        "2-prototype/evidence/webp13-business-logic/p13-overview.png",
+        "2-prototype/evidence/webp13-business-logic/validation-p13.json",
+        "2-prototype/evidence/webp13-business-logic/validation-results.json",
+        "2-prototype/evidence/webp14-v6/check-v6.mjs",
+        "2-prototype/evidence/webp14-v6/p14-confirmation.json",
+        "2-prototype/evidence/webp14-v6/validation.json",
+        "2-prototype/evidence/webp8/01-real-overview.png",
+        "2-prototype/evidence/webp8/02-real-subissue-map.png",
+        "2-prototype/evidence/webp8/03-real-evidence-timeline.png",
+        "2-prototype/evidence/webp8/04-real-source-modal.png",
+        "2-prototype/evidence/webp8/05-scenario-overview.png",
+        "2-prototype/evidence/webp8/06-scenario-decision-modal.png",
+        "2-prototype/evidence/webp8/07-scenario-map-reset.png",
+        "2-prototype/evidence/webp8/08-scenario-blocked-human.png",
+        "2-prototype/evidence/webp8/09-scenario-review-start.png",
+        "2-prototype/evidence/webp8/10-scenario-review-edited.png",
+        "2-prototype/evidence/webp8/11-scenario-returned.png",
+        "2-prototype/evidence/webp8/12-mobile-real-480.png",
+        "2-prototype/evidence/webp8/13-mobile-scenario-480.png",
+        "2-prototype/evidence/webp8/14-wide-real-1440.png",
+        "2-prototype/evidence/webp8/47-webp8-baseline-vs-real-truth.png",
+        "2-prototype/evidence/webp8/48-webp8-baseline-vs-simulated-boundary.png",
+        "2-prototype/evidence/webp8/audit-results.json",
+        "2-prototype/evidence/webp9-v4/01-current-global-map.png",
+        "2-prototype/evidence/webp9-v4/02-current-153-inspector.png",
+        "2-prototype/evidence/webp9-v4/03-current-author-progression.png",
+        "2-prototype/evidence/webp9-v4/04-current-source-modal.png",
+        "2-prototype/evidence/webp9-v4/05-sim-global-dual-map.png",
+        "2-prototype/evidence/webp9-v4/06-sim-frontier-only.png",
+        "2-prototype/evidence/webp9-v4/07-sim-web-qa-selected.png",
+        "2-prototype/evidence/webp9-v4/08-review-workspace.png",
+        "2-prototype/evidence/webp9-v4/09-review-edited.png",
+        "2-prototype/evidence/webp9-v4/10-review-returned-map.png",
+        "2-prototype/evidence/webp9-v4/11-sim-action-projection.png",
+        "2-prototype/evidence/webp9-v4/12-sim-evidence-history.png",
+        "2-prototype/evidence/webp9-v4/13-mobile-current-480.png",
+        "2-prototype/evidence/webp9-v4/14-mobile-sim-480.png",
+        "2-prototype/evidence/webp9-v4/15-wide-sim-1440.png",
+        "2-prototype/evidence/webp9-v4/16-v3-v4-current-map-first.png",
+        "2-prototype/evidence/webp9-v4/17-v3-v4-sim-dynamic-maps.png",
+        "2-prototype/evidence/webp9-v4/audit-results.json",
+        "2-prototype/example-run.md",
+        "2-prototype/impact-surface.md",
+        "manifest.json"
+      ],
+      "fileCount": 162,
+      "bytes": 11853821,
+      "manifest": {
+        "stage": "2-prototype",
+        "status": "in_progress",
+        "goal_oneline": "重新定稿一个可跨 GitHub/GitLab 与多 RepoLane、以持久事实重建全局掌控并按 Discovery/Delivery 双图编排至精确集成交付的薄 workflow-story-map 设计。",
+        "target": null,
+        "stage_gates": {
+          "1-interview": {
+            "status": "done",
+            "closed_at": "2026-08-29T20:55:18Z",
+            "self_assessment": {
+              "意图": "已定",
+              "结果": "已定",
+              "边界": "已定",
+              "约束": "已定",
+              "现状": "已定"
+            }
+          },
+          "2-prototype": {
+            "status": "pending",
+            "artifacts_confirmed": [
+              "behavior",
+              "api-mock",
+              "example-run",
+              "diagram",
+              "diagram-detail"
+            ]
+          },
+          "3-contract": {
+            "status": "pending"
+          }
+        },
+        "validation": null,
+        "blocked": [],
+        "next_action": "P14 业务基线已确认；v6 Web 草稿已构建。先完成真实浏览器与可视化核对，再询问 Web 独立确认；不得进入 Contract 或实现。"
+      },
+      "keyFiles": [
+        {
+          "path": "1-interview/context.md",
+          "bytes": 67823,
+          "lines": 346,
+          "sha256": "f5f767f6304a88f98c7db6169534af2c60e4260beddfd9be48e3b2f4048dfce9"
+        },
+        {
+          "path": "1-interview/rounds.jsonl",
+          "bytes": 132103,
+          "lines": 64,
+          "sha256": "591fd523972e46188c6063ea789ef04b72dc92e317c1328591016b4ab484b7b8"
+        },
+        {
+          "path": "manifest.json",
+          "bytes": 1412,
+          "lines": 42,
+          "sha256": "6e6dd47da4f3863b1107b1a545c8a006982eb35c7119f6fbbc547b0901bd4e18"
+        }
+      ]
+    },
+    {
+      "case": "2026-08-30-issue-160-eval-evidence-contract",
+      "role": "historical-case",
+      "files": [
+        "1-interview/context.md",
+        "1-interview/interview-r1.json",
+        "1-interview/rounds.jsonl",
+        "2-prototype/api-mock.md",
+        "2-prototype/behavior.md",
+        "2-prototype/diagram.html",
+        "2-prototype/drafts/independence-correction.md",
+        "2-prototype/drafts/v1-api-mock.md",
+        "2-prototype/drafts/v1-behavior.md",
+        "2-prototype/drafts/v1-diagram.html",
+        "2-prototype/drafts/v1-example-run.md",
+        "2-prototype/drafts/v1-mock.html",
+        "2-prototype/evidence-audit.md",
+        "2-prototype/example-run.md",
+        "2-prototype/impact-surface.md",
+        "2-prototype/mock.html",
+        "2-prototype/prototype-independence-r4.json",
+        "2-prototype/prototype-r1.json",
+        "2-prototype/prototype-steelman-r2.json",
+        "3-contract/contract-criteria-r1.json",
+        "3-contract/contract-final-r2.json",
+        "3-contract/contract.md",
+        "3-contract/decision-dossier.html",
+        "3-contract/drafts/contract-v1.md",
+        "3-contract/verify.txt",
+        "manifest.json",
+        "web/.last-port",
+        "web/assets/api-mock.md",
+        "web/assets/behavior.md",
+        "web/assets/contract-v1.md",
+        "web/assets/diagram.html",
+        "web/assets/evidence-audit.md",
+        "web/assets/example-run.md",
+        "web/assets/independence-correction.md",
+        "web/assets/mock.html",
+        "web/consumed/contract-criteria-r1.json",
+        "web/consumed/contract-final-r2.json",
+        "web/consumed/interview-r1.json",
+        "web/consumed/prototype-independence-r4.json",
+        "web/consumed/prototype-r1.json",
+        "web/consumed/prototype-steelman-r2.json",
+        "web/decision-ledger.jsonl",
+        "web/runtime/consumption-records.jsonl",
+        "web/server-stopped",
+        "web/state.json",
+        "web/submissions/contract-criteria-r1.json",
+        "web/submissions/contract-final-r2.json",
+        "web/submissions/interview-r1.json",
+        "web/submissions/prototype-independence-r4.json",
+        "web/submissions/prototype-r1.json",
+        "web/submissions/prototype-steelman-r2.json"
+      ],
+      "fileCount": 51,
+      "bytes": 2002868,
+      "manifest": {
+        "stage": "3-contract",
+        "status": "ready",
+        "goal_oneline": "parking-skill-creator 能以固定、可审计、跨 gate 一致的证据评测技能，并以独立本地质量门产出诚实结论，最终由 shopping replay+live pilot 证明全链可用",
+        "target": "skills/workflow/parking-skill-creator; skills/life/shopping-deep-research",
+        "stage_gates": {
+          "1-interview": {
+            "status": "done",
+            "closed_at": "2026-08-30T10:05:33Z",
+            "self_assessment": {
+              "意图": "已定",
+              "结果": "已定",
+              "边界": "已定",
+              "约束": "已定",
+              "现状": "已定"
+            }
+          },
+          "2-prototype": {
+            "status": "done",
+            "closed_at": "2026-08-30T12:19:37Z",
+            "artifacts_confirmed": [
+              "mock",
+              "behavior",
+              "api-mock",
+              "example-run",
+              "diagram"
+            ],
+            "reason": "修订确认版架构与上下文预算"
+          },
+          "3-contract": {
+            "status": "done",
+            "reason": "用户新增强约束：parking-skill-creator 必须独立，不能依赖 writing-for-agents；常驻与质量分支上下文需设可验预算",
+            "closed_at": "2026-08-30T12:54:50Z"
+          }
+        },
+        "validation": {
+          "status": "valid",
+          "ac_count": 6,
+          "warnings": [],
+          "ran_at": "2026-08-30T12:54:02Z",
+          "verify_tiers": {
+            "A": 5,
+            "B": 0,
+            "C": 1,
+            "D": 0
+          }
+        },
+        "blocked": [
+          "AC-006 真实 live acceptance 等待 2026-09-10 外部搜索配额恢复与用户显式授权"
+        ],
+        "next_action": "可先实现 AC-001 至 AC-005 和 AC-006 replay 半段；真实 live 完成前不得宣告合同完成"
+      },
+      "keyFiles": [
+        {
+          "path": "1-interview/context.md",
+          "bytes": 8598,
+          "lines": 65,
+          "sha256": "e21d6281d3693f098b4f2e1ab20bd22f25c0f1b161e463ee0a9b7e345cc79108"
+        },
+        {
+          "path": "1-interview/rounds.jsonl",
+          "bytes": 36161,
+          "lines": 36,
+          "sha256": "eef12c506da1db826438b2ba50316788d1fb690e6b79d6a283c587abbbf4f93f"
+        },
+        {
+          "path": "3-contract/contract-criteria-r1.json",
+          "bytes": 12755,
+          "lines": 120,
+          "sha256": "8bdda8a61f0aabba61120fee925674e9f06b71042c0854464208d8c4d7c914c2"
+        },
+        {
+          "path": "3-contract/contract-final-r2.json",
+          "bytes": 4153,
+          "lines": 77,
+          "sha256": "e91aa0204b66c32d1c97a9a945829d10ff8b84b38a4359e63c0a2c70f97c2874"
+        },
+        {
+          "path": "3-contract/contract.md",
+          "bytes": 25835,
+          "lines": 242,
+          "sha256": "5815a151f59ccb1e57012fadd74721c67ff4df32e27b569d440d985f7d37c3a9"
+        },
+        {
+          "path": "3-contract/verify.txt",
+          "bytes": 2048,
+          "lines": 23,
+          "sha256": "f679ad982dc4c108436dc1b9c9f8a625bd006d3090ac2492118350b7619bd52b"
+        },
+        {
+          "path": "manifest.json",
+          "bytes": 2069,
+          "lines": 59,
+          "sha256": "a0c455585f15025750ff9b143e5771db3634cb5eb2663b8f4ab96f10bf3506ab"
+        }
+      ]
+    },
+    {
+      "case": "2026-08-30-psc-layout-regression-fix",
+      "role": "historical-case",
+      "files": [
+        "1-interview/context.md",
+        "1-interview/rounds.jsonl",
+        "2-prototype/behavior.md",
+        "2-prototype/example-run.md",
+        "2-prototype/impact-surface.md",
+        "3-contract/contract.md",
+        "3-contract/verify.txt",
+        "dossier.html",
+        "manifest.json"
+      ],
+      "fileCount": 9,
+      "bytes": 298643,
+      "manifest": {
+        "stage": "3-contract",
+        "status": "ready",
+        "goal_oneline": "creator 工具链在分类布局+link 挂载下恢复两条不变量：评测产物缺省落扫描根外（任意嵌套深度）、影子检测按产物特征真实区分真技能与冒充产物",
+        "target": null,
+        "stage_gates": {
+          "1-interview": {
+            "status": "done",
+            "closed_at": "2026-08-30T16:23:12Z",
+            "self_assessment": {
+              "意图": "已定",
+              "结果": "已定",
+              "边界": "已定",
+              "约束": "已定",
+              "现状": "已定"
+            }
+          },
+          "2-prototype": {
+            "status": "done",
+            "closed_at": "2026-08-30T16:59:52Z",
+            "artifacts_confirmed": [
+              "behavior",
+              "example-run"
+            ]
+          },
+          "3-contract": {
+            "status": "done",
+            "closed_at": "2026-08-30T17:29:36Z"
+          }
+        },
+        "validation": {
+          "status": "valid",
+          "ac_count": 6,
+          "warnings": [],
+          "ran_at": "2026-08-30T17:28:29Z",
+          "verify_tiers": {
+            "A": 6,
+            "B": 0,
+            "C": 0,
+            "D": 0
+          }
+        },
+        "blocked": [],
+        "next_action": "交接执行 Agent：按 contract.md 实现两脚本修复+夹具+配套，先提交 #160 WIP 再落本修复"
+      },
+      "keyFiles": [
+        {
+          "path": "1-interview/context.md",
+          "bytes": 6665,
+          "lines": 62,
+          "sha256": "6a9bb04836d28a3b64ef45786055f2fbe32d039693efd8f9368683bfb61b910d"
+        },
+        {
+          "path": "1-interview/rounds.jsonl",
+          "bytes": 11126,
+          "lines": 18,
+          "sha256": "8e9cc6e9480c9ff027b9840c0f3c7f4dc99b74c3a56e49d6c013e18f3569c4d8"
+        },
+        {
+          "path": "3-contract/contract.md",
+          "bytes": 12189,
+          "lines": 153,
+          "sha256": "667ae7c5806897d11c81c93a7f830857abbbb79ca5b89ea4d91800f18dedd06b"
+        },
+        {
+          "path": "3-contract/verify.txt",
+          "bytes": 2575,
+          "lines": 27,
+          "sha256": "8c53c9901af43c08242a8e27b82702838fc1bf562a6dc0adb0284796700999a7"
+        },
+        {
+          "path": "manifest.json",
+          "bytes": 1630,
+          "lines": 52,
+          "sha256": "2aa505f1f2d90e06a50b93206fa11a832bacb46dadfc6ce682df78d4c77e60c3"
+        }
+      ]
+    },
+    {
+      "case": "2026-08-31-large-task-spec-ticket-delivery",
+      "role": "current-study-not-historical-case",
+      "files": [
+        "1-interview/context.md",
+        "1-interview/facts/existing-large-task-boundaries.md",
+        "1-interview/facts/verification-infrastructure.md",
+        "1-interview/rounds.jsonl",
+        "manifest.json"
+      ],
+      "fileCount": 5,
+      "bytes": 42778,
+      "manifest": {
+        "stage": "1-interview",
+        "status": "in_progress",
+        "goal_oneline": "使大任务能够形成完整总体规格、可独立验收且依赖清晰的任务切片，并明确整体完成判据（目标候选，交付终点待Q1裁决）",
+        "target": "G:/GIT/AI_WorkFlow/parking-agents-manual@f4e37757b9f3d5627c7636626f579d87d523bc37",
+        "stage_gates": {
+          "1-interview": {
+            "status": "in_progress"
+          },
+          "2-prototype": {
+            "status": "pending"
+          },
+          "3-contract": {
+            "status": "pending"
+          }
+        },
+        "validation": null,
+        "blocked": [],
+        "next_action": "Q1：锁定本次工作流对用户负责的最终交付状态；随后收敛范围与拆分规则。"
+      },
+      "keyFiles": [
+        {
+          "path": "1-interview/context.md",
+          "bytes": 13580,
+          "lines": 168,
+          "sha256": "bc7f891f87c915a3337fd76c3e93bcec60a4e06e3e28abfe28aa43b8a8794bd8"
+        },
+        {
+          "path": "1-interview/rounds.jsonl",
+          "bytes": 3371,
+          "lines": 5,
+          "sha256": "2bc351f4a0e5604906138b4fd90de7abd742c26c1a113545b3e275950af0ebf2"
+        },
+        {
+          "path": "manifest.json",
+          "bytes": 1117,
+          "lines": 27,
+          "sha256": "e8289d192013cb3f68571a28d65db180f2e3019d38fc11f24f2e942e941bc916"
+        }
+      ]
+    }
+  ]
+}
