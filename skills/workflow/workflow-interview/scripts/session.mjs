@@ -8,7 +8,8 @@
  *   init <slug> [--request <原话>]        建/读 issue 目录（幂等）
  *   round <dir> <json>                    追加一行到 rounds.jsonl（先过 schema 校验）
  *   stage <dir> <stage> <status> [flags]  推进阶段状态（done/skipped 先过结构闸门）
- *   verify <dir> [--write]                跑 contract.md 里全部 [A] 档命令
+ *   verify <dir> [--write]                跑 contract.md 里全部 [A] 档段（含内嵌）；
+ *                                         --write 落 verify-evidence.txt，不碰冒烟快照
  *   rebuild <dir>                         从目录扫描重建 manifest
  *   finalize <dir>                        校验 + 冒烟 + 交接闸门 + 生成交接指令
  *   list                                  现扫全部 issue，输出一张表
@@ -339,14 +340,22 @@ function gateDone(dir, stage, gate, m) {
     return errs;
   }
   // 3-contract：先 finalize 后 done。顺序反了，或 finalize 之后又改了契约，这道闸就是空的。
+  const cdir = join(dir, '3-contract');
   const cpath = contractPath(dir);
   if (!existsSync(cpath)) return ['3-contract/contract.md 不存在。'];
   const errs = [];
   const v = m.validation;
   if (!v || v.status !== 'valid') {
     errs.push('finalize 还没通过（manifest.validation.status ≠ valid）。先跑 finalize 再报 done。');
-  } else if (statSync(cpath).mtimeMs > Date.parse(v.ran_at) + 2000) {
-    errs.push('contract.md 在上次 finalize 之后又改过。重跑 finalize，别让改动绕过校验和冒烟。');
+  } else {
+    // 对账盯 3-contract/ 下全部契约文件（contract.md 及 contract-*.md）：里程碑家族里
+    // 只盯主契约，m1b/m2 改动能绕过「重跑 finalize」（2026-08-31 实锤）。
+    const limit = Date.parse(v.ran_at) + 2000;
+    for (const f of readdirSync(cdir).filter((x) => /^contract.*\.md$/i.test(x)).sort()) {
+      if (statSync(join(cdir, f)).mtimeMs > limit) {
+        errs.push(`${f} 在上次 finalize 之后又改过。重跑 finalize，别让改动绕过校验和冒烟。`);
+      }
+    }
   }
   return errs;
 }
@@ -482,6 +491,16 @@ function cmdStage(argv) {
   if (status === 'needs_reinterview') {
     m.stage = STAGES[0];
     m.stage_gates[STAGES[0]].status = 'in_progress';
+    // 打回撤销的不只是阶段：顶层 ready 和 validation 描述的都是被打回前的那份契约。
+    // 残留着，list 和续跑判断就会拿旧结论误导（2026-08-31 实锤：打回后 status 仍 ready、
+    // validation 仍是打回前的存量）。ready 回落、validation 标 stale（不删历史）。
+    if (m.status === 'ready') m.status = 'in_progress';
+    if (m.validation) {
+      m.validation.stale = true;
+      m.validation.stale_reason = flags.reason || `${stage} 被打回`;
+    }
+    delete gate.closed_at;
+    gate.reverted_at = iso();
     // 回退时旧的 next_action 一定是陈旧的——它指向的正是刚被打回的那一步。
     if (typeof flags.next !== 'string') {
       m.next_action = `${stage} 撞出新歧义，回 /aes-interview 问清：${flags.reason || '见该阶段产物'}`;
@@ -503,11 +522,13 @@ function cmdStage(argv) {
 // ─────────────────────────────── verify ───────────────────────────────
 
 /**
- * 抽出 contract.md 里全部 Verify 行，连档位一起。
+ * 抽出 contract.md 里全部 Verify 行，按行内 [X] 标记切段。
  *
- * 只有 [A] 会被真的执行：[B] 要 fixture 就位，[C] 是人工步骤，[D] 的判据写在自然语言里
- * 抽不干净，硬跑剩下三档只会制造假绿。但四档都要**数出来**——非 [A] 的那几条正是长时程
- * 执行里没有任何东西能反驳「我做完了」的地方，得让人看见有多少。
+ * 一行 Verify 可以挂多档（「[C] 人工步骤…；[A] `命令` → 退出码」）：首档是主档，
+ * 后续标记是内嵌段。只有 [A] 段会被真的执行（含内嵌）：[B] 要 fixture 就位、[C] 是
+ * 人工步骤、[D] 的判据写在自然语言里抽不干净，硬跑剩下三档只会制造假绿。但四档都要
+ * **数出来**——非 [A] 的段正是长时程执行里没有任何东西能反驳「我做完了」的地方。
+ * 只认首档会让内嵌 [A] 既不被冒烟也不被点名，报告上却与通过长得一模一样（首档遮蔽）。
  */
 function extractVerifyLines(md) {
   const lines = md.split(/\r?\n/);
@@ -516,15 +537,25 @@ function extractVerifyLines(md) {
   for (const line of lines) {
     const ac = /^\s*-\s*(AC-\d{3})\s*:/.exec(line);
     if (ac) currentAc = ac[1];
-    const v = /^\s*-\s*Verify\s*:\s*\[([ABCD])\]\s*(.+)$/.exec(line);
+    const v = /^\s*-\s*Verify\s*:\s*(.+)$/.exec(line);
     if (!v) continue;
-    const cmd = /`([^`]+)`/.exec(v[2]);
-    out.push({
-      ac: currentAc || '(未编号)',
-      tier: v[1],
-      command: cmd ? cmd[1] : null,
-      raw: v[2].trim(),
-    });
+    const rest = v[1];
+    const marks = [...rest.matchAll(/\[([ABCD])\]/g)];
+    // 首个档位标记必须在行首——没标档位的行由 validate-goal-contract.mjs 拦，这里不猜。
+    if (marks.length === 0 || marks[0].index !== 0) continue;
+    for (let i = 0; i < marks.length; i += 1) {
+      const segStart = marks[i].index + marks[i][0].length;
+      const segEnd = i + 1 < marks.length ? marks[i + 1].index : rest.length;
+      const seg = rest.slice(segStart, segEnd).trim();
+      const cmd = /`([^`]+)`/.exec(seg);
+      out.push({
+        ac: currentAc || '(未编号)',
+        tier: marks[i][1],
+        command: cmd ? cmd[1] : null,
+        raw: seg,
+        embedded: i > 0,
+      });
+    }
   }
   return out;
 }
@@ -556,7 +587,7 @@ function cmdVerify(argv) {
   const items = verifies.filter((v) => v.tier === 'A');
   const manual = verifies.filter((v) => v.tier !== 'A');
   if (items.length === 0) {
-    console.log(`契约里没有 [A] 档 Verify，无可执行项（另有 ${manual.length} 条非 [A] 档，本命令不跑）。`);
+    console.log(`契约里没有 [A] 档 Verify 段，无可执行项（另有 ${manual.length} 段非 [A] 档，本命令不跑）。`);
     return 0;
   }
 
@@ -565,29 +596,32 @@ function cmdVerify(argv) {
   const tally = { green: 0, red: 0, unrunnable: 0 };
 
   for (const item of items) {
+    const acLabel = item.embedded ? `${item.ac} [A·内嵌]` : item.ac;
     if (!item.command) {
       tally.unrunnable += 1;
-      report.push(`[UNRUNNABLE] ${item.ac}  抽不出命令（反引号里没东西）：${item.raw}`);
+      report.push(`[UNRUNNABLE] ${acLabel}  抽不出命令（段内反引号里没东西）：${item.raw}`);
       continue;
     }
     const res = spawnSync(item.command, { cwd, shell: true, encoding: 'utf8', timeout: 300000 });
     const verdict = classify(res);
     tally[verdict] += 1;
     const label = { green: 'PASS', red: 'FAIL', unrunnable: 'UNRUNNABLE' }[verdict];
-    report.push(`[${label}] ${item.ac}  exit=${res.status ?? 'n/a'}  $ ${item.command}`);
+    report.push(`[${label}] ${acLabel}  exit=${res.status ?? 'n/a'}  $ ${item.command}`);
     const tail = `${res.stderr || res.stdout || ''}`.trim().split(/\r?\n/).slice(-3);
     for (const l of tail) if (l) report.push(`         ${l}`);
   }
 
   report.push('', `绿 ${tally.green} / 红 ${tally.red} / 跑不起来 ${tally.unrunnable}`);
   if (manual.length > 0) {
-    report.push(`另有 ${manual.length} 条非 [A] 档没跑：${manual.map((v) => `${v.ac} [${v.tier}]`).join('、')}`);
+    report.push(`另有 ${manual.length} 段非 [A] 档没跑：${manual.map((v) => `${v.ac} [${v.tier}]${v.embedded ? '·内嵌' : ''}`).join('、')}`);
   }
   const text = report.join('\n');
   console.log(text);
 
   if (flags.write) {
-    const out = join(dir, '3-contract', 'verify.txt');
+    // 冒烟快照（finalize 时跑，期望全红）与完成证据（实现后复验，期望转绿）语义相反，
+    // 共用一个文件只会互相覆盖——红态证据最后只剩 git 史。分开落盘，谁也不覆盖谁。
+    const out = join(dir, '3-contract', flags.smoke ? 'verify.txt' : 'verify-evidence.txt');
     writeFileSync(out, `${text}\n`, 'utf8');
     console.log(`\n→ ${out}`);
   }
@@ -683,6 +717,21 @@ function extractSection(md, heading) {
   return (end ? rest.slice(0, end.index) : rest).trim();
 }
 
+/** 口径闸门用：rounds 里是否问过/确认过复刻精度（ask/confirm 档 + 像素类关键词）。 */
+function caliberAsked(dir) {
+  const p = roundsPath(dir);
+  if (!existsSync(p)) return false;
+  for (const line of readFileSync(p, 'utf8').split(/\r?\n/)) {
+    if (!line.trim()) continue;
+    try {
+      const row = JSON.parse(line);
+      if ((row.tier === 'ask' || row.tier === 'confirm')
+        && /像素|复刻精度|视觉基准|逐像素/.test(JSON.stringify(row))) return true;
+    } catch { /* 坏行由 1-interview 的 rounds 闸门管，这里不重复报 */ }
+  }
+  return false;
+}
+
 function cmdFinalize(argv) {
   const dir = resolveIssueDir(argv[0]);
   const cpath = contractPath(dir);
@@ -690,6 +739,18 @@ function cmdFinalize(argv) {
   const md = readFileSync(cpath, 'utf8');
   const m = readManifest(dir);
   let failed = false;
+
+  // 0. 打回未修订拦截：3-contract 已被打回，而 contract.md 自上次 finalize 后没改过，
+  //    说明打回的裁决还没折进契约。fail-fast，不跑后续步骤——否则会拿旧稿的冒烟
+  //    覆盖 verify.txt，把好证据也冲掉。（要在下方覆写 m.validation 前读旧 ran_at。）
+  if (m.stage_gates?.['3-contract']?.status === 'needs_reinterview') {
+    const lastRan = m.validation?.ran_at ? Date.parse(m.validation.ran_at) : 0;
+    if (lastRan && statSync(cpath).mtimeMs <= lastRan + 2000) {
+      console.error(`3-contract 已被打回：${m.stage_gates['3-contract'].reason || m.validation?.stale_reason || '见访谈记录'}`);
+      console.error('但 contract.md 自上次 finalize 之后没改过——打回的裁决还没折进契约。先修订契约再 finalize。');
+      return 1;
+    }
+  }
 
   // 1. 结构校验
   const validator = join(HERE, 'validate-goal-contract.mjs');
@@ -706,10 +767,14 @@ function cmdFinalize(argv) {
   };
   if (vres.status !== 0) failed = true;
 
-  // 2. [A] 档冒烟。此刻期望全红——红是对的，跑不起来才是错的。
+  // 2. [A] 档冒烟（含一行多档的内嵌段）。此刻期望全红——红是对的，跑不起来才是错的。
   console.log('\n─── [A] 档冒烟 ───');
-  const smoke = cmdVerify([dir, '--write']);
+  const smoke = cmdVerify([dir, '--write', '--smoke']);
   if (smoke !== 0) failed = true;
+  // smoke 只在「命令根本跑不起来」时非 0（红是此刻的合法预期）。结构过了但冒烟崩了
+  // 时 status 不能停在 valid——done 闸门只认 valid，残留 valid 等于给失败留了旁门
+  // （2026-08-31 语料实锤：finalize 失败仍 valid → stage done 照样可过）。
+  if (smoke !== 0) m.validation.status = 'invalid';
 
   // 3. 交接可执行性闸门。
   //    codex `/goal` 交接之后，执行 Agent 手上只有「一句话 + 一个路径」。所以路径读不到、
@@ -728,15 +793,39 @@ function cmdFinalize(argv) {
   const verifies = extractVerifyLines(md);
   const tiers = tallyTiers(verifies);
   const manual = verifies.filter((v) => v.tier !== 'A');
-  console.log(`档位分布：[A] ${tiers.A} / [B] ${tiers.B} / [C] ${tiers.C} / [D] ${tiers.D}`);
+  const acsWithA = new Set(verifies.filter((v) => v.tier === 'A').map((v) => v.ac));
+  console.log(`档位分布（按段计，含内嵌）：[A] ${tiers.A} / [B] ${tiers.B} / [C] ${tiers.C} / [D] ${tiers.D}`);
   if (manual.length > 0) {
-    console.log(`以下 ${manual.length} 条无法自动判定，长时程执行里只有执行 Agent 的自陈：`);
-    for (const v of manual) console.log(`  ${v.ac} [${v.tier}] ${v.raw.slice(0, 64)}`);
+    console.log(`以下 ${manual.length} 段无法自动判定，长时程执行里只有执行 Agent 的自陈：`);
+    for (const v of manual) console.log(`  ${v.ac} [${v.tier}]${v.embedded ? '·内嵌' : ''} ${v.raw.slice(0, 64)}`);
     console.log('  这不是错。但它们不会在 /goal 每轮的完成审计里被反驳，交接时要当面说清哪几条得人来看。');
   }
-  if (verifies.length > 0 && tiers.A === 0) {
+  if (verifies.length > 0 && acsWithA.size === 0) {
     console.log('WARNING: 一条 [A] 档都没有。完成判定全部依赖自陈，长时程执行等于没有终止条件。');
     console.log('         回去看有没有哪条能升到 [A]；确实一条都升不了，就跟用户说清这次靠人验收。');
+  }
+
+  // 口径闸门：界面对照物在场的契约，复刻精度必须问过。「结构非像素」曾是 aes-prototype
+  // 的默认口径，2026-08-31 aes-agent 实例证明默认档会吞掉验收口径——finalize 全绿后仍被
+  // 「完全复刻」整族打回。口径是尺子，只有用户裁过才算数：rounds 里没有 ask/confirm 档
+  // 的像素类记录即拒，契约正文写没写口径词不作数（写过也可能只是默认档的自述）。
+  const confirmedArtifacts = m.stage_gates?.['2-prototype']?.artifacts_confirmed || [];
+  const uiMockPresent = /mock[\w-]*\.html/i.test(md)
+    || confirmedArtifacts.some((n) => /^mock(\.html)?$/i.test(String(n).trim()));
+  if (uiMockPresent && !caliberAsked(dir)) {
+    console.error('\n契约引用了界面对照物（mock.html），但访谈里从没问过复刻精度口径（结构/状态级/双轨/像素）。');
+    console.error('回契约阶段把「判到多严」带候选问用户，问过用 session.mjs round 落盘（ask/confirm 档，');
+    console.error('含像素/复刻精度/视觉基准关键词），再回来 finalize。像素级要顺带点名不可修改的规格源。');
+    failed = true;
+  }
+  // 尺子锁定：声明了像素级还原，规格源却没点名——尺子还留在执行者手里，改尺子永远
+  // 比改工件容易。只警告：规格源可能就是 mock 本身，机器分不出来。
+  if (/锁像素|像素还原|逐像素/.test(md)) {
+    const rulerHolders = `${extractSection(md, '强约束') || ''}\n${extractSection(md, '读什么') || ''}`;
+    if (!/`[^`]+`/.test(rulerHolders)) {
+      console.log('WARNING: 契约声明像素级还原，但强约束/「读什么」没有反引号点名的规格源路径。');
+      console.log('         像素级要锁尺子：规格源写进强约束并声明不可修改（执行 Agent 改的是产品不是尺子），基准替换记 overturned。');
+    }
   }
 
   // 残留风险对账：manifest 记着赌过的东西，契约里却没有这一节时直接拒。
@@ -774,12 +863,32 @@ function cmdFinalize(argv) {
   if (m.validation.status === 'valid' && !failed) {
     m.status = 'ready';
     m.next_action = `契约已就绪，把交接指令发给执行 Agent。契约：${cpath}`;
+    // 重新走完全部闸门的这份 validation 是现行的，打回标记随之解除。
+    delete m.validation.stale;
+    delete m.validation.stale_reason;
   }
   writeManifest(dir, m);
   return failed ? 1 : 0;
 }
 
 // ─────────────────────────────── list ───────────────────────────────
+
+/** list 用：契约相对上次 finalize 是否已过期。定位为提示不是判据——mtime 受
+ *  checkout/合并触碰污染（2026-08-31 语料：八份契约同毫秒批量假偏移）。 */
+function contractStaleNote(dir, m) {
+  if (!m.validation || !m.validation.status) return '';
+  if (m.validation.stale) return '⚠已打回待修订';
+  if (m.validation.status !== 'valid') return '';
+  const limit = Date.parse(m.validation.ran_at) + 2000;
+  const cdir = join(dir, '3-contract');
+  if (!existsSync(cdir)) return '';
+  for (const f of readdirSync(cdir)) {
+    if (/^contract.*\.md$/i.test(f) && statSync(join(cdir, f)).mtimeMs > limit) {
+      return '⚠契约改动晚于finalize';
+    }
+  }
+  return '';
+}
 
 function cmdList() {
   const root = grillingRoot();
@@ -793,7 +902,7 @@ function cmdList() {
     if (!statSync(dir).isDirectory() || !existsSync(manifestPath(dir))) continue;
     try {
       const m = JSON.parse(readFileSync(manifestPath(dir), 'utf8'));
-      rows.push([name, m.stage || '?', m.status || '?', (m.goal_oneline || m.original_request || '').slice(0, 40)]);
+      rows.push([name, m.stage || '?', (m.status || '?') + contractStaleNote(dir, m), (m.goal_oneline || m.original_request || '').slice(0, 40)]);
     } catch {
       rows.push([name, '(manifest 损坏)', '-', '跑 rebuild']);
     }

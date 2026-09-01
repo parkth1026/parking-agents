@@ -6,7 +6,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const suites = ['session.test.mjs', 'export-dossier.test.mjs'];
+const suites = ['session.test.mjs', 'validate-goal-contract.test.mjs', 'export-dossier.test.mjs'];
 let failed = 0;
 for (const suite of suites) {
   const res = spawnSync(process.execPath, [join(HERE, 'scripts', suite)], { stdio: 'inherit' });

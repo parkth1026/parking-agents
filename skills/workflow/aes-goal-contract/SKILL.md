@@ -68,9 +68,12 @@ node <workflow-interview>/scripts/session.mjs init <date>-<任务词组>
   基建现成、途径可逆、后果不严重的，一行定掉：`AC-003 用现有 npm test 断言，
   仓库测试就是这个风格，代价：覆盖不到真实数据形态`。
 
-三种情况即使你很确定也必须进提问区，因为它们要么难逆、要么要用户付出成本：含数字
+四种情况即使你很确定也必须进提问区，因为它们要么难逆、要么要用户付出成本：含数字
 门槛的（门槛值、用什么尺子量、尺子锁不锁）、需要用户提供真实数据的、仓库没有基建
-得先建的。这三类恰好是验收里最贵的部分，省这里的轮次等于在唯一不能省的地方省。
+得先建的、**对照物含界面（mock.html）时的复刻精度口径**（结构对照 / 状态级 / 双轨 /
+像素级）。前三类是验收里最贵的部分；第四类是验收的尺子本身——「结构非像素」曾是
+aes-prototype 的默认口径，默认档代答的代价是 finalize 全绿后仍被「完全复刻」整族打回
+（2026-08-31 aes-agent 实例）。finalize 有硬闸门：引用 mock 而访谈没问过口径，直接拒。
 
 进了提问区的照 [asking.md](../workflow-interview/references/asking.md) 的三段格式与
 百分比写，这里的好处就是这条能给多少信心、多快出结果，代价就是要先付出什么。形如：
@@ -127,9 +130,19 @@ Agent 到底要跑什么、跑到什么程度。没到就继续问，问了几�
 走过对照物阶段的需求，对照物经由例子进入验收条件，**不在聚类之外另加一条整体对照**。
 
 界面向：mock 的每个关键状态与交互作为例子参与聚类，Verify 默认 `[C]` 并写明 mock
-路径（`强约束` 声明像素级时按像素级判），仓库存在截图 diff 或视觉回归基建时升级
-`[A]`；只有当整体结构或信息层级确实无法被任何一条逐点验收覆盖时，才单独立一条结构
-对照。逐点已经覆盖完还立一条，是同一件事判两遍。
+路径，仓库存在截图 diff 或视觉回归基建时升级 `[A]`；只有当整体结构或信息层级确实
+无法被任何一条逐点验收覆盖时，才单独立一条结构对照。逐点已经覆盖完还立一条，是
+同一件事判两遍。
+
+**复刻精度必须问，mock 不预设答案**：判到多严（结构对照 / 状态级 / 双轨 / 像素级）
+带候选问用户，裁决落 rounds（ask/confirm 档）——finalize 的口径闸门只认访谈记录，
+契约正文写「结构对照」不算数，默认档的自述不是裁决。闸门认的是 mock.html 这个
+规范名（含 2-prototype gate 的确认清单），自定义命名的界面对照物暂不触发——起别的
+名字时自己把口径问掉，别指望闸门兜底。裁成像素级时按三件套落契约：
+强约束点名**不可修改的规格源**、写明「执行 Agent 改的是产品不是尺子」、视觉基准
+整体替换时在访谈记录记 overturned（范本：session-evolution 对 handoff 规格源的用法）。
+双轨判定同理：固定数据的视觉基准夹具与真实数据的排版规则分开验收，尺子（视口、
+容差、动态差异清单）在 finalize 前落进契约，不留给执行 Agent 现场发明。
 
 架构向：`diagram.html` 的架构视图是拓扑事实源，每处改动标注对应一条依赖断言——
 进契约 `强约束` 的不变式（「X 不再依赖 Y」「模块归属从 A 挪到 B」），有测试基建时
@@ -200,9 +213,12 @@ Agent 到底要跑什么、跑到什么程度。没到就继续问，问了几�
 node <workflow-interview>/scripts/session.mjs finalize <issue-dir>
 ```
 
-一条命令做四件事：跑结构校验并把结果回填进 manifest；跑全部 `[A]` 档 Verify 命令；
-过一遍交接可执行性闸门；按 [handoff-prompt.md](references/handoff-prompt.md) 生成交接
-指令并检查它没超 4000 字符。
+一条命令做六件事：先拦「打回未修订」（3-contract 被打回而契约没改过就拒，不让旧稿
+重新点亮 ready）；跑结构校验并把结果回填进 manifest；跑全部 `[A]` 档 Verify 段（含
+一行多档里的内嵌段）；过口径闸门（引用 mock 而访谈没问过复刻精度即拒）与交接可
+执行性闸门；按 [handoff-prompt.md](references/handoff-prompt.md) 生成交接指令并
+检查它没超 4000 字符。结构或冒烟任何一步失败，validation 都不会停在 valid——done
+闸门只认 valid。
 
 ### 冒烟怎么读
 
@@ -216,6 +232,10 @@ node <workflow-interview>/scripts/session.mjs finalize <issue-dir>
 
 `UNRUNNABLE` 是这一步唯一要拦的东西。放它过去，执行 Agent 会撞上一条无法执行的验收
 标准，然后自己发明一个替代判据——那条 AC 就被架空了，而报告上看起来跟通过了一样。
+
+冒烟快照落 `verify.txt`；实现之后复验用
+`session.mjs verify <issue-dir> --write`，落 **verify-evidence.txt**——两个文件语义
+相反（期望红 vs 期望绿），分离落盘互不覆盖，谁也别把谁的证据冲掉。
 
 ### 交接可执行性怎么读
 
@@ -243,8 +263,9 @@ node <workflow-interview>/scripts/session.mjs finalize <issue-dir>
 node <workflow-interview>/scripts/session.mjs stage <issue-dir> 3-contract done --next "<一句话>"
 ```
 
-`done` 要求 finalize 已通过（validation.status = valid）且契约在那之后没再改过；
-先 done 后 finalize、或 finalize 完又改了契约，都会被拒收——顺序反了这道闸就是空的。
+`done` 要求 finalize 已通过（validation.status = valid）且 `3-contract/` 下**全部契约
+文件**在那之后没再改过（里程碑家族的 contract-m1b/m2 同受对账）；先 done 后 finalize、
+或 finalize 完又改了任何一份契约，都会被拒收——顺序反了这道闸就是空的。
 
 最终报告契约路径、目标、范围、验收条件数量、校验与冒烟结果，以及精确阻塞项或那条
 可复制的交接指令。**交接指令不落盘**：它是模板加两个变量，落一份只会在契约改了之后

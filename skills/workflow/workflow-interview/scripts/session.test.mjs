@@ -10,7 +10,7 @@
  * 测试口径和使用口径保持一致。测试在 os.tmpdir 下伪造带 .git 的仓库根，不碰真仓库。
  */
 
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, unlinkSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, unlinkSync, existsSync, utimesSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
@@ -381,6 +381,165 @@ const askRow = (pcts) => JSON.stringify({
 }
 
 // ─────────────────────────────── 收尾 ───────────────────────────────
+
+// ─────────────────────── 首档遮蔽修复：一行多档的内嵌 [A] 段 ───────────────────────
+
+const VALID_CONTRACT = [
+  '# Goal Contract: 测试占位',
+  '',
+  '## 目标',
+  '',
+  '占位目标一句话可观察。',
+  '',
+  '## 验收条件',
+  '',
+  '- AC-001: 可观察的占位结果成立',
+  '  - Verify: [A] `node -e "process.exit(1)"` → 退出码 1（此刻应为红）',
+  '',
+].join('\n');
+// 把 manifest 手工推到「三阶段全闭 + finalize 已过」的形态（黑盒盘上事实，同 rebuild 测试手法）。
+function forceReady(dir, contract) {
+  writeFileSync(join(dir, '3-contract', 'contract.md'), contract || VALID_CONTRACT, 'utf8');
+  writeFileSync(join(dir, '2-prototype', 'behavior.md'), '占位\n', 'utf8');
+  const mp = join(dir, 'manifest.json');
+  const m = JSON.parse(readFileSync(mp, 'utf8'));
+  m.stage_gates['2-prototype'] = { status: 'done', artifacts_confirmed: ['behavior'] };
+  m.stage_gates['3-contract'] = { status: 'done', closed_at: '2026-08-31T00:00:00Z' };
+  m.stage = '3-contract';
+  m.status = 'ready';
+  m.validation = { status: 'valid', ac_count: 1, warnings: [], ran_at: '2026-08-31T00:00:00Z' };
+  writeFileSync(mp, JSON.stringify(m), 'utf8');
+  return m;
+}
+
+{
+  const dir = mkIssue();
+  writeFileSync(join(dir, '3-contract', 'contract.md'),
+    '## 验收条件\n\n- AC-001: 界面按 mock 呈现\n  - Verify: [C] 人工对照 mock 逐处看；[A] `node -e "process.exit(1)"` → 退出码 1\n', 'utf8');
+  const res = run('verify', dir);
+  const out = `${res.stdout || ''}\n${res.stderr || ''}`;
+  check('shadow/内嵌 [A] 段被执行计红', res.status === 0 && out.includes('AC-001 [A·内嵌]') && out.includes('红 1'), out.trim().slice(0, 400));
+  check('shadow/页脚列出非 [A] 段', out.includes('AC-001 [C]'), out.trim().slice(0, 400));
+}
+{
+  const dir = mkIssue();
+  writeFileSync(join(dir, '3-contract', 'contract.md'),
+    '## 验收条件\n\n- AC-001: 占位结果\n  - Verify: [C] 人工步骤；[A] 没写反引号命令 → 退出码 0\n', 'utf8');
+  expect('shadow/内嵌 [A] 抽不出命令拦下', run('verify', dir), 1, 'UNRUNNABLE');
+}
+{
+  const dir = mkIssue();
+  writeFileSync(join(dir, '3-contract', 'contract.md'), VALID_CONTRACT, 'utf8');
+  writeFileSync(join(dir, '3-contract', 'verify.txt'), 'SMOKE MARKER\n', 'utf8');
+  run('verify', dir, '--write');
+  check('evidence/独立复验写 verify-evidence.txt', existsSync(join(dir, '3-contract', 'verify-evidence.txt')));
+  check('evidence/独立复验不碰冒烟快照', readFileSync(join(dir, '3-contract', 'verify.txt'), 'utf8') === 'SMOKE MARKER\n');
+}
+
+// ─────────────────────── 生命周期对账：打回回撤 / F5 / 多契约 mtime ───────────────────────
+
+{
+  const dir = mkIssue({ interview: true, impact: true });
+  doneInterview(dir);
+  forceReady(dir);
+  expect('lifecycle/打回 ready issue', run('stage', dir, '3-contract', 'needs_reinterview', '--reason', '口径没问'), 0);
+  const after = manifest(dir);
+  check('lifecycle/ready 回落 in_progress', after.status === 'in_progress', `status=${after.status}`);
+  check('lifecycle/validation 标 stale 带理由',
+    after.validation.stale === true && /口径没问/.test(after.validation.stale_reason || ''),
+    JSON.stringify(after.validation));
+  check('lifecycle/closed_at 清除并记 reverted_at',
+    after.stage_gates['3-contract'].closed_at === undefined && !!after.stage_gates['3-contract'].reverted_at,
+    JSON.stringify(after.stage_gates['3-contract']));
+  check('list/打回态出现告警', `${run('list').stdout || ''}`.includes('⚠已打回待修订'));
+}
+{
+  // 打回后契约没改过（mtime 早于上次 finalize）→ finalize fail-fast；修订后放行并清 stale。
+  const dir = mkIssue({ interview: true, impact: true });
+  doneInterview(dir);
+  forceReady(dir);
+  const cp = join(dir, '3-contract', 'contract.md');
+  utimesSync(cp, new Date('2026-08-30T00:00:00Z'), new Date('2026-08-30T00:00:00Z'));
+  run('stage', dir, '3-contract', 'needs_reinterview', '--reason', '整族打回');
+  expect('lifecycle/打回后契约未修订即拒', run('finalize', dir), 1, '还没折进契约');
+  writeFileSync(cp, VALID_CONTRACT.replace('占位目标', '修订后的占位目标'), 'utf8');
+  const res = run('finalize', dir);
+  check('lifecycle/修订后重新通过并清 stale',
+    res.status === 0 && manifest(dir).validation.stale === undefined && manifest(dir).status === 'ready',
+    `${res.status}\n${JSON.stringify(manifest(dir).validation)}`);
+}
+{
+  // F5：结构过了但冒烟崩 → validation 必须落在 invalid，done 闸门随之拒收。
+  const dir = mkIssue();
+  writeFileSync(join(dir, '3-contract', 'contract.md'),
+    VALID_CONTRACT.replace('`node -e "process.exit(1)"`', '`definitely-missing-cmd-xyz-9g`'), 'utf8');
+  expect('lifecycle/冒烟崩 exit 1', run('finalize', dir), 1, 'UNRUNNABLE');
+  check('lifecycle/冒烟崩后 validation 不停在 valid',
+    manifest(dir).validation.status === 'invalid', JSON.stringify(manifest(dir).validation));
+  expect('lifecycle/finalize 失败后 done 仍被拒', run('stage', dir, '3-contract', 'done'), 1, 'finalize');
+}
+{
+  // 里程碑家族：contract-m2.md 在 finalize 后改动同样触发 done 对账。
+  // 写完把 mtime 推到未来——闸门带 +2s 容差，同瞬写入测不出真实场景的先后。
+  const dir = mkIssue();
+  writeFileSync(join(dir, '3-contract', 'contract.md'), VALID_CONTRACT, 'utf8');
+  expect('lifecycle/主契约 finalize 通过', run('finalize', dir), 0);
+  const m2 = join(dir, '3-contract', 'contract-m2.md');
+  writeFileSync(m2, '# M2 占位\n', 'utf8');
+  const future = new Date(Date.now() + 8000);
+  utimesSync(m2, future, future);
+  expect('lifecycle/家族契约改动后 done 拒', run('stage', dir, '3-contract', 'done'), 1, 'contract-m2.md 在上次 finalize 之后又改过');
+}
+
+// ─────────────────────── 口径闸门：复刻精度必须问过 ───────────────────────
+
+const MOCK_CONTRACT = [
+  '# Goal Contract: 界面占位',
+  '',
+  '## 目标',
+  '',
+  '界面按对照物呈现的占位目标。',
+  '',
+  '## 验收条件',
+  '',
+  '- AC-001: 界面结构与关键状态呈现',
+  '  - Verify: [C] 人工对照 mock.html 逐处走查',
+  '',
+].join('\n');
+const CALIBER_ASK = JSON.stringify({
+  stage: '3-contract', round: 1, tier: 'ask',
+  question: '复刻精度判到多严：结构对照还是像素级？',
+  options: [{ key: 'A', text: '结构对照', pct: 70 }, { key: 'B', text: '像素级还原', pct: 30 }],
+});
+{
+  const dir = mkIssue();
+  writeFileSync(join(dir, '3-contract', 'contract.md'), MOCK_CONTRACT, 'utf8');
+  expect('caliber/契约引用 mock 未问口径拒', run('finalize', dir), 1, '复刻精度');
+}
+{
+  const dir = mkIssue();
+  writeFileSync(join(dir, '3-contract', 'contract.md'), MOCK_CONTRACT, 'utf8');
+  expect('caliber/落盘口径提问行', run('round', dir, CALIBER_ASK), 0, 'appended');
+  expect('caliber/问过口径放行', run('finalize', dir), 0);
+}
+{
+  // 确认清单里的 mock（2-prototype gate）同样触发，不依赖契约正文写没写 mock.html。
+  const dir = mkIssue({ interview: true, impact: true, artifacts: ['mock.html'] });
+  doneInterview(dir);
+  run('stage', dir, '2-prototype', 'done', '--artifacts', 'mock');
+  writeFileSync(join(dir, '3-contract', 'contract.md'), VALID_CONTRACT, 'utf8');
+  expect('caliber/确认清单含 mock 同样触发', run('finalize', dir), 1, '复刻精度');
+}
+{
+  // 声明逐像素而规格源没点名 → 只警告不拦。
+  const dir = mkIssue();
+  writeFileSync(join(dir, '3-contract', 'contract.md'),
+    VALID_CONTRACT.replace('占位目标一句话可观察。', '整页逐像素还原的占位目标。'), 'utf8');
+  const res = run('finalize', dir);
+  check('caliber/逐像素无规格源只警告',
+    res.status === 0 && `${res.stdout || ''}`.includes('规格源'),
+    `${res.status}\n${`${res.stdout || ''}${res.stderr || ''}`.slice(0, 400)}`);
+}
 
 console.log(`\n${total - failed}/${total} 通过`);
 rmSync(ROOT, { recursive: true, force: true });

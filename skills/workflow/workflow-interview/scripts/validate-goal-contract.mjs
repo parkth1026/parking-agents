@@ -8,7 +8,8 @@
  * 查这些：
  *   1. 验收条件 1 到 7 条。超了说明这个任务该拆，不是把条数压回去。
  *   2. AC 编号是连续唯一的三位 AC-001、AC-002。
- *   3. 每条 AC 恰好挂一行缩进的 "- Verify: [A|B|C|D] <内容>"。
+ *   3. 每条 AC 恰好挂一行缩进的 "- Verify: [A|B|C|D] <内容>"。一行内可续写内嵌档段
+ *      （「[C] 步骤…；[A] `命令`」），首档是主档。
  *   4. [A] 和 [B] 的 Verify 没写反引号命令或路径时给 WARNING。
  *   5. 「要落盘的东西」出现时，编号必须是连续唯一的 D-01、D-02。
  *   6. 有 [B] 却没有「要落盘的东西」时给 WARNING，fixture 可能已经在磁盘上了。
@@ -16,8 +17,8 @@
  *   8. 模板占位符 <name> 和没解决的 TODO、TBD、FIXME 直接拒。
  *   9. 交接指令模板已经接管的章节还留着就拒（Agent Mandate / Iteration Strategy /
  *      Completion 等，见 handoff-prompt.md）——避免每份契约重复抄一遍。
- *  10. [A] 档没写反引号命令直接拒：session.mjs verify 靠反引号抽命令，抽不出就静默漏跑，
- *      而漏跑的那条 AC 看起来跟通过了一模一样。
+ *  10. [A] 档段没写反引号命令直接拒（含一行多档里的内嵌 [A]）：session.mjs verify
+ *      靠反引号抽命令，抽不出就静默漏跑，而漏跑的那段 AC 看起来跟通过了一模一样。
  *  11. 契约在 issue 目录里但同级没有 manifest.json 时给 WARNING。
  *  12. 「读什么」指向 2-prototype 下的对照物但文件不在时给 WARNING。
  *  13. 「自主边界」「残留风险」写了就不能空着，且只能各出现一次。
@@ -200,6 +201,20 @@ for (const verifyMatch of acceptance.matchAll(/^\s+-\s+Verify:\s*(\S.*)$/gm)) {
   // 但缺了它验收阶段要靠猜，值得人工复核一次。
   if (tier === 'B' && !/`[^`]+`/.test(trimmed)) {
     warnings.push(`Verify [B] 该用反引号写出 fixture 的落盘路径：${trimmed}`);
+  }
+  // 内嵌档段（一行多档：「[C] 步骤…；[A] `命令`」）。session 的冒烟与本校验器曾共用
+  // 「只认首档」的视野，内嵌 [A] 既不被跑也不被查——双处一致的盲区（2026-08-31 实锤：
+  // 3 份契约 4 条 AC 的内嵌 [A] 从未冒烟）。每段独立校验：内嵌 [A] 同样必须有反引号。
+  const marks = [...rest.matchAll(/\[([ABCD])\]/g)];
+  for (let i = 1; i < marks.length; i += 1) {
+    const segStart = marks[i].index + marks[i][0].length;
+    const segEnd = i + 1 < marks.length ? marks[i + 1].index : rest.length;
+    const seg = rest.slice(segStart, segEnd).trim();
+    if (marks[i][1] === 'A' && !/`[^`]+`/.test(seg)) {
+      errors.push(`Verify 的内嵌 [A] 段必须用反引号写出要跑的命令，否则冒烟抽不出来会静默漏跑：${seg || '(空段)'}`);
+    } else if (marks[i][1] === 'B' && !/`[^`]+`/.test(seg)) {
+      warnings.push(`Verify 的内嵌 [B] 段该用反引号写出 fixture 的落盘路径：${seg}`);
+    }
   }
 }
 
