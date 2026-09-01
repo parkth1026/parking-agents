@@ -4,7 +4,7 @@
 //       夹具全部建在系统临时目录——本测试自身不能在技能扫描根下留下任何 SKILL.md。
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -1862,6 +1862,36 @@ try {
     && Object.keys(crossEvalRegression.quality_audit.assertion_delta).length === 2);
 } finally {
   rmSync(verdictRoot, { recursive: true, force: true });
+}
+
+// ---- 模型控制 fallback·provision-eval-agent ----
+console.log("模型控制 fallback·provision-eval-agent：");
+{
+  const fx = mkdtempSync(join(tmpdir(), "psc-provision-"));
+  const prov = (args) => runFile("provision-eval-agent.mjs", args);
+  const r1 = prov(["--list", "--agents-dir", fx]);
+  check("空目录 list 退出码 0 且提示无定义", r1.code === 0 && out(r1).includes("无 agent 定义"));
+  const r2 = prov(["--ensure", "--name", "eval-smoke", "--agents-dir", fx]);
+  check("ensure 缺失时写入定义并提示重启", r2.code === 0 && existsSync(join(fx, "eval-smoke.md")) && out(r2).includes("重启"));
+  const r3 = prov(["--check", "--name", "eval-smoke", "--agents-dir", fx]);
+  check("check 通过并解析 model", r3.code === 0 && out(r3).includes("model=inherit"));
+  const before = readFileSync(join(fx, "eval-smoke.md"), "utf8");
+  const r4 = prov(["--ensure", "--name", "eval-smoke", "--agents-dir", fx]);
+  const after4 = readFileSync(join(fx, "eval-smoke.md"), "utf8");
+  check("ensure 幂等不改写", r4.code === 0 && before === after4);
+  const r5 = prov(["--ensure", "--name", "eval-smoke", "--model", "custom:test:flash", "--agents-dir", fx]);
+  const after5 = readFileSync(join(fx, "eval-smoke.md"), "utf8");
+  check("model 不同且未加 --force 不覆盖", r5.code === 0 && after5 === before);
+  const r6 = prov(["--ensure", "--name", "eval-smoke", "--model", "custom:test:flash", "--force", "--agents-dir", fx]);
+  const after6 = readFileSync(join(fx, "eval-smoke.md"), "utf8");
+  check("--force 覆盖生效", r6.code === 0 && after6.includes("custom:test:flash"));
+  const r7 = prov(["--check", "--name", "no-such", "--agents-dir", fx]);
+  check("check 缺失退出码 1", r7.code === 1);
+  const r8 = prov(["--ensure", "--name", "Bad_Name", "--agents-dir", fx]);
+  check("非法 name 退出码 2", r8.code === 2);
+  const r9 = prov(["--list", "--agents-dir", fx]);
+  check("list 解析新写入定义", r9.code === 0 && out(r9).includes("eval-smoke") && out(r9).includes("custom:test:flash"));
+  rmSync(fx, { recursive: true, force: true });
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

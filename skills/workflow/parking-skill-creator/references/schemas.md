@@ -328,6 +328,34 @@ Wall clock timing for a run — exactly one file per run directory. Located at `
 
 ---
 
+## run-meta.json
+
+Written by `scripts/run-headless-eval-arm.mjs` into `<run-dir>/run-meta.json` — present only for runs executed through the headless channel (model-controlled runs; see `references/eval-models.md`). Agent-channel runs have no such file: they inherit the host session model by definition.
+
+```json
+{
+  "channel": "headless",
+  "model_requested": "glm-4.7-flash",
+  "zcode_version": "0.16.5",
+  "exit_code": 0,
+  "timed_out": false,
+  "trace_id": "9073bb00-1ead-420b-82a7-64e08e16c65c",
+  "started_at": "2026-09-01T14:00:00+08:00",
+  "duration_ms": 137000,
+  "prompt_file": "G:\\...\\run-prompt.txt"
+}
+```
+
+**Fields:**
+- `channel`: Always `headless` for this file; distinguishes from Agent-channel runs in audits
+- `model_requested`: The `ZCODE_MODEL` value the launcher passed to the process — the model-control evidence. Aggregation cross-checks it against the round's declared model configuration
+- `zcode_version` / `exit_code` / `timed_out` / `trace_id`: Reproducibility anchors; invalid model IDs surface as non-zero `exit_code` (fail-fast)
+- `started_at` / `duration_ms` / `prompt_file`: Run provenance
+
+**Boundary behavior:** the launcher refuses to start without both `ZCODE_MODEL` and `ZCODE_API_KEY` in the process environment (exit 2) and never writes fabricated outputs on failure. `model_requested` records what was requested, not a provider-side attestation — control verification rests on fail-fast plus the round-level comparability gate (cross-model rounds are excluded from `vs_previous`), see `references/eval-models.md`.
+
+---
+
 ## benchmark.json
 
 Output from `scripts/aggregate-benchmark.mjs`. Located at `<iteration-dir>/benchmark.json`.

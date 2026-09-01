@@ -129,15 +129,15 @@ PASS 但缺 `run-tests.mjs` 或 `references/design.md` 时给警告、SKILL.md �
 
 ### 6.1 起跑前问 gate 集，分批并行 spawn run
 
-评测配置叫 **gate**（= 产物目录名，下文统一用 gate 称呼；目录布局模板里的 `<config>` 即 gate 目录名）。起跑前先问用户「**这轮评测跑哪些 gate？**」——默认组合只是建议，用户可增删、可自定义 gate 名：
+评测配置叫 **gate**（= 产物目录名，下文统一用 gate 称呼；目录布局模板里的 `<config>` 即 gate 目录名）。起跑前先问用户「**这轮评测跑哪些 gate、各臂与评分器用什么模型？**」——默认组合只是建议，用户可增删、可自定义 gate 名：
 
 - 新建技能（建议默认）：`with_skill` + `without_skill`
-- 改进既有技能（建议默认）：`with_skill` + `old_skill` + `without_skill`
-- 自定义例：`with_skill_no_refs`（不带 references 跑一组）、任意配置目录名——聚合器按目录名动态发现，都能聚合
+- 改进既有技能（建议默认）：`with_skill` + `old_skill` + `without_skill`；自定义例 `with_skill_no_refs`（不带 references 跑一组）——任意配置目录名聚合器都按名动态发现
 
-用户不在场（夜间批跑/自动化流程）或已授权自动时，按默认组合执行并在结果里注明「按默认 gate 集跑」——别卡在问询上。
+用户不在场或已授权自动时，按默认组合执行并在结果里注明「按默认 gate 集跑」——别卡在问询上。模型默认宿主同款；降档、自建与降级链见 references/eval-models.md。
 
-问完按用户定的 gate 集，把全部 eval × gate 的 run **分批** spawn。批内铁律：**同一个 eval 的各 gate 必须同一批发**——带技能的与基线的一起跑，时间对齐、状态一致；「同回合」服务的是这层对照公平，不是并发越大越好。批间节奏：默认每批 2 个 eval（2 gate 即 4 个、3 gate 即 6 个 subagent 在飞），一批收完（timing 抓完、6.3 产物核完）再发下一批；宿主并发充裕可加大批次，并发受限的宿主（低并发套餐、频发限流）降到每批 1 个 eval 甚至串行——官方 claude-skill-creator 对 Cowork 超时场景同样允许退化为串行。别先跑 with 再回头补 baseline。
+
+问完按用户定的 gate 集，把全部 eval × gate 的 run **分批** spawn。批内铁律：**同一个 eval 的各 gate 必须同一批发**——带技能的与基线的一起跑，时间对齐、状态一致；「同回合」服务的是这层对照公平，不是并发越大越好。批间节奏：默认每批 2 个 eval（2 gate 即 4 个、3 gate 即 6 个 subagent 在飞），一批收完（timing 抓完、6.3 产物核完）再发下一批；宿主并发充裕可加大批次，并发受限的宿主降到每批 1 个 eval 甚至串行。别先跑 with 再回头补 baseline。
 
 带技能 run 的 prompt 模板：
 
