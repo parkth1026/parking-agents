@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "default_profile": "economy",
+  "profiles": {
+    "economy": {
+      "description": "大量日常回归默认档：弱模型执行，平衡模型评分。",
+      "hosts": {
+        "codex": {
+          "execution": { "models": ["gpt-5.6-luna"], "effort": "high" },
+          "trigger": { "models": ["gpt-5.6-luna"], "effort": "high" },
+          "grader": { "models": ["gpt-5.6-luna"], "effort": "high" }
+        },
+        "claude": {
+          "execution": { "models": ["sonnet"], "effort": "medium" },
+          "trigger": { "models": ["sonnet"], "effort": "medium" },
+          "grader": { "models": ["sonnet"], "effort": "medium" }
+        }
+      }
+    },
+    "representative": {
+      "description": "使用当前会话模型复现目标用户体验。",
+      "hosts": {
+        "codex": { "execution": { "models": ["inherit"], "effort": null }, "trigger": { "models": ["inherit"], "effort": null }, "grader": { "models": ["inherit"], "effort": null } },
+        "claude": { "execution": { "models": ["inherit"], "effort": null }, "trigger": { "models": ["inherit"], "effort": null }, "grader": { "models": ["inherit"], "effort": null } }
+      }
+    },
+    "strict": {
+      "description": "显式验收档；必须由调用方指定目标模型，禁止自动选择昂贵模型。",
+      "requires_model_override": true,
+      "hosts": {}
+    }
+  }
+}

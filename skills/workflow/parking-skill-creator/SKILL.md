@@ -127,17 +127,14 @@ PASS 但缺 `run-tests.mjs` 或 `references/design.md` 时给警告、SKILL.md �
 
 评测结果默认放 skills 祖先父级的 `evals/<技能名>-workspace/`（与 skills 根平行，向上找 skills 祖先，任意嵌套深度）；workspace 在技能扫描根之外，评测产物/夹具里出现再多的 `SKILL.md` 也不会被宿主识别成技能。workspace 是 scratch、不入库（.gitignore 已忽略）——持久评测依据住技能目录，clean 前先把成绩沉淀进去（见「迭代依据的发现约定」）。若显式沿用扫描根内的旧 workspace，跑完 iteration 要用 `check-shadow-skills` 复查产物有没有冒充技能。按迭代组织（`iteration-1/`、`iteration-2/`…），每个测试用例一个 `eval-<描述性名>/` 目录。目录随用随建，不要预先全铺。
 
-### 6.1 起跑前问 gate 集，分批并行 spawn run
+### 6.1 解析低成本 profile，分批 spawn run
 
-评测配置叫 **gate**（= 产物目录名，下文统一用 gate 称呼；目录布局模板里的 `<config>` 即 gate 目录名）。起跑前先问用户「**这轮评测跑哪些 gate、各臂与评分器用什么模型？**」——默认组合只是建议，用户可增删、可自定义 gate 名：
+评测配置叫 **gate**（= 产物目录名）。默认直接运行 `node scripts/resolve-eval-profile.mjs --host <codex|claude> --output <iteration-dir>/eval-profile.resolved.json` 解析随包 `economy`，不询问；只在用户显式覆盖、`strict` 缺模型或低成本候选不可用时询问，禁止静默继承高级模型。完整规则见 references/eval-models.md。gate 默认组合：
 
 - 新建技能（建议默认）：`with_skill` + `without_skill`
 - 改进既有技能（建议默认）：`with_skill` + `old_skill` + `without_skill`；自定义例 `with_skill_no_refs`（不带 references 跑一组）——任意配置目录名聚合器都按名动态发现
 
-用户不在场或已授权自动时，按默认组合执行并在结果里注明「按默认 gate 集跑」——别卡在问询上。模型默认宿主同款；降档、自建与降级链见 references/eval-models.md。
-
-
-问完按用户定的 gate 集，把全部 eval × gate 的 run **分批** spawn。批内铁律：**同一个 eval 的各 gate 必须同一批发**——带技能的与基线的一起跑，时间对齐、状态一致；「同回合」服务的是这层对照公平，不是并发越大越好。批间节奏：默认每批 2 个 eval（2 gate 即 4 个、3 gate 即 6 个 subagent 在飞），一批收完（timing 抓完、6.3 产物核完）再发下一批；宿主并发充裕可加大批次，并发受限的宿主降到每批 1 个 eval 甚至串行。别先跑 with 再回头补 baseline。
+按解析结果把全部 eval × gate **分批** spawn。同一个 eval 的各 gate 必须同批同 profile；默认每批 2 个 eval，收完 timing 与产物再发下一批，并发受限时降到 1 个。别先跑 with 再补 baseline。
 
 带技能 run 的 prompt 模板：
 
@@ -305,7 +302,8 @@ node scripts/package-skill.mjs <技能目录> [输出目录]
 - `agents/openai.yaml` — 技能列表 UI 元数据，字段值不含宿主路径
 - `agents/grader.md` — grader subagent 指令（评分哲学与 grading.json 契约）
 - `agents/analyzer.md` — 基准分析指令（analyst pass：找聚合看不见的模式）
-- `scripts/` — init-skill / snapshot-skill / check-shadow-skills / quick-validate / aggregate-benchmark / aggregate-trigger / package-skill + lib/
+- `eval-profiles.json` — 随包分发的零配置 `economy` 默认和显式 `representative`/`strict` profile
+- `scripts/` — init-skill / snapshot-skill / resolve-eval-profile / run-headless-eval-arm / check-shadow-skills / quick-validate / aggregate-benchmark / aggregate-trigger / package-skill + lib/
 - `eval-viewer/` — generate-review.mjs（服务器与 --static 模式）+ viewer.html
 ---
 

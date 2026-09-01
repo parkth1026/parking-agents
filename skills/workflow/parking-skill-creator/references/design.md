@@ -44,7 +44,8 @@
 | AC-20 | record/live 只在显式授权、串行、有预算和 freshness policy 下访问 provider；record 不评分，失败不晋级或覆盖 epoch | script |
 | AC-21 | 本地 writing guide 的静态 finding 转为绑定 risk/expected behavior/assertion/gates 的 hypothesis；静态审查不直接产生质量 PASS | script |
 | AC-22 | benchmark/history/viewer 分离 run 判罚与 `SUPPORTED | INCONCLUSIVE | REGRESSED | BLOCKED` quality verdict；跨 evidence/harness epoch 不制造比较 | script |
-| AC-23 | 评测起跑问询含模型配置；降档首选自定义 agent 通道（~/.zcode/agents/<name>.md 钉 model，冒烟确认在列后才用），headless 通道（ZCODE_MODEL+ZCODE_API_KEY 进程环境，凭据不落盘）仅作精细控制 fallback；模型是可比性维度，跨模型轮不进 vs_previous | script |
+| AC-23 | 评测起跑问询含 host/model/effort profile；Codex/Claude 优先逐 run 原生传参，统一 headless launcher 支持 codex/claude/zcode fallback；同 eval 各 gate profile 不同则不可归因，跨 profile 轮不进 vs_previous | script |
+| AC-24 | Creator 随包提供零配置 economy，Codex/Claude 新机器可直接解析；strict 缺显式模型、未知宿主或 headless inherit 失败关闭；resolved profile 生成稳定 digest 且禁止昂贵隐式 fallback | script |
 
 ## 迭代记录
 
@@ -76,3 +77,6 @@
 | 2026-09-01 | 模型控制通道升级：用户提供 zcode 自定义 agent（~/.zcode/agents/skill-creator-evals.md，model=GLM-5.3-Flash + thoughtLevel: high，zcode UI 生成），证实 frontmatter model 字段受支持；eval-models.md 通道矩阵改为自定义 agent 首选（无需 API key、Agent 传输层不变）、headless 降为 fallback；SKILL.md 6.1 与 AC-23 同步 | 自定义 agent 文件实证（schema 含 model/thoughtLevel）；本会话 spawn not found 实证注册表为会话启动快照（新会话生效）；AC-23 措辞从 headless 单通道改为双通道 | 自定义 agent 重启后 spawn+工具冒烟实跑通过（skill-creator-evals，28.6k tokens）；通道链路端到端验证完成 未命中；保持单一流水线技能 |
 | 2026-09-01 | fallback 补全：eval-models.md 增「换机器/缺定义」三级降级链（自建定义文件+一次重启 → headless 需 key → 宿主同款兜底，缺定义不阻塞评测）；实证补录 subagent 无 Agent 工具（嵌套 spawn 不存在）、无运行时临时建 agent 通道 | 负向实证：嵌套 spawn 请求被 subagent 明确报告无 spawn 类工具；自建路径为文件写入+重启，与既有注册表快照实证一致 | 未命中；保持单一流水线技能 |
 | 2026-09-01 | fallback 执行件化：新 scripts/provision-eval-agent.mjs（--list/--check/--ensure，幂等+--force 门、kebab-case 校验、--agents-dir 可测；退出码 0/1/2/3），eval-models.md 自建路径改走脚本；9 个黑盒用例固化进 run-tests.mjs；SKILL.md 折行瘦身保零增长预算（模型问询并入既有 gate 问句与指针行、删独立段落与索引行、三处修饰性从句压缩，31,330B/312 行 ≤ 预算 31,415/312） | 自测 235/235（+9）；脚本 9 场景实跑含真机 --list 解析出 skill-creator-evals（GLM-5.3-Flash）；预算测试由 FAIL（超 471B/3 行）回到 PASS | 未命中；保持单一流水线技能 |
+| 2026-09-01 | Codex/Claude 模型控制升级：模型配置提升为 host/model/effort profile；Codex Desktop 逐次传 model/reasoning_effort，Claude Agent 逐次 model + subagent effort；headless launcher 统一支持 codex/claude/zcode，并记录统一 run-meta | 239/239 自测、quick-validate、diff-check 通过；Codex CLI 0.151.0 与 Claude Code 2.1.250 参数面已核对；为避免额外 token，本轮未跑真实模型成功臂，账号可用性待首轮最小冒烟 | 未命中；保持单一流水线技能 |
+| 2026-09-01 | 零配置评测 profile：随包内置 economy/representative/strict，新增 resolver 与稳定 digest；economy 自动路由 Codex Luna low / Claude Haiku，strict 和 headless inherit 失败关闭 | 245/245 自测、quick-validate、diff-check 通过；真实 Codex Luna low 37.1s 与 Claude Haiku 13.3s smoke 均生成逐字 PROFILE_SMOKE_OK 和 run-meta；未把 smoke 冒充完整质量评测 | 未命中；保持单一流水线技能 |
+| 2026-09-01 | 用户裁决主力 profile 改为 Codex Luna high 与 Claude Sonnet medium；launcher 增 effective identity 取证等级，区分 provider_reported / host_reported / requested_only | 245/245 自测通过；真实 smoke：Codex runtime 回显 Luna/high（host_reported）并完成，Claude modelUsage 回显 canonicalModel=claude-sonnet-5/provider=firstParty（provider_reported）并完成；Claude effective effort 未回显，保持 requested_only | 未命中；保持单一流水线技能 |

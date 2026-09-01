@@ -1,26 +1,16 @@
 #!/usr/bin/env node
-// headless 评测臂启动器：按进程指定模型（ZCODE_MODEL + ZCODE_API_KEY），跑一个 eval run。
-// 只从进程环境读凭据；不读共享配置；失败硬报、绝不代写产物。
+// 为 Codex / Claude / zcode 按 run 指定模型与推理强度。失败硬报，不代写产物。
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { resolve } from "node:path";
 
 const USAGE = `用法:
-  node scripts/run-headless-eval-arm.mjs \\
-    --prompt-file <run prompt 文本文件> \\
-    --run-dir <该 run 的目录（含 outputs/）> \\
-    [--timeout-ms <毫秒，默认 600000>]
+  node scripts/run-headless-eval-arm.mjs --host <codex|claude|zcode> \\
+    (--model <模型> [--effort <强度>] | --profile-file <resolved.json> --role <execution|trigger|grader>) \\
+    --prompt-file <文件> --run-dir <目录> [--timeout-ms <毫秒>]
 
-凭据契约（与 run-headless-trigger-probe.mjs 同源）:
-  只从当前进程环境读取 ZCODE_API_KEY 与 ZCODE_MODEL；不接受 key 参数，不读取任何配置文件。
-  两项必须同时存在，否则在启动前拒绝（退出码 2）。
-
-行为:
-  - 以参数数组启动 zcode --prompt <全文> --cwd <run-dir> --mode yolo --no-color；
-    产物由 headless agent 按 prompt 指示写入 run-dir/outputs/。
-  - 在 run-dir 写 run-meta.json：请求模型、zcode 版本、退出码、时长、traceId（若可提取）。
-  - 退出码：0 = headless 正常结束；1 = headless 失败（含无效模型，zcode 会硬失败）；
-    2 = 参数/环境拒绝。失败时不伪造任何产物。`;
+认证由宿主 CLI 自己管理；本脚本不接受 credential 参数。zcode 兼容通道仍要求进程环境提供 ZCODE_API_KEY。
+退出码: 0=完成；1=宿主执行失败；2=参数或前置条件拒绝。`;
 
 function fail(message, code = 1) {
   process.stderr.write(`${message}\n`);
@@ -37,83 +27,82 @@ function parseArgs(argv) {
     }
     const value = argv[++i];
     if (value === undefined || value.startsWith("--")) fail(`${USAGE}\n参数缺值: ${flag}`, 2);
-    if (flag === "--prompt-file") parsed.promptFile = resolve(value);
+    if (flag === "--host") parsed.host = value;
+    else if (flag === "--model") parsed.model = value;
+    else if (flag === "--effort") parsed.effort = value;
+    else if (flag === "--profile-file") parsed.profileFile = resolve(value);
+    else if (flag === "--role") parsed.role = value;
+    else if (flag === "--prompt-file") parsed.promptFile = resolve(value);
     else if (flag === "--run-dir") parsed.runDir = resolve(value);
     else if (flag === "--timeout-ms") parsed.timeoutMs = Number(value);
     else fail(`${USAGE}\n未知参数: ${flag}`, 2);
   }
-  if (!parsed.promptFile || !parsed.runDir) fail(USAGE, 2);
-  if (!Number.isInteger(parsed.timeoutMs) || parsed.timeoutMs < 1_000 || parsed.timeoutMs > 3_600_000) {
-    fail("拒绝: --timeout-ms 必须是 1000..3600000 的整数", 2);
-  }
+  if (!parsed.host || !parsed.promptFile || !parsed.runDir || (!parsed.model && !parsed.profileFile)) fail(USAGE, 2);
+  if (!["codex", "claude", "zcode"].includes(parsed.host)) fail("拒绝: --host 只接受 codex、claude、zcode", 2);
+  if (parsed.profileFile && !["execution", "trigger", "grader"].includes(parsed.role)) fail("拒绝: --profile-file 必须同时提供合法 --role", 2);
+  if (!Number.isInteger(parsed.timeoutMs) || parsed.timeoutMs < 1_000 || parsed.timeoutMs > 3_600_000) fail("拒绝: --timeout-ms 必须是 1000..3600000 的整数", 2);
   return parsed;
 }
 
 const args = parseArgs(process.argv.slice(2));
-
-if (!process.env.ZCODE_MODEL) {
-  fail("拒绝: 进程环境缺 ZCODE_MODEL。headless 模型控制必须由宿主/用户预置该变量（与 ZCODE_API_KEY 成对）。", 2);
+if (args.profileFile) {
+  if (!existsSync(args.profileFile)) fail(`拒绝: resolved profile 不存在: ${args.profileFile}`, 2);
+  const profile = JSON.parse(readFileSync(args.profileFile, "utf8"));
+  if (profile.host !== args.host) fail(`拒绝: profile host=${profile.host} 与 --host=${args.host} 不同`, 2);
+  args.model = profile[args.role]?.model_requested;
+  args.effort = profile[args.role]?.effort_requested ?? undefined;
+  if (!args.model || args.model === "inherit") fail(`拒绝: headless ${args.role} 没有可执行的具体模型`, 2);
 }
-if (!process.env.ZCODE_API_KEY) {
-  fail("拒绝: 进程环境缺 ZCODE_API_KEY。共享 OAuth 登录不供给 headless --prompt；不得从配置文件提取。", 2);
-}
+if (args.host === "zcode" && !process.env.ZCODE_API_KEY) fail("拒绝: zcode 通道缺 ZCODE_API_KEY", 2);
 if (!existsSync(args.promptFile)) fail(`拒绝: prompt 文件不存在: ${args.promptFile}`, 2);
-
 const prompt = readFileSync(args.promptFile, "utf8");
 if (!prompt.trim()) fail("拒绝: prompt 文件为空", 2);
 
 mkdirSync(args.runDir, { recursive: true });
+const command = args.host === "codex" ? "codex" : args.host === "claude" ? "claude" : "zcode";
+const commandArgs = args.host === "codex"
+  ? ["exec", "--ephemeral", "--skip-git-repo-check", "--sandbox", "workspace-write", "--model", args.model,
+      ...(args.effort ? ["--config", `model_reasoning_effort=${JSON.stringify(args.effort)}`] : []), "--cd", args.runDir, prompt]
+  : args.host === "claude"
+    ? ["--print", "--no-session-persistence", "--permission-mode", "acceptEdits", "--output-format", "json", "--model", args.model,
+        ...(args.effort ? ["--effort", args.effort] : []), prompt]
+    : ["--prompt", prompt, "--cwd", args.runDir, "--mode", "yolo", "--no-color"];
+const childEnv = args.host === "zcode" ? { ...process.env, ZCODE_MODEL: args.model } : process.env;
 const startedAt = new Date().toISOString();
 const t0 = Date.now();
-
-const result = spawnSync(
-  "zcode",
-  ["--prompt", prompt, "--cwd", args.runDir, "--mode", "yolo", "--no-color"],
-  {
-    encoding: "utf8",
-    timeout: args.timeoutMs,
-    env: process.env,
-    windowsHide: true,
-    maxBuffer: 32 * 1024 * 1024,
-  },
-);
-
+const result = spawnSync(command, commandArgs, {
+  encoding: "utf8", timeout: args.timeoutMs, env: childEnv, cwd: args.runDir,
+  windowsHide: true, maxBuffer: 32 * 1024 * 1024,
+});
 const durationMs = Date.now() - t0;
-const stdout = result.stdout ?? "";
-const stderr = result.stderr ?? "";
-const combined = stdout + stderr;
+const versionOut = spawnSync(command, ["--version"], { encoding: "utf8", timeout: 30_000 });
+const combined = (result.stdout ?? "") + (result.stderr ?? "");
 const traceId = (combined.match(/traceId[: ]+([0-9a-f-]{8,})/i) || [])[1] ?? null;
-const versionOut = spawnSync("zcode", ["--version"], { encoding: "utf8", timeout: 30_000 });
-const zcodeVersion = (versionOut.stdout || "").trim() || null;
-
+let effectiveModel = null;
+let effectiveEffort = null;
+let modelEvidence = "requested_only";
+if (args.host === "codex") {
+  effectiveModel = (combined.match(/^model:\s*(\S+)\s*$/mi) || [])[1] ?? null;
+  effectiveEffort = (combined.match(/^reasoning effort:\s*(\S+)\s*$/mi) || [])[1] ?? null;
+  if (effectiveModel) modelEvidence = "host_reported";
+} else if (args.host === "claude") {
+  try {
+    const response = JSON.parse(result.stdout ?? "{}");
+    const usage = Object.values(response.modelUsage ?? {})[0];
+    effectiveModel = usage?.canonicalModel ?? null;
+    if (effectiveModel) modelEvidence = "provider_reported";
+  } catch { /* non-JSON failure is handled by exit status */ }
+}
 const meta = {
-  channel: "headless",
-  model_requested: process.env.ZCODE_MODEL,
-  zcode_version: zcodeVersion,
-  exit_code: result.status,
-  timed_out: result.signal === "SIGTERM" || result.error?.code === "ETIMEDOUT",
-  trace_id: traceId,
-  started_at: startedAt,
-  duration_ms: durationMs,
-  prompt_file: args.promptFile,
+  channel: "headless", host: args.host, model_requested: args.model,
+  effort_requested: args.effort ?? null, host_version: (versionOut.stdout || "").trim() || null,
+  effective_model: effectiveModel, effective_effort: effectiveEffort,
+  model_evidence: modelEvidence, effort_evidence: effectiveEffort ? "host_reported" : "requested_only",
+  exit_code: result.status, timed_out: result.signal === "SIGTERM" || result.error?.code === "ETIMEDOUT",
+  trace_id: traceId, started_at: startedAt, duration_ms: durationMs, prompt_file: args.promptFile,
 };
-writeFileSync(
-  resolve(args.runDir, "run-meta.json"),
-  JSON.stringify(meta, null, 2) + "\n",
-  "utf8",
-);
+writeFileSync(resolve(args.runDir, "run-meta.json"), JSON.stringify(meta, null, 2) + "\n", "utf8");
 
-// 不打印任何可能携带凭据的环境内容；只给诊断最小集。
-if (result.error) {
-  fail(`headless 启动失败: ${result.error.message}（model=${process.env.ZCODE_MODEL}, traceId=${traceId}）`, 1);
-}
-if (result.status !== 0) {
-  fail(
-    `headless 退出码 ${result.status}（model=${process.env.ZCODE_MODEL}, traceId=${traceId}）。` +
-      `无效模型会在此处硬失败——这是 fail-fast 验证的一部分；请核对模型 ID 与 API key 的配对。`,
-    1,
-  );
-}
-process.stdout.write(
-  `OK model=${process.env.ZCODE_MODEL} duration_ms=${durationMs} traceId=${traceId}\nrun-meta.json 已写入 ${args.runDir}\n`,
-);
+if (result.error) fail(`headless 启动失败: ${result.error.message}（host=${args.host}, model=${args.model}）`, 1);
+if (result.status !== 0) fail(`headless 退出码 ${result.status}（host=${args.host}, model=${args.model}, effort=${args.effort ?? "default"}）。请核对模型可用性、强度支持和宿主认证。`, 1);
+process.stdout.write(`OK host=${args.host} model=${args.model} effort=${args.effort ?? "default"} duration_ms=${durationMs}\nrun-meta.json 已写入 ${args.runDir}\n`);

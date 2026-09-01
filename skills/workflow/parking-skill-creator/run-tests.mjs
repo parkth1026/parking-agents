@@ -2,7 +2,7 @@
 // run-tests.mjs — parking-skill-creator 自带回归测试（升级/改动后必跑）
 // 惯例：check() 计数器 + 黑盒执行（execFileSync 跑脚本再比对输出），退出码 0=全过/1=有失败；
 //       夹具全部建在系统临时目录——本测试自身不能在技能扫描根下留下任何 SKILL.md。
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -1864,8 +1864,46 @@ try {
   rmSync(verdictRoot, { recursive: true, force: true });
 }
 
-// ---- 模型控制 fallback·provision-eval-agent ----
-console.log("模型控制 fallback·provision-eval-agent：");
+// ---- 模型控制 profile 与 fallback ----
+console.log("模型控制 profile 与 fallback：");
+{
+  const fx = mkdtempSync(join(tmpdir(), "psc-model-runner-"));
+  const promptPath = join(fx, "prompt.txt");
+  writeFileSync(promptPath, "仅输出 OK", "utf8");
+  const resolvedCodexPath = join(fx, "codex-profile.json");
+  const resolvedClaudePath = join(fx, "claude-profile.json");
+  const codexProfile = runFile("resolve-eval-profile.mjs", ["--host", "codex", "--output", resolvedCodexPath]);
+  const codexJson = JSON.parse(codexProfile.stdout);
+  check("新机器 Codex 零配置解析 economy", codexProfile.code === 0 && codexJson.profile === "economy"
+    && codexJson.execution.model_requested === "gpt-5.6-luna" && codexJson.execution.effort_requested === "high"
+    && existsSync(resolvedCodexPath));
+  const claudeProfile = runFile("resolve-eval-profile.mjs", ["--host", "claude", "--output", resolvedClaudePath]);
+  const claudeJson = JSON.parse(claudeProfile.stdout);
+  check("新机器 Claude 零配置解析 economy", claudeProfile.code === 0 && claudeJson.execution.model_requested === "sonnet"
+    && claudeJson.execution.effort_requested === "medium" && claudeJson.grader.model_requested === "sonnet");
+  check("相同 profile 的 digest 不受解析时间影响", codexJson.harness_profile_digest === JSON.parse(runFile("resolve-eval-profile.mjs", ["--host", "codex"]).stdout).harness_profile_digest);
+  const strict = runFile("resolve-eval-profile.mjs", ["--host", "codex", "--profile", "strict"]);
+  check("strict 缺目标模型失败关闭", strict.code === 1 && out(strict).includes("必须显式提供 --model"));
+  const strictExplicit = runFile("resolve-eval-profile.mjs", ["--host", "codex", "--profile", "strict", "--model", "target-cheap"]);
+  check("strict 显式模型可解析且不造默认 grader", strictExplicit.code === 0
+    && JSON.parse(strictExplicit.stdout).execution.model_requested === "target-cheap");
+  const runner = (args, env = process.env) => runFile("run-headless-eval-arm.mjs", args, { env });
+  const missing = runner(["--host", "codex", "--prompt-file", promptPath, "--run-dir", join(fx, "run")]);
+  check("统一 launcher 缺 model 时退出码 2", missing.code === 2 && out(missing).includes("用法"));
+  const badHost = runner(["--host", "other", "--model", "cheap", "--prompt-file", promptPath, "--run-dir", join(fx, "run")]);
+  check("统一 launcher 拒绝未知 host", badHost.code === 2 && out(badHost).includes("codex、claude、zcode"));
+  const noZcodeKey = { ...process.env };
+  delete noZcodeKey.ZCODE_API_KEY;
+  const noKey = runner(["--host", "zcode", "--model", "cheap", "--prompt-file", promptPath, "--run-dir", join(fx, "run")], noZcodeKey);
+  check("zcode 兼容通道缺 key 时启动前拒绝", noKey.code === 2 && out(noKey).includes("ZCODE_API_KEY"));
+  const inheritPath = join(fx, "inherit.json");
+  runFile("resolve-eval-profile.mjs", ["--host", "codex", "--profile", "representative", "--output", inheritPath]);
+  const inherit = runner(["--host", "codex", "--profile-file", inheritPath, "--role", "execution", "--prompt-file", promptPath, "--run-dir", join(fx, "inherit-run")]);
+  check("headless 禁止 representative 隐式继承", inherit.code === 2 && out(inherit).includes("没有可执行的具体模型"));
+  const syntax = spawnSync(process.execPath, ["--check", join(SCRIPTS, "run-headless-eval-arm.mjs")], { encoding: "utf8" });
+  check("统一 launcher Node 语法通过", syntax.status === 0);
+  rmSync(fx, { recursive: true, force: true });
+}
 {
   const fx = mkdtempSync(join(tmpdir(), "psc-provision-"));
   const prov = (args) => runFile("provision-eval-agent.mjs", args);
