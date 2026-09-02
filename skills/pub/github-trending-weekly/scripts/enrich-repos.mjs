@@ -2,16 +2,18 @@
 // enrich-repos.mjs — 用 gh api 为周快照里的每个仓库补元数据与 README 摘要。
 // 容错：单仓库失败标记 api_ok:false 继续；gh 不可用整体 exit 2；合并后必须再过校验器。
 // 用法:
-//   node enrich-repos.mjs --workspace <dir> [--week YYYY-Www] [--max-readme 2500] [--delay 150]
+//   node enrich-repos.mjs [--workspace <dir>] [--week YYYY-Www] [--max-readme 2500] [--delay 150]
 //                         [--stub <dir>]   ← 离线回放：从目录读 {owner}__{repo}.json / .readme.md
+// --workspace 省略时走配置链（lib/config.mjs）。
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import { parseArgs, paths, repoFileName, fatal } from "./lib/util.mjs";
+import { resolveWorkspace } from "./lib/config.mjs";
 import { validateWeek } from "./lib/validate.mjs";
 
 const args = parseArgs(process.argv.slice(2), {
-  workspace: { default: "." },
+  workspace: {},
   week: {},
   "max-readme": { default: "2500" },
   delay: { default: "150" },
@@ -25,7 +27,7 @@ function latestWeek(p) {
   if (!files.length) fatal(`data/weeks 下没有周快照，先跑 fetch-trending`);
   return files.at(-1).replace(".json", "");
 }
-const p = paths(args.workspace);
+const p = paths(resolveWorkspace(args.workspace));
 const week = args.week ?? latestWeek(p);
 const weekFile = join(p.weeks, `${week}.json`);
 if (!existsSync(weekFile)) fatal(`周快照不存在: ${weekFile}`);

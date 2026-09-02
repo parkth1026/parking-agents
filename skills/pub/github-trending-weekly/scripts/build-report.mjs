@@ -2,19 +2,20 @@
 // build-report.mjs — 汇总全部周快照生成 report/data.js + report/index.html（viewer 从 assets 拷贝）。
 // analysis.md 存在则内联为该周分析文本；缺失时照常生成（管线不依赖 LLM）。
 // 用法:
-//   node build-report.mjs --workspace <dir> [--readme-cap 900]
+//   node build-report.mjs [--workspace <dir>] [--readme-cap 900]   ← workspace 省略走配置链（lib/config.mjs）
 import { copyFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs, paths, fatal } from "./lib/util.mjs";
+import { resolveWorkspace } from "./lib/config.mjs";
 import { buildPayload } from "./lib/report-data.mjs";
 
 const args = parseArgs(process.argv.slice(2), {
-  workspace: { default: "." },
+  workspace: {},
   "readme-cap": { default: "900" },
 });
 const SKILL_DIR = dirname(dirname(fileURLToPath(import.meta.url))); // scripts/ 的上级 = 技能根
-const p = paths(args.workspace);
+const p = paths(resolveWorkspace(args.workspace));
 
 let payload;
 try {

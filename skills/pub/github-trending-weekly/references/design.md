@@ -7,7 +7,7 @@
 触发场景：
 
 - 用户说「跑一下本周 GitHub 周报 / 更新 trending 数据 / 出周报」
-- 定时任务（cron）每周调用：提示词写明「执行 $github-trending-weekly 技能，workspace 为 D:\GIT_dev\cron」
+- 定时任务（cron）每周调用：提示词只写「执行 $github-trending-weekly 技能」，workspace 由配置链解析（不再携带路径）
 - 用户想查看历史周报或某个仓库的上榜历史（直接打开 `report/index.html`，不需要本技能）
 
 ## 设计取舍
@@ -21,6 +21,7 @@
 | JSON 校验 | 手写结构校验器（类型/格式/枚举/秩），退出码即门禁 | 引入 JSON Schema 库违反零依赖约束；校验规则就是本技能的契约 |
 | HTML 报告加载本地数据 | 生成 `data.js`（`window.TRENDING_DATA = {...}`）由 `<script>` 引入 | `file://` 下 `fetch()` 本地 JSON 被 CORS 拦截；双击即开是硬需求 |
 | 榜单条数 | 固定 20（weekly 页恰好 20 个 `Box-row`） | 少于 20 视为页面异常或改版，宁可失败不可缺数据 |
+| workspace/服务参数来源 | 族级配置链（CLI > `$SKILL_ENV` > `~/.config/parking-agents/github-trending-weekly.json` > 技能内 config.json 占位），实现于 `scripts/lib/config.mjs` | 真实机器路径不进 git；cron 提示词不再携带路径；同时移除原 `--workspace` 缺省落回当前目录的误写隐患（缺配置即三步引导退出） |
 
 自由度分级：scripts/ 五个脚本与 lib 校验器全部低自由度（参数固定、退出码锁死）；references/analysis-guide.md 高自由度（分析口径是文字指令，留给模型判断）；SKILL.md 工作流编排为中自由度。
 
@@ -29,7 +30,7 @@
 | 编号 | 条件 | 类型 |
 | --- | --- | --- |
 | AC-1 | 离线解析真实 HTML fixture 得到 20 条记录：rank 1..20 连续、首名 tt-a1i/archify、周增 22095、`&amp;` 等 HTML entity 正确解码、无 language 的仓库该字段为 null | script |
-| AC-2 | 页面结构异常（条数≠20、star 数字非法、repo 全名不合法）导致 fetch-trending 非零退出，stderr 指明原因 | script |
+| AC-2 | 页面结构异常（条数少于 20、star 数字非法、repo 全名不合法）导致 fetch-trending 非零退出，stderr 指明原因；条数 ≥20 时取前 20（Wayback 存档常见 21–22 行） | script |
 | AC-3 | enrich 对每个仓库合并 API 元数据与 README 摘要；`--stub` 离线回放模式下缺响应的仓库标记 `api_ok:false` 且整体不失败 | script |
 | AC-4 | update-history 依据既有历史正确分类 new/recurring/returning，追加快照幂等（重跑不重复），recurring/returning 带周环比 | script |
 | AC-5 | validate-week 对合法数据 PASS；字段缺失/类型错误/全名非法/`--full` 模式缺 entry_status 各自 FAIL 并指认问题字段 | script |
@@ -37,6 +38,7 @@
 | AC-7 | 全管线脚本无 LLM 参与：analysis.md 不存在时 build-report 照常产出完整报告 | script |
 | AC-8 | run-tests 全部离线运行，退出码 0 | script |
 | AC-9 | serve.mjs 本地只读后端：viewer 与静态版同源渲染，JSON API（weeks/repos/latest/analysis）全路由正确，404/路径注入拒绝，绑定 127.0.0.1 | script |
+| AC-10 | workspace/port/host 配置解析链：CLI 参数最高优先；省略时按 `$SKILL_ENV`（文件或目录下 `<域>.json`）> `~/.config/parking-agents/<域>.json` 解析并生效；配置与 CLI 都无 workspace 时打印三步引导并 exit 1，绝不落回当前目录 | script |
 
 ## 迭代记录
 
@@ -45,3 +47,5 @@
 | --- | --- | --- | --- |
 | 2026-09-02 | 初版：5 脚本 + 校验器 + viewer + 离线回归 | — | 无 |
 | 2026-09-02 | 加 serve.mjs 本地后端：载荷构建抽到 lib/report-data（build-report 与 serve 同源），viewer 不改（HTTP 下 /data.js 动态生成，file:// 下仍用静态 data.js）；回归 46/46，退出码 0 | — | 无 |
+| 2026-09-02 | 配置链接入：新增 lib/config.mjs（AC-10），6 脚本 workspace 与 serve 的 port/host 走「CLI > 环境层 > 占位」；workspace 由 D:\GIT_dev\cron 迁至 D:\GIT_dev\github-trading（W36 数据已迁移，旧目录保留未动） | — | 无 |
+| 2026-09-02 | 回填导入通道：parse-html 行数 ≥20 截断（AC-2 修订）、fetch-trending `--source/--captured-at`（wayback 元数据透传）、serve 挂 `/backfill/`；W27/W28/W30 以 Wayback 快照导入官方数据，data/repos 按周序重建、W36 重分类 | — | 无 |

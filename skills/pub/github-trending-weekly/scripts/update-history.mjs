@@ -1,14 +1,15 @@
 #!/usr/bin/env node
 // update-history.mjs — 累计每仓库星数历史，分类 new/recurring/returning，算周环比。幂等：重跑替换同周快照。
 // 用法:
-//   node update-history.mjs --workspace <dir> [--week YYYY-Www]
+//   node update-history.mjs [--workspace <dir>] [--week YYYY-Www]   ← workspace 省略走配置链（lib/config.mjs）
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseArgs, paths, prevWeekId, repoFileName, fatal } from "./lib/util.mjs";
+import { resolveWorkspace } from "./lib/config.mjs";
 import { validateWeek, validateHistory, crossCheckWeekHistory } from "./lib/validate.mjs";
 
 const args = parseArgs(process.argv.slice(2), {
-  workspace: { default: "." },
+  workspace: {},
   week: {},
 });
 
@@ -17,7 +18,7 @@ function latestWeek(p) {
   if (!files.length) fatal(`data/weeks 下没有周快照，先跑 fetch-trending`);
   return files.at(-1).replace(".json", "");
 }
-const p = paths(args.workspace);
+const p = paths(resolveWorkspace(args.workspace));
 const week = args.week ?? latestWeek(p);
 const weekFile = join(p.weeks, `${week}.json`);
 if (!existsSync(weekFile)) fatal(`周快照不存在: ${weekFile}`);

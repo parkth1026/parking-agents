@@ -2,24 +2,33 @@
 // fetch-trending.mjs — 抓取 GitHub Trending（weekly）并解析为周快照 JSON。
 // 门禁：解析与结构校验任何一条不过即 exit 1，不写半成品数据。
 // 用法:
-//   node fetch-trending.mjs --workspace <dir> [--top 20] [--since weekly] [--html <file>] [--week YYYY-Www]
-// --html 走离线 fixture（测试/回放），默认在线抓取。
+//   node fetch-trending.mjs [--workspace <dir>] [--top 20] [--since weekly] [--html <file>] [--week YYYY-Www]
+//                          [--source live|offline|wayback] [--captured-at <ISO>]
+// --html 走离线 fixture（测试/回放），默认在线抓取。--workspace 省略时走配置链（lib/config.mjs）。
+// --source/--captured-at 供回填导入：Wayback 快照导入时标 source=wayback 并写真实存档时刻。
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { isoWeekId, parseArgs, paths, fatal } from "./lib/util.mjs";
+import { resolveWorkspace } from "./lib/config.mjs";
 import { parseTrending } from "./lib/parse-html.mjs";
 import { validateWeek } from "./lib/validate.mjs";
 
 const args = parseArgs(process.argv.slice(2), {
-  workspace: { default: "." },
+  workspace: {},
   top: { default: "20" },
   since: { default: "weekly" },
   html: {},
   week: {},
+  source: {},
+  "captured-at": {},
 });
 
 const top = Number(args.top);
 if (!Number.isInteger(top) || top < 1 || top > 25) fatal(`--top 取值非法: ${args.top}`);
+const source = args.source ?? (args.html ? "offline" : "live");
+if (!["live", "offline", "wayback"].includes(source)) fatal(`--source 非法: ${source}（live | offline | wayback）`);
+const capturedAt = args["captured-at"] ?? new Date().toISOString();
+if (Number.isNaN(Date.parse(capturedAt))) fatal(`--captured-at 不是合法时间: ${args["captured-at"]}`);
 
 async function getHtml() {
   if (args.html) {
@@ -48,8 +57,8 @@ const week = args.week ?? isoWeekId(new Date());
 const doc = {
   schema: "trending-week/1",
   week,
-  captured_at: new Date().toISOString(),
-  source: args.html ? "offline" : "live",
+  captured_at: capturedAt,
+  source,
   since: args.since,
   repos,
 };
@@ -59,7 +68,7 @@ if (errs.length) {
   fatal("周快照未通过结构校验，已拒绝写入");
 }
 
-const p = paths(args.workspace);
+const p = paths(resolveWorkspace(args.workspace));
 const file = join(p.weeks, `${week}.json`);
 writeFileSync(file, JSON.stringify(doc, null, 2));
 console.log(`OK  ${week}  ${repos.length} 个仓库  →  ${file}`);

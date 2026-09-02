@@ -1,0 +1,6 @@
+{
+  "_README": "模板：拷贝到 ~/.config/parking-agents/github-trending-weekly.json 后按机器改 workspace（支持 ~/ 前缀）。$SKILL_ENV 指向目录时读 <目录>/github-trending-weekly.json，指向文件则该文件即本域配置；CLI --workspace/--port/--host 优先于本文件。port/host 可省略（缺省 8788 / 127.0.0.1）。",
+  "workspace": "D:/GIT_dev/github-trading",
+  "port": 8788,
+  "host": "127.0.0.1"
+}

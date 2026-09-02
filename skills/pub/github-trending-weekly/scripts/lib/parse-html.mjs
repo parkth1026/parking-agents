@@ -33,11 +33,14 @@ export function parseTrending(html, expectedCount = 20) {
     throw new ParseError('页面不含 Box-row 区块——trending 页面改版或返回了错误页（限流/登录墙）');
   }
   const blocks = html.match(/<article class="Box-row"[\s\S]*?<\/article>/g) ?? [];
-  if (blocks.length !== expectedCount) {
-    throw new ParseError(`解析到 ${blocks.length} 个仓库区块，期望 ${expectedCount} 个——页面结构异常`);
+  // 少于期望=页面异常/存档残缺，拒绝；多于期望（Wayback 存档常见 21-22 行）取前 N，
+  // 与 live 榜单「取 top 20」语义一致
+  if (blocks.length < expectedCount) {
+    throw new ParseError(`解析到 ${blocks.length} 个仓库区块，少于期望的 ${expectedCount} 个——页面结构异常或存档残缺`);
   }
+  const rows = blocks.slice(0, expectedCount);
 
-  const repos = blocks.map((block, i) => {
+  const repos = rows.map((block, i) => {
     const rank = i + 1;
     const h = one(/<h2[^>]*>\s*<a[^>]*href="\/([^"?]+)"/, block, "仓库标题链接");
     const fullName = h[1];

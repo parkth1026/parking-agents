@@ -2,7 +2,7 @@
 // run-tests.mjs — github-trending-weekly 的离线回归测试（升级/改动后必跑）
 // 惯例：check() 计数器 + 黑盒执行（spawnSync 跑脚本再比对输出/产物），退出码 0=全过/1=有失败；
 //       fixtures/ 放黄金输入（真实 HTML 快照 + gh api 响应回放），全部离线，不碰网络。
-// 断言 ↔ 验收条件（references/design.md AC-1..AC-8）映射见各测试节标题。
+// 断言 ↔ 验收条件（references/design.md AC-1..AC-10）映射见各测试节标题。
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
@@ -230,6 +230,64 @@ console.log("== T8/AC-9 serve.mjs 本地后端（loopback，离线） ==");
   } finally {
     proc.kill();
   }
+}
+
+console.log("== T9/AC-10 配置解析链（SKILL_ENV 隔离，不依赖本机真实配置） ==");
+{
+  const runEnv = (script, argv, env) => {
+    const r = spawnSync(process.execPath, [join(SCRIPTS, script), ...argv],
+      { encoding: "utf8", windowsHide: true, env: { ...process.env, ...env } });
+    return { status: r.status, out: r.stdout ?? "", err: r.stderr ?? "" };
+  };
+  const T9 = mkws("t9");
+  const cfgFile = join(ROOT_WS, "t9-config.json");
+  writeFileSync(cfgFile, JSON.stringify({ workspace: T9 }));
+  const r1 = runEnv("fetch-trending.mjs",
+    ["--html", join(FIXTURES, "trending-weekly.html"), "--week", "2026-W36"], { SKILL_ENV: cfgFile });
+  check("SKILL_ENV 指向文件：无 --workspace 时周快照落配置目录",
+    r1.status === 0 && existsSync(join(T9, "data", "weeks", "2026-W36.json")));
+
+  const T9b = mkws("t9b");
+  const r2 = runEnv("fetch-trending.mjs",
+    ["--workspace", T9b, "--html", join(FIXTURES, "trending-weekly.html"), "--week", "2026-W35"],
+    { SKILL_ENV: cfgFile });
+  check("CLI --workspace 覆盖配置层",
+    r2.status === 0 && existsSync(join(T9b, "data", "weeks", "2026-W35.json"))
+    && !existsSync(join(T9, "data", "weeks", "2026-W35.json")));
+
+  const noWsCfg = join(ROOT_WS, "t9-nows.json");
+  writeFileSync(noWsCfg, JSON.stringify({ port: 9000 }));
+  const r3 = runEnv("fetch-trending.mjs",
+    ["--html", join(FIXTURES, "trending-weekly.html"), "--week", "2026-W36"], { SKILL_ENV: noWsCfg });
+  check("配置缺 workspace → exit 1 且打配置引导，不落回当前目录",
+    r3.status === 1 && r3.err.includes("配置引导") && !existsSync(join(SKILL_DIR, "data")));
+
+  const cfgDir = join(ROOT_WS, "t9-dir");
+  mkdirSync(cfgDir, { recursive: true });
+  writeFileSync(join(cfgDir, "github-trending-weekly.json"), JSON.stringify({ workspace: T9 }));
+  const r4 = runEnv("validate-week.mjs", ["--week", "2026-W36"], { SKILL_ENV: cfgDir });
+  check("SKILL_ENV 指向目录：读 <目录>/github-trending-weekly.json",
+    r4.status === 0 && r4.out.includes("PASS"));
+}
+
+console.log("== T10/AC-2 扩展 行数≥20 截断与回填元数据 ==");
+{
+  const html = readFileSync(join(FIXTURES, "trending-weekly.html"), "utf8");
+  const wsA = mkws("t10a");
+  const lastBlock = html.match(/<article class="Box-row"[\s\S]*?<\/article>/g).at(-1);
+  writeFileSync(join(wsA, "21.html"), html.replace("</body>", lastBlock + "</body>"));
+  const r1 = run("fetch-trending.mjs", ["--workspace", wsA, "--html", join(wsA, "21.html"), "--week", "2026-W36"]);
+  check("21 块 → 取前 20，exit 0", r1.status === 0 && readWeek(wsA, "2026-W36").repos.length === 20);
+
+  const wsB = mkws("t10b");
+  const r2 = run("fetch-trending.mjs", ["--workspace", wsB, "--html", join(FIXTURES, "trending-weekly.html"), "--week", "2026-W31",
+    "--source", "wayback", "--captured-at", "2026-08-02T14:11:33Z"]);
+  const d2 = readWeek(wsB, "2026-W31");
+  check("--source/--captured-at 回填元数据透传", r2.status === 0 && d2.source === "wayback" && d2.captured_at === "2026-08-02T14:11:33Z");
+
+  const wsC = mkws("t10c");
+  const r3 = run("fetch-trending.mjs", ["--workspace", wsC, "--html", join(FIXTURES, "trending-weekly.html"), "--week", "2026-W36", "--source", "bogus"]);
+  check("--source 非法值 → exit 1", r3.status === 1 && /source/.test(r3.err));
 }
 
 console.log("== T7/AC-8 SKILL.md 声明完整 ==");

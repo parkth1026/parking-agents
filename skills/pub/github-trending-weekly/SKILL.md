@@ -11,16 +11,26 @@ description: 每周采集 GitHub Trending（weekly 榜 top 20）生成可积累�
 
 - Node ≥ 18（用到内置 fetch）
 - `gh` 已登录（`gh auth status` 通过即可，公开仓库只读）
-- workspace：数据与报告落地的目录（当前为 `D:\GIT_dev\cron`）
+- workspace 已配置（见下节「配置」）；未配置时脚本会报三步引导并退出
+
+## 配置
+
+输出位置与服务参数走两层解析（`scripts/lib/config.mjs`），优先级从高到低：
+
+1. **CLI 参数**：`--workspace` / `--port` / `--host`（本次调用显式覆盖）
+2. **环境层**（真实值，不进任何 git 仓库）：`$SKILL_ENV`（指向文件则该文件即本域配置；指向目录则读 `<目录>/github-trending-weekly.json`）> `~/.config/parking-agents/github-trending-weekly.json`（一域一文件）
+3. **技能内 `config.json`**：随仓库版本化，只放占位说明（本技能无固有默认项）
+
+字段：`workspace`（必填，数据/报告落地目录，支持 `~/`）、`port`（缺省 8788）、`host`（缺省 127.0.0.1）。模板见 `config.example.json`。所有路径相对 workspace 解析，本技能文档不写死机器路径。
 
 ## 工作流（按序执行，每步退出码非 0 就停，不要跳步续跑）
 
-设 `<S>` = 本技能 scripts 目录，`<WS>` = workspace。
+设 `<S>` = 本技能 scripts 目录。workspace 由「配置」解析，命令不必传；需临时覆盖时加 `--workspace <dir>`。
 
 ### Step 1 采集榜单
 
 ```bash
-node <S>/fetch-trending.mjs --workspace <WS>
+node <S>/fetch-trending.mjs
 ```
 
 抓 `github.com/trending?since=weekly`，解析 20 个仓库（rank / 全名 / 描述 / 语言 / 总星 / 周增星），结构校验不过则拒绝写入。产出 `data/weeks/<YYYY-Www>.json`。失败常见原因：限流（稍后重试）、页面改版（读「维护」节）。
@@ -28,7 +38,7 @@ node <S>/fetch-trending.mjs --workspace <WS>
 ### Step 2 富化仓库详情
 
 ```bash
-node <S>/enrich-repos.mjs --workspace <WS>
+node <S>/enrich-repos.mjs
 ```
 
 逐仓库 `gh api` 补 topics、homepage、创建/推送时间、forks、license、README 摘要（前 2500 字符）。单仓库失败标 `api_ok:false` 继续；gh 不可用整体退出。
@@ -36,7 +46,7 @@ node <S>/enrich-repos.mjs --workspace <WS>
 ### Step 3 更新历史与分类
 
 ```bash
-node <S>/update-history.mjs --workspace <WS>
+node <S>/update-history.mjs
 ```
 
 累计每仓库历史 `data/repos/<owner>__<repo>.json`，分类 `new`（首次上榜）/ `recurring`（上周也在）/ `returning`（上过榜但上周不在），并算环比。幂等，重跑安全。
@@ -44,7 +54,7 @@ node <S>/update-history.mjs --workspace <WS>
 ### Step 4 数据门禁
 
 ```bash
-node <S>/validate-week.mjs --workspace <WS> --full
+node <S>/validate-week.mjs --full
 ```
 
 全量结构校验 + 周↔历史咬合检查。**不过不进 Step 5**。
@@ -56,14 +66,14 @@ node <S>/validate-week.mjs --workspace <WS> --full
 ### Step 6 重建报告
 
 ```bash
-node <S>/build-report.mjs --workspace <WS>
+node <S>/build-report.mjs
 ```
 
 汇总全部历史周生成 `report/data.js` + `report/index.html`（viewer 从 assets 拷贝，双击离线打开，分析文字内联）。告诉用户报告路径。
 
 ### Step 7 知识页（可选，每周例行时做）
 
-按 `references/analysis-guide.md` 末尾的模板写 `<WS>/wiki/<YYYY-Www>.md`。
+按 `references/analysis-guide.md` 末尾的模板写 workspace 下的 `wiki/<YYYY-Www>.md`。
 
 ## 输出物一览
 
@@ -82,10 +92,13 @@ node <S>/build-report.mjs --workspace <WS>
 纯 HTML 双击可用，但要命令行访问或让 browser 工具打开时，起本地后端：
 
 ```bash
-node <S>/serve.mjs --workspace <WS> [--port 8788]
+node <S>/serve.mjs [--port 8788]
 ```
 
+workspace 与 port/host 同走「配置」（CLI > 环境层 > 缺省）。
+
 - viewer：`http://127.0.0.1:8788/`（与双击 index.html 同一 viewer；`/data.js` 按请求实时生成，服务常开也能看到最新采集）
+- `/backfill/` — workspace 的 `backfill/index.html`（缺周回填 presence 页，自包含，存在才挂载）
 - JSON API（curl / agent 浏览器工具 / WebFetch 均可）：
   - `GET /api/weeks` — 全部周摘要（counts/top1/has_analysis）
   - `GET /api/weeks/:id` — 单周完整快照；`/api/weeks/:id/analysis` — 该周分析 markdown
@@ -103,11 +116,12 @@ node <S>/serve.mjs --workspace <WS> [--port 8788]
 - **fetch 报"页面不含 Box-row"或条数不符**：先用浏览器/curl 确认页面结构；若 GitHub 改版，更新 `scripts/lib/parse-html.mjs` 的正则并重新固化 `fixtures/trending-weekly.html`，跑 `node run-tests.mjs` 回归。
 - **enrich 大面积 miss**：`gh api rate_limit` 查配额；限流则等待，已成功的字段保留。
 - **validate --full 报历史不一致**：不要手改 JSON，重跑 Step 3（幂等）后再校验。
+- **脚本报「未指定 workspace」**：CLI 与配置层都没给。按报错里的三步引导建 `~/.config/parking-agents/github-trending-weekly.json`，或本次传 `--workspace <dir>`；不要依赖当前目录。
 - **重跑同一周**：Step 1-4 幂等，直接按序重跑即可（同周快照替换不重复）。
 
 ## 维护
 
-解析锚点固化在 fixtures（真实 HTML 快照 + gh api 响应回放），`run-tests.mjs` 35 条断言全部离线。改任何脚本后必跑：
+解析锚点固化在 fixtures（真实 HTML 快照 + gh api 响应回放），`run-tests.mjs` 断言全部离线（含配置解析链回归）。改任何脚本后必跑：
 
 ```bash
 node run-tests.mjs

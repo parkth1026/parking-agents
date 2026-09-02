@@ -1,0 +1,3 @@
+{
+  "_README": "技能固有默认与占位说明（随仓库版本化，真实环境值绝不放这里）。workspace/port/host 的真实值放环境层：~/.config/parking-agents/github-trending-weekly.json 或 $SKILL_ENV 指向的文件，与本文件深合并、环境层优先；CLI 参数（--workspace/--port/--host）优先于一切。字段说明与模板见 config.example.json。本技能当前无固有默认项。"
+}

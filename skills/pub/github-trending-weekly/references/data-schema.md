@@ -9,7 +9,7 @@
   "schema": "trending-week/1",        // 固定
   "week": "2026-W36",                 // ISO 周编号，与文件名一致
   "captured_at": "2026-09-02T03:00:00.000Z",
-  "source": "live",                   // live | offline
+  "source": "live",                   // live | offline | wayback（Wayback 快照回填导入，captured_at 为真实存档时刻）
   "since": "weekly",
   "repos": [ /* 恰好 20 条 */ ]
 }

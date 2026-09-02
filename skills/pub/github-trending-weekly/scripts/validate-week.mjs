@@ -1,18 +1,19 @@
 #!/usr/bin/env node
 // validate-week.mjs — 数据门禁：校验周快照与历史文件结构；--full 追加周↔历史咬合检查。
 // 用法:
-//   node validate-week.mjs --workspace <dir> [--week YYYY-Www] [--full]
+//   node validate-week.mjs [--workspace <dir>] [--week YYYY-Www] [--full]   ← workspace 省略走配置链（lib/config.mjs）
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { parseArgs, paths, repoFileName, fatal } from "./lib/util.mjs";
+import { resolveWorkspace } from "./lib/config.mjs";
 import { validateWeek, validateHistory, crossCheckWeekHistory } from "./lib/validate.mjs";
 
 const args = parseArgs(process.argv.slice(2), {
-  workspace: { default: "." },
+  workspace: {},
   week: {},
   full: { flag: true },
 });
-const p = paths(args.workspace);
+const p = paths(resolveWorkspace(args.workspace));
 
 function weekIds() {
   if (args.week) return [args.week];
