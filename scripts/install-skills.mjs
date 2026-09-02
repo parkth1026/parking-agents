@@ -3,7 +3,12 @@
  * Unified installer entry: junction skills from this repo's skills/ tree into
  * user-level skill directories.
  *
- *   node scripts/install-skills.mjs                              interactive menu
+ *   node scripts/install-skills.mjs                              interactive TUI
+ *                                                                 (arrow keys +
+ *                                                                 Enter; falls
+ *                                                                 back to a plain
+ *                                                                 menu when not a
+ *                                                                 terminal)
  *   node scripts/install-skills.mjs --target both --set default  non-interactive
  *   node scripts/install-skills.mjs --target agents --set progress --dry-run
  *   node scripts/install-skills.mjs --target claude --only deprecated --dry-run
@@ -22,6 +27,7 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 import readline from "node:readline/promises";
+import * as clack from "./vendor/clack-prompts.mjs";
 import {
   SETS,
   discoverRepoSkills,
@@ -38,7 +44,9 @@ const TARGETS = {
 function usage() {
   console.log(`用法: node scripts/install-skills.mjs [选项]
 
-不带参数进入交互菜单；带任意参数则纯非交互（默认 target=both, set=default）。
+不带参数进入交互安装（真终端为方向键 clack TUI，回车取高亮推荐项；
+管道/CI/哑终端自动退回 plain 菜单，每步直接回车即取默认）。目标=both，
+套档=default；带任意参数则纯非交互（默认 target=both, set=default）。
 
   --target agents|claude|both   安装目标（默认 both）
   --set default|progress|all    套档（默认 default；deprecated/in-progress 默认不装；
@@ -133,7 +141,58 @@ function runInstall({ target, set, dryRun, only, skillNames }) {
   return failed;
 }
 
+/** Interactive entry: clack TUI on a real terminal, plain menu otherwise. */
 async function interactive() {
+  // Piped stdin / CI / dumb terminals (e.g. Git Bash mintty without winpty)
+  // cannot drive the arrow-key UI, so they get the plain readline menu with
+  // the same Enter-accepts-default semantics.
+  return process.stdin.isTTY && process.stdout.isTTY ? interactiveTui() : interactivePlain();
+}
+
+async function interactiveTui() {
+  const skills = discoverRepoSkills();
+  const setCount = (set) =>
+    skills.filter((skill) => !skill.category || !SETS[set].includes(skill.category)).length;
+
+  clack.intro("parking-agents 技能安装器");
+  const target = await clack.select({
+    message: "安装目标",
+    initialValue: "both",
+    options: [
+      { value: "both", label: "两个都装（推荐）", hint: "~/.agents/skills + ~/.claude/skills" },
+      { value: "agents", label: "只装 ~/.agents/skills" },
+      { value: "claude", label: "只装 ~/.claude/skills" },
+    ],
+  });
+  if (clack.isCancel(target)) return cancelled();
+
+  const set = await clack.select({
+    message: "套档",
+    initialValue: "default",
+    options: [
+      { value: "default", label: "默认（推荐）", hint: `${setCount("default")} 个，排除 deprecated + in-progress` },
+      { value: "progress", label: "含 in-progress", hint: `${setCount("progress")} 个，排除 deprecated` },
+      { value: "all", label: "全部", hint: `${setCount("all")} 个` },
+    ],
+  });
+  if (clack.isCancel(set)) return cancelled();
+
+  const targetLabel = { agents: "~/.agents/skills", claude: "~/.claude/skills", both: "~/.agents/skills + ~/.claude/skills" }[target];
+  clack.note(`将把 ${setCount(set)} 个技能（${set} 档）junction 到 ${targetLabel}。`, "安装计划");
+  const confirmed = await clack.confirm({ message: "确认执行?", initialValue: true });
+  if (clack.isCancel(confirmed) || !confirmed) return cancelled("已取消，未做任何改动。");
+
+  const failed = runInstall({ target, set, dryRun: false, only: null, skillNames: null });
+  clack.outro(failed ? "安装结束：有失败项，见上方日志" : "安装完成 ✓");
+  return failed ? 1 : 0;
+}
+
+function cancelled(message = "已取消") {
+  clack.cancel(message);
+  return 0;
+}
+
+async function interactivePlain() {
   const skills = discoverRepoSkills();
   const { rows, inSet } = categoryTable(skills);
   const setCount = (set) =>
@@ -160,27 +219,30 @@ async function interactive() {
       : new Promise((res) => {
           lineWaiter = res;
         });
-  const ask = async (prompt, valid) => {
+  const ask = async (prompt, valid, fallback) => {
     for (;;) {
       process.stdout.write(prompt);
       const answer = (await nextLine()).trim();
+      if (answer === "" && fallback !== undefined) return fallback;
       if (valid.includes(answer)) return answer;
-      console.log(`无效选择: ${answer || "(空)"}，请输入 ${valid.join(" / ")}`);
+      const hint = fallback !== undefined ? `，或直接回车用默认 ${fallback}` : "";
+      console.log(`无效选择: ${answer || "(空)"}，请输入 ${valid.join(" / ")}${hint}`);
     }
   };
 
   try {
+    console.log("一路直接回车 = 默认安装（两个目录都装 + default 档）。\n");
     console.log("① 安装目标:");
     console.log("  [1] ~/.agents/skills");
     console.log("  [2] ~/.claude/skills");
-    console.log("  [3] 两个都装");
-    const targetAnswer = await ask("选择 [1-3]: ", ["1", "2", "3"]);
+    console.log("  [3] 两个都装（默认）");
+    const targetAnswer = await ask("选择 [1-3]（回车=3）: ", ["1", "2", "3"], "3");
 
     console.log("\n② 套档:");
-    console.log(`  [1] 默认       (${setCount("default")} 个，排除 deprecated + in-progress)`);
+    console.log(`  [1] 默认       (${setCount("default")} 个，排除 deprecated + in-progress)（默认）`);
     console.log(`  [2] 含 in-progress (${setCount("progress")} 个，排除 deprecated)`);
     console.log(`  [3] 全部       (${setCount("all")} 个)`);
-    const setAnswer = await ask("选择 [1-3]: ", ["1", "2", "3"]);
+    const setAnswer = await ask("选择 [1-3]（回车=1）: ", ["1", "2", "3"], "1");
 
     const target = { "1": "agents", "2": "claude", "3": "both" }[targetAnswer];
     const set = { "1": "default", "2": "progress", "3": "all" }[setAnswer];

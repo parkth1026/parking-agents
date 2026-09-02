@@ -19,7 +19,7 @@ CHANGELOG.md             # 面向使用者的可感知变化记录
 
 install-skills.cmd       # 双击进安装菜单（junction 本机技能目录，见下节）
 uninstall-skills.cmd     # 双击进卸载菜单（全清指向本仓 skills/ 的链接）
-scripts/                 # skill-links.mjs 安装核心库 + install/uninstall 入口 + 版本锁步 + evals
+scripts/                 # skill-links.mjs 安装核心库 + install/uninstall 入口 + 版本锁步 + evals + vendor/（冻结的 clack TUI bundle）
 hooks/                   # SessionStart 注入器（注入 AGENTS.md；Claude Code / Cursor / Copilot CLI 共用）
 tests/                   # 结构断言 + 工具名 lint + 安装器测试 + 各平台契约测试
 evals/                   # 评测运行工作台（with/without 对照产物；gitignored 临时区，耐久记录在各技能目录）
@@ -43,7 +43,7 @@ gemini-extension.json    # Gemini CLI 扩展清单
 
 ### 本机一键安装（junction 安装器）
 
-给**自己机器上的 agent** 用：双击仓库根的 `install-skills.cmd` 进菜单（选目标 `~/.agents/skills` / `~/.claude/skills` / 两者，选套档，确认执行）。命令行等价：
+给**自己机器上的 agent** 用：双击仓库根的 `install-skills.cmd` 进交互安装——真终端里是方向键 TUI（↑↓ 选择、回车取高亮推荐项：**两个目录都装 + default 档**、Ctrl-C 取消），管道/CI/哑终端自动回退纯文本菜单（每步回车=默认）。命令行等价：
 
 ```bash
 node scripts/install-skills.mjs --target both --set default

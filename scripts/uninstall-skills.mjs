@@ -4,7 +4,9 @@
  * directory that points into this repo's skills/ tree — whatever installed it,
  * including historical deprecated/in-progress links.
  *
- *   node scripts/uninstall-skills.mjs                    interactive menu
+ *   node scripts/uninstall-skills.mjs                    interactive TUI
+ *                                                        (plain menu when not
+ *                                                        a terminal)
  *   node scripts/uninstall-skills.mjs --target both      non-interactive (default)
  *   node scripts/uninstall-skills.mjs --target claude --dry-run
  *
@@ -17,6 +19,7 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 import readline from "node:readline/promises";
+import * as clack from "./vendor/clack-prompts.mjs";
 import { repoSources, uninstallSkills } from "./skill-links.mjs";
 
 const TARGETS = {
@@ -27,7 +30,8 @@ const TARGETS = {
 function usage() {
   console.log(`用法: node scripts/uninstall-skills.mjs [选项]
 
-不带参数进入交互菜单；带任意参数则纯非交互（默认 target=both）。
+不带参数进入交互卸载（真终端为方向键 clack TUI，回车取高亮推荐项；
+管道/CI/哑终端自动退回 plain 菜单，每步回车即默认）；带任意参数则纯非交互（默认 target=both）。
 
   --target agents|claude|both   卸载目标（默认 both）
   --dry-run                     只报告，不改任何东西`);
@@ -67,7 +71,40 @@ function runUninstall({ target, dryRun }) {
   return failed;
 }
 
+/** Interactive entry: clack TUI on a real terminal, plain menu otherwise. */
 async function interactive() {
+  return process.stdin.isTTY && process.stdout.isTTY ? interactiveTui() : interactivePlain();
+}
+
+async function interactiveTui() {
+  clack.intro("parking-agents 技能卸载器");
+  clack.log.info("只删指向本仓 skills/ 的链接，lark-* 等外来项不动。");
+  const target = await clack.select({
+    message: "卸载目标",
+    initialValue: "both",
+    options: [
+      { value: "both", label: "两个都卸（推荐）", hint: "~/.agents/skills + ~/.claude/skills" },
+      { value: "agents", label: "只卸 ~/.agents/skills" },
+      { value: "claude", label: "只卸 ~/.claude/skills" },
+    ],
+  });
+  if (clack.isCancel(target)) {
+    clack.cancel("已取消");
+    return 0;
+  }
+  const targetLabel = { agents: "~/.agents/skills", claude: "~/.claude/skills", both: "~/.agents/skills + ~/.claude/skills" }[target];
+  clack.note(`将删除 ${targetLabel} 里所有指向本仓 skills/ 的链接（外来项不动）。`, "卸载计划");
+  const confirmed = await clack.confirm({ message: "确认执行?", initialValue: true });
+  if (clack.isCancel(confirmed) || !confirmed) {
+    clack.cancel("已取消，未做任何改动。");
+    return 0;
+  }
+  const failed = runUninstall({ target, dryRun: false });
+  clack.outro(failed ? "卸载结束：有失败项，见上方日志" : "卸载完成 ✓");
+  return failed ? 1 : 0;
+}
+
+async function interactivePlain() {
   console.log("parking-agents 技能卸载器（只删指向本仓 skills/ 的链接，lark-* 等外来项不动）\n");
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   // Queue every line, even ones arriving before a prompt is shown (piped
@@ -89,20 +126,22 @@ async function interactive() {
       : new Promise((res) => {
           lineWaiter = res;
         });
-  const ask = async (prompt, valid) => {
+  const ask = async (prompt, valid, fallback) => {
     for (;;) {
       process.stdout.write(prompt);
       const answer = (await nextLine()).trim();
+      if (answer === "" && fallback !== undefined) return fallback;
       if (valid.includes(answer)) return answer;
-      console.log(`无效选择: ${answer || "(空)"}，请输入 ${valid.join(" / ")}`);
+      const hint = fallback !== undefined ? `，或直接回车用默认 ${fallback}` : "";
+      console.log(`无效选择: ${answer || "(空)"}，请输入 ${valid.join(" / ")}${hint}`);
     }
   };
   try {
     console.log("卸载目标:");
     console.log("  [1] ~/.agents/skills");
     console.log("  [2] ~/.claude/skills");
-    console.log("  [3] 两个都卸");
-    const answer = await ask("选择 [1-3]: ", ["1", "2", "3"]);
+    console.log("  [3] 两个都卸（默认）");
+    const answer = await ask("选择 [1-3]（回车=3）: ", ["1", "2", "3"], "3");
     const target = { "1": "agents", "2": "claude", "3": "both" }[answer];
     const targetLabel = { agents: "~/.agents/skills", claude: "~/.claude/skills", both: "~/.agents/skills + ~/.claude/skills" }[target];
     console.log(`\n即将删除 ${targetLabel} 里所有指向本仓 skills/ 的链接（外来项不动）。`);
