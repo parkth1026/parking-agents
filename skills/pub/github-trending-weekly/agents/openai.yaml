@@ -1,0 +1,7 @@
+interface:
+  display_name: "github-trending-weekly"
+  short_description: "GitHub Trending 周榜采集、校验与 HTML 周报"
+  default_prompt: "Use $github-trending-weekly to collect this week's GitHub trending data and build the weekly report."
+
+policy:
+  allow_implicit_invocation: true

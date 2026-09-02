@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GitHub Trending 周报</title>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --border: #30363d; --fg: #e6edf3; --muted: #8b949e;
+    --accent: #58a6ff; --green: #3fb950; --yellow: #d29922; --purple: #bc8cff; --red: #f85149;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--fg); font: 14px/1.6 -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; padding: 24px; }
+  a { color: var(--accent); text-decoration: none; } a:hover { text-decoration: underline; }
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 20px; }
+  h1 { font-size: 20px; margin-right: auto; }
+  select { background: var(--panel); color: var(--fg); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 14px; }
+  .meta { color: var(--muted); font-size: 12px; }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+  .chip { background: var(--panel); border: 1px solid var(--border); border-radius: 999px; padding: 2px 12px; font-size: 12px; }
+  .chip b { font-weight: 600; }
+  .chip.new b { color: var(--green); } .chip.recurring b { color: var(--yellow); } .chip.returning b { color: var(--purple); }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px 20px; margin-bottom: 20px; }
+  .card h2 { font-size: 16px; margin-bottom: 10px; }
+  .analysis h1, .analysis h2, .analysis h3 { font-size: 15px; margin: 14px 0 6px; color: var(--accent); }
+  .analysis p { margin: 6px 0; } .analysis ul { margin: 6px 0 6px 20px; } .analysis code { background: #21262d; border-radius: 4px; padding: 1px 5px; font-size: 13px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; color: var(--muted); font-weight: 500; padding: 8px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  td { padding: 8px 10px; border-bottom: 1px solid #21262d; vertical-align: top; }
+  tr.row { cursor: pointer; } tr.row:hover { background: #1c2129; }
+  tr.sel { background: #1f2937; }
+  .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .up { color: var(--green); }
+  .badge { display: inline-block; border-radius: 4px; padding: 0 6px; font-size: 12px; line-height: 20px; }
+  .badge.new { color: var(--green); border: 1px solid var(--green); }
+  .badge.recurring { color: var(--yellow); border: 1px solid var(--yellow); }
+  .badge.returning { color: var(--purple); border: 1px solid var(--purple); }
+  .lang { color: var(--muted); white-space: nowrap; }
+  .desc { color: var(--muted); max-width: 480px; overflow: hidden; text-overflow: ellipsis; }
+  .detail { border: 1px solid var(--accent); }
+  .detail .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px 20px; margin-bottom: 12px; font-size: 13px; }
+  .detail .grid span { color: var(--muted); }
+  .topics { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  .topic { background: #21262d; border-radius: 999px; padding: 1px 10px; font-size: 12px; color: var(--accent); }
+  .readme { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; font: 12px/1.6 ui-monospace, Consolas, monospace; white-space: pre-wrap; word-break: break-word; max-height: 300px; overflow-y: auto; }
+  .hist-tbl td, .hist-tbl th { padding: 4px 10px; font-size: 12px; }
+  .empty { color: var(--muted); padding: 40px; text-align: center; }
+  footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>GitHub Trending 周报</h1>
+  <select id="weekSel" aria-label="选择周"></select>
+  <span class="meta" id="genAt"></span>
+</header>
+<div class="chips" id="chips"></div>
+<div class="card analysis" id="analysis" style="display:none"></div>
+<div class="card">
+  <table>
+    <thead><tr><th>#</th><th>仓库</th><th>语言</th><th>本周 +★</th><th>总 ★</th><th>环比</th><th>状态</th><th>描述</th></tr></thead>
+    <tbody id="tbody"></tbody>
+  </table>
+</div>
+<div class="card detail" id="detail" style="display:none"></div>
+<footer>由 github-trending-weekly 技能生成 · 数据文件 data/weeks/*.json · 点击行查看详情</footer>
+
+<script src="data.js"></script>
+<script>
+const DATA = window.TRENDING_DATA;
+const $ = (id) => document.getElementById(id);
+const fmt = (n) => n == null ? "—" : Number(n).toLocaleString("en-US");
+let current = null, selectedRepo = null;
+
+function esc(s) { return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+function md(src) {
+  const lines = esc(src).split(/\r?\n/); let out = "", inList = false;
+  const inline = (t) => t
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
+    .replace(/\*([^*]+)\*/g, "<i>$1</i>")
+    .replace(/\[([^\]]+)\]\((https?:[^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+  for (const line of lines) {
+    const h = /^(#{1,4})\s+(.*)$/.exec(line);
+    const li = /^[-*]\s+(.*)$/.exec(line);
+    if (li) { if (!inList) { out += "<ul>"; inList = true; } out += `<li>${inline(li[1])}</li>`; continue; }
+    if (inList) { out += "</ul>"; inList = false; }
+    if (h) { out += `<h3>${inline(h[2])}</h3>`; continue; }
+    if (!line.trim()) continue;
+    out += `<p>${inline(line)}</p>`;
+  }
+  if (inList) out += "</ul>";
+  return out;
+}
+const STATUS_LABEL = { new: "新晋", recurring: "常驻", returning: "回锅" };
+
+function repoHistory(fullName) {
+  return DATA.weeks.filter(w => w.repos.some(r => r.full_name === fullName))
+    .map(w => ({ week: w.week, ...(w.repos.find(r => r.full_name === fullName)) }));
+}
+
+function renderWeek() {
+  const w = DATA.weeks.find(x => x.week === current);
+  $("genAt").textContent = `数据采集 ${w.captured_at.slice(0, 10)} · 报告生成 ${DATA.generated_at.slice(0, 16).replace("T", " ")}`;
+  $("chips").innerHTML = `
+    <span class="chip new">新晋 <b>${w.counts.new || 0}</b></span>
+    <span class="chip recurring">常驻 <b>${w.counts.recurring || 0}</b></span>
+    <span class="chip returning">回锅 <b>${w.counts.returning || 0}</b></span>
+    <span class="chip">上榜 <b>${w.repos.length}</b></span>`;
+  const an = $("analysis");
+  an.style.display = w.analysis ? "" : "none";
+  an.innerHTML = w.analysis ? `<h2>本周分析</h2>${md(w.analysis)}` : "";
+  $("detail").style.display = "none"; selectedRepo = null;
+
+  $("tbody").innerHTML = w.repos.map(r => `
+    <tr class="row" data-name="${esc(r.full_name)}">
+      <td class="num">${r.rank}</td>
+      <td><a href="${esc(r.url)}" target="_blank" onclick="event.stopPropagation()">${esc(r.full_name)}</a></td>
+      <td class="lang">${esc(r.language ?? "—")}</td>
+      <td class="num up">+${fmt(r.stars_week)}</td>
+      <td class="num">${fmt(r.stars_total)}</td>
+      <td class="num">${r.stars_delta == null ? "—" : (r.stars_delta >= 0 ? "+" : "") + fmt(r.stars_delta)}</td>
+      <td>${r.entry_status ? `<span class="badge ${r.entry_status}">${STATUS_LABEL[r.entry_status]}</span>` : "—"}</td>
+      <td class="desc">${esc(r.description)}</td>
+    </tr>`).join("");
+  document.querySelectorAll("tr.row").forEach(tr =>
+    tr.addEventListener("click", () => renderDetail(tr.dataset.name)));
+}
+
+function renderDetail(fullName) {
+  const w = DATA.weeks.find(x => x.week === current);
+  const r = w.repos.find(x => x.full_name === fullName);
+  const hist = repoHistory(fullName);
+  selectedRepo = fullName;
+  document.querySelectorAll("tr.row").forEach(tr => tr.classList.toggle("sel", tr.dataset.name === fullName));
+  const d = $("detail");
+  d.style.display = "";
+  d.innerHTML = `
+    <h2>${esc(r.full_name)}</h2>
+    <div class="grid">
+      <div><span>语言</span> ${esc(r.language ?? "—")}</div>
+      <div><span>本周 +★</span> +${fmt(r.stars_week)}</div>
+      <div><span>总 ★</span> ${fmt(r.stars_total)}</div>
+      <div><span>环比</span> ${r.stars_delta == null ? "—" : (r.stars_delta >= 0 ? "+" : "") + fmt(r.stars_delta)}</div>
+      <div><span>forks</span> ${fmt(r.forks)}</div>
+      <div><span>创建</span> ${r.created_at ? r.created_at.slice(0, 10) : "—"}</div>
+      <div><span>最近推送</span> ${r.pushed_at ? r.pushed_at.slice(0, 10) : "—"}</div>
+      <div><span>累计上榜</span> ${hist.length} 周</div>
+      ${r.homepage ? `<div><span>主页</span> <a href="${esc(r.homepage)}" target="_blank">${esc(r.homepage)}</a></div>` : ""}
+    </div>
+    ${r.topics.length ? `<div class="topics">${r.topics.map(t => `<span class="topic">${esc(t)}</span>`).join("")}</div>` : ""}
+    <p style="margin-bottom:10px">${esc(r.description)}</p>
+    <table class="hist-tbl"><thead><tr><th>周</th><th>名次</th><th>总 ★</th><th>周 +★</th></tr></thead>
+      <tbody>${hist.slice().reverse().map(h => `<tr><td>${h.week}</td><td>#${h.rank}</td><td class="num">${fmt(h.stars_total)}</td><td class="num up">+${fmt(h.stars_week)}</td></tr>`).join("")}</tbody></table>
+    ${r.readme_excerpt ? `<p style="margin:12px 0 6px"><span>README 摘录</span></p><div class="readme">${esc(r.readme_excerpt)}</div>` : ""}`;
+}
+
+const sel = $("weekSel");
+sel.innerHTML = DATA.weeks.slice().reverse().map(w => `<option value="${w.week}">${w.week}${w.analysis ? "" : "（无分析）"}</option>`).join("");
+sel.addEventListener("change", () => { current = sel.value; renderWeek(); });
+current = DATA.weeks.at(-1).week; sel.value = current;
+renderWeek();
+</script>
+</body>
+</html>
