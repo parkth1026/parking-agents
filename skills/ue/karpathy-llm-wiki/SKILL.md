@@ -33,7 +33,8 @@ description: |
 - `scoring.indexCountsAsInbound` — `index.md` 目录链接是否计入孤儿页检测的入链（默认：`true`；`index.md` 是本文语义下的官方目录——无论此开关如何，其中的链接同样参与断链检查）
 - `scoring.stalenessEnforce` — 为 `true` 时，任何 stale 页面（raw 证据新于页面 `updated` 日期）直接判校验失败；默认 `false`（存量 stale 积压清完之前仅报告）
 - `scoring.ambiguousNamesEnforce` — 为 `true` 时，存在跨目录同名 basename 页面直接判校验失败；默认 `false`（与 staleness 同过渡策略：先报告清积压，再开执行）
-- `page.maxLines` — 单页超过此行数就要拆分（默认：200）
+- `scoring.organicOrphansEnforce` — 为 `true` 时，存在有机孤儿（除 index.md 外零入链的页面）直接判校验失败；默认 `false`（同过渡策略）。注意默认 `indexCountsAsInbound=true` 下孤儿检查与 index 完整性互为充要（逻辑恒真），有机孤儿节才是图连通性的真实度量
+- `page.maxLines` — 单页超过此行数就要拆分（默认：200；同样适用于 index.md 的 report-only 行数检查）
 - `page.minOutboundLinks` — 每页最少 `[[wikilink]]` 数（默认：2）
 
 禁止硬编码路径——一律从合并后的配置读取。
@@ -233,16 +234,20 @@ wiki 可能被共享——NAS 后端的 `wikiDir` 会被其他会话和技能
 #### 步骤
 
 1. **运行 `validate-wiki.mjs`** — 覆盖以下量化检查：
-   - 断链 `[[wikilink]]`（指向不存在页面的链接，**含 `index.md` 目录链接**）
+   - 断链 `[[wikilink]]`（指向不存在页面的链接，**含 `index.md` 目录链接**；v7 起 log.md / SCHEMA.md 的活链接同口径计入，代码围栏与反引号内的语法示例豁免）
    - 自引用（页面链向自己）
    - 孤儿页（入链为零的页面；除非 `scoring.indexCountsAsInbound` 为 `false`，`index.md` 目录链接计入入链）
+   - **有机孤儿**（v7，独立报告）：除 index.md 外零入链的页面——默认配置下孤儿检查与 index 完整性互为充要（逻辑恒真），本节才是图连通性的真实度量；`scoring.organicOrphansEnforce: true` 时 FAIL
    - index 完整性（每个页面都列进了 index.md）
    - frontmatter 有效性（必填字段齐全；`type` 必须是基础类型或 SCHEMA.md `## Page Types` 中声明的类型）
-   - 超大页面（超过 `page.maxLines`）
+   - 超大页面（超过 `page.maxLines`）；index.md 行数单独恒报告（目录页不计入 pageSize 维度，但超限时提示分层 MOC 拆分）
    - 最少出链（低于 `page.minOutboundLinks`）
    - 标签合规（标签存在于 SCHEMA.md 分类中；`ue5.5` 这类版本号风格标签合法——允许点号、必须小写）
    - **staleness**（raw 证据新于页面 `updated` 日期；传 `--raw` 或依赖配置 `knowledgeBase.rawDir`。默认仅报告，除非 `scoring.stalenessEnforce` 为 `true`）
    - **同名歧义**（跨目录同名 basename 的页面使 `[[Title]]` 解析产生歧义。默认仅报告，`scoring.ambiguousNamesEnforce` 为 `true` 时 FAIL）
+   - **未建链提及**（v7，advisory）：页面正文以纯文本出现其他页面名但全页从未链过——关系数据（花名册/责任人/汇报线）以纯文本逃逸出图的检测。CJK 名 ≥2 字符、ASCII 名 ≥4 字符参与；链一次即豁免该名其余提及；代码区与 frontmatter 不计；长名优先遮蔽防子串误报
+   - **图结构摘要**（v7，informational）：有机节点/边数、入度分布、顶级枢纽、叶子占比——星型拓扑（hub-and-spoke）在 8 维度下可拿满分，本节让它可见
+   - **嵌套 vault 探测**（v7，report-only）：wikiDir 祖先存在 `.obsidian` 即告警并枚举 basename 碰撞——Obsidian 不支持嵌套 vault，从父库打开时裸 `[[名]]` 解析歧义
 
 2. **审阅报告** — 脚本输出带评分的报告。分数 < 9.0 时先修问题再宣称
    wiki 健康。保存报告或任何工作文件时放在 `{wikiDir}` **之外**——
@@ -254,10 +259,18 @@ wiki 可能被共享——NAS 后端的 `wikiDir` 会被其他会话和技能
      [Recurrence 回流](#recurrence-回流跨技能契约)。stale 页面意味着
      wiki 正在输出过时知识；优先级高于一切表面修整。绝不只改 `updated`
      日期而不真正吸收证据
-   - **断链**：链接合法就建缺失页面，链接有误就修复/删除
-   - **孤儿页**：从相关页面加入链；页面太小无法独立时并入父页面
+   - **断链**：链接合法就建缺失页面，链接有误就修复/删除。log.md / SCHEMA.md
+     中描述链接语法的文字（如「修复了 `[[A|B]]` 别名」）必须放反引号内——
+     裸写即活断链
+   - **孤儿页 / 有机孤儿**：从相关页面加入链；页面太小无法独立时并入父页面。
+     有机孤儿（除 index 外零入链）优先从**引用它的内容页**（花名册、责任人、
+     汇报线字段）补链，而不是只往 index 里塞一行
+   - **未建链提及（advisory）**：按 top 页逐个处置——把结构化字段（花名册/
+     责任人/汇报线/对比表）里的既有页面名升级为 `[[wikilink]]`；逐字照录的
+     引文库可按其保真约束保留纯文本，但结构化字段不在此列
    - **缺失 frontmatter**：补齐必填 YAML 字段
-   - **超大页面**：拆成聚焦的子页面并交叉引用
+   - **超大页面**：拆成聚焦的子页面并交叉引用。index.md 超限则拆分层 MOC
+     （按分类的子目录页），index 只留分类入口
    - **出链不足的页面**：向相关概念补 `[[wikilink]]`
 
 4. **重跑校验** — 循环直到分数 >= 9.0、断链 = 0、且 staleness 节清零
@@ -369,6 +382,11 @@ staleness 判定（存在对应 raw 证据时，缺失 `updated` 按 stale 处�
   （校验器的 Ambiguous Page Names 节会点名此类页面）
 - 每页至少 2 条出链 `[[wikilink]]`
 - 避免自引用（页面链向自己）
+- 关系数据必须进图：花名册、责任人、汇报线、对比表中的既有页面名一律用
+  `[[wikilink]]` 而非纯文本——纯文本提及会让关系从图谱中逃逸
+  （校验器的 Unlinked Mentions 节会点名）
+- log.md / SCHEMA.md 中引用链接语法的示例必须放反引号内（`` `[[A|B]]` ``）；
+  index.md 则完全不留任何双方括号示例（含反引号内，v6.2 硬口径）
 
 ### 矛盾处理
 

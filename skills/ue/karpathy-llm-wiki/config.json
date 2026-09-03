@@ -14,7 +14,8 @@
       "frontmatter": 0.15
     },
     "stalenessEnforce": false,
-    "ambiguousNamesEnforce": false
+    "ambiguousNamesEnforce": false,
+    "organicOrphansEnforce": false
   },
   "page": {
     "minOutboundLinks": 2,

@@ -1,0 +1,5 @@
+interface:
+  display_name: "codex-use-gpt-pro"
+  default_prompt: "Use $codex-use-gpt-pro"
+policy:
+  allow_implicit_invocation: false

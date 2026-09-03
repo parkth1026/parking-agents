@@ -15,18 +15,18 @@ node {skill-dir}/scripts/validate-wiki.mjs --wiki "{wikiDir}" --config "{skill-d
 
 `--raw` 可省略：解析链 `--raw` > `$SKILL_ENV` > `~/.config/parking-agents/skill-env.json` 的 `knowledgeBase.rawDir`。找不到 rawDir 时 staleness 检查跳过（报告中标明），不影响其余维度。
 
-### 检查维度（8 维度 + staleness）
+### 检查维度（8 维度 + staleness + v7 图结构体检）
 
 维度名称与脚本报告输出的标签一致，保持英文。
 
 | 维度 | 权重 | 检查什么 |
 |-----------|--------|----------------|
-| Broken Links | 25% | `[[wikilink]]` 指向不存在的页面 |
+| Broken Links | 25% | `[[wikilink]]` 指向不存在的页面（v7 起 **含 log.md / SCHEMA.md 的活链接**；代码围栏与反引号内的语法示例豁免——log/SCHEMA 是审计/规范文档，合法引用语法。index.md 沿用 v6.2 硬口径：反引号内也计入） |
 | Self References | 10% | 页面链向自己 |
-| Orphan Pages | 10% | 入链为零的页面 |
+| Orphan Pages | 10% | 入链为零的页面（`indexCountsAsInbound=true` 默认下与 Index Completeness 互为充要——逻辑恒真，不能证明连通性，见 Organic Orphans） |
 | Index Completeness | 15% | 每个页面都列进了 index.md |
 | Frontmatter | 15% | 必填 YAML 字段齐全且有效；`type` 必须是基础类型或 SCHEMA.md `## Page Types` 声明的类型 |
-| Page Size | 10% | 无页面超过 maxLines |
+| Page Size | 10% | 无页面超过 maxLines（index.md 不在此维度，但有独立恒报告的行数检查） |
 | Outbound Links | 10% | 每页 >= minOutboundLinks |
 | Tag Compliance | 5% | 所有标签在 SCHEMA.md 中定义（Page Types / Page Directories 节不是标签） |
 
@@ -42,6 +42,29 @@ node {skill-dir}/scripts/validate-wiki.mjs --wiki "{wikiDir}" --config "{skill-d
 存在同名歧义直接 FAIL——与 staleness 同过渡策略。自引用检测自 v6.2 起
 大小写不敏感：`[[transformer]]` 在 `Transformer.md` 内同样计入 Self References。
 
+**v7 图结构体检（2026-09-02 wiki-top5 审计后新增：342 页星型拓扑拿 10/10，
+暴露质量模型只看「每页合规」不看「库是图」的盲区）**：
+
+- **Organic Orphans（有机孤儿）**：除 index.md 外零入链的页面，恒报告；
+  `scoring.organicOrphansEnforce: true` 时 FAIL。默认孤儿检查在
+  `indexCountsAsInbound=true` 下与 index 完整性互为充要（每页都被要求进 index、
+  index 链接又计入入链），「孤儿 0」不能证明图连通性——本节才是真实度量
+- **Unlinked Mentions（未建链提及，advisory）**：页面正文以纯文本出现其他页面
+  basename 但全页从未链过——关系数据（花名册/责任人/汇报线）逃逸出图的检测。
+  匹配口径：CJK 名 ≥2 字符、ASCII 名 ≥4 字符（3 字符缩写如 Sim/PCG 误报面过大）；
+  链一次即豁免该名其余纯文本提及；frontmatter/代码围栏/行内代码不计；
+  长名优先遮蔽防子串误报（王超凡 不误报 王超）。报告 top 20 页 + 总数；
+  逐字照录语料库可按保真约束保留部分纯文本，但结构化字段不在此列
+- **Graph Structure（图结构摘要，informational）**：有机节点/无向边/平均入度/
+  入度分布/顶级枢纽/叶子占比（≤1 有机入链）。叶子占比 >70% 时提示
+  hub-and-spoke 星型拓扑——关系不可导航，应在结构化字段补横向链接
+- **index.md 行数（report-only）**：目录页豁免 pageSize 维度后无人守门；
+  超过 `page.maxLines` 时提示拆分层 MOC（分类子目录页 + 精简 index 入口）
+- **嵌套 vault 探测（report-only）**：wikiDir 祖先存在 `.obsidian` 即告警
+  （Obsidian 不支持嵌套 vault；从父库打开时裸 `[[名]]` 因等深路径解析歧义，
+  另一个同名页成死岛），并枚举祖先库与本库的 basename 碰撞清单。
+  处置：迁移 wikiDir 出父库，或给碰撞页加 namespace 前缀
+
 **链接解析目录（v6）**：规范五目录 + 根目录 + SCHEMA.md `## Page Directories` 声明的扩展目录
 （v5 曾硬编码 details/scratch/patterns；部署形态现由 SCHEMA 声明）。
 
@@ -49,12 +72,17 @@ node {skill-dir}/scripts/validate-wiki.mjs --wiki "{wikiDir}" --config "{skill-d
 
 wiki 满足以下条件才算通过校验：
 - [ ] 校验脚本无错误跑完
-- [ ] 断链数 = 0（**硬门槛**：断链 > 0 时即使分数 >= 9.0 仍判 FAIL）
+- [ ] 断链数 = 0（**硬门槛**：断链 > 0 时即使分数 >= 9.0 仍判 FAIL；v7 起含 log/SCHEMA 活链接）
 - [ ] 总分 >= 9.0/10
 - [ ] staleness 节清零，或积压已被用户明确接受
       （`stalenessEnforce: true` 时这一条也是硬门槛）
 - [ ] 无跨目录同名 basename 页面，或积压已被用户明确接受
       （`ambiguousNamesEnforce: true` 时这一条也是硬门槛）
+- [ ] 有机孤儿清零，或积压已被用户明确接受
+      （`organicOrphansEnforce: true` 时这一条也是硬门槛）
+- [ ] 审阅 v7 报告节（Unlinked Mentions / Graph Structure / index 行数 /
+      嵌套 vault）——advisory 项不拦 PASS，但 lint 语义上应逐节给出
+      「已处置 / 明确接受」的结论后再宣称 wiki 健康
 - [ ] 生成校验报告——保存在 `{wikiDir}` **之外**：wiki 内每个 `.md`
       都会被当作页面计数和校验
 

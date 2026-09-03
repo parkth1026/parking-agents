@@ -1,9 +1,32 @@
 #!/usr/bin/env node
-// validate-wiki.mjs — Wiki 校验 v6：8 维度综合检查 + staleness 体检
+// validate-wiki.mjs — Wiki 校验 v7：8 维度综合检查 + staleness 体检 + 图结构体检
 // （唯一入口；原 validate-wiki.ps1 已按仓库脚本标准移除）
 //
 // 用法: node validate-wiki.mjs --wiki <path/to/wiki> [--config <path/to/config.json>] [--raw <path/to/rawDir>]
 // 退出码: 0 = PASS（总分 >= minScore 且断链为 0），1 = FAIL
+//
+// v7.0 变更（2026-09-02 wiki-top5 图谱审计后修复——342 页星型拓扑拿 10/10，暴露质量模型只看
+//        「每页合规」不看「库是图」的盲区；见 skill 会话审计报告）:
+//  14. 脚手架链接纳入断链：log.md / SCHEMA.md 的 [[wikilink]] 此前完全不被扫描
+//      （「修复了 [[占位]] 断链」的日志自身再造一个活断链即此类）。现与 index.md 同口径
+//      计入 Broken Links 硬门。与 index 的 v6.2 硬口径（反引号内也计入）不同：log/SCHEMA
+//      是审计/规范文档，合法引用链接语法——代码围栏与反引号内联代码中的 [[示例]] 豁免
+//  15. 有机孤儿（Organic Orphans）：默认 indexCountsAsInbound=true 下孤儿检查与 index 完整性
+//      互为充要（每页都被要求进 index，index 链接又计入入链）→ 逻辑恒真，「孤儿 0」不能
+//      证明图连通性。现恒报告「除 index 外零入链」页面；scoring.organicOrphansEnforce=true
+//      时 FAIL（与 staleness/ambiguousNames 同过渡策略）
+//  16. 未建链提及（Unlinked Mentions，advisory）：页面正文以纯文本出现其他页面 basename
+//      但全页从未链过——关系数据（人名花名册/责任人/汇报线）以纯文本形态逃逸出图。
+//      匹配规则：CJK 名 ≥2 字符、ASCII 名 ≥4 字符（3 字符缩写如 Sim/PCG 误报面过大）；
+//      「链一次即豁免」：该页已 [[链]] 过的名字其余纯文本提及不再计；frontmatter/代码围栏/
+//      行内代码中的出现不计；长名优先遮蔽防子串误报（王超凡 不误报 王超）
+//  17. 图结构摘要（Graph Structure）：有机节点/边数、入度分布、顶级枢纽、叶子占比
+//      —— hub-and-spoke 星型拓扑此前可满分，结构不可见则不可治理
+//  18. index.md 行数检查（report-only）：目录页豁免 pageSize 维度后无人守门，
+//      318 人目录超 200 行即此类；恒报告，超限时提示分层 MOC 拆分
+//  19. 嵌套 vault 探测（report-only）：wikiDir 祖先存在 .obsidian 即告警——Obsidian 不支持
+//      嵌套 vault，从父库打开时裸 [[名]] 因等深路径解析歧义，另一个同名页成死岛；
+//      并枚举祖先库与本库的 basename 碰撞清单
 //
 // v6.2 变更（2026-08-19 iteration-8 严格审查后修复）:
 //  12. 自引用检测大小写不敏感：[[transformer]] 在 Transformer.md 内此前既逃过 Self References
@@ -37,7 +60,7 @@
 //   6. EXCLUDED_NAMES / index 完整性匹配大小写不敏感
 
 import { fileURLToPath } from "node:url";
-import { dirname, join, basename, extname, relative } from "node:path";
+import { dirname, join, basename, extname, relative, resolve, sep } from "node:path";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 
@@ -85,10 +108,25 @@ function lineCount(content) {
   return lines.length;
 }
 
+// ---- v7 工具：正则转义 / 非正文遮蔽（等长 \x00 填充，保持偏移稳定）----
+const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const maskFill = (m) => "\x00".repeat(m.length);
+// 代码围栏与行内代码不是活文本：Obsidian 不渲染其中的链接，log/SCHEMA 引用语法属文档行为
+function stripCodeSpans(content) {
+  return content
+    .replace(/```[\s\S]*?(```|$)/g, maskFill)
+    .replace(/`[^`\n]*`/g, maskFill);
+}
+// frontmatter 之后才是正文
+function stripFrontmatter(content) {
+  return content.replace(/^---\s*\r?\n[\s\S]*?\r?\n---/, "");
+}
+const isCJKName = (s) => /^[\u4e00-\u9fff]/.test(s);
+
 // ---- 入口 ----
 const { wiki: wikiPath, config: configPath, raw: rawArg } = parseArgs(process.argv.slice(2));
 
-console.log(C.cyan("=== Wiki Validation Script v6.2 ==="));
+console.log(C.cyan("=== Wiki Validation Script v7.0 ==="));
 if (!existsSync(wikiPath)) {
   console.error(`Wiki path does not exist: ${wikiPath}`);
   process.exit(1);
@@ -101,6 +139,7 @@ let minScore = 9.0;
 let indexCountsAsInbound = true;
 let stalenessEnforce = false;
 let ambiguousNamesEnforce = false;
+let organicOrphansEnforce = false;
 const weights = {
   brokenLinks: 0.25, selfReferences: 0.10, orphanPages: 0.10,
   indexCompleteness: 0.15, frontmatter: 0.15, pageSize: 0.10,
@@ -117,6 +156,7 @@ if (configPath && existsSync(configPath)) {
   if (typeof config.scoring?.indexCountsAsInbound === "boolean") indexCountsAsInbound = config.scoring.indexCountsAsInbound;
   if (typeof config.scoring?.stalenessEnforce === "boolean") stalenessEnforce = config.scoring.stalenessEnforce;
   if (typeof config.scoring?.ambiguousNamesEnforce === "boolean") ambiguousNamesEnforce = config.scoring.ambiguousNamesEnforce;
+  if (typeof config.scoring?.organicOrphansEnforce === "boolean") organicOrphansEnforce = config.scoring.organicOrphansEnforce;
 }
 
 // 收集所有 .md（排除 SCHEMA.md / index.md / log.md / raw 目录；basename 大小写不敏感）
@@ -179,11 +219,14 @@ const brokenLinks = [];
 const selfReferences = [];
 const allPageNames = new Map();
 const inboundCount = new Map();
+// v7：有机入链（仅内容页之间的链接；index/脚手架不算）——孤儿检查恒真缺陷的对症数据
+const organicInboundCount = new Map();
 const outboundCount = new Map();
 
 for (const file of allFiles) {
   allPageNames.set(baseName(file), file);
   inboundCount.set(baseName(file), 0);
+  organicInboundCount.set(baseName(file), 0);
 }
 
 // v6.2：同名 basename 歧义收集（跨目录同名让 [[Title]] 解析产生歧义）+
@@ -239,7 +282,10 @@ for (const file of allFiles) {
 
     if (found) {
       const canonical = pageByLower.get(linkText.toLowerCase());
-      if (canonical) inboundCount.set(canonical, inboundCount.get(canonical) + 1);
+      if (canonical) {
+        inboundCount.set(canonical, inboundCount.get(canonical) + 1);
+        organicInboundCount.set(canonical, organicInboundCount.get(canonical) + 1);
+      }
     } else {
       brokenLinks.push({ File: basename(file), Link: linkText });
     }
@@ -267,10 +313,37 @@ if (existsSync(indexPath)) {
   }
 }
 
+// v7：脚手架文件（log.md / SCHEMA.md）的活链接纳入断链——此前完全不扫描，
+// 「修复了 [[占位]]」的日志自身再造活断链即此类。与 index 的 v6.2 硬口径不同：
+// log/SCHEMA 是审计/规范文档，合法引用链接语法，代码围栏与反引号内的 [[示例]] 豁免。
+// 脚手架链接不计入任何页面的入链（审计记录不是知识边）。
+for (const scaffoldName of ["log.md", "SCHEMA.md"]) {
+  const scaffoldPath = join(wikiPath, scaffoldName);
+  if (!existsSync(scaffoldPath)) continue;
+  const prose = stripCodeSpans(read(scaffoldPath));
+  for (const m of prose.matchAll(/\[\[([^\]]+)\]\]/g)) {
+    const target = m[1];
+    totalLinkSum++;
+    let found = false;
+    for (const dir of SEARCH_DIRS) {
+      if (existsSync(join(wikiPath, dir, `${target}.md`))) { found = true; break; }
+    }
+    if (!found) brokenLinks.push({ File: scaffoldName, Link: target });
+  }
+}
+
 // === 维度 3: 孤儿页 ===
 const orphanPages = [];
 for (const [page] of allPageNames) {
   if (inboundCount.get(page) === 0) orphanPages.push(page);
+}
+
+// === v7: 有机孤儿（除 index.md 外零入链）===
+// 默认配置下 Orphan Pages 与 Index Completeness 互为充要（逻辑恒真），不能证明图连通性；
+// 本节恒报告真实孤立页面。scoring.organicOrphansEnforce=true 时升级为硬门。
+const organicOrphans = [];
+for (const [page] of allPageNames) {
+  if (organicInboundCount.get(page) === 0) organicOrphans.push(page);
 }
 
 // === 维度 4: index 完整性（大小写不敏感）===
@@ -341,7 +414,107 @@ if (validTags.length > 0) {
   }
 }
 
-// === v6: staleness（raw 证据日期 vs 页面 updated；纯日期比较，零 LLM）===
+// === v7: 图结构摘要（有机 = 仅内容页之间的边，index/脚手架不计）===
+// hub-and-spoke 星型拓扑在 8 维度下可拿满分——结构不可见则不可治理
+const graphEdges = new Set(); // 无向去重边 "a\x00b"（a<b）
+let graphDirectedEdges = 0;
+for (const file of allFiles) {
+  const src = baseName(file);
+  const content = read(file);
+  for (const m of content.matchAll(/\[\[([^\]]+)\]\]/g)) {
+    const canonical = pageByLower.get(m[1].split(/[|#]/)[0].trim().toLowerCase());
+    if (!canonical || canonical === src) continue;
+    graphDirectedEdges++;
+    graphEdges.add(src < canonical ? `${src}\x00${canonical}` : `${canonical}\x00${src}`);
+  }
+}
+const graphDist = { 0: 0, 1: 0, "2-3": 0, "4-10": 0, "11+": 0 };
+for (const [page] of allPageNames) {
+  const d = organicInboundCount.get(page) || 0;
+  graphDist[d === 0 ? 0 : d === 1 ? 1 : d <= 3 ? "2-3" : d <= 10 ? "4-10" : "11+"]++;
+}
+const graphHubs = [...allPageNames.keys()]
+  .map((p) => ({ name: p, d: organicInboundCount.get(p) || 0 }))
+  .filter((h) => h.d > 0)
+  .sort((a, b) => b.d - a.d)
+  .slice(0, 5);
+const leafPages = graphDist[0] + graphDist[1];
+const leafRatio = totalPages > 0 ? leafPages / totalPages : 0;
+
+// === v7: 未建链提及（advisory）——纯文本出现其他页面名但全页从未链过 ===
+// 关系数据（花名册/责任人/汇报线）以纯文本形态逃逸出图的重灾区检测。
+// 口径：CJK 名 ≥2 字符、ASCII 名 ≥4 字符；链一次即豁免该名其余提及；
+// frontmatter/代码围栏/行内代码不计；长名优先遮蔽防子串误报。
+const mentionCandidates = [...new Set([...pageByLower.values()])]
+  .filter((n) => (isCJKName(n) ? n.length >= 2 : n.length >= 4))
+  .sort((a, b) => b.length - a.length); // 长名先匹配先遮蔽
+const unlinkedMentions = { total: 0, pages: 0, top: [] };
+{
+  const perPage = [];
+  for (const file of allFiles) {
+    const pageName = baseName(file);
+    const linkedNames = new Set();
+    for (const m of read(file).matchAll(/\[\[([^\]]+)\]\]/g)) {
+      linkedNames.add(m[1].split(/[|#]/)[0].trim().toLowerCase());
+    }
+    // 正文 = 去 frontmatter + 代码区 + 全部 [[链接]] 跨度（等长遮蔽）
+    let prose = stripFrontmatter(read(file));
+    prose = stripCodeSpans(prose).replace(/\[\[[^\]]*\]\]/g, maskFill);
+    let pageTotal = 0;
+    const pageNames = [];
+    for (const cand of mentionCandidates) {
+      // 所有名字一律最长优先遮蔽（含自我/已链豁免者），防止其子串被较短名字误计；
+      // 仅非豁免且计数 >0 者进入报告
+      let cnt = 0;
+      prose = prose.replace(new RegExp(escapeRegExp(cand), "gi"), (mm) => { cnt++; return maskFill(mm); });
+      if (cnt === 0) continue;
+      if (cand.toLowerCase() === pageName.toLowerCase()) continue; // 自我提及
+      if (linkedNames.has(cand.toLowerCase())) continue;           // 链一次即豁免
+      pageTotal += cnt;
+      pageNames.push(`${cand}×${cnt}`);
+    }
+    if (pageTotal > 0) perPage.push({ file: basename(file), total: pageTotal, names: pageNames });
+  }
+  unlinkedMentions.total = perPage.reduce((s, p) => s + p.total, 0);
+  unlinkedMentions.pages = perPage.length;
+  unlinkedMentions.top = perPage.sort((a, b) => b.total - a.total).slice(0, 20);
+}
+
+// === v7: index.md 行数（report-only）——目录页豁免 pageSize 维度后无人守门 ===
+let indexLines = null;
+if (existsSync(indexPath)) indexLines = lineCount(read(indexPath));
+
+// === v7: 嵌套 vault 探测（report-only）+ 祖先库 basename 碰撞 ===
+// wikiDir 自带 .obsidian（本库即独立 vault）没问题；祖先带 .obsidian 才是嵌套冲突
+let nestedVault = null;
+let nestedCollisions = [];
+{
+  let dir = dirname(resolve(wikiPath));
+  const limit = dirname(dir);
+  for (; dir !== limit; dir = dirname(dir)) {
+    if (existsSync(join(dir, ".obsidian"))) { nestedVault = dir; break; }
+  }
+  if (nestedVault) {
+    const ownLower = new Set([...allPageNames.keys()].map((p) => p.toLowerCase()));
+    const seen = new Set();
+    let scanned = 0;
+    for (const f of walkMd(nestedVault)) {
+      // f 在本库子树内 → relative 返回不以 .. 开头的相对路径，跳过（两侧同口径：内容页对内容页）
+      const rel = relative(wikiPath, f);
+      if (rel !== ".." && !rel.startsWith("..")) continue;
+      if (EXCLUDED_LOWER.has(basename(f).toLowerCase())) continue;
+      if (++scanned > 5000) break; // 超大祖先库（如家目录）止损
+      const low = basename(f, extname(f)).toLowerCase();
+      if (ownLower.has(low) && !seen.has(low)) {
+        seen.add(low);
+        nestedCollisions.push(low);
+      }
+    }
+    nestedCollisions.sort();
+  }
+}
+
+// === v6: staleness（raw 证据日期 vs 页面 `updated`；纯日期比较，零 LLM）===
 // rawDir 解析链：--raw > $SKILL_ENV > ~/.config/parking-agents/skill-env.json（knowledgeBase.rawDir）
 // 证据日期：frontmatter recorded_at / ingested / date（YYYY-MM-DD 前缀即可），缺省回退 mtime
 // 匹配：raw 文件名去 recurrence- 前缀后与页面 basename 大小写不敏感比对
@@ -518,17 +691,79 @@ if (ambiguousNames.length === 0) {
   }
 }
 
+// === v7: 有机孤儿报告 ===
+console.log("\n" + C.cyan("=== Organic Orphans (zero inbound excluding index.md) ==="));
+if (organicOrphans.length === 0) {
+  console.log(C.green("  No organic orphans — every page earns at least one inbound link from real content."));
+} else {
+  console.log(C.yellow(`  Organic Orphans (${organicOrphans.length}) — reachable only via index.md, invisible to the orphan check when indexCountsAsInbound=true:`));
+  for (const o of organicOrphans) console.log(C.yellow(`    ${o}`));
+  if (!organicOrphansEnforce) {
+    console.log(C.yellow("  (report-only — set scoring.organicOrphansEnforce=true to hard-gate)"));
+  }
+}
+
+// === v7: 图结构摘要 ===
+console.log("\n" + C.cyan("=== Graph Structure (content-page edges only, index.md excluded) ==="));
+console.log(`  ${totalPages} nodes, ${graphEdges.size} undirected edges (${graphDirectedEdges} directed), avg organic in-degree ${(totalPages > 0 ? graphDirectedEdges / totalPages : 0).toFixed(2)}`);
+console.log(`  Organic in-degree distribution: 0: ${graphDist[0]} | 1: ${graphDist[1]} | 2-3: ${graphDist["2-3"]} | 4-10: ${graphDist["4-10"]} | 11+: ${graphDist["11+"]}`);
+if (graphHubs.length > 0) {
+  console.log(`  Top hubs by organic inbound: ${graphHubs.map((h) => `${h.name}=${h.d}`).join(", ")}`);
+}
+if (leafRatio > 0.7) {
+  console.log(C.yellow(`  Leaf ratio ${(leafRatio * 100).toFixed(1)}% (≤1 organic inbound) — hub-and-spoke topology; surface relationships (rosters, reporting lines, cross-references) as [[wikilinks]] or the graph stays unnavigable`));
+} else {
+  console.log(C.green(`  Leaf ratio ${(leafRatio * 100).toFixed(1)}% (≤1 organic inbound)`));
+}
+
+// === v7: 未建链提及报告（advisory）===
+console.log("\n" + C.cyan("=== Unlinked Mentions (advisory) ==="));
+if (unlinkedMentions.total === 0) {
+  console.log(C.green("  No unlinked mentions — page names appearing in plain text are linked somewhere on the same page."));
+} else {
+  console.log(C.yellow(`  ${unlinkedMentions.total} page-name mention(s) on ${unlinkedMentions.pages} page(s) appear as plain text with zero links to that page (top 20 by count):`));
+  for (const p of unlinkedMentions.top) {
+    console.log(C.yellow(`    ${p.file}: ${p.total} — ${p.names.slice(0, 6).join(", ")}${p.names.length > 6 ? ", …" : ""}`));
+  }
+  console.log(C.yellow("  (advisory — fix by linking names in structured fields (rosters/owners/reporting lines); verbatim-quote corpora may keep some by design)"));
+}
+
+// === v7: 脚手架健康（index 行数 + 嵌套 vault）===
+console.log("\n" + C.cyan("=== Scaffolding Health ==="));
+if (indexLines === null) {
+  console.log(C.yellow("  index.md not found"));
+} else if (indexLines > maxLines) {
+  console.log(C.yellow(`  index.md: ${indexLines} lines (max: ${maxLines}) — split into hierarchical MOC pages (per-section sub-indexes) linked from a slim index`));
+} else {
+  console.log(C.green(`  index.md: ${indexLines} lines (max: ${maxLines})`));
+}
+if (nestedVault) {
+  console.log(C.yellow(`  Nested vault: wikiDir sits inside another Obsidian vault (.obsidian found at ${nestedVault})`));
+  if (nestedCollisions.length > 0) {
+    const sample = nestedCollisions.slice(0, 10).join(", ");
+    console.log(C.yellow(`    ${nestedCollisions.length} basename collision(s) with pages in the ancestor vault: ${sample}${nestedCollisions.length > 10 ? ", …" : ""}`));
+    console.log(C.yellow("    Bare [[links]] resolve ambiguously when the vault is opened from the parent — relocate the wiki or namespace the colliding pages"));
+  } else {
+    console.log(C.yellow("    No basename collisions with ancestor vault pages — link resolution is ambiguous only for future name overlaps"));
+  }
+} else {
+  console.log(C.green("  No ancestor .obsidian — wikiDir is not nested inside another vault"));
+}
+
 // === 最终得分 ===
 console.log("\n" + C.cyan("=== Final Score ==="));
 const totalRounded = Math.round(totalScore * 10) / 10;
 const stalenessFail = stalenessEnforce && stalePages.length > 0;
 const ambiguousFail = ambiguousNamesEnforce && ambiguousNames.length > 0;
-const pass = totalRounded >= minScore && brokenLinks.length === 0 && !stalenessFail && !ambiguousFail;
+const organicOrphansFail = organicOrphansEnforce && organicOrphans.length > 0;
+const pass = totalRounded >= minScore && brokenLinks.length === 0 && !stalenessFail && !ambiguousFail && !organicOrphansFail;
 // 总分展示 2 位小数：避免 9.95 四舍五入显示成 10 误导
 console.log((totalRounded >= 9 ? C.green : totalRounded >= 7 ? C.yellow : C.red)(`  Total: ${totalScore.toFixed(2)} / 10`));
 console.log(C.white(`  Threshold: ${minScore} / 10`));
 if (pass) {
   console.log(C.green("  Status: PASS"));
+} else if (organicOrphansFail) {
+  console.log(C.red(`  Status: FAIL (organic orphans enforced: ${organicOrphans.length} page(s) with zero inbound excluding index.md — earn real inbound links or merge them)`));
 } else if (stalenessFail) {
   console.log(C.red(`  Status: FAIL (staleness enforced: ${stalePages.length} stale pages — knowledge must be recompiled to cover newer raw evidence)`));
 } else if (ambiguousFail) {

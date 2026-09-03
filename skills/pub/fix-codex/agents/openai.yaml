@@ -1,0 +1,4 @@
+interface:
+  display_name: "Fix Codex"
+  short_description: "Diagnose and repair Codex desktop, plugins, Browser, and configuration"
+  default_prompt: "Use $fix-codex to diagnose and safely repair this Codex desktop issue with explicit evidence."

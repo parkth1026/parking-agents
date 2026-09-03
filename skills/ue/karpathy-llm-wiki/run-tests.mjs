@@ -366,5 +366,147 @@ function run(args) {
     && rDup.stdout.includes("同名断言") && rDup.stdout.includes("只保留 objective"));
 }
 
+// ============ 场景 14: v7 脚手架活断链（log.md / SCHEMA.md；代码跨度豁免） ============
+{
+  const wiki = join(ROOT, "scaffold-wiki");
+  mkdirSync(join(wiki, "concepts"), { recursive: true });
+  writeFileSync(join(wiki, "SCHEMA.md"), "# S\n## Tags\n- architecture\n");
+  writeFileSync(join(wiki, "index.md"), "# I\n- [[A]] — x\n- [[B]] — x\n- [[C]] — x\n");
+  // log 同时含：合法活链接 [[A]]（解析成功）、裸断链 [[Ghost Log]]、反引号内示例 `[[Ghost Code]]`（豁免）
+  writeFileSync(join(wiki, "log.md"),
+    "# Log\n| Date | Operation | Details |\n|------|-----------|---------|\n| 2026-01-01 | Fix | 修复 [[A]] 引用；又见 [[Ghost Log]]；示例 `[=[Ghost Code]]=` 豁免 |\n".replace("=[Ghost Code]=", "[[Ghost Code]]"));
+  writeFileSync(join(wiki, "concepts", "A.md"),
+    "---\ntitle: A\ntype: concept\ntags: [architecture]\n---\n# A\nSee [[B]] and [[C]].\n");
+  writeFileSync(join(wiki, "concepts", "B.md"),
+    "---\ntitle: B\ntype: concept\ntags: [architecture]\n---\n# B\nSee [[A]] and [[C]].\n");
+  writeFileSync(join(wiki, "concepts", "C.md"),
+    "---\ntitle: C\ntype: concept\ntags: [architecture]\n---\n# C\nSee [[A]] and [[B]].\n");
+  const r = run(["--wiki", wiki]);
+  console.log("\n[14] v7 scaffolding live links");
+  check("log.md 裸断链计入 Broken Links", r.stdout.includes("log.md -> [[Ghost Log]]"));
+  check("反引号内示例豁免", !r.stdout.includes("Ghost Code"));
+  check("log 合法活链接不误报", !r.stdout.includes("log.md -> [[A]]"));
+  check("断链硬门 FAIL", r.code === 1 && r.stdout.includes("hard gate: broken links must be 0 — found 1"), `code=${r.code}`);
+}
+
+// ============ 场景 15: v7 有机孤儿（indexCountsAsInbound 恒真缺陷的对症度量） ============
+{
+  const wiki = join(ROOT, "organic-wiki");
+  mkdirSync(join(wiki, "concepts"), { recursive: true });
+  writeFileSync(join(wiki, "SCHEMA.md"), "# S\n## Tags\n- architecture\n");
+  // C 仅被 index 链接 —— 旧口径不算孤儿（恒真），有机口径是孤儿
+  writeFileSync(join(wiki, "index.md"), "# I\n- [[A]] — x\n- [[B]] — x\n- [[C]] — x\n");
+  writeFileSync(join(wiki, "log.md"), "# Log\n");
+  writeFileSync(join(wiki, "concepts", "A.md"),
+    "---\ntitle: A\ntype: concept\ntags: [architecture]\n---\n# A\nSee [[B]] and [[C]].\n");
+  writeFileSync(join(wiki, "concepts", "B.md"),
+    "---\ntitle: B\ntype: concept\ntags: [architecture]\n---\n# B\nSee [[A]] and [[C]].\n");
+  writeFileSync(join(wiki, "concepts", "C.md"),
+    "---\ntitle: C\ntype: concept\ntags: [architecture]\n---\n# C\nSee [[A]] and [[B]].\n");
+  const r = run(["--wiki", wiki]);
+  console.log("\n[15] v7 organic orphans");
+  check("A/B/C 互相有链 → 默认口径无孤儿", !r.stdout.includes("Orphan Pages ("));
+  check("互链充分时有机孤儿为 0", r.stdout.includes("No organic orphans"));
+  // 改造：C 不再被任何内容页链接
+  writeFileSync(join(wiki, "concepts", "A.md"),
+    "---\ntitle: A\ntype: concept\ntags: [architecture]\n---\n# A\nSee [[B]].\n");
+  writeFileSync(join(wiki, "concepts", "B.md"),
+    "---\ntitle: B\ntype: concept\ntags: [architecture]\n---\n# B\nSee [[A]].\n");
+  const r2 = run(["--wiki", wiki]);
+  check("仅 index 链接的页面 → Organic Orphans 点名", r2.stdout.includes("Organic Orphans (1)") && r2.stdout.includes("C"));
+  check("旧孤儿口径仍不报（indexCountsAsInbound 默认 true）", !r2.stdout.includes("Orphan Pages ("));
+  check("默认 report-only 提示开关", r2.stdout.includes("organicOrphansEnforce=true"));
+  check("默认 exit 0", r2.code === 0, `got ${r2.code}`);
+  const enfCfg = join(ROOT, "organic-enforce-config.json");
+  writeFileSync(enfCfg, JSON.stringify({ scoring: { organicOrphansEnforce: true } }));
+  const rEnf = run(["--wiki", wiki, "--config", enfCfg]);
+  check("organicOrphansEnforce=true → exit 1 且原因明示", rEnf.code === 1 && rEnf.stdout.includes("organic orphans enforced: 1"), `code=${rEnf.code}`);
+}
+
+// ============ 场景 16: v7 未建链提及（advisory；长名遮蔽/链一次豁免/长度阈值/代码豁免） ============
+{
+  const wiki = join(ROOT, "mention-wiki");
+  mkdirSync(join(wiki, "concepts"), { recursive: true });
+  mkdirSync(join(wiki, "entities"), { recursive: true });
+  writeFileSync(join(wiki, "SCHEMA.md"), "# S\n## Tags\n- architecture\n");
+  writeFileSync(join(wiki, "index.md"), "# I\n- [[A]] — x\n- [[Beta]] — x\n- [[王超]] — x\n- [[王超凡]] — x\n- [[Allen]] — x\n- [[Sim]] — x\n");
+  writeFileSync(join(wiki, "log.md"), "# Log\n");
+  // A：纯文本提 王超凡/Beta/Allen（全页从未链过这三个）→ 各报 1；链过 [[王超]]/[[Sim]]；
+  //    「王超凡」长名优先遮蔽，不误报「王超」；代码里 `Allen` 不计
+  writeFileSync(join(wiki, "concepts", "A.md"),
+    "---\ntitle: A\ntype: concept\ntags: [architecture]\n---\n# A\nSee [[王超]] and [[Sim]].\n正文纯文本：王超凡 与 Beta 与 Allen 各出现一次，代码里 `Allen` 不计。\n");
+  // 王超：已链 [[王超凡]] 一次，正文再纯文本提 → 链一次即豁免
+  writeFileSync(join(wiki, "concepts", "王超.md"),
+    "---\ntitle: 王超\ntype: concept\ntags: [architecture]\n---\n# 王超\nSee [[A]] and [[王超凡]]。王超凡 正文再提一次。\n");
+  // Beta：正文提自己两次 → 自我提及不计
+  writeFileSync(join(wiki, "concepts", "Beta.md"),
+    "---\ntitle: Beta\ntype: concept\ntags: [architecture]\n---\n# Beta\nSee [[A]] and [[王超]]。Beta 正文 Beta 再提。\n");
+  writeFileSync(join(wiki, "concepts", "王超凡.md"),
+    "---\ntitle: 王超凡\ntype: concept\ntags: [architecture]\n---\n# 王超凡\nSee [[A]] and [[Beta]]。\n");
+  writeFileSync(join(wiki, "entities", "Allen.md"),
+    "---\ntitle: Allen\ntype: entity\ntags: [architecture]\n---\n# Allen\nSee [[A]] and [[Beta]]。\n");
+  writeFileSync(join(wiki, "entities", "Sim.md"),
+    "---\ntitle: Sim\ntype: entity\ntags: [architecture]\n---\n# Sim\nSee [[A]] and [[Beta]]。\n");
+  const r = run(["--wiki", wiki]);
+  console.log("\n[16] v7 unlinked mentions");
+  check("A 页三个未链裸提及齐报", r.stdout.includes("A.md: 3") && r.stdout.includes("王超凡×1") && r.stdout.includes("Beta×1") && r.stdout.includes("Allen×1"));
+  check("长名优先遮蔽：王超凡 不误报 王超", !r.stdout.includes("王超×1"));
+  check("ASCII <4 字符（Sim）不参与", !r.stdout.includes("Sim×"));
+  check("链一次即豁免（王超页不再报）", !r.stdout.includes("王超.md:"));
+  check("自我提及不计（Beta 页不报）", !r.stdout.includes("Beta.md:"));
+  check("advisory 不拦 PASS", r.code === 0, `code=${r.code}`);
+}
+
+// ============ 场景 17: v7 嵌套 vault 探测 + 祖先库 basename 碰撞 ============
+{
+  const parent = join(ROOT, "parent-vault");
+  const wiki = join(parent, "wiki");
+  mkdirSync(join(wiki, "concepts"), { recursive: true });
+  mkdirSync(join(parent, ".obsidian"), { recursive: true });
+  mkdirSync(join(parent, "elsewhere"), { recursive: true });
+  writeFileSync(join(wiki, "SCHEMA.md"), "# S\n## Tags\n- architecture\n");
+  writeFileSync(join(wiki, "index.md"), "# I\n- [[A]] — x\n- [[Collide]] — x\n");
+  writeFileSync(join(wiki, "log.md"), "# Log\n");
+  writeFileSync(join(wiki, "concepts", "A.md"),
+    "---\ntitle: A\ntype: concept\ntags: [architecture]\n---\n# A\nSee [[Collide]].\n");
+  writeFileSync(join(wiki, "concepts", "Collide.md"),
+    "---\ntitle: Collide\ntype: concept\ntags: [architecture]\n---\n# Collide\nSee [[A]].\n");
+  // 祖先库同名页（碰撞）与不同名页（不碰撞）；脚手架同名（index.md）两侧同口径排除
+  writeFileSync(join(parent, "elsewhere", "Collide.md"), "# sibling collide\n");
+  writeFileSync(join(parent, "elsewhere", "Unique.md"), "# sibling unique\n");
+  const r = run(["--wiki", wiki]);
+  console.log("\n[17] v7 nested vault probe");
+  check("探测到祖先 .obsidian 并告警", r.stdout.includes("Nested vault:") && r.stdout.includes("parent-vault"));
+  check("basename 碰撞点名 collide", r.stdout.includes("1 basename collision") && r.stdout.includes("collide"));
+  check("不同名祖先页不计入", !r.stdout.includes("unique"));
+  check("嵌套 vault 为 report-only，不拦 PASS", r.code === 0, `code=${r.code}`);
+  // 无祖先 .obsidian 的对照（临时移走）
+  rmSync(join(parent, ".obsidian"), { recursive: true, force: true });
+  const r2 = run(["--wiki", wiki]);
+  check("无祖先 vault → 无告警", r2.stdout.includes("No ancestor .obsidian"));
+}
+
+// ============ 场景 18: v7 index.md 行数检查（report-only） ============
+{
+  const wiki = join(ROOT, "idxsize-wiki");
+  mkdirSync(join(wiki, "concepts"), { recursive: true });
+  writeFileSync(join(wiki, "SCHEMA.md"), "# S\n## Tags\n- architecture\n");
+  const pad = Array.from({ length: 10 }, (_, i) => `<!-- pad ${i} -->`).join("\n");
+  writeFileSync(join(wiki, "index.md"), `# I\n- [[A]] — x\n- [[B]] — x\n${pad}\n`);
+  writeFileSync(join(wiki, "log.md"), "# Log\n");
+  writeFileSync(join(wiki, "concepts", "A.md"),
+    "---\ntitle: A\ntype: concept\ntags: [architecture]\n---\n# A\nSee [[B]].\n");
+  writeFileSync(join(wiki, "concepts", "B.md"),
+    "---\ntitle: B\ntype: concept\ntags: [architecture]\n---\n# B\nSee [[A]].\n");
+  // maxLines=7：index 13 行超限；A/B 各 7 行不超；minOutboundLinks=1 使单链页不拖分数
+  const cfg = join(ROOT, "idxsize-config.json");
+  writeFileSync(cfg, JSON.stringify({ page: { maxLines: 7, minOutboundLinks: 1 } }));
+  const r = run(["--wiki", wiki, "--config", cfg]);
+  console.log("\n[18] v7 index size report");
+  check("index 超限被报告并提示分层 MOC", r.stdout.includes("index.md: 13 lines (max: 7)") && r.stdout.includes("hierarchical MOC"));
+  check("index 行数不进 pageSize 维度", !r.stdout.includes("Oversized Pages"));
+  check("report-only 不拦 PASS", r.code === 0, `code=${r.code}`);
+}
+
 console.log(`\n=== ${pass} passed, ${fail} failed ===`);
 process.exit(fail === 0 ? 0 : 1);
