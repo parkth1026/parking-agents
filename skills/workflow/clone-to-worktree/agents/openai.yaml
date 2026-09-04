@@ -1,0 +1,7 @@
+interface:
+  display_name: "clone-to-worktree"
+  short_description: "把同源独立 clone 原地转换成当前仓库的 worktree，保留 ignored 资产与 submodule"
+  default_prompt: "用 $clone-to-worktree 把目标 clone 转换成当前仓库的 worktree"
+
+policy:
+  allow_implicit_invocation: true
