@@ -60,7 +60,13 @@ snapshot：`{ week, date, rank, stars_total, stars_week }`，类型约束同上�
 
 ## viewer 载荷 `report/data.js`
 
-`window.TRENDING_DATA = { schema: "trending-report/1", generated_at, weeks: [...] }`。weeks 按周升序；每项含 `week / captured_at / analysis（string|null）/ counts{new,recurring,returning} / repos[]`；readme_excerpt 截断到 900 字符。viewer（assets/viewer.html）零外部依赖，`<script src="data.js">` 载入——这是绕开 `file://` CORS 限制的既定方案，不要改回 fetch。
+`window.TRENDING_DATA = { schema: "trending-report/1", generated_at, weeks: [...] }`。weeks 按周升序；每项含 `week / captured_at / analysis（string|null）/ counts{new,recurring,returning} / repos[]`；readme_excerpt 及新增别名 readme 截断到最多 2400 字符。viewer 零外部依赖，`<script src="data.js">` 载入，保留 file:// 双击访问。
+
+新增均为可选字段：repo 的 `created/pushed/license/issues`、`coreImg`（解析后的 HTTP(S) URL）、`accel{ratio,baseWeek}`（与此前最近上榜周的 stars_week 之比，四舍五入一位小数；必须有当前及此前两点）、`presence{days,best,week}`（取不晚于当前周的最近在场记录，week 显示证据周）、`note{positioning,whyNow,trust,nicheTags:string[],niche}`。旧键保留；无证据的扩展字段不写 null。
+
+周层增加 `capturedAt/analyzed` 别名和条件性 `staleAt/staleReason`。重写分析的分类头与当前周吻合、且内容 hash 已变化时，viewer 不再显示旧 stale。结构化 note 的固定标签和受控词表见 analysis-guide.md；整篇原稿始终保留。
+
+周 JSON 的 enrichment 增可选 `tree[]`、`contributors[]`、`commits_90d{since,until,sampled,capped,items[]}`、`releases[]`、`source_status{readme,tree,contrib,commit,release}` 与 `evidence_at`。单信源失败删该信源产物并标 false；空数组是成功但无记录。目录不递归；提交只采近90天最多100条，并明确样本是否到上限。stale 增可选 `staleAnalysisHash`，用于识别是否完成重写，供数据层消费。
 
 ## HTTP API（serve.mjs，载荷与 viewer 同源构建）
 

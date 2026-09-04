@@ -41,7 +41,7 @@ node <S>/fetch-trending.mjs
 node <S>/enrich-repos.mjs
 ```
 
-逐仓库 `gh api` 补 topics、homepage、创建/推送时间、forks、license、README 摘要（前 2500 字符）。单仓库失败标 `api_ok:false` 继续；gh 不可用整体退出。
+逐仓库 `gh api` 补元数据，以及五信源：README 摘要（前 2500 字符）、顶层 git tree、前 20 contributors、近 90 天最多 100 条 commits 概要、最近 3 releases。输出 `+readme +tree +contrib +commit +release`；单信源失败标记在 `source_status`，其余继续。`api_ok` 保留元数据成功语义；gh 不可用整体退出。证据另记采集时间，晚于榜单的事件不得倒推为当周爆因。
 
 ### Step 3 更新历史与分类
 
@@ -49,7 +49,7 @@ node <S>/enrich-repos.mjs
 node <S>/update-history.mjs
 ```
 
-累计每仓库历史 `data/repos/<owner>__<repo>.json`，分类 `new`（首次上榜）/ `recurring`（上周也在）/ `returning`（上过榜但上周不在），并算环比。幂等，重跑安全。
+累计每仓库历史 `data/repos/<owner>__<repo>.json`，分类 `new`（首次上榜）/ `recurring`（上周也在）/ `returning`（上过榜但上周不在），并算环比。幂等，重跑安全。已有分析的分类依据变化时标记 `staleAt/staleReason`，报告显示「分析待重跑」；回填重分类应对受影响周逐周执行。
 
 ### Step 4 数据门禁
 
@@ -61,7 +61,7 @@ node <S>/validate-week.mjs --full
 
 ### Step 5 写本周分析（LLM 环节）
 
-读 `data/weeks/<YYYY-Www>.json`（重点看 `entry_status == "new"` 的仓库和 `stars_week` 排序），按 `references/analysis-guide.md` 的口径写 `data/weeks/<YYYY-Www>.analysis.md`。不写也能出报告，但每周例行时应当写。
+读 `data/weeks/<YYYY-Www>.json`，按 `references/analysis-guide.md` 为全部 20 仓写定位、为什么爆、可信度、生态位四字段及受控 nicheTags，并记录完整分类依据。完成标志是每仓有可核查证据且事实与推断分明。缺分析仍能出报告；例行周报和 stale 刷新必须完成此步。
 
 ### Step 6 重建报告
 
@@ -69,7 +69,7 @@ node <S>/validate-week.mjs --full
 node <S>/build-report.mjs
 ```
 
-汇总全部历史周生成 `report/data.js` + `report/index.html`（viewer 从 assets 拷贝，双击离线打开，分析文字内联）。告诉用户报告路径。
+汇总全部历史周生成 `report/data.js` + `report/index.html`：1152px 单列 Top20、新晋/回锅、SURGE（周增/总星≥20%）、前次上榜加速度、四字段展开。README 首图→Social Preview→离线首字母。旧分析整篇仍可读；viewer 从 assets 拷贝，双击离线可用。告诉用户报告路径。
 
 ### Step 7 知识页（可选，每周例行时做）
 
@@ -127,4 +127,6 @@ workspace 与 port/host 同走「配置」（CLI > 环境层 > 缺省）。
 node run-tests.mjs
 ```
 
-设计依据与验收条件（AC-1..AC-8）见 `references/design.md`。
+改 viewer 时另跑 `node scripts/assert-browser.mjs --checks layout`，再分别跑 `tokens`、`detail`、`mobile`；需要已安装的 playwright-cli。默认用黄金 fixture，`--workspace <dir>` 可验证实际报告，`--output <dir>` 保存截图和 JSON。浏览器通过不能代替用户阅读当期分析的内容验收。
+
+设计依据与验收条件见 `references/design.md`。

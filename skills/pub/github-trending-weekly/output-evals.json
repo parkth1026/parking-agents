@@ -1,0 +1,70 @@
+{
+  "skill": "github-trending-weekly",
+  "source_iteration": "iteration-1",
+  "evals": [
+    {
+      "name": "eval-完整周报产出",
+      "prompt": "这周 GitHub 上爆了什么？他们是干啥的？给我出一份本周的完整周报。（数据已离线备好：seed 为已过校验的 workspace，data/weeks/2026-W36.json 含五信源与分类，另有历史周；尚无本周分析、尚无 report/。全程离线。）",
+      "assertions": [
+        {
+          "name": "产出本周周报工件（HTML 报告或完整 Markdown），保存在 outputs 内",
+          "type": "manual"
+        },
+        {
+          "name": "新晋与既往上榜区分显式且与数据一致（17 新晋；tt-a1i/archify、rohitg00/ai-engineering-from-scratch、every-app/open-seo 为回锅）——不得把回锅标成新晋，允许不同但一致的口径表述",
+          "type": "manual"
+        },
+        {
+          "name": "全部 20 个上榜仓各有至少一句『是干嘛的』定位说明",
+          "type": "manual"
+        },
+        {
+          "name": "指认本周爆发最猛仓库（tt-a1i/archify，周增 22095）且依据与数据一致（周增星数或增速口径）",
+          "type": "manual"
+        },
+        {
+          "name": "新晋仓在工件中获得突出呈现（相对老仓有视觉/结构上的强调）",
+          "type": "manual"
+        },
+        {
+          "name": "实锤纪律：描述区分数据事实与项目自述/未验证项，不是通篇照抄 README 自我介绍",
+          "type": "manual"
+        },
+        {
+          "name": "给用户的答复可直接读：先答『爆了什么』再答『他们是干嘛的』，非脚本流水账",
+          "type": "manual"
+        }
+      ]
+    },
+    {
+      "name": "eval-新晋聚焦问答",
+      "prompt": "我每周都看 GitHub 周报，老仓库不用重复展开讲。这周新晋了哪些项目？哪几个爆发最猛（加速度角度）？挑最值得看的新晋，一两句话说清是干嘛的、跟谁竞争。（数据已离线备好：seed 为已过校验的 workspace；全程离线。）",
+      "assertions": [
+        {
+          "name": "答复直接可读并保存在 outputs 内（answer.md 或等价物）",
+          "type": "manual"
+        },
+        {
+          "name": "新晋口径正确：与数据一致（17 新晋/3 回锅），无回锅误标为新晋；只挑重点时口径说明清楚",
+          "type": "manual"
+        },
+        {
+          "name": "爆发最猛识别：tt-a1i/archify（周增 22095、加速度约 21.7×）被指认且依据与数据一致",
+          "type": "manual"
+        },
+        {
+          "name": "重点新晋仓各有 1-2 句定位说明（是干嘛的）",
+          "type": "manual"
+        },
+        {
+          "name": "至少 3 个重点仓给出具体同类/竞品名",
+          "type": "manual"
+        },
+        {
+          "name": "老读者视角：回锅/老仓未被重复展开占篇幅",
+          "type": "manual"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,80 @@
+{
+  "skill": "github-trending-weekly",
+  "runs": [
+    {
+      "date": "2026-09-03T23:52:23+08:00",
+      "iteration_ref": "D:\\GIT_dev\\parking-agents\\evals\\github-trending-weekly-workspace\\iteration-1",
+      "gates": {
+        "old_skill": {
+          "pass_rate": 1,
+          "mean_ms": 861711,
+          "mean_tokens": 1325774.5
+        },
+        "with_skill": {
+          "pass_rate": 1,
+          "mean_ms": 765494.5,
+          "mean_tokens": 1148732
+        },
+        "without_skill": {
+          "pass_rate": 1,
+          "mean_ms": 638050.5,
+          "mean_tokens": 890969
+        }
+      },
+      "vs_previous": null,
+      "bank_epoch": 1,
+      "current_best": true
+    },
+    {
+      "date": "2026-09-03T23:53:48+08:00",
+      "iteration_ref": "D:\\GIT_dev\\parking-agents\\evals\\github-trending-weekly-workspace\\iteration-1",
+      "gates": {
+        "old_skill": {
+          "pass_rate": 1,
+          "mean_ms": 861711,
+          "mean_tokens": 1325774.5
+        },
+        "with_skill": {
+          "pass_rate": 1,
+          "mean_ms": 765494.5,
+          "mean_tokens": 1148732
+        },
+        "without_skill": {
+          "pass_rate": 1,
+          "mean_ms": 638050.5,
+          "mean_tokens": 890969
+        }
+      },
+      "vs_previous": null,
+      "bank_epoch": 1,
+      "supersedes": "runs[0]",
+      "current_best": true
+    },
+    {
+      "date": "2026-09-03T23:54:09+08:00",
+      "iteration_ref": "D:\\GIT_dev\\parking-agents\\evals\\github-trending-weekly-workspace\\iteration-1",
+      "gates": {
+        "old_skill": {
+          "pass_rate": 1,
+          "mean_ms": 861711,
+          "mean_tokens": 1325774.5
+        },
+        "with_skill": {
+          "pass_rate": 1,
+          "mean_ms": 765494.5,
+          "mean_tokens": 1148732
+        },
+        "without_skill": {
+          "pass_rate": 1,
+          "mean_ms": 638050.5,
+          "mean_tokens": 890969
+        }
+      },
+      "vs_previous": null,
+      "bank_epoch": 1,
+      "supersedes": "runs[1]",
+      "current_best": true
+    }
+  ],
+  "current_best": "runs[2]"
+}

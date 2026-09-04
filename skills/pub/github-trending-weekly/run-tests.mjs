@@ -290,6 +290,8 @@ console.log("== T10/AC-2 扩展 行数≥20 截断与回填元数据 ==");
   check("--source 非法值 → exit 1", r3.status === 1 && /source/.test(r3.err));
 }
 
+await (await import('./scripts/test-redesign.mjs')).runRedesign({ check, run, mkws, fixtures: FIXTURES });
+
 console.log("== T7/AC-8 SKILL.md 声明完整 ==");
 check("SKILL.md 存在且声明 name", existsSync(join(SKILL_DIR, "SKILL.md"))
   && readFileSync(join(SKILL_DIR, "SKILL.md"), "utf8").includes("name: github-trending-weekly"));

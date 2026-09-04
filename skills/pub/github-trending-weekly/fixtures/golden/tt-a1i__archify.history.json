@@ -1,0 +1,22 @@
+{
+  "schema": "repo-history/1",
+  "full_name": "tt-a1i/archify",
+  "first_seen_week": "2026-W28",
+  "snapshots": [
+    {
+      "week": "2026-W28",
+      "date": "2026-07-11T17:43:28Z",
+      "rank": 13,
+      "stars_total": 3634,
+      "stars_week": 1019
+    },
+    {
+      "week": "2026-W36",
+      "date": "2026-09-01T20:05:11.014Z",
+      "rank": 1,
+      "stars_total": 41617,
+      "stars_week": 22095
+    }
+  ],
+  "last_seen_week": "2026-W36"
+}

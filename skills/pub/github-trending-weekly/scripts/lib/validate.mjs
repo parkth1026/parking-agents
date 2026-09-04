@@ -11,6 +11,8 @@ export function validateWeek(doc, { expectedCount = 20 } = {}) {
   if (doc?.schema !== "trending-week/1") errs.push(`schema 必须是 "trending-week/1"，实际 ${JSON.stringify(doc?.schema)}`);
   if (!WEEK_RE.test(doc?.week ?? "")) errs.push(`week 格式非法: ${doc?.week}（期望 YYYY-Www）`);
   if (typeof doc?.captured_at !== "string" || !ISO_DATE_RE.test(doc.captured_at)) errs.push("captured_at 缺失或非 ISO 时间");
+  if (doc?.staleAt !== undefined && (typeof doc.staleAt !== 'string' || !Number.isFinite(Date.parse(doc.staleAt)))) errs.push('staleAt 必须是 ISO 时间');
+  if (doc?.staleReason !== undefined && typeof doc.staleReason !== 'string') errs.push('staleReason 必须是字符串');
   if (!Array.isArray(doc?.repos)) { errs.push("repos 不是数组"); return errs; }
   if (doc.repos.length !== expectedCount) errs.push(`repos 条数 ${doc.repos.length} ≠ ${expectedCount}`);
 
@@ -26,6 +28,9 @@ export function validateWeek(doc, { expectedCount = 20 } = {}) {
     if (r.api_ok !== undefined && typeof r.api_ok !== "boolean") errs.push(`${w}api_ok 必须是布尔`);
     if (r.topics !== undefined && !Array.isArray(r.topics)) errs.push(`${w}topics 必须是数组`);
     if (r.readme_excerpt !== undefined && typeof r.readme_excerpt !== "string") errs.push(`${w}readme_excerpt 必须是字符串`);
+    for (const key of ['tree','contributors','releases']) if (r[key] !== undefined && !Array.isArray(r[key])) errs.push(`${w}${key} 必须是数组`);
+    if (r.source_status !== undefined && (!r.source_status || Array.isArray(r.source_status) || typeof r.source_status !== 'object' || Object.values(r.source_status).some(v => typeof v !== 'boolean'))) errs.push(`${w}source_status 必须是布尔映射`);
+    if (r.commits_90d !== undefined && (!Array.isArray(r.commits_90d?.items) || !Number.isInteger(r.commits_90d?.sampled) || typeof r.commits_90d?.capped !== 'boolean')) errs.push(`${w}commits_90d 格式非法`);
     if (r.entry_status !== undefined && !["new", "recurring", "returning"].includes(r.entry_status)) {
       errs.push(`${w}entry_status 非法: ${r.entry_status}`);
     }

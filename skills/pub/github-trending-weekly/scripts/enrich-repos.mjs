@@ -36,15 +36,22 @@ const doc = JSON.parse(readFileSync(weekFile, "utf8"));
 function ghApi(endpoint, acceptRaw = false) {
   if (args.stub) {
     // repos/o/r -> o__r.json；repos/o/r/readme -> o__r.readme.md（与 fixtures/stub 命名一致）
-    const key = endpoint.replace(/^repos\//, "").replace(/\/readme$/, "").replace(/\//g, "__");
-    const f = acceptRaw ? join(args.stub, `${key}.readme.md`) : join(args.stub, `${key}.json`);
+    const [,owner,name,source] = /^repos\/([^/]+)\/([^/?]+)(?:\/([^?]+))?/.exec(endpoint);
+    const suffix = source === 'readme' ? '.readme.md' : source ? `.${source.startsWith('git/trees/') ? 'tree' : source}.json` : '.json';
+    const f = join(args.stub, `${owner}__${name}${suffix}`);
     if (!existsSync(f)) return { ok: false, missing: true };
-    return { ok: true, text: readFileSync(f, "utf8") };
+    const text = readFileSync(f, 'utf8');
+    if (!acceptRaw) {
+      try { if (JSON.parse(text)._error) return { ok: false, stderr: JSON.parse(text)._error }; }
+      catch { return { ok: false, stderr: 'stub JSON 解析失败' }; }
+    }
+    return { ok: true, text };
   }
   const cmdArgs = ["api", endpoint];
   if (acceptRaw) cmdArgs.push("-H", "Accept: application/vnd.github.raw");
-  const r = spawnSync("gh", cmdArgs, { encoding: "utf8", windowsHide: true });
-  if (r.error) { console.error("gh 不可用:", r.error.message); process.exit(2); }
+  const r = spawnSync("gh", cmdArgs, { encoding: "utf8", windowsHide: true, timeout: 30000, maxBuffer: 8 * 1024 * 1024 });
+  if (r.error?.code === 'ENOENT') { console.error("gh 不可用:", r.error.message); process.exit(2); }
+  if (r.error) return { ok: false, stderr: r.error.message };
   if (r.status !== 0) return { ok: false, stderr: (r.stderr || "").slice(0, 200) };
   return { ok: true, text: r.stdout };
 }
@@ -53,6 +60,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let okCount = 0, missCount = 0;
 
 for (const repo of doc.repos) {
+  const sourceStatus = {};
   const metaRes = ghApi(`repos/${repo.full_name}`);
   let readme = "";
   if (metaRes.ok) {
@@ -69,22 +77,43 @@ for (const repo of doc.repos) {
       repo.license = m.license?.spdx_id ?? null;
       repo.stars_api = Number.isInteger(m.stargazers_count) ? m.stargazers_count : null;
       repo.api_ok = true;
+      delete repo.api_error;
       okCount++;
     } catch (e) {
       repo.api_ok = false;
       repo.api_error = `元数据解析失败: ${e.message}`;
       missCount++;
     }
-    const rdRes = ghApi(`repos/${repo.full_name}/readme`, true);
-    if (rdRes.ok) readme = rdRes.text.slice(0, maxReadme);
   } else {
     repo.api_ok = false;
     repo.api_error = metaRes.missing ? "stub 无响应" : (metaRes.stderr || "gh api 失败");
     missCount++;
   }
+  const rdRes = ghApi(`repos/${repo.full_name}/readme`, true);
+  sourceStatus.readme = rdRes.ok;
+  if (rdRes.ok) readme = rdRes.text.slice(0, maxReadme);
+  // Evidence observed now is dated independently of the historical star snapshot.
+  const until = new Date().toISOString();
+  const since = new Date(Date.parse(until) - 90 * 86400000).toISOString();
+  for (const [key, endpoint, field, project] of [
+    ['tree', 'git/trees/HEAD', 'tree', m => { if (!Array.isArray(m.tree)) throw new Error('tree 非数组'); return m.tree.map(x => ({path:x.path, type:x.type, sha:x.sha})); }],
+    ['contrib', 'contributors?per_page=20', 'contributors', m => m.slice(0,20).map(x => ({login:x.login, contributions:x.contributions, type:x.type}))],
+    ['commit', `commits?since=${since}&until=${until}&per_page=100`, 'commits_90d', m => ({since, until, sampled:m.length, capped:m.length === 100, items:m.map(x => ({sha:x.sha, date:x.commit?.committer?.date, message:x.commit?.message?.split('\n')[0], url:x.html_url}))})],
+    ['release', 'releases?per_page=3', 'releases', m => m.slice(0,3).map(x => ({tag:x.tag_name, published_at:x.published_at, prerelease:x.prerelease, url:x.html_url, body:(x.body || '').slice(0,2400)}))],
+  ]) {
+    const res = ghApi(`repos/${repo.full_name}/${endpoint}`);
+    sourceStatus[key] = false;
+    delete repo[field];
+    if (res.ok) {
+      try { repo[field] = project(JSON.parse(res.text)); sourceStatus[key] = true; }
+      catch { /* malformed single source does not discard the other sources */ }
+    }
+  }
+  repo.source_status = sourceStatus;
+  repo.evidence_at = until;
   repo.readme_excerpt = readme;
   if (!args.stub && delay > 0) await sleep(delay);
-  console.log(`${repo.api_ok ? "ok " : "miss"} #${repo.rank} ${repo.full_name}${readme ? " (+readme)" : ""}`);
+  console.log(`${repo.api_ok ? "ok " : "miss"} #${repo.rank} ${repo.full_name} (${Object.entries(sourceStatus).map(([key,ok]) => `${ok ? '+' : '-'}${key}`).join(' ')})`);
 }
 
 const errs = validateWeek(doc, { expectedCount: doc.repos.length });

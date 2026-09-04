@@ -1,165 +1,212 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GitHub Trending 周报</title>
-<style>
-  :root {
-    --bg: #0d1117; --panel: #161b22; --border: #30363d; --fg: #e6edf3; --muted: #8b949e;
-    --accent: #58a6ff; --green: #3fb950; --yellow: #d29922; --purple: #bc8cff; --red: #f85149;
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: var(--bg); color: var(--fg); font: 14px/1.6 -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; padding: 24px; }
-  a { color: var(--accent); text-decoration: none; } a:hover { text-decoration: underline; }
-  header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 20px; }
-  h1 { font-size: 20px; margin-right: auto; }
-  select { background: var(--panel); color: var(--fg); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 14px; }
-  .meta { color: var(--muted); font-size: 12px; }
-  .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
-  .chip { background: var(--panel); border: 1px solid var(--border); border-radius: 999px; padding: 2px 12px; font-size: 12px; }
-  .chip b { font-weight: 600; }
-  .chip.new b { color: var(--green); } .chip.recurring b { color: var(--yellow); } .chip.returning b { color: var(--purple); }
-  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px 20px; margin-bottom: 20px; }
-  .card h2 { font-size: 16px; margin-bottom: 10px; }
-  .analysis h1, .analysis h2, .analysis h3 { font-size: 15px; margin: 14px 0 6px; color: var(--accent); }
-  .analysis p { margin: 6px 0; } .analysis ul { margin: 6px 0 6px 20px; } .analysis code { background: #21262d; border-radius: 4px; padding: 1px 5px; font-size: 13px; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th { text-align: left; color: var(--muted); font-weight: 500; padding: 8px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
-  td { padding: 8px 10px; border-bottom: 1px solid #21262d; vertical-align: top; }
-  tr.row { cursor: pointer; } tr.row:hover { background: #1c2129; }
-  tr.sel { background: #1f2937; }
-  .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .up { color: var(--green); }
-  .badge { display: inline-block; border-radius: 4px; padding: 0 6px; font-size: 12px; line-height: 20px; }
-  .badge.new { color: var(--green); border: 1px solid var(--green); }
-  .badge.recurring { color: var(--yellow); border: 1px solid var(--yellow); }
-  .badge.returning { color: var(--purple); border: 1px solid var(--purple); }
-  .lang { color: var(--muted); white-space: nowrap; }
-  .desc { color: var(--muted); max-width: 480px; overflow: hidden; text-overflow: ellipsis; }
-  .detail { border: 1px solid var(--accent); }
-  .detail .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px 20px; margin-bottom: 12px; font-size: 13px; }
-  .detail .grid span { color: var(--muted); }
-  .topics { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
-  .topic { background: #21262d; border-radius: 999px; padding: 1px 10px; font-size: 12px; color: var(--accent); }
-  .readme { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; font: 12px/1.6 ui-monospace, Consolas, monospace; white-space: pre-wrap; word-break: break-word; max-height: 300px; overflow-y: auto; }
-  .hist-tbl td, .hist-tbl th { padding: 4px 10px; font-size: 12px; }
-  .empty { color: var(--muted); padding: 40px; text-align: center; }
-  footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22%3E%3Crect width=%2224%22 height=%2224%22 rx=%226%22 fill=%22%236670cc%22/%3E%3Ctext x=%227%22 y=%2218%22 fill=%22white%22%3ET%3C/text%3E%3C/svg%3E"><title>GitHub Trending 周报</title><style>
+:root{
+  --page-max:1152px;
+  --ink:#171717;--body:#5c5e70;--divider:#dadce7;--indigo:#6670cc;
+  --indigo-soft:rgba(102,112,204,.1);--ink80:rgba(23,23,23,.8);--zinc70:rgba(92,94,112,.7);
+  --amber-ink:#b45309;--amber-bg:#fffbeb;--amber-line:#fde68a;
+  --r:8px;--r-lg:12px;
+  --font:"Instrument Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:#fff;color:var(--ink);font:16px/1.5 var(--font);-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+.topbar{border-bottom:1px solid var(--divider)}
+.topbar-in{max-width:var(--page-max);margin:0 auto;padding:12px 32px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:8px;font-size:16px;font-weight:600;color:var(--ink)}
+.brand .logo{width:24px;height:24px;border-radius:6px;background:var(--indigo);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:700}
+.win{color:var(--zinc70);font-size:12px}
+select{font:inherit;font-size:13px;color:var(--ink);background:#fff;border:1px solid var(--divider);border-radius:var(--r);padding:8px 12px}
+.main{max-width:var(--page-max);margin:0 auto;padding:28px 32px 90px}
+.pagehead h1{font-size:24px;font-weight:600;color:var(--ink);margin:0 0 6px}
+.pagehead .desc{color:var(--body);font-size:14px;margin:0}
+.tldr{margin:14px 0 0;padding:10px 14px;border-left:3px solid var(--indigo);background:var(--indigo-soft);border-radius:0 var(--r) var(--r) 0}
+.tldr p{margin:4px 0;color:var(--body);font-size:13.5px}
+.tldr p.hot{color:var(--ink);font-weight:600}
+.stale{display:flex;gap:8px;align-items:flex-start;margin:16px 0 0;padding:10px 14px;background:var(--amber-bg);border:1px solid var(--amber-line);color:var(--amber-ink);border-radius:var(--r);font-size:13px}
+.listwrap{margin:20px 0 0;border:1px solid var(--divider);border-radius:var(--r-lg)}
+.listhead{padding:16px 16px 12px;border-bottom:1px solid var(--divider)}
+.listhead h2{font-size:17px;font-weight:600;margin:0 0 2px}
+.listhead p{font-size:12.5px;color:var(--zinc70);margin:0}
+.row{position:relative;display:flex;gap:14px;padding:24px 16px;border-bottom:1px solid var(--divider);cursor:pointer;align-items:center}
+.row:last-of-type .surgebar{display:none}
+.row:last-of-type{border-bottom:0 solid var(--divider)}
+.row:hover{background:#fafafa}
+.surgebar{position:absolute;left:0;bottom:-1px;height:2px;background:var(--indigo);z-index:1}
+.rk{flex:0 0 32px;display:flex;justify-content:flex-start;padding-top:2px}
+.rk .medal{width:24px;height:24px;border-radius:50%;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.rk .medal.g{background:#f99c00}.rk .medal.s{background:#9ca3af}.rk .medal.b{background:#b45309}
+.rk .plain{color:var(--zinc70);font-size:12px;font-weight:600;padding:5px 0 0 8px}
+.rthumb{flex:0 0 288px}
+.rthumb .box{width:288px;aspect-ratio:16/9;border-radius:10px;border:1px solid var(--divider);overflow:hidden;background:#fafafa}
+.rthumb img,.rthumb .fb{width:100%;height:100%;display:block}
+.rthumb img{object-fit:cover;object-position:top}
+.rthumb .fb{display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:34px}
+.rmain{flex:1;min-width:0}
+.rhead{display:flex;justify-content:flex-start;gap:12px;align-items:center}
+.nm{font-size:16px;font-weight:500;color:var(--ink80)}
+.nm:hover{color:var(--indigo)}
+.nums{flex:0 0 auto;margin-left:auto;margin-right:6px;text-align:right;color:var(--ink)}
+.nums .pair{display:flex;gap:12px;justify-content:flex-end;font-size:14px;font-weight:500;font-variant-numeric:tabular-nums}
+.nums .pair span{display:inline-flex;align-items:center;gap:4px}
+.nums .pair svg{width:14px;height:14px;fill:none;stroke:var(--ink);stroke-width:1.8;opacity:.85}
+.nums .glabel{font-size:12px;color:var(--zinc70);margin-top:2px}
+.badges{display:flex;gap:12px;align-items:center;margin-top:9px;flex-wrap:nowrap;white-space:nowrap;overflow:hidden}
+.bdg{font-size:10px;font-weight:600;letter-spacing:.25px;text-transform:uppercase;color:var(--indigo)}
+.bdg.z{color:var(--zinc70)}
+.rdesc{font-size:14px;color:var(--body);margin:7px 0 0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.45}
+.rfoot{display:flex;gap:8px;align-items:center;margin-top:9px;flex-wrap:nowrap;white-space:nowrap;overflow:hidden}
+.tpill{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--body);border:1px solid var(--divider);border-radius:6px;padding:4px 8px}
+.tpill .h{color:var(--zinc70)}
+.lang{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--body)}
+.dot{width:9px;height:9px;border-radius:50%}
+.detail{border-top:1px solid var(--divider);padding:16px;display:none;background:#fcfcfd}
+.detail.open{display:block}
+.note .lead{font-size:14.5px;color:var(--ink);line-height:1.7}
+.note .lead b{color:var(--indigo);margin-right:10px}
+.analysis{margin-top:12px;display:grid;gap:10px}
+.analysis .f{font-size:13.5px;color:var(--body)}
+.analysis .f b{display:inline-block;min-width:60px;color:var(--ink);font-weight:600;margin-right:8px}
+.niche{margin-top:2px}
+.niche .tags{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+.npill{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--indigo);background:var(--indigo-soft);border-radius:6px;padding:4px 8px}
+.npill .h{opacity:.7}
+.niche .who{font-size:13px;color:var(--body)}
+.niche .who b{color:var(--ink);font-weight:600;margin-right:8px}
+.kv{display:grid;grid-template-columns:repeat(3,1fr);gap:8px 12px;margin:12px 0 0}
+.kv div{font-size:11px;color:var(--zinc70)}
+.kv b{display:block;font-size:13px;color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
+.rd{margin-top:12px;background:#fff;border:1px solid var(--divider);border-radius:6px;padding:10px 12px}
+.rd summary{cursor:pointer;color:var(--body);font-size:12px;list-style:none}
+.rd pre{margin:8px 0 0;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;color:var(--body);max-height:160px;overflow:auto;white-space:pre-wrap}
+.surgenote{margin:14px 2px 0;font-size:11.5px;color:var(--zinc70)}
+footer{max-width:var(--page-max);margin:26px auto 0;padding:0 32px;color:var(--zinc70);font-size:11.5px}
+@media (max-width:640px){
+  .row{padding:16px 12px}
+  .nums .pair span.fk{display:none}
+  .rdesc{-webkit-line-clamp:1}
+  .rthumb{flex:0 0 100%;order:3;margin-top:10px}
+  .rthumb .box{width:100%}
+  .kv{grid-template-columns:repeat(2,1fr)}
+  .pagehead h1{font-size:20px}
+}
 </style>
-</head>
+<style>
+/* Locked desktop tokens come from the confirmed 2026-09-03 specification. */
+.row:last-of-type .surgebar{display:block}
+.row:focus-visible{outline:2px solid var(--indigo);outline-offset:-2px}
+.nm{overflow-wrap:anywhere;min-width:0}
+.nums .total{font-size:12px;color:var(--zinc70);margin-top:3px}
+.badges,.rfoot{flex-wrap:wrap;white-space:normal;overflow:visible}
+.rthumb .box{position:relative}.rthumb .fb{position:absolute;inset:0}
+.rthumb img{position:absolute;inset:0}.rthumb img[hidden]{display:none}
+.detail{overflow-wrap:anywhere}.rd pre{overflow-wrap:anywhere}
+.history{width:100%;font-size:12px;border-collapse:collapse}.history td,.history th{padding:4px;text-align:left}
+.whole{margin-top:24px;color:var(--body);font-size:14px}.whole summary{cursor:pointer}
+.whole h3{color:var(--ink);font-size:16px}.whole p{overflow-wrap:anywhere}
+.whole a,.analysis a,.lead a{color:var(--indigo);text-decoration:underline}
+[hidden]{display:none!important}
+@media(min-width:641px) and (max-width:900px){.rthumb{flex-basis:230px}.rthumb .box{width:230px}.rhead{flex-wrap:wrap}.nums{margin-left:46px}}
+@media(max-width:640px){
+.topbar-in,.main{padding-left:16px;padding-right:16px}
+.row{flex-wrap:wrap;gap:10px}.rmain{flex-basis:100%;width:100%}
+.rhead{flex-wrap:wrap;gap:8px}.rk{flex-basis:24px}.nm{flex:1}
+.nums{flex-basis:100%;margin:0;text-align:left}.nums .pair{justify-content:flex-start}
+.rdesc{display:none}.rthumb{flex:0 0 100%;width:100%;margin:0}.rthumb .box{width:100%}
+.tldr{overflow-wrap:anywhere}.badges{gap:8px}.win{display:block}
+}
+</style></head>
 <body>
-<header>
-  <h1>GitHub Trending 周报</h1>
-  <select id="weekSel" aria-label="选择周"></select>
-  <span class="meta" id="genAt"></span>
-</header>
-<div class="chips" id="chips"></div>
-<div class="card analysis" id="analysis" style="display:none"></div>
-<div class="card">
-  <table>
-    <thead><tr><th>#</th><th>仓库</th><th>语言</th><th>本周 +★</th><th>总 ★</th><th>环比</th><th>状态</th><th>描述</th></tr></thead>
-    <tbody id="tbody"></tbody>
-  </table>
-</div>
-<div class="card detail" id="detail" style="display:none"></div>
-<footer>由 github-trending-weekly 技能生成 · 数据文件 data/weeks/*.json · 点击行查看详情</footer>
-
+<div class="topbar"><div class="topbar-in">
+<span class="brand"><span class="logo">T</span>GitHub Trending 周报</span>
+<label>周次 <select id="weekSel" aria-label="选择周"></select></label><span class="win" id="genAt"></span>
+</div></div>
+<main class="main">
+<div class="pagehead"><h1>Weekly trending repositories</h1>
+<p class="desc">Top 20 · GitHub 周榜 · 新晋 / 回锅徽章 · 点行看定位详解与生态位</p>
+<div class="tldr"><p class="hot" id="hot"></p><p id="intro"></p></div></div>
+<div class="stale" id="stale" hidden></div><div id="app"></div>
+<p class="surgenote">SURGE = 本周增量 ÷ 总★ ≥ 20%；×N = 与前一次上榜的周增量之比。每日在场徽章注明来源周次，不参与周榜分类。</p>
+<details class="whole" id="whole"><summary>完整周分析</summary><div id="analysis"></div></details>
+</main><footer>GitHub Trending 周报 · 点击仓库名访问源码 · 图片：README → GitHub Social Preview → 离线首字母</footer>
 <script src="data.js"></script>
 <script>
 const DATA = window.TRENDING_DATA;
-const $ = (id) => document.getElementById(id);
-const fmt = (n) => n == null ? "—" : Number(n).toLocaleString("en-US");
-let current = null, selectedRepo = null;
-
-function esc(s) { return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
-function md(src) {
-  const lines = esc(src).split(/\r?\n/); let out = "", inList = false;
-  const inline = (t) => t
-    .replace(/`([^`]+)`/g, "<code>$1</code>")
-    .replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
-    .replace(/\*([^*]+)\*/g, "<i>$1</i>")
-    .replace(/\[([^\]]+)\]\((https?:[^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
-  for (const line of lines) {
-    const h = /^(#{1,4})\s+(.*)$/.exec(line);
-    const li = /^[-*]\s+(.*)$/.exec(line);
-    if (li) { if (!inList) { out += "<ul>"; inList = true; } out += `<li>${inline(li[1])}</li>`; continue; }
-    if (inList) { out += "</ul>"; inList = false; }
-    if (h) { out += `<h3>${inline(h[2])}</h3>`; continue; }
-    if (!line.trim()) continue;
-    out += `<p>${inline(line)}</p>`;
-  }
-  if (inList) out += "</ul>";
-  return out;
+const $ = id => document.getElementById(id);
+const fmt = n => n == null ? '—' : Number(n).toLocaleString('en-US');
+const esc = s => String(s ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const safeUrl = s => {try { const u=new URL(s); return ['http:','https:'].includes(u.protocol)?u.href:''; } catch{return '';}};
+function inline(s){
+ return esc(s).replace(/\[([^\]]+)\]\((https?:[^)]+)\)/g,'<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>').replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>').replace(new RegExp(String.fromCharCode(96)+'([^'+String.fromCharCode(96)+']+)'+String.fromCharCode(96),'g'),'<code>$1</code>');
 }
-const STATUS_LABEL = { new: "新晋", recurring: "常驻", returning: "回锅" };
-
-function repoHistory(fullName) {
-  return DATA.weeks.filter(w => w.repos.some(r => r.full_name === fullName))
-    .map(w => ({ week: w.week, ...(w.repos.find(r => r.full_name === fullName)) }));
+function md(s){return s.replace(/<!--[\s\S]*?-->/g,'').split(/\r?\n/).filter(l=>l.trim()).map(l=>/^#{1,4} /.test(l)?'<h3>'+inline(l.replace(/^#{1,4} /,''))+'</h3>':'<p>'+inline(l)+'</p>').join('');}
+const velocity = r => r.stars_total > 0 ? r.stars_week / r.stars_total : 0;
+const social = r => 'https://opengraph.githubassets.com/weekly/'+r.full_name;
+const colors=['#6670cc','#7c3aed','#007f64','#286baf','#b45309'];
+function card(r,w){
+ const n=r.note;
+ const placeholder='本周尚无四字段注释；旧口径内容可在「完整周分析」阅读。';
+ const history=DATA.weeks.filter(x=>x.week<=w.week).flatMap(x=>x.repos.filter(a=>a.full_name===r.full_name).map(a=>({week:x.week,...a})));
+ return '<section class="detail" id="d-'+r.rank+'" aria-label="'+esc(r.full_name)+' 注释">'+
+ '<div class="note"><div class="lead"><b>定位</b>'+inline(n?.positioning||placeholder)+'</div></div>'+
+ '<div class="analysis"><div class="f"><b>为什么爆</b>'+inline(n?.whyNow||'待补因果证据')+'</div>'+
+ '<div class="f"><b>可信度</b>'+ (r.api_ok===false || Object.values(r.source_status||{}).includes(false)?'<strong>信源不完整。 </strong>':'')+inline(n?.trust||'尚未核验')+'</div>'+
+ '<div class="niche"><div class="tags">'+(n?.nicheTags||[]).map(t=>'<span class="npill"><span class="h">#</span>'+esc(t)+'</span>').join('')+'</div>'+
+ '<div class="who"><b>生态位</b>'+inline(n?.niche||'待补具体竞品与差异')+'</div></div></div>'+
+ '<details class="rd"><summary>元数据与上榜历史</summary><div class="kv">'+
+ Object.entries({'总★':fmt(r.stars_total),'本周 +★':fmt(r.stars_week),'forks':fmt(r.forks),'open issues':fmt(r.issues),'建仓':(r.created||r.created_at||'—').slice(0,10),'最近推送':(r.pushed||r.pushed_at||'—').slice(0,10),'license':r.license||'—','环比':fmt(r.stars_delta),'累计上榜':history.length+' 周'}).map(([k,v])=>'<div>'+esc(k)+'<b>'+esc(v)+'</b></div>').join('')+'</div>'+
+ (safeUrl(r.homepage)?'<p><a href="'+esc(safeUrl(r.homepage))+'" target="_blank" rel="noopener noreferrer">项目主页</a></p>':'')+
+ '<table class="history"><thead><tr><th>周</th><th>名次</th><th>总★</th><th>周增</th></tr></thead><tbody>'+
+ history.reverse().map(h=>'<tr><td>'+esc(h.week)+'</td><td>'+h.rank+'</td><td>'+fmt(h.stars_total)+'</td><td>'+fmt(h.stars_week)+'</td></tr>').join('')+'</tbody></table></details>'+
+ '<details class="rd"><summary>README 摘录（作者自述）</summary><pre>'+esc(r.readme??r.readme_excerpt??'（无）')+'</pre></details></section>';
 }
-
-function renderWeek() {
-  const w = DATA.weeks.find(x => x.week === current);
-  $("genAt").textContent = `数据采集 ${w.captured_at.slice(0, 10)} · 报告生成 ${DATA.generated_at.slice(0, 16).replace("T", " ")}`;
-  $("chips").innerHTML = `
-    <span class="chip new">新晋 <b>${w.counts.new || 0}</b></span>
-    <span class="chip recurring">常驻 <b>${w.counts.recurring || 0}</b></span>
-    <span class="chip returning">回锅 <b>${w.counts.returning || 0}</b></span>
-    <span class="chip">上榜 <b>${w.repos.length}</b></span>`;
-  const an = $("analysis");
-  an.style.display = w.analysis ? "" : "none";
-  an.innerHTML = w.analysis ? `<h2>本周分析</h2>${md(w.analysis)}` : "";
-  $("detail").style.display = "none"; selectedRepo = null;
-
-  $("tbody").innerHTML = w.repos.map(r => `
-    <tr class="row" data-name="${esc(r.full_name)}">
-      <td class="num">${r.rank}</td>
-      <td><a href="${esc(r.url)}" target="_blank" onclick="event.stopPropagation()">${esc(r.full_name)}</a></td>
-      <td class="lang">${esc(r.language ?? "—")}</td>
-      <td class="num up">+${fmt(r.stars_week)}</td>
-      <td class="num">${fmt(r.stars_total)}</td>
-      <td class="num">${r.stars_delta == null ? "—" : (r.stars_delta >= 0 ? "+" : "") + fmt(r.stars_delta)}</td>
-      <td>${r.entry_status ? `<span class="badge ${r.entry_status}">${STATUS_LABEL[r.entry_status]}</span>` : "—"}</td>
-      <td class="desc">${esc(r.description)}</td>
-    </tr>`).join("");
-  document.querySelectorAll("tr.row").forEach(tr =>
-    tr.addEventListener("click", () => renderDetail(tr.dataset.name)));
+function row(r,w){
+ const vel=velocity(r), surge=vel>=.2;
+ const badges=[];
+ if(r.entry_status==='new')badges.push('<span class="bdg status">New this week</span>');
+ if(r.entry_status==='returning')badges.push('<span class="bdg status">Back on trending</span>');
+ if(surge)badges.push('<span class="bdg surge">⚡ Surge · '+Math.round(vel*100)+'%/wk</span>');
+ if(r.accel)badges.push('<span class="bdg accel">×'+r.accel.ratio+' vs '+esc(r.accel.baseWeek.slice(5))+'</span>');
+ if(r.presence)badges.push('<span class="bdg z">'+esc(r.presence.week||w.week)+' · 在场 '+r.presence.days+' 天 · best #'+r.presence.best+'</span>');
+ const rank=r.rank<=3?'<span class="medal '+['g','s','b'][r.rank-1]+'">'+r.rank+'</span>':'<span class="plain">'+r.rank+'</span>';
+ return '<div class="row" role="button" tabindex="0" aria-expanded="false" aria-controls="d-'+r.rank+'" data-r="'+r.rank+'">'+
+ (surge?'<div class="surgebar" style="width:'+Math.min(100,vel*100)+'%"></div>':'')+
+ '<div class="rmain"><div class="rhead"><div class="rk">'+rank+'</div><a class="nm" href="'+esc(safeUrl(r.url))+'" target="_blank" rel="noopener noreferrer">'+esc(r.full_name)+'</a>'+
+ '<div class="nums"><div class="pair"><span class="gain">+'+fmt(r.stars_week)+' ★</span><span class="fk">⑂ '+fmt(r.forks)+'</span></div><div class="glabel">Gained this week <span class="total">· 总★ '+fmt(r.stars_total)+'</span></div></div></div>'+
+ '<p class="rdesc">'+esc(r.description)+'</p><div class="badges">'+badges.join('')+'</div>'+
+ '<div class="rfoot"><span class="lang"><span class="dot" style="background:'+colors[r.rank%colors.length]+'"></span>'+esc(r.language||'—')+'</span>'+
+ (r.topics||[]).slice(0,3).map(t=>'<span class="tpill"><span class="h">#</span>'+esc(t)+'</span>').join('')+'</div></div>'+
+ '<div class="rthumb"><div class="box"><div class="fb" style="background:'+colors[r.rank%colors.length]+'">'+esc(r.full_name.split('/')[1][0].toUpperCase())+'</div><img hidden alt="'+esc(r.full_name)+' 核心图"></div></div></div>'+card(r,w);
 }
-
-function renderDetail(fullName) {
-  const w = DATA.weeks.find(x => x.week === current);
-  const r = w.repos.find(x => x.full_name === fullName);
-  const hist = repoHistory(fullName);
-  selectedRepo = fullName;
-  document.querySelectorAll("tr.row").forEach(tr => tr.classList.toggle("sel", tr.dataset.name === fullName));
-  const d = $("detail");
-  d.style.display = "";
-  d.innerHTML = `
-    <h2>${esc(r.full_name)}</h2>
-    <div class="grid">
-      <div><span>语言</span> ${esc(r.language ?? "—")}</div>
-      <div><span>本周 +★</span> +${fmt(r.stars_week)}</div>
-      <div><span>总 ★</span> ${fmt(r.stars_total)}</div>
-      <div><span>环比</span> ${r.stars_delta == null ? "—" : (r.stars_delta >= 0 ? "+" : "") + fmt(r.stars_delta)}</div>
-      <div><span>forks</span> ${fmt(r.forks)}</div>
-      <div><span>创建</span> ${r.created_at ? r.created_at.slice(0, 10) : "—"}</div>
-      <div><span>最近推送</span> ${r.pushed_at ? r.pushed_at.slice(0, 10) : "—"}</div>
-      <div><span>累计上榜</span> ${hist.length} 周</div>
-      ${r.homepage ? `<div><span>主页</span> <a href="${esc(r.homepage)}" target="_blank">${esc(r.homepage)}</a></div>` : ""}
-    </div>
-    ${r.topics.length ? `<div class="topics">${r.topics.map(t => `<span class="topic">${esc(t)}</span>`).join("")}</div>` : ""}
-    <p style="margin-bottom:10px">${esc(r.description)}</p>
-    <table class="hist-tbl"><thead><tr><th>周</th><th>名次</th><th>总 ★</th><th>周 +★</th></tr></thead>
-      <tbody>${hist.slice().reverse().map(h => `<tr><td>${h.week}</td><td>#${h.rank}</td><td class="num">${fmt(h.stars_total)}</td><td class="num up">+${fmt(h.stars_week)}</td></tr>`).join("")}</tbody></table>
-    ${r.readme_excerpt ? `<p style="margin:12px 0 6px"><span>README 摘录</span></p><div class="readme">${esc(r.readme_excerpt)}</div>` : ""}`;
+function loadImage(img,r){
+ if(navigator.onLine===false)return;
+ let fallback=false;
+ img.addEventListener('load',()=>{img.hidden=false;img.previousElementSibling.hidden=true;});
+ img.addEventListener('error',()=>{img.hidden=true;img.previousElementSibling.hidden=false;if(!fallback){fallback=true;img.src=social(r);}});
+ const core=safeUrl(r.coreImg);
+ fallback=!core; img.src=core||social(r);
 }
-
-const sel = $("weekSel");
-sel.innerHTML = DATA.weeks.slice().reverse().map(w => `<option value="${w.week}">${w.week}${w.analysis ? "" : "（无分析）"}</option>`).join("");
-sel.addEventListener("change", () => { current = sel.value; renderWeek(); });
-current = DATA.weeks.at(-1).week; sel.value = current;
-renderWeek();
-</script>
-</body>
-</html>
+function renderWeek(){
+ const w=DATA.weeks.find(w=>w.week===$('weekSel').value);
+ if(!w)return;
+ $('genAt').textContent='采集 '+(w.captured_at||w.capturedAt||'').slice(0,10);
+ const hottest=[...w.repos].sort((a,b)=>velocity(b)-velocity(a)).slice(0,3);
+ $('hot').textContent='⚡ 本周最猛：'+hottest.map(r=>r.full_name+' +'+fmt(r.stars_week)+'（'+Math.round(velocity(r)*100)+'%/wk）').join(' · ');
+ $('intro').innerHTML=inline((w.analysis||'').replace(/<!--[\s\S]*?-->/g,'').split(/\r?\n/).find(l=>l.trim()&&!/^#|^-/.test(l))||'本周分析尚未生成；榜单数据可独立阅读。');
+ $('stale').hidden=!w.staleAt;$('stale').textContent=w.staleAt?'⚠ 分析待重跑 — '+(w.staleReason||'分类依据已变化'):'';
+ const counts={new:0,recurring:0,returning:0};w.repos.forEach(r=>{if(r.entry_status in counts)counts[r.entry_status]++;});
+ $('app').innerHTML='<div class="listwrap"><div class="listhead"><h2>This week · Top '+w.repos.length+'</h2><p>新晋 '+counts.new+' · 回锅 '+counts.returning+' · 常驻 '+counts.recurring+' · SURGE '+w.repos.filter(r=>velocity(r)>=.2).length+'</p></div>'+w.repos.map(r=>row(r,w)).join('')+'</div>';
+ document.querySelectorAll('.rthumb img').forEach((img,i)=>loadImage(img,w.repos[i]));
+ $('whole').hidden=!w.analysis;$('whole').open=false;$('analysis').innerHTML=md(w.analysis||'');
+}
+function toggle(e){
+ if(e.target.closest('a'))return;
+ const row=e.target.closest('.row');if(!row)return;
+ const open=$(row.getAttribute('aria-controls')).classList.toggle('open');row.setAttribute('aria-expanded',String(open));
+}
+$('app').addEventListener('click',toggle);
+$('app').addEventListener('keydown',e=>{if(e.target.matches('.row')&&['Enter',' '].includes(e.key)){e.preventDefault();toggle(e);}});
+if(DATA?.weeks?.length){
+ $('weekSel').innerHTML=DATA.weeks.slice().reverse().map(w=>'<option value="'+esc(w.week)+'">'+esc(w.week)+(w.analysis?'':'（无分析）')+'</option>').join('');
+ $('weekSel').addEventListener('change',renderWeek);renderWeek();
+}else{$('app').textContent='未找到周报数据，请将 data.js 与本页放在同一目录。';}
+</script></body></html>

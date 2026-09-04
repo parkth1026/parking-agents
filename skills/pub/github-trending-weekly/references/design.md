@@ -16,7 +16,7 @@
 | --- | --- | --- |
 | 数据路径是否依赖 LLM | **完全不依赖**。抓取/解析/富化/校验/报告全部是确定性脚本，LLM 只写 analysis.md 与 wiki 页 | 用户明确要求：稳定性靠脚本校验 JSON，不靠模型自觉。缺分析时报告照常生成 |
 | trending 榜单获取方式 | 直接抓 HTML（每周 1 次）+ 正则解析 | 无官方 API；请求量极小不触发限流；解析锚点（`Box-row` 区块、`/stargazers` 链接、`stars this week` 文案）在 fixtures 里固化，页面改版会被校验器立刻抓住 |
-| 仓库详情获取方式 | `gh api`（复用本机已登录凭证，5,000 次/小时配额） | 免凭证管理；每周约 40 次调用占配额 0.8% |
+| 仓库详情获取方式 | `gh api` 复用本机凭证，元数据 + README/tree/contributors/commits/releases 五信源 | 20 仓约 120 次请求，单源降级；提交为近90天最多100条样本，不声称全量 |
 | 存储 | 文件即数据库：`data/weeks/*.json`（周快照）+ `data/repos/*.json`（累计历史），git 做版本 | 周量级 20 条，SQLite 是 over-engineering |
 | JSON 校验 | 手写结构校验器（类型/格式/枚举/秩），退出码即门禁 | 引入 JSON Schema 库违反零依赖约束；校验规则就是本技能的契约 |
 | HTML 报告加载本地数据 | 生成 `data.js`（`window.TRENDING_DATA = {...}`）由 `<script>` 引入 | `file://` 下 `fetch()` 本地 JSON 被 CORS 拦截；双击即开是硬需求 |
