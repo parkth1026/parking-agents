@@ -1,0 +1,42 @@
+[
+  {
+    "Path": "D:\\GIT_dev\\parking-agents\\.aes-workflow\\grilling\\2026-09-03-trending-weekly-redesign\\2-prototype\\api-mock.md",
+    "Hash": "EBF5495BAADD9ABB71AD7DC4FCD6B60EEF51D3A75345685DEE25F9D825127A37"
+  },
+  {
+    "Path": "D:\\GIT_dev\\parking-agents\\.aes-workflow\\grilling\\2026-09-03-trending-weekly-redesign\\2-prototype\\behavior.md",
+    "Hash": "FB023CA94803EC7EA0DFB66F48EA30C2C05DF7038DB26C0C39EC0746C40A0196"
+  },
+  {
+    "Path": "D:\\GIT_dev\\parking-agents\\.aes-workflow\\grilling\\2026-09-03-trending-weekly-redesign\\2-prototype\\diagram.html",
+    "Hash": "53A73D3A7446F34CCDE956C491EC8FD9E4163459BCFA37BC7ADAC90E30FEC051"
+  },
+  {
+    "Path": "D:\\GIT_dev\\parking-agents\\.aes-workflow\\grilling\\2026-09-03-trending-weekly-redesign\\2-prototype\\example-run.md",
+    "Hash": "46C269B19D408C5654DF143812747D08F863AA1E23757962F21261DEC3129B3D"
+  },
+  {
+    "Path": "D:\\GIT_dev\\parking-agents\\.aes-workflow\\grilling\\2026-09-03-trending-weekly-redesign\\2-prototype\\impact-surface.md",
+    "Hash": "787D4F1D0D6B3537739EC5E4CC2325D548337593C5A3F5683E434E36E9F2A5AA"
+  },
+  {
+    "Path": "D:\\GIT_dev\\parking-agents\\.aes-workflow\\grilling\\2026-09-03-trending-weekly-redesign\\2-prototype\\mock.html",
+    "Hash": "B1DEE2EB30F07DD75B299A1087390EC7D2529EECEC36627FD3FF5C153FDC2A0B"
+  },
+  {
+    "Path": "D:\\GIT_dev\\parking-agents\\skills\\pub\\github-trending-weekly\\fixtures\\golden\\2026-W36.json",
+    "Hash": "FC0E03083781A422F82962C5D96107CDFA64219F36D2BE56318D1A5421904067"
+  },
+  {
+    "Path": "D:\\GIT_dev\\parking-agents\\skills\\pub\\github-trending-weekly\\fixtures\\golden\\tt-a1i__archify.history.json",
+    "Hash": "E77EBB31C5D1BA44656E336B3BAE5BE8D14F0FE13E337D1A5E2D47B6171413D3"
+  },
+  {
+    "Path": "D:\\GIT_dev\\parking-agents\\skills\\pub\\github-trending-weekly\\scripts\\serve.mjs",
+    "Hash": "39C4B32427AF30E0F9F934D96559134C66424DA0EB7F2BF512889F83FFC9CCBB"
+  },
+  {
+    "Path": "D:\\GIT_dev\\parking-agents\\skills\\pub\\github-trending-weekly\\scripts\\lib\\config.mjs",
+    "Hash": "918C7F9F0B6CCC46104FE1D0957681C8679129D24FA91C6FF99AA65E90F1BE48"
+  }
+]

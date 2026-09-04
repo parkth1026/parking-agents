@@ -1,0 +1,17 @@
+{
+  "testedAt": "2026-09-03T06:02:17.937Z",
+  "regression": "88 passed, 0 failed",
+  "browserChecks": 29,
+  "browserPass": true,
+  "lockedFiles": 10,
+  "apiSourceUnchanged": true,
+  "apiHelpersUnchanged": [
+    "listWeekFiles",
+    "weekSummary"
+  ],
+  "humanAcceptance": {
+    "AC-004-offline": "PENDING_USER",
+    "AC-007-analysis": "PENDING_USER"
+  },
+  "report": "D:/GIT_dev/github-trading/report/index.html"
+}

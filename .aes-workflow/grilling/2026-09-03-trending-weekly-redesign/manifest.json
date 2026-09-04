@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "slug": "2026-09-03-trending-weekly-redesign",
+  "created_at": "2026-09-02T17:23:16Z",
+  "updated_at": "2026-09-03T05:16:17Z",
+  "original_request": null,
+  "goal_oneline": "把 github-trending-weekly 周报页改成：三段版面（新晋高亮/回锅平铺/常驻折叠）+TLDR 头+trendshift 式行样式，注释层升级为仓库内深调研四字段（定位/为什么爆/可信度/生态位竞品），详情卡接跨周轨迹（sparkline+backfill），移动端可读降级，全程保零依赖双击可开",
+  "target": null,
+  "stage": "3-contract",
+  "next_action": "实现期：按契约 AC-001..007 交付，[A] 命令全绿后用 session.mjs verify --write 落证据",
+  "stage_gates": {
+    "1-interview": {
+      "status": "done",
+      "closed_at": "2026-09-02T17:43:48Z",
+      "self_assessment": {
+        "意图": "已定",
+        "结果": "已定",
+        "边界": "已定",
+        "约束": "已定",
+        "现状": "已定"
+      }
+    },
+    "2-prototype": {
+      "status": "done",
+      "closed_at": "2026-09-02T20:10:41Z",
+      "artifacts_confirmed": [
+        "mock",
+        "behavior",
+        "api-mock",
+        "example-run",
+        "diagram"
+      ]
+    },
+    "3-contract": {
+      "status": "done",
+      "closed_at": "2026-09-03T05:16:17Z"
+    }
+  },
+  "validation": {
+    "status": "valid",
+    "ac_count": 7,
+    "warnings": [],
+    "ran_at": "2026-09-03T05:15:46Z",
+    "verify_tiers": {
+      "A": 8,
+      "B": 0,
+      "C": 2,
+      "D": 0
+    }
+  },
+  "blocked": [],
+  "residual_risk": null,
+  "status": "ready"
+}

@@ -1,0 +1,30 @@
+# verify @ 2026-09-03T05:15:46Z
+# cwd: D:\GIT_dev\parking-agents
+
+[FAIL] AC-001  exit=1  $ node skills/pub/github-trending-weekly/scripts/assert-browser.mjs --checks layout
+         }
+         Node.js v24.14.1
+[FAIL] AC-001 [A·内嵌]  exit=1  $ node skills/pub/github-trending-weekly/scripts/assert-browser.mjs --checks tokens
+         }
+         Node.js v24.14.1
+[FAIL] AC-001 [A·内嵌]  exit=1  $ node skills/pub/github-trending-weekly/scripts/assert-browser.mjs --checks mobile
+         }
+         Node.js v24.14.1
+[PASS] AC-002  exit=0  $ node skills/pub/github-trending-weekly/run-tests.mjs
+           ok  SKILL.md 存在且声明 name
+         53 passed, 0 failed
+[PASS] AC-003  exit=0  $ node skills/pub/github-trending-weekly/run-tests.mjs
+           ok  SKILL.md 存在且声明 name
+         53 passed, 0 failed
+[PASS] AC-004  exit=0  $ node skills/pub/github-trending-weekly/run-tests.mjs
+           ok  SKILL.md 存在且声明 name
+         53 passed, 0 failed
+[FAIL] AC-005  exit=1  $ node skills/pub/github-trending-weekly/scripts/assert-browser.mjs --checks detail
+         }
+         Node.js v24.14.1
+[PASS] AC-006  exit=0  $ node skills/pub/github-trending-weekly/run-tests.mjs
+           ok  SKILL.md 存在且声明 name
+         53 passed, 0 failed
+
+绿 4 / 红 4 / 跑不起来 0
+另有 2 段非 [A] 档没跑：AC-004 [C]·内嵌、AC-007 [C]

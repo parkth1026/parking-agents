@@ -1,0 +1,104 @@
+== T1/AC-1 fetch-trending 离线解析真实 fixture ==
+  ok  exit 0
+  ok  20 条记录
+  ok  第 1 名 tt-a1i/archify 周增 22095 总 41614
+  ok  rank 1..20 连续
+  ok  HTML entity 解码（&amp; → &）
+  ok  无 language 仓库为 null
+== T2/AC-2 页面结构异常必须拒绝 ==
+  ok  条数 19≠20 → exit 1 且 stderr 指明
+  ok  条数异常时不写数据文件
+  ok  总星数非数字 → exit 1
+  ok  repo 全名不合法 → exit 1
+== T3/AC-3 enrich-repos --stub 离线回放 ==
+  ok  exit 0（缺响应容错不失败）
+  ok  archify 合并 topics/stars_api/readme
+  ok  googletest 富化成功
+  ok  stub 无响应 → api_ok:false 且标记原因
+  ok  miss 仓库不残留 readme
+  ok  enrich 后仍过校验器
+== T4/AC-4 update-history 分类/环比/幂等 ==
+  ok  update-history 2026-W34 exit 0
+  ok  update-history 2026-W35 exit 0
+  ok  update-history 2026-W36 exit 0
+  ok  alpha/demo 上过 W34 未上周榜 → returning，环比 +50
+  ok  beta/tool 上周在榜 → recurring，环比 +20
+  ok  delta/new 首次入榜 → new 且无环比字段
+  ok  beta/tool 历史 3 条快照（W34..W36）
+  ok  重跑幂等：快照不重复
+== T5/AC-5 validate-week 门禁 ==
+  ok  合法数据 --full 全过
+  ok  full_name 非法 → exit 1 指认字段
+  ok  stars_total 字符串 → exit 1 指认字段
+  ok  缺 entry_status：基础模式过、--full 拒绝并点名
+== T6/AC-6,AC-7 build-report 产物 ==
+  ok  exit 0
+  ok  包含全部 3 个历史周
+  ok  W36 分析已内联
+  ok  AC-7 无分析周 analysis 为 null 且报告照常生成
+  ok  readme 截断上限生效
+  ok  index.html 存在且引用 data.js
+== T8/AC-9 serve.mjs 本地后端（loopback，离线） ==
+  ok  GET / 返回 viewer（引用 data.js）
+  ok  GET /data.js 动态载荷 3 周
+  ok  GET /api/weeks 摘要含 top1 与分析标记
+  ok  GET /api/weeks/:id 完整快照
+  ok  GET /api/weeks/:id/analysis 返回 markdown
+  ok  GET /api/repos 历史摘要
+  ok  GET /api/repos/:name 单仓库历史
+  ok  GET /api/latest 最近一周
+  ok  未知周 404 JSON
+  ok  未知路由 404 且列出路由表
+  ok  路径注入被拒（不匹配即 404）
+== T9/AC-10 配置解析链（SKILL_ENV 隔离，不依赖本机真实配置） ==
+  ok  SKILL_ENV 指向文件：无 --workspace 时周快照落配置目录
+  ok  CLI --workspace 覆盖配置层
+  ok  配置缺 workspace → exit 1 且打配置引导，不落回当前目录
+  ok  SKILL_ENV 指向目录：读 <目录>/github-trending-weekly.json
+== T10/AC-2 扩展 行数≥20 截断与回填元数据 ==
+  ok  21 块 → 取前 20，exit 0
+  ok  --source/--captured-at 回填元数据透传
+  ok  --source 非法值 → exit 1
+  ok  黄金尺子 hash 2026-W36.json
+  ok  黄金尺子 hash 2026-W36.analysis.md
+  ok  黄金尺子 hash tt-a1i__archify.history.json
+== T11/AC-002 SURGE 黄金快照 ==
+  ok  恰 5 仓 ≥20%（黄金数据不重算/不修饰）
+  ok  archify ×21.7 vs W28（周增而非总星）
+  ok  不足两快照无 accel
+  ok  TLDR 最猛前三按 velocity
+== T12/AC-003 载荷契约 + AC-004 图片 ==
+  ok  20 仓四字段完整抽取且标签受控
+  ok  新增 readme 上限 2400 且旧字段保留
+  ok  字段映射/analysis 整篇内联
+  ok  核心图跳过徽章，解析相对路径
+  ok  无 README 图不写 coreImg
+  ok  访问计数器与吉祥物不充当核心图
+  ok  GitHub attachment 保持原地址
+  ok  图优先级、HTML entity 与相对地址
+  ok  注释/code/logo/shields/危险协议不作为核心图
+  ok  旧周无新注释/无过期误报、整篇旧分析保留
+  ok  未知 tag 拒绝结构化注释
+  ok  readme-cap 超上限夹到2400
+  ok  presence 有则透传且旧周不借未来数据
+== T13/AC-006 stale 咬合 + 历史时序 ==
+  ok  重分类写 staleAt/staleReason，旧分析 hash 固定
+  ok  build-report stale 透传
+  ok  同分析重跑不解除 stale
+  ok  只改文字不清除过期标记
+  ok  重写且分类吻合即解除 viewer 黄条
+  ok  update-history 清除已刷新 stale 元数据
+  ok  回填旧周不拿未来分类/环比
+  ok  回跑旧周保留 last_seen_week
+== T14/AC-006 enrich 五信源 ==
+  ok  5 标记齐全
+  ok  tree/contrib/commit/release 结构正确
+  ok  单信源403不整仓失败
+  ok  缺元数据仓保持 api_ok:false
+  ok  五信源产物过校验
+  ok  新可选字段出现即校验
+  ok  正常重建成功且没有新增应用依赖
+== T7/AC-8 SKILL.md 声明完整 ==
+  ok  SKILL.md 存在且声明 name
+
+88 passed, 0 failed
