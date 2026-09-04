@@ -156,7 +156,7 @@ node .agents/skills/aes-worktree-board/scripts/master.mjs status
 
 | outcome | 什么时候 | 必带 |
 | --- | --- | --- |
-| `READY_TO_MERGE` | 全部 AC、循环轮、最终轮通过 | `contractDigest` / `baseCommit` / `candidateCommit` / `acceptance[]` |
+| `READY_TO_MERGE` | 全部 AC、循环轮、最终轮通过 | `contractDigest` / `baseCommit` / `candidateCommit` / `acceptance[]` / `contractExternal[]`（无契约外行为时为空数组） |
 | `BUDGET_EXHAUSTED` | 某本预算耗尽 | `budget{kind,limit,used}` / `remainingBlockers` / `recommendedMasterActions` |
 | `BLOCKED_DEPENDENCY` | 需要另一个 Issue 先落地 | 已回流的 `DISCOVERED_WORK` |
 | `CONTRACT_CONFLICT` | AC 自相矛盾或需要改目标 | `humanRequest` |
@@ -165,6 +165,17 @@ node .agents/skills/aes-worktree-board/scripts/master.mjs status
 
 `READY_TO_MERGE` **不等于已合并**。aes-merge-worker 会 fresh 重验 slot / commit /
 integration / AC / review / QA，再按 effectiveRisk 分档决定是否合并。
+
+### 契约外行为清单（规则 A，2026-09-04 owner 裁决）
+
+实现超出契约文本的行为（同一不变量在契约未点名的实例上完备化）不算越线、不占
+提问轮，但**披露是硬要求**：READY 回执与票面终局里必须单列「契约外行为清单」，
+每条写清三点——做了什么行为、挂在哪条 AC/强约束的不变量下、由哪个测试锁定。
+未列出的契约外行为被 merge review 的 Spec 轴（以契约为尺子逐项 diff）抓到时，
+按 spec finding 处理：must-fix 打回，或 owner 裁决后补进契约归档。先例：
+#104（INTERNAL_ERROR+operation 扩到 open/recover/status/heartbeat 路径）、
+#158（队列报文 createdAt 对齐 AES admission 语义），归档见两票 contract.md 的
+「实现扩面与 merge 裁决记录」节。
 
 三个人工态终点必须带完整 `humanRequest{kind, prompt, requiredEvidence, resumeToken}`。
 缺 `resumeToken` 的报文会被 schema 拒收且状态不推进——这是恢复能力的锚点，
