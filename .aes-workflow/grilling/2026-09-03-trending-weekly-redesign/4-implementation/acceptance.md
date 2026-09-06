@@ -48,3 +48,15 @@
 3. 可信度与具体竞品差异是否足以支持你决定投入时间，而非重复作者宣传？
 
 此外请断网双击实际report/index.html确认图片色块、周切换和展开；通过后才可将AC-004(C)与AC-007及整体视觉记为用户验收通过、完成Goal。
+
+## 2026-09-07 复验
+
+交付后次日全量复跑，状态未漂移：
+
+- `run-tests.mjs`：88 passed, 0 failed（含 T11–T14）。
+- `assert-browser.mjs` layout/tokens/detail/mobile 四项：fixtures 与真实 report（`--workspace D:\GIT_dev\github-trading`，file:// + 离线上下文）双路全部退出码 0；layout 证据含 20 行单列、1152 居中、20 个离线首字母、20% 闭边界、三级图片回落、零 console 错误。
+- 强约束复核：locked-hashes.json 全部 10 文件 SHA256 吻合；golden sha256.json 三件锁吻合；run-tests.mjs 相对 4deb160 仅 2 行新增（T1–T10 零删改）；viewer.html `--page-max:1152px`、`vel>=.2`、`<script src="data.js">` 均在位；serve.mjs/config.mjs 字节不变。
+- AC-002 数值直验：黄金快照恰 5 仓 vel≥20%（archify 53.1%、claude-plugins-community 58.7%、cursor/plugins 22.7%、awesome-gpt-image-2 43.5%、maka 38.4%）；archify 周增比 22095/1019=21.7（基线 2026-W28，周增而非总星）。
+- AC-007 预检：通读 W36 全 20 仓分析，定位均为 2–4 句含领域×解决什么×核心入口，为什么爆均为因果叙事并明示推断边界、未复述行内星数，生态位均含具体竞品名（Mermaid/LiteLLM/v0/Catch2/Mem0 等），nicheTags 均为受控小写连字符数组。口径符合 analysis-guide；最终定夺仍归用户（C 档）。
+
+仍待用户的两项 C 档动作不变：断网物理双击 report/index.html；读当期 analysis.md 定内容质量。
