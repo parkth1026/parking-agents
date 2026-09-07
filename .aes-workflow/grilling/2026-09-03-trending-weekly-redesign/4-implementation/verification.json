@@ -10,10 +10,11 @@
     "weekSummary"
   ],
   "humanAcceptance": {
-    "AC-004-offline": "PENDING_USER",
-    "AC-007-analysis": "PENDING_USER"
+    "AC-004-offline": "PASS 2026-09-07 用户断网双击 report/index.html：首字母色块 20/20、Console 零报错、周切换与行展开正常",
+    "AC-007-analysis": "PASS 2026-09-07 用户通读 W36 全 20 仓四字段：定位/为什么爆/可信度与竞品差异三条标准均符合"
   },
   "report": "D:/GIT_dev/github-trading/report/index.html",
   "reverifiedAt": "2026-09-07",
-  "reverification": "88 passed 0 failed; browser layout/tokens/detail/mobile exit 0 on fixtures and real report (file:// offline); locked files SHA256 unchanged; T1-T10 additive-only diff vs 4deb160; golden 5-surge + archify x21.7 verified"
+  "reverification": "88 passed 0 failed; browser layout/tokens/detail/mobile exit 0 on fixtures and real report (file:// offline); locked files SHA256 unchanged; T1-T10 additive-only diff vs 4deb160; golden 5-surge + archify x21.7 verified",
+  "closedAt": "2026-09-07"
 }

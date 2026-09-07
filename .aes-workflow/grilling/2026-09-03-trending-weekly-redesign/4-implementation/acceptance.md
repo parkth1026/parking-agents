@@ -1,6 +1,6 @@
 # 实施与验收记录
 
-状态：实现完成；自动验收全部通过；人工验收待用户。Goal 尚未完成。
+状态：完成。自动验收与强约束复验通过（2026-09-07），两项 C 档用户验收已由用户本人确认通过（2026-09-07），Goal 关闭。
 
 实际产品：`D:/GIT_dev/github-trading/report/index.html`（同目录 data.js）。预览服务：`http://127.0.0.1:51975/`。首份分析：`D:/GIT_dev/github-trading/data/weeks/2026-W36.analysis.md`，覆盖全部20仓。修改前的 W36 JSON、分析与报告备份在本目录 `before-live/`。
 
@@ -60,3 +60,10 @@
 - AC-007 预检：通读 W36 全 20 仓分析，定位均为 2–4 句含领域×解决什么×核心入口，为什么爆均为因果叙事并明示推断边界、未复述行内星数，生态位均含具体竞品名（Mermaid/LiteLLM/v0/Catch2/Mem0 等），nicheTags 均为受控小写连字符数组。口径符合 analysis-guide；最终定夺仍归用户（C 档）。
 
 仍待用户的两项 C 档动作不变：断网物理双击 report/index.html；读当期 analysis.md 定内容质量。
+
+## 2026-09-07 用户 C 档验收
+
+- AC-004 (C)：用户断网双击 `report/index.html`——首字母色块 20/20、Console 零报错、周切换（含 2026-W28 旧周）与行展开/收起正常。**PASS**。
+- AC-007 (C)：用户通读 `data/weeks/2026-W36.analysis.md` 全 20 仓四字段——定位明确领域/问题/入口、为什么爆因果可核查且推断有标注、可信度与竞品差异支撑投入决策，三条标准均符合。**PASS**。
+
+至此「验收条件」节 AC-001~AC-007 全部 Verify 通过、「强约束」节 1~7 全部保持，Goal 关闭（verification.json `closedAt: 2026-09-07`）。
