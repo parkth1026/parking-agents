@@ -2,7 +2,7 @@
 // preflight.mjs — 只读核验：判断一个独立 clone 能否安全转换为当前仓库的 worktree
 // 全程零写入、零网络副作用（ls-remote 是只读查询）；结果以 JSON 打印，退出码 0=可转 / 1=不可转。
 // 用法: node preflight.mjs --target <clone路径> [--main <主仓路径，缺省=当前目录所在仓]
-import { existsSync, statSync } from "node:fs";
+import { existsSync, statSync, realpathSync } from "node:fs";
 import path from "node:path";
 import { git, gitOk, parseArgs, samePath, toPosix } from "./lib/core.mjs";
 
@@ -198,7 +198,9 @@ export function runPreflight(targetArg, mainArg) {
 
 // ---- CLI（仅在作为主模块执行时运行；被 convert.mjs import 时不触发） ----
 import { pathToFileURL } from "node:url";
-if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
+// Windows junction/symlink：import.meta.url 是真实路径，pathToFileURL(argv[1]) 保留链接路径，
+// 直接字符串比较会静默失效（CLI 无输出）。先 realpath 再比。
+if (import.meta.url === pathToFileURL(realpathSync(process.argv[1] || "")).href) {
   const args = parseArgs(process.argv.slice(2));
   const result = runPreflight(args.target, args.main);
   console.log(JSON.stringify(result, null, 2));
