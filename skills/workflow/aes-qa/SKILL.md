@@ -102,6 +102,42 @@ candidate 前进后必须重跑，不能拿旧结论顶。
 环境污染与真实缺陷烧的是不同预算，混为一谈会让 owner 在还没修到点子上时
 就先耗尽修复机会。
 
+## repository gate level：`aes.qa.receipt/v3`
+
+需要声明仓库门强度的最终轮使用 v3（标准所有权在 aes-gate 的 `AES-QG/1`，规范见
+`../aes-gate/references/aes-qg.md`）。v3 = v2 全部义务（`baseCommit` 强制）＋ repository
+gate 原子引用：
+
+```json
+{
+  "schemaVersion": "aes.qa.receipt/v3",
+  "jobId": "job-58", "attemptId": "attempt-2",
+  "commitSha": "7d9c0b4…", "baseCommit": "211aa90…",
+  "requiredRepositoryGate": "AES-QG-L3",
+  "repositoryGate": {
+    "standardVersion": "AES-QG/1",
+    "achievedLevel": "AES-QG-L3",
+    "gateReceiptDigest": "sha256:<GateReceipt canonical JSON 的 sha256>",
+    "candidateCommitSha": "7d9c0b4…",
+    "outcome": "PASS"
+  },
+  "checks": [ { "id": "QA-1", "kind": "automated", "outcome": "PASS", "command": "./run gate.l3" } ],
+  "unexecuted": [], "outcome": "PASS"
+}
+```
+
+- `repositoryGate` 必须原子引用**同一 candidate** 的 `aes.gate.receipt/v1`：digest 取引擎
+  canonical JSON 的 sha256（跑 `node ../aes-gate/scripts/aes-qg.mjs --repo <repo> gate.l3`
+  拿 receipt，不手抄等级结论）。缺级、旧证据、NOT_RUN、裸 `Lx`、candidate 不符，
+  GATE-qa 一律 fail closed。
+- `requiredRepositoryGate="none"` 只用于 tracker-only 工作：`trackerOnly:true` +
+  `repositoryGateReason`（记录用途，不是绕过）+ candidate 无 product bytes 变化；GATE-qa
+  按默认拒绝的 tracker-only 路径白名单机械复核，不得伪造 L0 PASS。
+- v1/v2 历史语义永久冻结：无 repository gate 义务，GATE-qa 豁免该子门；v3 缺字段
+  fail closed，不降级成旧 receipt 处理。
+- 等级与发布资格正交：`AES-QG L5 PASS` 不等于 release-qualified，正交证据另由
+  release profile 裁决。
+
 ## 需要人的时候
 
 ```json

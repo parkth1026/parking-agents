@@ -1,0 +1,27 @@
+# 旧仓 fixture：AES-QG 确认前的 legacy 注册形态（迁移测试的可重放输入，勿改——字节即证据）
+[project]
+id = "legacy/fixture-repo"
+
+[[actions]]
+id = "test.regression"
+name = "Legacy regression"
+kind = "test"
+run = ["node", "-e", "process.exit(0)"]
+
+[[actions]]
+id = "gate"
+name = "Legacy bare gate"
+kind = "gate"
+run = ["node", "-e", "process.exit(0)"]
+
+[[actions]]
+id = "gate.e2e"
+name = "Legacy e2e"
+kind = "gate"
+run = ["node", "-e", "process.exit(0)"]
+
+[[actions]]
+id = "gate.unit"
+name = "Legacy unit"
+kind = "gate"
+run = ["node", "-e", "process.exit(0)"]

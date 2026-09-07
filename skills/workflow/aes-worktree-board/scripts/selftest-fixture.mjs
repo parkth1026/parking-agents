@@ -5,7 +5,7 @@
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { HEADLESS_CHILD_OPTIONS } from './headless.mjs';
 
 export function git(cwd, args, { allowFailure = false } = {}) {
@@ -34,9 +34,15 @@ function initRepo(path, branch) {
 
 // workers: [{ id, dirty?, foreignRepo?, behind? }]
 export function makeFixture(label, { workers = [{ id: 'worker-1' }], integrationBranch = 'dev', issueRepo = 'owner/repo' } = {}) {
-  const root = mkdtempSync(join(tmpdir(), `aes-v4-${label}-`));
-  const repoRoot = join(root, 'main');
-  const baseline = initRepo(repoRoot, integrationBranch);
+  const rawRoot = mkdtempSync(join(tmpdir(), `aes-v4-${label}-`));
+  initRepo(join(rawRoot, 'main'), integrationBranch);
+  // Windows 8.3 短名（如 TMP=C:\Users\ADMINI~1\...）下，Node resolve 保留短名而 git
+  // 输出实名，runner-slots 的 repo identity 比较会把同一目录误判成 CONFIG_DRIFT。
+  // 以 git 自己的 canonical 形式统一 root/repoRoot 字符串；物理目录不变。
+  const canonical = gitOut(join(rawRoot, 'main'), ['rev-parse', '--show-toplevel']);
+  const repoRoot = canonical ? resolve(canonical) : join(rawRoot, 'main');
+  const root = dirname(repoRoot);
+  const baseline = gitOut(repoRoot, ['rev-parse', 'HEAD']);
   // 三段构造，顺序有意义：先把所有 worktree 建成 clean 且同步，再制造「落后」，
   // 最后才写 dirty 文件 —— 否则推进 integration 会把所有 slot 一起变成落后，
   // 而重新同步又会抹掉本该保留的 dirty 现场。
@@ -90,9 +96,10 @@ export function makeFixture(label, { workers = [{ id: 'worker-1' }], integration
   };
 }
 
-// 在 worker worktree 上造一个真实 candidate commit。
+// 在 worker worktree 上造一个真实 candidate commit（支持嵌套路径，如 src/app.mjs）。
 export function makeCandidate(fixture, slotId, { file = 'feature.txt', content = 'candidate\n', message = 'candidate work' } = {}) {
   const path = fixture.worktreeOf(slotId);
+  mkdirSync(dirname(join(path, file)), { recursive: true });
   writeFileSync(join(path, file), content);
   git(path, ['add', '.']);
   git(path, ['commit', '-m', message]);

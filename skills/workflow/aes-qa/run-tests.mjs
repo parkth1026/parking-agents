@@ -5,15 +5,33 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const CONTRACT = 'screenshot-evidence';
-const CASES = new Map([
-  ['terminal-boundary', 'terminal-boundary.contract.mjs'],
-  ['claim-gate', 'claim-gate.contract.mjs'],
-  ['preflight-bounds', 'preflight-bounds.contract.mjs'],
-  ['recovery-cost-pilot', 'recovery-cost-pilot.contract.mjs'],
-  ['live-u2-strict', 'live-u2-strict.contract.mjs'],
-]);
-const DEFAULT_CASES = [...CASES.keys()].filter((name) => name !== 'live-u2-strict');
+
+// 合同注册表：新增合同走这里，保持统一的 usage/JSON 语义。
+// - screenshot-evidence：截图证据协议契约（live-u2-strict 默认排除，需显式点名）。
+// - repository-gate-level：AES-QG repository gate 同一证据合同（生成= aes-gate 引擎，
+//   消费= aes-worktree-board GATE-qa level 子门；缺同伴技能时如实 SKIPPED）。
+const CONTRACTS = {
+  'screenshot-evidence': {
+    resultSchema: 'aes.screenshot-evidence-contract-result/v1',
+    suiteSchema: 'aes.screenshot-evidence-contract-suite-result/v1',
+    cases: new Map([
+      ['terminal-boundary', 'terminal-boundary.contract.mjs'],
+      ['claim-gate', 'claim-gate.contract.mjs'],
+      ['preflight-bounds', 'preflight-bounds.contract.mjs'],
+      ['recovery-cost-pilot', 'recovery-cost-pilot.contract.mjs'],
+      ['live-u2-strict', 'live-u2-strict.contract.mjs'],
+    ]),
+    defaultCases: ['terminal-boundary', 'claim-gate', 'preflight-bounds', 'recovery-cost-pilot'],
+  },
+  'repository-gate-level': {
+    resultSchema: 'aes.repository-gate-level-contract-result/v1',
+    suiteSchema: 'aes.repository-gate-level-contract-suite-result/v1',
+    cases: new Map([
+      ['generation-and-consumption', 'repository-gate.contract.mjs'],
+    ]),
+    defaultCases: ['generation-and-consumption'],
+  },
+};
 
 function parseArgs(argv) {
   const values = {};
@@ -34,24 +52,26 @@ function parseArgs(argv) {
 
 function emit(payload, json) {
   if (json) process.stdout.write(`${JSON.stringify(payload)}\n`);
-  else process.stdout.write(`${payload.outcome} ${payload.case}: ${payload.passed}/${payload.total} assertions passed\n`);
+  else process.stdout.write(`${payload.outcome} ${payload.case ?? payload.contract}: ${payload.passed ?? 0}/${payload.total ?? 0} assertions passed\n`);
 }
 
 let args;
 try {
   args = parseArgs(process.argv.slice(2));
 } catch (error) {
-  emit({ schema: 'aes.screenshot-evidence-contract-result/v1', outcome: 'USAGE_ERROR', error: error.message }, true);
+  emit({ schema: 'aes.qa-contract-result/v1', outcome: 'USAGE_ERROR', error: error.message }, true);
   process.exit(64);
 }
 
-if (args.contract !== CONTRACT || (args.case !== undefined && !CASES.has(args.case))) {
+const contractName = args.contract ?? 'screenshot-evidence';
+const contract = CONTRACTS[contractName];
+if (!contract || (args.case !== undefined && !contract.cases.has(args.case))) {
   emit({
-    schema: 'aes.screenshot-evidence-contract-result/v1',
-    contract: args.contract ?? null,
+    schema: `${contract?.resultSchema ?? 'aes.qa-contract-result/v1'}`,
+    contract: contractName,
     case: args.case ?? null,
     outcome: 'USAGE_ERROR',
-    error: args.contract !== CONTRACT ? 'unsupported contract' : 'unsupported case',
+    error: !contract ? `unsupported contract; available: ${Object.keys(CONTRACTS).join('|')}` : 'unsupported case',
   }, args.json);
   process.exit(64);
 }
@@ -62,7 +82,7 @@ for (const [key, value] of Object.entries(args)) {
   forwarded.push(`--${key}`, value);
 }
 function runCase(name) {
-  const result = spawnSync(process.execPath, [join(HERE, 'scripts', 'tests', CASES.get(name)), ...forwarded], {
+  const result = spawnSync(process.execPath, [join(HERE, 'scripts', 'tests', contract.cases.get(name)), ...forwarded], {
     cwd: HERE, encoding: 'utf8', stdio: 'pipe', windowsHide: true,
   });
   try {
@@ -72,7 +92,7 @@ function runCase(name) {
     return {
       result,
       payload: {
-        schema: 'aes.screenshot-evidence-contract-result/v1', contract: CONTRACT, case: name,
+        schema: contract.resultSchema, contract: contractName, case: name,
         outcome: 'FAIL', passed: 0, total: 1,
         failures: [{ name: 'contract process returned JSON', detail: (result.stderr || result.stdout || '').trim() }],
       },
@@ -86,9 +106,9 @@ if (args.case) {
   process.exit(result.status === 0 && payload.outcome === 'PASS' ? 0 : 1);
 }
 
-const results = DEFAULT_CASES.map((name) => runCase(name));
+const results = contract.defaultCases.map((name) => runCase(name));
 const payload = {
-  schema: 'aes.screenshot-evidence-contract-suite-result/v1', contract: CONTRACT,
+  schema: contract.suiteSchema, contract: contractName,
   outcome: results.every(({ result, payload: item }) => result.status === 0 && item.outcome === 'PASS') ? 'PASS' : 'FAIL',
   passed: results.reduce((sum, entry) => sum + (entry.payload.passed || 0), 0),
   total: results.reduce((sum, entry) => sum + (entry.payload.total || 0), 0),

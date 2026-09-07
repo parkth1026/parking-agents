@@ -48,10 +48,13 @@ export const STAGE_RESULT_SCHEMA_V1 = 'aes.issue-worker.stage-result/v1';
 export const STAGE_RESULT_SCHEMA_V2 = 'aes.issue-worker.stage-result/v2';
 export const QA_RECEIPT_SCHEMA_V1 = 'aes.qa.receipt/v1';
 export const QA_RECEIPT_SCHEMA_V2 = 'aes.qa.receipt/v2';
+// v3：新增 repository gate level 义务（requiredRepositoryGate/repositoryGate 原子引用
+// GateReceipt，AES-QG/1）。v1/v2 历史语义永久冻结；v3 缺字段不降级成旧 receipt 处理。
+export const QA_RECEIPT_SCHEMA_V3 = 'aes.qa.receipt/v3';
 export const REVIEW_RETURN_SCHEMA = 'aes.issue-worker.review-return/v1';
 export const REVIEWER_INDEPENDENCE_VALUES = Object.freeze(['same-session', 'independent', 'unknown']);
 const ACCEPTED_STAGE_RESULT_SCHEMAS = Object.freeze([STAGE_RESULT_SCHEMA_V1, STAGE_RESULT_SCHEMA_V2]);
-const ACCEPTED_QA_RECEIPT_SCHEMAS = Object.freeze([QA_RECEIPT_SCHEMA_V1, QA_RECEIPT_SCHEMA_V2]);
+const ACCEPTED_QA_RECEIPT_SCHEMAS = Object.freeze([QA_RECEIPT_SCHEMA_V1, QA_RECEIPT_SCHEMA_V2, QA_RECEIPT_SCHEMA_V3]);
 
 function git(cwd, args) {
   return spawnSync('git', args, { ...HEADLESS_CHILD_OPTIONS, cwd, encoding: 'utf8' });
@@ -781,11 +784,12 @@ export function recordStageResult(options = {}) {
   }
   const { dir } = ctx(options);
   const payload = options.payload;
-  // qa 与 review 各自的 v1/v2 接受集：review v2 起同时强制 baseCommit（AC-007）与
-  // reviewerSessionId（#65）；qa v2 只强制 baseCommit（reviewerSessionId 不适用于 qa）。
+  // qa 与 review 各自的 v1→v3 接受集：review v2 起强制 baseCommit（AC-007）与
+  // reviewerSessionId（#65）；qa v2 起强制 baseCommit，v3 再加 repository gate 义务
+  // （GATE-qa 的 level 子门消费；recordStageResult 只做 schema/绑定面校验）。
   const isQa = options.stage === 'qa';
   const accepted = isQa ? ACCEPTED_QA_RECEIPT_SCHEMAS : ACCEPTED_STAGE_RESULT_SCHEMAS;
-  const latest = isQa ? QA_RECEIPT_SCHEMA_V2 : STAGE_RESULT_SCHEMA_V2;
+  const latest = isQa ? QA_RECEIPT_SCHEMA_V3 : STAGE_RESULT_SCHEMA_V2;
   return updateV4Registry(dir, (registry) => {
     const attempt = currentAttempt(registry, options.jobId);
     if (!attempt) throw storeError('NO_CURRENT_ATTEMPT', `job ${options.jobId} 无当前 attempt`, { jobId: options.jobId });
@@ -844,9 +848,13 @@ export function recordStageResult(options = {}) {
         expectedCommit: attempt.candidateCommit, actualCommit: payload.commitSha || null, pending: true,
       };
     }
-    // 证据必须记录取证时的 base commit（AC-1）。只有 v2 承诺了这个字段——v1 语义保持
-    // 原样，不对 v1 报文强制 baseCommit（向下兼容；历史 trajectory replay 依赖这条）。
-    if (payload.schemaVersion === latest && !payload.baseCommit) {
+    // 证据必须记录取证时的 base commit（AC-1）。qa 的 v2 与 v3、review 的 v2 都承诺了
+    // 这个字段——v1 语义保持原样，不对 v1 报文强制 baseCommit（向下兼容；历史
+    // trajectory replay 依赖这条）。缺 baseCommit 的 v3 不降级成旧 receipt 处理。
+    const requiresBaseCommit = isQa
+      ? payload.schemaVersion !== QA_RECEIPT_SCHEMA_V1
+      : payload.schemaVersion === STAGE_RESULT_SCHEMA_V2;
+    if (requiresBaseCommit && !payload.baseCommit) {
       return {
         ok: false, code: 'MISSING_BASE_COMMIT', stage: options.stage,
         jobId: options.jobId, consumed: false, pending: true,
@@ -1141,6 +1149,7 @@ export function evaluateGate(options = {}) {
     candidateCommit: attempt?.candidateCommit || null,
     baseCommit: job.baseCommit || null,
     integrationHead,
+    changedPaths,
   });
 
   const decision = decideMerge({ mechanical, policy, humanApproval: job.humanGateApproval || null });

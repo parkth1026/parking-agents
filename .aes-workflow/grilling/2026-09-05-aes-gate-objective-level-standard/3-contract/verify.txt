@@ -1,0 +1,10 @@
+# verify @ 2026-09-04T20:21:53Z
+# cwd: D:\GIT\parking-agents
+
+[FAIL] AC-001  exit=1  $ node -e "const{spawnSync}=require('node:child_process');const r=spawnSync(process.execPath,['skills/workflow/aes-gate/run-tests.mjs','--contract','aes-qg','--case','level-classification','--json'],{encoding:'utf8'});let p;try{p=JSON.parse(r.stdout)}catch{}process.exit(r.status===0&&p&&p.outcome==='PASS'&&p.case==='level-classification'?0:1)"
+[FAIL] AC-002  exit=1  $ node -e "const{spawnSync}=require('node:child_process');const r=spawnSync(process.execPath,['skills/workflow/aes-gate/run-tests.mjs','--contract','aes-qg','--case','policy-execution','--json'],{encoding:'utf8'});let p;try{p=JSON.parse(r.stdout)}catch{}process.exit(r.status===0&&p&&p.outcome==='PASS'&&p.case==='policy-execution'?0:1)"
+[FAIL] AC-003  exit=1  $ node -e "const{spawnSync}=require('node:child_process');const r=spawnSync(process.execPath,['skills/workflow/aes-gate/run-tests.mjs','--contract','aes-qg','--case','receipt-identity-board','--json'],{encoding:'utf8'});let p;try{p=JSON.parse(r.stdout)}catch{}process.exit(r.status===0&&p&&p.outcome==='PASS'&&p.case==='receipt-identity-board'?0:1)"
+[FAIL] AC-004  exit=1  $ node -e "const{spawnSync}=require('node:child_process');const q=spawnSync(process.execPath,['skills/workflow/aes-qa/run-tests.mjs','--contract','repository-gate-level','--json'],{encoding:'utf8'});let p;try{p=JSON.parse(q.stdout)}catch{}const g=spawnSync(process.execPath,['skills/workflow/aes-worktree-board/scripts/selftest.mjs','orchestration','--scenario','repository-gate-level'],{encoding:'utf8'});process.exit(q.status===0&&p&&p.outcome==='PASS'&&p.contract==='repository-gate-level'&&g.status===0&&(g.stdout||'').includes('repository-gate-level')?0:1)"
+[FAIL] AC-005  exit=1  $ node -e "const{spawnSync}=require('node:child_process');const r=spawnSync(process.execPath,['skills/workflow/aes-gate/run-tests.mjs','--contract','aes-qg','--case','legacy-migration','--json'],{encoding:'utf8'});let p;try{p=JSON.parse(r.stdout)}catch{}process.exit(r.status===0&&p&&p.outcome==='PASS'&&p.case==='legacy-migration'?0:1)"
+
+绿 0 / 红 5 / 跑不起来 0

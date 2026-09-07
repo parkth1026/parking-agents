@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "slug": "2026-09-05-aes-gate-objective-level-standard",
+  "created_at": "2026-09-04T17:56:44Z",
+  "updated_at": "2026-09-04T20:22:07Z",
+  "original_request": "我认为 L几应该是客观的标准，而不是排序。以后所有仓库都是统一的，应该写进 aes-gate 标准。以后提到任何一个 L 都知道是什么强度，有共识。请结合软件工程最佳实践设计这个模式，并作为 aes-gate 技能标准。请先深度调研与思考，然后开始 workflow-interview。",
+  "goal_oneline": "建立跨仓统一、可机械审计且与正交风险证据解耦的 AES-QG L0-L5 assurance 标准，并接入 aes-gate/aes-qa/GATE-qa。",
+  "target": null,
+  "stage": "3-contract",
+  "next_action": "将 contract.md 交给执行 Agent：实现 AES-QG 标准，直到 5 条 [A] Verify 全绿且强约束保持。",
+  "stage_gates": {
+    "1-interview": {
+      "status": "done",
+      "closed_at": "2026-09-04T18:38:46Z",
+      "self_assessment": {
+        "意图": "已定",
+        "结果": "已定",
+        "边界": "已定",
+        "约束": "已定",
+        "现状": "已定"
+      }
+    },
+    "2-prototype": {
+      "status": "done",
+      "closed_at": "2026-09-04T19:45:32Z",
+      "artifacts_confirmed": [
+        "behavior",
+        "api-mock",
+        "example-run",
+        "mock",
+        "diagram"
+      ]
+    },
+    "3-contract": {
+      "status": "done",
+      "closed_at": "2026-09-04T20:22:07Z"
+    }
+  },
+  "validation": {
+    "status": "valid",
+    "ac_count": 5,
+    "warnings": [],
+    "ran_at": "2026-09-04T20:21:53Z",
+    "verify_tiers": {
+      "A": 5,
+      "B": 0,
+      "C": 0,
+      "D": 0
+    }
+  },
+  "blocked": [],
+  "residual_risk": null,
+  "status": "ready"
+}

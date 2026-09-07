@@ -9,6 +9,35 @@ description: 熟悉行业惯例的门禁建设者：盘点项目门禁基建（�
 
 铁律：run.toml 是 gate 唯一注册真源（门 id=action id，registry/看板/报告不复制命令定义）；退出码显式读取、超时/不确定归红；无调查不生成；任何生成物未经用户确认不落地。
 
+## AES-QG 客观保证等级（本技能是标准所有者）
+
+`AES-QG Lx` 回答「通过了什么客观保证边界」，跨仓统一、可机械审计，与正交风险证据
+（security/performance/…、automated/live/manual、发布策略）解耦。规范全文见
+`references/aes-qg.md`；要点：
+
+- **判级只看三轴**：test object / assertion scope / artifact fidelity（等级=三轴最小值）。
+  名称含 `E2E`/`full`/`release`、耗时、测试数量、网络策略都不是判级证据；单项只产生
+  `classifiedAt`，总体 `achievedLevel` 由累计 receipt 裁决。
+- **namespace**：首次提到等级必须写完整 `AES-QG Lx`（机器字段 `AES-QG-Lx`）；裸 `Lx`
+  在 policy/receipt/required 字段里一律 fail closed。
+- **policy**：`gate-policy.toml`（`aes-gate-policy/v1`）只引用 run.toml action id（外键），
+  `levels` 从 L0 连续到 `supported_through`；`quick/mid/full` 只是 profile，必须显式
+  `target_level`。执行器：`node scripts/aes-qg.mjs --repo <repo> gate.l3 [--json]`；
+  裸 `gate` 一律拒绝歧义退出 64，不执行任何门。
+- **receipt 与复用**：`aes.gate.receipt/v1` 的 `achievedLevel`=同 candidate 的 L0-Lx 最高
+  连续 PASS；低层证据复用要求五维 identity（candidate SHA、artifact digest、
+  gate-definition digest、policy digest/version、environment identity）全匹配，任一变化
+  `STALE_EVIDENCE` 重跑。`AES-QG L5 PASS` ≠ release-qualified（发布资格由 release profile
+  的正交证据另行裁决）。
+- **legacy 迁移**：无 policy 的旧 gate 全部 `legacy-unqualified`，collect 只给 UNCONFIRMED
+  映射候选，不回填历史报告/receipt/Issue。
+- **消费方**：aes-qa 用 `aes.qa.receipt/v3` 原子引用 GateReceipt；GATE-qa（aes-worktree-board）
+  的 level 子门对 required/achieved、candidate、digest、NOT_RUN、`"none"` 滥用 fail closed，
+  v1/v2 历史语义冻结豁免。
+
+collect 的报告/看板/回传会附加标准面（policy 合规、supported/achieved、legacy 分类与
+映射缺口）；等级看板 `.aes-gate/level-board.html` 随每次 gate 运行刷新，零 JS、零外链。
+
 ## 路径一：单条沉淀（主路径·高频）
 
 开发中踩坑后用户说「把刚才这个问题记成 gate」：
@@ -69,12 +98,15 @@ node .agents/skills/aes-gate/scripts/collect.mjs --handoff [--repo <路径>]   #
 
 ## 参考文件
 
+- `references/aes-qg.md` — AES-QG/1 规范：判级矩阵/闭集、policy schema、GateReceipt、五维 identity、release 正交、legacy 迁移、消费合同
 - `references/weights.md` — 六维权重 30/20/15/20/15/10 与三档（硬门禁/部分/纸面）的依据
 - `references/pattern-library.md` — 最小集四模式页（出处/适用条件/代价/反例）+两范例四机制
 - `references/api.md` — gate-registry v1 schema、aes-qa 回传三结局、轻路径接口、退出码契约
 - `references/design.md` — 意图、设计取舍与验收条件（AC-1…AC-5）
 - `scripts/collect.mjs` — 采集与检测入口（`--self-test` 正反样例自测）
+- `scripts/aes-qg.mjs` — AES-QG/1 标准引擎：判级/policy/累计执行/GateReceipt/等级看板/legacy 分类
 - `assets/board.template.html` — 看板投影模板
+- `assets/level-board.template.html` — 等级看板投影模板（Gate Board）
 
 ## 测试
 
@@ -82,4 +114,9 @@ node .agents/skills/aes-gate/scripts/collect.mjs --handoff [--repo <路径>]   #
 
 ```bash
 node .agents/skills/aes-gate/run-tests.mjs
+# AES-QG 契约单跑（Goal Contract 的 AC 验收入口）：
+node .agents/skills/aes-gate/run-tests.mjs --contract aes-qg --case level-classification --json
+node .agents/skills/aes-gate/run-tests.mjs --contract aes-qg --case policy-execution --json
+node .agents/skills/aes-gate/run-tests.mjs --contract aes-qg --case receipt-identity-board --json
+node .agents/skills/aes-gate/run-tests.mjs --contract aes-qg --case legacy-migration --json
 ```

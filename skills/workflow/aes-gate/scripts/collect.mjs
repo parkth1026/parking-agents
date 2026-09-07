@@ -19,6 +19,8 @@ import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 const parseToml = require('./vendor/toml/index.cjs').parse;
+// AES-QG/1 等级标准面（policy 合规/legacy 分类/映射缺口）由标准引擎提供，collect 只集成与投影。
+import { analyzeGateStandard } from './aes-qg.mjs';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 export const SKILL_DIR = dirname(SCRIPT_DIR);
@@ -418,6 +420,10 @@ export async function detect(repoRoot, { timeoutMs = DEFAULT_TIMEOUT_MS, runGate
   sentinel('ratchet.lines', '棘轮（指标只许收紧）', ratchet, ratchet ? '棘轮门或基线文件在场' : '无 ratchet 门/基线文件');
   sentinel('evals.wired', 'AI/eval 门禁（advisory→evidence→gating 光谱）', evals.wired, evals.command ? `${evals.command} 在场但未接线为门（agent 复核）` : '无 eval 命令');
 
+  // 6.3b AES-QG 等级标准面（B10）：policy 合规 / legacy 分类 / 映射缺口。只读，不改任何旧证据。
+  const statusOfGate = (action) => gates.find((g) => g.id === action)?.status ?? null;
+  const aesQg = runToml ? analyzeGateStandard(repoRoot, runToml, statusOfGate) : null;
+
   // 6.4 评分
   const prevRegistry = existsSync(registryPath) ? safeJson(registryPath) : null;
   const historyLen = prevRegistry && Array.isArray(prevRegistry.history) ? prevRegistry.history.length : 0;
@@ -438,7 +444,7 @@ export async function detect(repoRoot, { timeoutMs = DEFAULT_TIMEOUT_MS, runGate
   return {
     meta: { project, commit, repoRoot, collectedAt: at(), command: process.argv.join(' '), exitCode: 0 },
     runToml, ci, hooks, evals: { command: evals.command, dir: evals.dir }, conventions,
-    gates, runResults, score, gaps, prevRegistry,
+    gates, runResults, score, gaps, prevRegistry, aesQg,
   };
 }
 
@@ -449,7 +455,7 @@ function safeJson(p) { try { return JSON.parse(readFileSync(p, 'utf8')); } catch
 // ---------------------------------------------------------------------------
 
 export function buildRegistry(result) {
-  const { meta, gates, conventions, gaps, score } = result;
+  const { meta, gates, conventions, gaps, score, aesQg } = result;
   const prevHistory = result.prevRegistry && Array.isArray(result.prevRegistry.history) ? result.prevRegistry.history : [];
   return {
     version: 1,
@@ -467,6 +473,7 @@ export function buildRegistry(result) {
       what: g.what, advice: g.advice ?? '',
     })),
     score: { total: score.total, tier: score.tier, dims: score.dims },
+    aesQg: aesQg ?? null,
     history: [...prevHistory, {
       at: meta.collectedAt, total: score.total, tier: score.tier,
       gateCount: gates.length, gapCount: gaps.length,
@@ -494,6 +501,11 @@ export function validateRegistry(obj) {
   }
   if (!obj.score || typeof obj.score.total !== 'number' || !TIERS.includes(obj.score.tier)) errors.push('score 非法');
   if (!obj.score || typeof obj.score.dims?.blocking !== 'number') errors.push('score.dims 非法');
+  if (obj.aesQg !== undefined && obj.aesQg !== null) {
+    if (!['legacy', 'staged', 'terminal', 'invalid'].includes(obj.aesQg.phase)) errors.push(`aesQg.phase 非法：${obj.aesQg.phase}`);
+    if (obj.aesQg.standardVersion !== 'AES-QG/1') errors.push('aesQg.standardVersion 必须是 AES-QG/1');
+    if (!Array.isArray(obj.aesQg.lines)) errors.push('aesQg.lines 必须是数组');
+  }
   if (!Array.isArray(obj.history) || obj.history.length === 0) errors.push('history 必须非空数组（追加式）');
   return errors;
 }
@@ -527,6 +539,11 @@ export function renderHandoff(result) {
   lines.push(`## 缺口清单（=移交单）：${gaps.length === 0 ? '（空——表头仍在，证明扫过）' : ''}`);
   for (const g of gaps) {
     lines.push(`- **${g.id} ${g.risk}** ${g.what}${g.assemblable ? `｜可组装·${g.pattern}` : '｜出界'}｜归属：${g.owner}`);
+  }
+  if (result.aesQg) {
+    lines.push('');
+    lines.push('## AES-QG 等级标准（policy 合规 / legacy 分类）');
+    for (const line of result.aesQg.lines) lines.push(`- ${line}`);
   }
   lines.push('');
   lines.push(`> 局限：低分≠有风险（防 Goodhart）；档位由保护结构决定、不看总分。采集：${meta.project}@${meta.commit || '?'} ${meta.collectedAt}`);
@@ -592,6 +609,10 @@ export function renderReport(result) {
   L.push('## 6. 约定级检查与局限');
   if (conventions.length === 0) L.push('约定级登记为空（`.aes-gate/conventions.json` 不存在——首次盘点请按 SKILL.md 整理 AGENTS.md 约定写入）。');
   for (const c of conventions) L.push(`- ${c.id}：${c.text}（机器断言：${c.machineEnforced ? '有' : '无'}，不计分）`);
+  L.push('');
+  L.push('## 7. AES-QG 等级标准（policy 合规 / legacy 分类）');
+  if (!result.aesQg) L.push('run.toml 缺失——无标准面可评估（见 G0）。');
+  else for (const line of result.aesQg.lines) L.push(`- ${line}`);
   L.push('');
   L.push('> 局限声明：低分≠有风险，分数是体检参考不是 KPI（防 Goodhart）；branch protection 离线不可核实，ci-protected 以 `.aes-gate/protection.json` 人工登记为准；语义缺口由 agent 复核补充、须带证据。');
   return { name: `report-${ts}.md`, body: L.join('\n') + '\n' };
@@ -790,6 +811,7 @@ async function main() {
   writeFileSync(join(gateDir, 'board.html'), renderBoard(registry), 'utf8');
   console.log(`[aes-gate] 检测完成：${registry.gates.length} 门（红 ${registry.gates.filter((g) => g.status === 'red').length}）｜评分 ${round1(registry.score.total)}/110 ${TIER_LABEL[registry.score.tier]}｜缺口 ${registry.gaps.length} 条`);
   console.log(`[aes-gate] 已写入 ${join(GATE_DIR_NAME, report.name)} / gate-registry.json / board.html`);
+  for (const line of registry.aesQg?.lines ?? []) console.log(line);
   return 0;
 }
 

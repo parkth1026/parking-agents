@@ -56,6 +56,87 @@ function declaresScreenshotEvidenceObligation(qa) {
     || (qa?.checks || []).some((check) => ['screenshot', 'live-screenshot'].includes(check?.kind));
 }
 
+// ---------------------------------------------------------------- AES-QG level 子门
+// aes.qa.receipt/v3 的 repository gate level 子门（并入既有 GATE-qa，不新增第九道顶层门）。
+// 标准所有权在 aes-gate（AES-QG/1）；此处只做机械消费面：required/achieved 可比较、
+// GateReceipt digest 合法、candidate 一致、缺级/旧证据/NOT_RUN 均 fail closed。
+// v1/v2 历史语义永久冻结：不携带 repository gate 义务，豁免本子门（向下兼容，不是漏检）。
+const AES_QG_FULL_LEVEL = /^AES-QG-L[0-5]$/;
+const SHA256_DIGEST = /^sha256:[0-9a-f]{64}$/i;
+
+function aesQgLevelIndex(level) {
+  return AES_QG_FULL_LEVEL.test(String(level || '')) ? Number(String(level).slice(-1)) : -1;
+}
+
+// tracker-only 路径白名单（默认拒绝）：只有明确不携带产品字节的跟踪面文件可豁免 repository gate。
+// 任何未知形态一律视为 product bytes——「none」是例外路径，必须证明自己配得上。
+const TRACKER_ONLY_PATH_RE = Object.freeze([
+  /(^|\/)\.github\/(ISSUE_TEMPLATE|PULL_REQUEST_TEMPLATE)\//i,
+  /^(\.aes-workflow|\.aes-gate|\.aes-worktree-board|\.agents)\//i,
+  /^docs?\//i,
+  /(^|\/)(CHANGELOG|README|LICENSE|CONTRIBUTING|AGENTS|CLAUDE|CONTEXT)(\.|\.md$|$)/i,
+  /\.(md|markdown|rst|adoc)$/i,
+]);
+
+export function isTrackerOnlyPath(path) {
+  const normalized = String(path).replaceAll('\\', '/');
+  return TRACKER_ONLY_PATH_RE.some((re) => re.test(normalized));
+}
+
+export function repositoryGateLevelGate(qa, candidateCommit, changedPaths = null) {
+  if (!qa?.schemaVersion?.endsWith('/v3')) {
+    return { ok: true, legacy: true, detail: `schemaVersion=${qa?.schemaVersion || 'NOT_SET'} 为 v1/v2 历史语义，无 repository gate 义务（豁免）` };
+  }
+  const required = qa.requiredRepositoryGate;
+  if (required === undefined || required === null || required === '') {
+    return { ok: false, detail: 'v3 缺 requiredRepositoryGate（AES-QG-Lx 或 "none"），fail closed' };
+  }
+  if (required === 'none') {
+    if (qa.trackerOnly !== true) {
+      return { ok: false, detail: 'requiredRepositoryGate="none" 需要 trackerOnly=true 的可信 tracker-only classification' };
+    }
+    if (typeof qa.repositoryGateReason !== 'string' || !qa.repositoryGateReason.trim()) {
+      return { ok: false, detail: 'requiredRepositoryGate="none" 必须携带非空 repositoryGateReason（自由文本是记录，不是绕过）' };
+    }
+    if (qa.repositoryGate != null) {
+      return { ok: false, detail: 'requiredRepositoryGate="none" 不得携带 repositoryGate 引用' };
+    }
+    if (Array.isArray(changedPaths)) {
+      const productPaths = changedPaths.filter((p) => !isTrackerOnlyPath(p));
+      if (productPaths.length > 0) {
+        return { ok: false, detail: `candidate 存在 product bytes 变化（${productPaths.slice(0, 3).join(', ')}${productPaths.length > 3 ? '…' : ''}），不得声明 repository gate "none"` };
+      }
+    }
+    return { ok: true, detail: 'tracker-only classification + 无 product bytes 变化' };
+  }
+  if (!AES_QG_FULL_LEVEL.test(required)) {
+    return { ok: false, detail: `requiredRepositoryGate 必须是完整 AES-QG-L[0-5] 或 "none"，实际：${required}` };
+  }
+  const rg = qa.repositoryGate;
+  if (!rg || typeof rg !== 'object') {
+    return { ok: false, detail: '缺 repositoryGate（GateReceipt 原子引用：achievedLevel/gateReceiptDigest/candidateCommitSha/outcome）' };
+  }
+  if (rg.standardVersion !== 'AES-QG/1') {
+    return { ok: false, detail: `repositoryGate.standardVersion=${rg.standardVersion || 'NOT_SET'}，必须是 AES-QG/1` };
+  }
+  if (!AES_QG_FULL_LEVEL.test(rg.achievedLevel || '')) {
+    return { ok: false, detail: `repositoryGate.achievedLevel=${rg.achievedLevel || 'NOT_SET'} 必须是完整 AES-QG-L[0-5]（裸 Lx 不算）` };
+  }
+  if (rg.outcome !== 'PASS') {
+    return { ok: false, detail: `repositoryGate.outcome=${rg.outcome || 'NOT_SET'}，NOT_RUN/非 PASS fail closed` };
+  }
+  if (typeof rg.gateReceiptDigest !== 'string' || !SHA256_DIGEST.test(rg.gateReceiptDigest)) {
+    return { ok: false, detail: 'repositoryGate.gateReceiptDigest 必须是 sha256:<64hex> 内容寻址摘要' };
+  }
+  if (!candidateCommit || rg.candidateCommitSha !== candidateCommit) {
+    return { ok: false, detail: `repositoryGate candidate=${rg.candidateCommitSha || 'NOT_BOUND'} current=${candidateCommit || 'NOT_RUN'}，旧证据/未绑定 fail closed` };
+  }
+  if (aesQgLevelIndex(rg.achievedLevel) < aesQgLevelIndex(required)) {
+    return { ok: false, detail: `required=${required} > achieved=${rg.achievedLevel}（缺级不得跨越）` };
+  }
+  return { ok: true, detail: `required=${required} ≤ achieved=${rg.achievedLevel}，GateReceipt digest 绑定 candidate` };
+}
+
 function screenshotEvidenceGate(qa, candidateCommit) {
   const marker = qa?.screenshotEvidence?.aggregateMarker;
   if (!marker) return { ok: false, detail: '截图证据义务已触发，但 aggregate marker 缺失' };
@@ -158,6 +239,7 @@ export function applyWaiver(resolution, waiver) {
 export function evaluateMechanicalGate({
   slotOk, slotReason, commitFresh, commitReason, integrationOk, integrationReason,
   acceptance = [], acceptanceCommit = null, review = null, qa = null, candidateCommit = null, baseCommit = null, integrationHead = null,
+  changedPaths = null,
 }) {
   const checks = [];
   const push = (id, ok, detail) => checks.push({ id, outcome: ok ? 'PASS' : 'FAIL', detail });
@@ -207,18 +289,24 @@ export function evaluateMechanicalGate({
   // runtime=NOT_RUN 不得伪装 PASS（不变清单）。
   const screenshotRequired = declaresScreenshotEvidenceObligation(qa);
   const screenshotGate = screenshotRequired ? screenshotEvidenceGate(qa, candidateCommit) : null;
+  // AES-QG repository gate level 子门（v3 义务；v1/v2 冻结豁免）——detail 并入 GATE-qa，
+  // 不新增顶层第九道机械门。
+  const repoGate = repositoryGateLevelGate(qa, candidateCommit, changedPaths);
   const qaOk = qa && qa.outcome === 'PASS'
     && candidateCommit && qa.commitSha === candidateCommit
     && !(qa.checks || []).some((check) => check.outcome === 'NOT_RUN')
     && !(qa.unexecuted || []).length
+    && repoGate.ok
     && (!screenshotRequired || screenshotGate.ok);
   push('GATE-qa', Boolean(qaOk), qa
-    ? `qa outcome=${qa.outcome} commit=${qa.commitSha || 'NOT_BOUND'} candidate=${candidateCommit || 'NOT_RUN'} unexecuted=${(qa.unexecuted || []).length}${screenshotRequired ? ` screenshot=${screenshotGate.detail}` : ''}`
+    ? `qa outcome=${qa.outcome} commit=${qa.commitSha || 'NOT_BOUND'} candidate=${candidateCommit || 'NOT_RUN'} unexecuted=${(qa.unexecuted || []).length} repositoryGate=${repoGate.detail}${screenshotRequired ? ` screenshot=${screenshotGate.detail}` : ''}`
     : 'QA 证据缺失');
 
   // QA 必须在当前 integration base 上取证；base 前进使旧证据失效（AC-007/AC-2）。
-  // 同上：只对 v2 证据强制，v1 豁免（向下兼容，理由见 GATE-review-base 处注释）。
-  const qaDeclaresBase = Boolean(qa?.schemaVersion?.endsWith('/v2'));
+  // v2 与 v3 都承诺 baseCommit（v3 是 repository gate 语义的最低字段集）；v1 豁免
+  // （向下兼容，理由见 GATE-review-base 处注释）。缺 baseCommit 的 v3 不降级成旧
+  // receipt 处理——recordStageResult 已 fail closed，这里同样按不匹配拒绝。
+  const qaDeclaresBase = Boolean(qa?.schemaVersion?.endsWith('/v2') || qa?.schemaVersion?.endsWith('/v3'));
   const qaBaseOk = !qa ? false : (!qaDeclaresBase || qa.baseCommit === baseCommit);
   const qaBaseReason = !qa
     ? 'QA 证据缺失'

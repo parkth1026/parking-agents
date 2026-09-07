@@ -1,0 +1,38 @@
+<!-- confirmed v1 | confirmed 2026-09-05 | user feedback: all A, continue -->
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>AES-QG Gate Board Mock</title>
+  <style>
+    :root{--paper:#f5f5f5;--ink:#2d3142;--muted:#4f5d75;--soft:#7a8399;--rule:#d9dbe1;--accent:#eb6c36;--tint:#fdf1ec;--ok:#2f6f52;--warn:#996b18}
+    *{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:14px system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+    main{max-width:1180px;margin:0 auto;padding:40px 32px 56px}h1{font-size:28px;margin:0 0 8px;font-weight:650}.lede{color:var(--muted);margin:0 0 28px}
+    .summary{display:grid;grid-template-columns:1.2fr 1fr 1fr 1fr;gap:12px;margin-bottom:24px}.card{background:#fff;border:1px solid var(--rule);border-radius:8px;padding:16px}.label{font:11px ui-monospace,"Cascadia Mono",Consolas,monospace;color:var(--soft);text-transform:uppercase;letter-spacing:.08em}.value{font-size:20px;font-weight:650;margin-top:6px}.accent{border-color:var(--accent);background:var(--tint)}
+    table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--rule)}th,td{text-align:left;padding:13px 14px;border-bottom:1px solid var(--rule);vertical-align:top}th{font-size:12px;color:var(--muted);background:#fafafa}.mono{font-family:ui-monospace,"Cascadia Mono",Consolas,monospace}.pill{display:inline-block;border:1px solid var(--rule);border-radius:999px;padding:3px 8px;font-size:12px}.pass{color:var(--ok);border-color:#a8c9b8;background:#f0f7f3}.blocked{color:var(--warn);border-color:#d9c18e;background:#fff9e9}.muted{color:var(--soft)}
+    .note{margin-top:20px;padding:16px;border-left:3px solid var(--accent);background:var(--tint)}
+  </style>
+</head>
+<body><main>
+  <h1>AES-QG Gate Board</h1>
+  <p class="lede">完整 namespace、累计等级与发布策略分离。任何 PASS 都绑定 candidate 与 policy identity。</p>
+  <section class="summary">
+    <div class="card"><div class="label">standard</div><div class="value mono">AES-QG/1</div></div>
+    <div class="card"><div class="label">supported</div><div class="value">through L5</div></div>
+    <div class="card accent"><div class="label">achieved</div><div class="value">AES-QG L4</div></div>
+    <div class="card"><div class="label">release</div><div class="value">BLOCKED</div></div>
+  </section>
+  <table aria-label="Gate level status">
+    <thead><tr><th>Action</th><th>客观边界</th><th>本 candidate</th><th>执行</th><th>Identity</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">gate.l0</td><td>Static conformance</td><td><span class="pill pass">PASS</span></td><td>reused</td><td class="mono muted">sha256:10…</td></tr>
+      <tr><td class="mono">gate.l1</td><td>Component behavior</td><td><span class="pill pass">PASS</span></td><td>reused</td><td class="mono muted">sha256:11…</td></tr>
+      <tr><td class="mono">gate.l2</td><td>Component integration</td><td><span class="pill pass">PASS</span></td><td>executed</td><td class="mono muted">run-102</td></tr>
+      <tr><td class="mono">gate.l3</td><td>System smoke</td><td><span class="pill pass">PASS</span></td><td>executed</td><td class="mono muted">run-103</td></tr>
+      <tr><td class="mono">gate.l4</td><td>System E2E</td><td><span class="pill pass">PASS</span></td><td>executed</td><td class="mono muted">run-104</td></tr>
+      <tr><td class="mono">gate.l5</td><td>Operational acceptance</td><td><span class="pill blocked">NOT REACHED</span></td><td>—</td><td class="mono muted">—</td></tr>
+    </tbody>
+  </table>
+  <div class="note"><strong>为什么 release 仍 BLOCKED：</strong>required=AES-QG L5，且 security/live/provenance 三项正交证据尚未齐全。L4 PASS 不会被界面包装成发布资格。</div>
+</main></body></html>

@@ -417,6 +417,15 @@ wrapper `screenshotEvidence:{required:true,aggregateMarker}` 必须存在且 mar
 [aes-qa GitLab 截图证据协议](../aes-qa/references/screenshot-evidence.md)，不在总管复制 schema。
 无实际截图时不新增 gate、upload 或 note，旧无截图 QaReceipt 保持兼容。
 
+QA 内另含一个 AES-QG repository gate level 子门（同样不新增顶层第九道门）：`aes.qa.receipt/v3`
+必须携带 `requiredRepositoryGate`（完整 `AES-QG-L[0-5]` 或 `"none"`）与 `repositoryGate` 原子引用
+（`standardVersion=AES-QG/1`、`achievedLevel ≥ required`、`gateReceiptDigest=sha256:<64hex>`、
+`candidateCommitSha` 等于当前 candidate、`outcome=PASS`）；缺级、旧证据、NOT_RUN、裸 `Lx`、
+`"none"` 却有 product bytes 变化（tracker-only 路径白名单默认拒绝）均 fail closed。v1/v2
+历史 QaReceipt 冻结豁免该子门；v3 缺 `baseCommit` 在 `stage qa` 入口即 `MISSING_BASE_COMMIT`
+（不降级成旧 receipt 处理）。标准所有权与规范在 [aes-gate AES-QG](../aes-gate/references/aes-qg.md)；
+等级与发布资格正交，level 子门不裁决 release。
+
 `gate` 另返回 `outboxWarning` 提醒未送达的 GitHub 出站条目；该字段只提供可观测性，
 不改变八门 outcome，也不参与 `decision.mayMerge`。
 其中 `-base` 两项校验证据取自的 integration base 仍等于当前 base，不等判 STALE

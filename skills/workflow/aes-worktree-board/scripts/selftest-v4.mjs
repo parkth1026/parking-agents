@@ -2694,3 +2694,188 @@ export async function attemptReassignScenario() {
     fixture.cleanup();
   }
 }
+
+// ---------------------------------------------------------------------------
+// AES-QG repository gate level（aes.qa.receipt/v3）：GATE-qa level 子门消费面。
+// 标准与生成侧在 aes-gate/aes-qa；这里证明 Master 流程实际消费并阻断：
+// required/achieved、candidate 绑定、digest、NOT_RUN、裸 namespace、none 滥用、
+// v1/v2 冻结豁免，以及 recordStageResult 对 v3 的 schema/绑定面校验。
+// ---------------------------------------------------------------------------
+
+const GATE_RECEIPT_DIGEST_FIXTURE = `sha256:${'ab'.repeat(32)}`;
+
+// v3 QaReceipt：repositoryGate 原子引用一块合法 GateReceipt 摘要。
+function qaV3Receipt(jobId, commitSha, baseCommit, overrides = {}) {
+  const required = overrides.requiredRepositoryGate ?? 'AES-QG-L3';
+  const gate = overrides.repositoryGate ?? {
+    standardVersion: 'AES-QG/1',
+    achievedLevel: overrides.achievedLevel ?? 'AES-QG-L3',
+    gateReceiptDigest: overrides.gateReceiptDigest ?? GATE_RECEIPT_DIGEST_FIXTURE,
+    candidateCommitSha: overrides.gateCandidate ?? commitSha,
+    outcome: overrides.gateOutcome ?? 'PASS',
+  };
+  const receipt = {
+    schemaVersion: master.QA_RECEIPT_SCHEMA_V3,
+    jobId, commitSha, baseCommit, outcome: 'PASS',
+    requiredRepositoryGate: required,
+    repositoryGate: required === 'none' ? null : gate,
+    checks: [{ id: 'QA-1', kind: 'automated', outcome: 'PASS', command: './run gate.l3' }],
+    unexecuted: [], manualDebt: [],
+  };
+  for (const [key, value] of Object.entries(overrides.extra ?? {})) receipt[key] = value;
+  if (overrides.dropRequired) delete receipt.requiredRepositoryGate;
+  return receipt;
+}
+
+export async function repositoryGateLevelScenario() {
+  const fixture = makeFixture('repository-gate-level', {
+    workers: Array.from({ length: 12 }, (_, i) => ({ id: `worker-${i + 1}` })),
+  });
+  let issueSeed = 900;
+  try {
+    writeSlots(fixture);
+    master.masterStart({ ...base(fixture) });
+
+    // 把一个 job 推到 ready-to-merge 且 review 通过；QA 报文按 qaFactory(jobId, candidate, base) 生成。
+    const drive = (qaFactory, { file = 'feature.txt' } = {}) => {
+      issueSeed += 1;
+      const issue = issuePayload({ number: issueSeed });
+      const slotId = `worker-${issueSeed - 900}`;
+      const claim = master.masterClaim({ ...base(fixture), issue, slotId });
+      assert.equal(claim.outcome, 'CLAIMED', `claim 失败: ${JSON.stringify(claim)}`);
+      const baseCommit = claim.workOrder.runner.baseCommit;
+      const candidate = makeCandidate(fixture, claim.slotId, { file });
+      master.recordCandidate({ ...base(fixture), jobId: claim.jobId, commitSha: candidate });
+      const qaResult = master.recordStageResult({
+        ...base(fixture), jobId: claim.jobId, stage: 'qa', payload: qaFactory(claim.jobId, candidate, baseCommit),
+      });
+      const terminal = master.masterTerminal({
+        ...base(fixture),
+        payload: readyTerminal(
+          { jobId: claim.jobId, attemptId: claim.attemptId, issue: issue.number, baseCommit },
+          candidate, claim.workOrder.issue.contractDigest,
+        ),
+      });
+      assert.equal(terminal.state, 'ready-to-merge');
+      const lifecycle = master.claimMergeReview({ ...base(fixture), jobId: claim.jobId });
+      master.recordStageResult({
+        ...base(fixture), jobId: claim.jobId, stage: 'review',
+        payload: {
+          ...passingReview(claim.jobId, candidate, baseCommit, `reviewer-rgl-${issueSeed}`),
+          attemptId: claim.attemptId,
+          effectiveRisk: lifecycle.effectiveRisk,
+          depthTier: lifecycle.depthTier,
+        },
+      });
+      return { jobId: claim.jobId, candidate, baseCommit, qaResult };
+    };
+    const gateOf = (jobId) => {
+      const gate = master.evaluateGate({ ...base(fixture), jobId });
+      return {
+        allGreen: gate.mechanical.allGreen,
+        qa: Object.fromEntries(gate.mechanical.checks.map((c) => [c.id, c.outcome]))['GATE-qa'],
+        detail: gate.mechanical.checks.find((c) => c.id === 'GATE-qa')?.detail ?? '',
+        decision: gate.decision.decision,
+        mayMerge: gate.decision.mayMerge,
+      };
+    };
+
+    // 1) 足够：required=L3 achieved=L3，digest 合法，candidate 绑定 → GATE-qa PASS，可 merge。
+    const ok = drive((jobId, sha, baseCommit) => qaV3Receipt(jobId, sha, baseCommit));
+    const okGate = gateOf(ok.jobId);
+    assert.equal(okGate.qa, 'PASS', `GATE-qa 应通过：${okGate.detail}`);
+    assert.match(okGate.detail, /required=AES-QG-L3 ≤ achieved=AES-QG-L3/);
+    assert.equal(okGate.allGreen, true, `全绿失败：${okGate.detail}`);
+    assert.equal(okGate.mayMerge, true);
+
+    // 2) 不足：required=L4 achieved=L3 → fail closed，缺级不得跨越。
+    const short = drive((jobId, sha, baseCommit) => qaV3Receipt(jobId, sha, baseCommit, { requiredRepositoryGate: 'AES-QG-L4' }));
+    const shortGate = gateOf(short.jobId);
+    assert.equal(shortGate.qa, 'FAIL');
+    assert.match(shortGate.detail, /required=AES-QG-L4 > achieved=AES-QG-L3/);
+    assert.equal(shortGate.allGreen, false);
+    assert.equal(shortGate.mayMerge, false);
+
+    // 3) 旧证据：repositoryGate 绑定的 candidate 与当前不符 → fail closed。
+    const stale = drive((jobId, sha, baseCommit) => qaV3Receipt(jobId, sha, baseCommit, { gateCandidate: 'f'.repeat(40) }));
+    assert.equal(gateOf(stale.jobId).qa, 'FAIL');
+    assert.match(gateOf(stale.jobId).detail, /旧证据\/未绑定 fail closed/);
+
+    // 4) digest 非法：不是 sha256:<64hex> 内容寻址摘要 → fail closed。
+    const badDigest = drive((jobId, sha, baseCommit) => qaV3Receipt(jobId, sha, baseCommit, { gateReceiptDigest: 'sha256:zz' }));
+    assert.equal(gateOf(badDigest.jobId).qa, 'FAIL');
+    assert.match(gateOf(badDigest.jobId).detail, /gateReceiptDigest/);
+
+    // 5) NOT_RUN：repositoryGate.outcome 不是 PASS → fail closed。
+    const notRun = drive((jobId, sha, baseCommit) => qaV3Receipt(jobId, sha, baseCommit, { gateOutcome: 'NOT_RUN' }));
+    assert.equal(gateOf(notRun.jobId).qa, 'FAIL');
+    assert.match(gateOf(notRun.jobId).detail, /NOT_RUN\/非 PASS fail closed/);
+
+    // 6) 裸 namespace：requiredRepositoryGate='L3' → fail closed（完整 AES-QG-Lx 才算）。
+    const bare = drive((jobId, sha, baseCommit) => qaV3Receipt(jobId, sha, baseCommit, { requiredRepositoryGate: 'L3' }));
+    assert.equal(gateOf(bare.jobId).qa, 'FAIL');
+    assert.match(gateOf(bare.jobId).detail, /完整 AES-QG-L\[0-5\]/);
+
+    // 7) v3 缺 requiredRepositoryGate → GATE-qa fail closed（recordStageResult 接受报文，门拒绝）。
+    const missing = drive((jobId, sha, baseCommit) => qaV3Receipt(jobId, sha, baseCommit, { dropRequired: true }));
+    assert.equal(missing.qaResult.ok, true);
+    assert.equal(gateOf(missing.jobId).qa, 'FAIL');
+    assert.match(gateOf(missing.jobId).detail, /缺 requiredRepositoryGate/);
+
+    // 8) none 滥用：trackerOnly 自报 + 理由，但 candidate 改了 product bytes → fail closed。
+    const abuse = drive(
+      (jobId, sha, baseCommit) => qaV3Receipt(jobId, sha, baseCommit, {
+        requiredRepositoryGate: 'none',
+        extra: { trackerOnly: true, repositoryGateReason: '声称纯跟踪项' },
+      }),
+      { file: 'src/app.mjs' },
+    );
+    assert.equal(gateOf(abuse.jobId).qa, 'FAIL');
+    assert.match(gateOf(abuse.jobId).detail, /product bytes 变化/);
+
+    // 9) none 正当：tracker-only classification + 只改 docs → 通过。
+    const tracker = drive(
+      (jobId, sha, baseCommit) => qaV3Receipt(jobId, sha, baseCommit, {
+        requiredRepositoryGate: 'none',
+        extra: { trackerOnly: true, repositoryGateReason: 'tracker-only change; no product bytes changed' },
+      }),
+      { file: 'docs/note.md' },
+    );
+    const trackerGate = gateOf(tracker.jobId);
+    assert.equal(trackerGate.qa, 'PASS', `tracker-only 应通过：${trackerGate.detail}`);
+    assert.equal(trackerGate.mayMerge, true);
+
+    // 10) v2 冻结豁免：旧 QaReceipt 无 repository gate 义务，仍按原语义通过。
+    const legacyV2 = drive((jobId, sha, baseCommit) => passingQa(jobId, sha, baseCommit));
+    const legacyGate = gateOf(legacyV2.jobId);
+    assert.equal(legacyGate.qa, 'PASS');
+    assert.match(legacyGate.detail, /v1\/v2 历史语义/);
+    assert.equal(legacyGate.mayMerge, true);
+
+    // 11) v3 缺 baseCommit：不降级成旧 receipt 处理，recordStageResult fail closed。
+    issueSeed += 1;
+    const issueV3 = issuePayload({ number: issueSeed });
+    const slotV3 = `worker-${issueSeed - 900}`;
+    const claimV3 = master.masterClaim({ ...base(fixture), issue: issueV3, slotId: slotV3 });
+    assert.equal(claimV3.outcome, 'CLAIMED');
+    const candidateV3 = makeCandidate(fixture, claimV3.slotId, { file: 'v3-base.txt' });
+    master.recordCandidate({ ...base(fixture), jobId: claimV3.jobId, commitSha: candidateV3 });
+    const v3NoBase = qaV3Receipt(claimV3.jobId, candidateV3, claimV3.workOrder.runner.baseCommit);
+    delete v3NoBase.baseCommit;
+    const noBase = master.recordStageResult({ ...base(fixture), jobId: claimV3.jobId, stage: 'qa', payload: v3NoBase });
+    assert.equal(noBase.ok, false);
+    assert.equal(noBase.code, 'MISSING_BASE_COMMIT');
+
+    // 12) 正交性：repositoryGate 达到 L5 也只是等级结论，level 子门不裁决发布资格。
+    const l5 = drive((jobId, sha, baseCommit) => qaV3Receipt(jobId, sha, baseCommit, {
+      requiredRepositoryGate: 'AES-QG-L5', achievedLevel: 'AES-QG-L5',
+    }));
+    const l5Gate = gateOf(l5.jobId);
+    assert.equal(l5Gate.qa, 'PASS');
+    assert.match(l5Gate.detail, /required=AES-QG-L5 ≤ achieved=AES-QG-L5/);
+    assert.equal(l5Gate.allGreen, true, 'L5 等级通过不等价于发布资格，但不得反向阻断 merge');
+    return { scenario: 'repository-gate-level', jobs: issueSeed - 900 };
+  } finally {
+    fixture.cleanup();
+  }
+}

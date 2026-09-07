@@ -29,6 +29,7 @@ import {
   stageResultSchemaBackwardCompat, reviewerIndependenceScenario, missingReviewerSessionIdScenario,
   acceptanceInvalidationScenario, humanOpenEvidenceScenario, attemptReassignScenario,
   outboxCloseScenario, outboxFlushScenario, outboxAckScenario, outboxGateScenario,
+  repositoryGateLevelScenario,
 } from './selftest-v4.mjs';
 import { trajectoryReplayScenario } from './selftest-trajectory.mjs';
 import { boardUiDomain } from './selftest-board-ui.mjs';
@@ -4666,6 +4667,8 @@ async function orchestrationDomain() {
     { group: 'recovery', name: 'human-open-required-evidence-fail-closed', run: humanOpenEvidenceScenario },
     // #78：attemptNew 释放旧租约、绑定新 slot 实时 HEAD；reconcile 检出残留双租约。
     { group: 'recovery', name: 'attempt-reassign-lease-and-base', run: attemptReassignScenario },
+    // AES-QG repository gate level（aes.qa.receipt/v3）：GATE-qa level 子门消费面。
+    { group: 'repository-gate-level', name: 'repository-gate-level', run: repositoryGateLevelScenario },
   ];
   const p2p3Ids = cases.filter((testCase) => testCase.id).map((testCase) => testCase.id).sort();
   assert.deepEqual(
