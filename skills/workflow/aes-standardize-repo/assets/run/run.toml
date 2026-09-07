@@ -4,5 +4,6 @@ id = "local/repository"
 [[actions]]
 id = "check"
 name = "Validate the run interface"
+desc = "语法自检：node --check scripts/run.mjs（种子模板；评审时替换为有效行为契约）"
 kind = "task"
 run = ["node", "--check", "scripts/run.mjs"]

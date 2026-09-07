@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:run:v1",
-  "title": "run/v1 动作目录",
-  "description": "run.toml 解析之后的严格 schema。映射关系：[project] 变成 project 对象，[[actions]] 条目变成 actions 数组元素，TOML 字符串保持字符串。下游软件必须先按 TOML 1.0 解析，再拿解析结果对照本 schema 校验。有一条约束 JSON Schema 表达不了，由 runner 兜底：动作 id 在整个目录内必须唯一。",
+  "$id": "urn:run:v2",
+  "title": "run/v2 动作目录",
+  "description": "run.toml 解析之后的严格 schema。映射关系：[project] 变成 project 对象，[[actions]] 条目变成 actions 数组元素，TOML 字符串保持字符串。下游软件必须先按 TOML 1.0 解析，再拿解析结果对照本 schema 校验。有一条约束 JSON Schema 表达不了，由 runner 兜底：动作 id 在整个目录内必须唯一。v2（2026-09-07）新增必填 desc：动作的有效行为契约（数据空间/默认档/旗标/边界），show 与 --json 同享渲染。",
   "type": "object",
   "properties": {
     "project": {
@@ -23,17 +23,26 @@
       "minItems": 1,
       "items": {
         "type": "object",
-        "properties": {
+          "properties": {
           "id": {
             "type": "string",
-            "description": "小写点分词；动词域见动作命名规范。",
-            "pattern": "^[a-z][a-z0-9]*(\\.[a-z][a-z0-9]*)*$",
+            "description": "小写点分词；段内允许连字符（不得开头/结尾/连续）；动词域见动作命名规范。",
+            "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*(\\.[a-z][a-z0-9]*(-[a-z0-9]+)*)*$",
             "not": {
-              "enum": ["list", "show", "doctor", "help", "run"]
+              "anyOf": [
+                { "enum": ["list", "show", "doctor", "help", "run"] },
+                { "pattern": "^x\\.(list|show|doctor|help|run)(\\.|$)" }
+              ]
             }
           },
           "name": {
             "type": "string",
+            "description": "一句话短摘要（list 内联渲染，保持紧凑）；机械映射场景必须保留原脚本名。",
+            "minLength": 1
+          },
+          "desc": {
+            "type": "string",
+            "description": "有效行为契约：做什么、数据落哪、默认档/量级、可用旗标与边界承诺。show 与 --json 渲染；list 不渲染（保持紧凑）。禁止与实际行为分叉——变更动作行为必须同笔更新 desc。",
             "minLength": 1
           },
           "kind": {
@@ -48,7 +57,7 @@
             }
           }
         },
-        "required": ["id", "name", "kind", "run"],
+        "required": ["id", "name", "desc", "kind", "run"],
         "additionalProperties": false
       }
     }

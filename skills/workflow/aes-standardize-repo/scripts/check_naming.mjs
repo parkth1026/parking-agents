@@ -9,7 +9,12 @@ import { createRequire } from "node:module";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const verbDomain = ["setup", "dev", "start", "serve", "preview", "build", "dist", "check", "lint", "typecheck", "test", "gate"];
+// 与 standardize_repo.mjs 的动词域同源（run standard v2/v4：serve 退役、prod/bench 入域）。
+const verbDomain = ["setup", "dev", "prod", "build", "check", "lint", "test", "gate", "dist", "bench"];
+// R2（run-standard §4 限定词治理）：形态限定词封闭五词，仅约束 dev.*/prod.* 族的形态位；
+// test.regression、bench.download-workers 的限定词是专题词，不受此域约束。新形态词
+// 须在 run.toml 头注释登记（与动词域扩展同构），未登记即报错。
+const formQualifiers = new Set(["desktop", "cli", "web", "mobile", "server"]);
 const reserved = new Set(["list", "show", "doctor", "help", "run"]);
 const productionTokens = new Set(["prod", "production"]);
 // 常见实现技术名词黑名单（不可能穷举，抓高频即可）：id 是产品目录不是技术目录，
@@ -36,6 +41,12 @@ function parseArguments(argv) {
 
 function mechanicalId(script) {
   return script.toLowerCase().replaceAll(":", ".").replaceAll("-", ".");
+}
+
+// 登记检测只认注释行（^# 开头）：id 行自身必然含该词，用全文 includes 检测登记
+// 会恒真通过，校验形同虚设——登记必须显式写在头注释里才算数。
+function registeredInComments(word, raw) {
+  return new RegExp(`^#.*\\b${word}\\b`, "mu").test(raw);
 }
 
 function main() {
@@ -68,16 +79,20 @@ function main() {
     const verb = segments[0];
     const qualifiers = segments.slice(1);
 
-    if (!/^[a-z][a-z0-9]*(?:\.[a-z][a-z0-9]*)*$/u.test(id)) findings.push({ level: "error", id, message: "id 不是合法的小写点分词" });
-    if (reserved.has(id)) findings.push({ level: "error", id, message: "id 是保留字" });
+    // 与 runner 同款逐段校验（规范 §3.1：段内连字符不得开头/结尾/连续）。
+    if (!id.split(".").every((segment) => /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/u.test(segment))) findings.push({ level: "error", id, message: "id 不是合法的小写点分词（段内连字符不得开头/结尾/连续）" });
+    if (reserved.has(id) || (segments[0] === "x" && reserved.has(segments[1] ?? ""))) findings.push({ level: "error", id, message: "id 是保留字（含 x.<保留字> 扩展形式）" });
     if (seen.has(id)) findings.push({ level: "error", id, message: "id 重复" });
     seen.add(id);
 
-    if (!verbDomain.includes(verb) && !raw.includes(verb)) {
+    if (!verbDomain.includes(verb) && !registeredInComments(verb, raw)) {
       findings.push({ level: "error", id, message: `动词 '${verb}' 不在封闭动词域，且未在 run.toml 注释里登记为扩展` });
     }
     if (verb === "dev" && qualifiers.some((token) => productionTokens.has(token))) {
-      findings.push({ level: "error", id, message: "dev 族出现生产限定词：dev 声明开发场景，生产形态属于 serve.prod" });
+      findings.push({ level: "error", id, message: "dev 族出现生产限定词：dev 声明开发场景，生产形态属于 prod 族（v2 起 动词=意图环境 dev/prod，限定词=形态）" });
+    }
+    if ((verb === "dev" || verb === "prod") && qualifiers.length > 0 && !formQualifiers.has(qualifiers[0]) && !registeredInComments(qualifiers[0], raw)) {
+      findings.push({ level: "error", id, message: `形态限定词 '${qualifiers[0]}' 不在封闭五词（desktop/cli/web/mobile/server），且未在 run.toml 注释登记（R2，run-standard §4 限定词治理）` });
     }
     const techHit = qualifiers.find((token) => techNouns.has(token));
     if (techHit) {
@@ -106,7 +121,7 @@ function main() {
   }
 
   const errors = findings.filter((finding) => finding.level === "error");
-  const result = { schema: "run/v1", repo: options.repo, families: Object.fromEntries([...families].map(([verb, q]) => [verb, q])), findings, errors: errors.length };
+  const result = { schema: "run/v2", repo: options.repo, families: Object.fromEntries([...families].map(([verb, q]) => [verb, q])), findings, errors: errors.length };
   if (options.json) process.stdout.write(`${JSON.stringify(result)}\n`);
   else {
     process.stdout.write(`\n  ${options.repo} — 动词族与限定词\n\n`);

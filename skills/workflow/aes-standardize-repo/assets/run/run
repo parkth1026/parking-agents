@@ -1,5 +1,12 @@
 #!/usr/bin/env sh
-# run-wrapper-version: 1.1.0
+# run-wrapper-version: 1.3.0
 set -eu
+# Node 缺失是 fresh clone 的第一个卡点（门/预检也跑在 Node 里，够不到这层）：
+# 在 exec node 之前 fail-fast，给安装指引而非裸报 command not found（run-standard 9.5）。
+if ! command -v node >/dev/null 2>&1; then
+  echo "[run] 未找到 Node.js——本仓库所有命令（含 ./run setup 类环境准备动作）都依赖它。" >&2
+  echo "[run] 请到 https://nodejs.org 安装（下载页默认 LTS 即可满足本项目），装完重开终端再试" >&2
+  exit 69
+fi
 RUN_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 exec node "$RUN_ROOT/scripts/run.mjs" "$@"
