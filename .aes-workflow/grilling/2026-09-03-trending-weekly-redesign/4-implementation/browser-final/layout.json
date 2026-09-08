@@ -1,0 +1,55 @@
+{
+  "checks": [
+    {
+      "name": "20 rows fully visible in one column",
+      "pass": true
+    },
+    {
+      "name": "1152px centered, no horizontal overflow",
+      "pass": true
+    },
+    {
+      "name": "counts include zero recurring",
+      "pass": true
+    },
+    {
+      "name": "TLDR first line contains velocity top three",
+      "pass": true
+    },
+    {
+      "name": "surge badges and bars match data",
+      "pass": true
+    },
+    {
+      "name": "all desktop thumbnails 288 by 162",
+      "pass": true
+    },
+    {
+      "name": "offline initials for every row",
+      "pass": true
+    },
+    {
+      "name": "offline local file loaded",
+      "pass": true
+    },
+    {
+      "name": "stale yellow banner and exact 20% boundary",
+      "pass": true
+    },
+    {
+      "name": "README decode failure falls back to Social Preview",
+      "pass": true
+    },
+    {
+      "name": "both image sources fail: all initials remain",
+      "pass": true
+    },
+    {
+      "name": "zero console errors and uncaught exceptions",
+      "pass": true
+    }
+  ],
+  "errors": [],
+  "pass": true,
+  "url": "file:///D:/GIT_dev/github-trading/report/index.html"
+}

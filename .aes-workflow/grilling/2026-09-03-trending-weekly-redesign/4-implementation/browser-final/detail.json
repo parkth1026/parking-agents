@@ -1,0 +1,51 @@
+{
+  "checks": [
+    {
+      "name": "details initially closed",
+      "pass": true
+    },
+    {
+      "name": "click opens inline card",
+      "pass": true
+    },
+    {
+      "name": "four fields and controlled niche pills",
+      "pass": true
+    },
+    {
+      "name": "no images inside analysis card",
+      "pass": true
+    },
+    {
+      "name": "metadata and README collapsed",
+      "pass": true
+    },
+    {
+      "name": "second click closes",
+      "pass": true
+    },
+    {
+      "name": "keyboard opens",
+      "pass": true
+    },
+    {
+      "name": "old week renders 20 rows and placeholder",
+      "pass": true
+    },
+    {
+      "name": "old week no false stale",
+      "pass": true
+    },
+    {
+      "name": "legacy data.js still renders",
+      "pass": true
+    },
+    {
+      "name": "zero console errors and uncaught exceptions",
+      "pass": true
+    }
+  ],
+  "errors": [],
+  "pass": true,
+  "url": "file:///D:/GIT_dev/github-trading/report/index.html"
+}

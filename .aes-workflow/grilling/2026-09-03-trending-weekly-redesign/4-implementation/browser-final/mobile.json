@@ -1,0 +1,23 @@
+{
+  "checks": [
+    {
+      "name": "640px no overflow, hidden description/fork, full-width bottom image, two-column metadata",
+      "pass": true
+    },
+    {
+      "name": "390px no overflow, hidden description/fork, full-width bottom image, two-column metadata",
+      "pass": true
+    },
+    {
+      "name": "320px no overflow, hidden description/fork, full-width bottom image, two-column metadata",
+      "pass": true
+    },
+    {
+      "name": "zero console errors and uncaught exceptions",
+      "pass": true
+    }
+  ],
+  "errors": [],
+  "pass": true,
+  "url": "file:///D:/GIT_dev/github-trading/report/index.html"
+}
