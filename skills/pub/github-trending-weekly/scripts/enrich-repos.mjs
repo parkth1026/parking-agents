@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 // enrich-repos.mjs — 用 gh api 为周快照里的每个仓库补元数据与 README 摘要。
 // 容错：单仓库失败标记 api_ok:false 继续；gh 不可用整体 exit 2；合并后必须再过校验器。
+// 熔断（仅在线模式）：gh stderr 出现限流特征，或连续多个仓整体富化失败（非个别 404），
+//   视为系统性故障——拒绝写回、exit 3，宁可整周延迟也不出半富化报告；stub 离线回放的 miss 是测试语义，豁免。
 // 用法:
 //   node enrich-repos.mjs [--workspace <dir>] [--week YYYY-Www] [--max-readme 2500] [--delay 150]
 //                         [--stub <dir>]   ← 离线回放：从目录读 {owner}__{repo}.json / .readme.md
@@ -33,6 +35,9 @@ const weekFile = join(p.weeks, `${week}.json`);
 if (!existsSync(weekFile)) fatal(`周快照不存在: ${weekFile}`);
 const doc = JSON.parse(readFileSync(weekFile, "utf8"));
 
+const RATE_LIMIT_RE = /rate.?limit|abuse detection/i;
+let rateLimited = false;
+
 function ghApi(endpoint, acceptRaw = false) {
   if (args.stub) {
     // repos/o/r -> o__r.json；repos/o/r/readme -> o__r.readme.md（与 fixtures/stub 命名一致）
@@ -52,14 +57,19 @@ function ghApi(endpoint, acceptRaw = false) {
   const r = spawnSync("gh", cmdArgs, { encoding: "utf8", windowsHide: true, timeout: 30000, maxBuffer: 8 * 1024 * 1024 });
   if (r.error?.code === 'ENOENT') { console.error("gh 不可用:", r.error.message); process.exit(2); }
   if (r.error) return { ok: false, stderr: r.error.message };
-  if (r.status !== 0) return { ok: false, stderr: (r.stderr || "").slice(0, 200) };
+  if (r.status !== 0) {
+    const stderr = (r.stderr || "").slice(0, 200);
+    if (RATE_LIMIT_RE.test(stderr)) rateLimited = true;
+    return { ok: false, stderr };
+  }
   return { ok: true, text: r.stdout };
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-let okCount = 0, missCount = 0;
+let okCount = 0, missCount = 0, consecutiveMiss = 0;
 
 for (const repo of doc.repos) {
+  if (rateLimited) break; // 已见限流特征，不再继续烧配额
   const sourceStatus = {};
   const metaRes = ghApi(`repos/${repo.full_name}`);
   let readme = "";
@@ -113,7 +123,15 @@ for (const repo of doc.repos) {
   repo.evidence_at = until;
   repo.readme_excerpt = readme;
   if (!args.stub && delay > 0) await sleep(delay);
-  console.log(`${repo.api_ok ? "ok " : "miss"} #${repo.rank} ${repo.full_name} (${Object.entries(sourceStatus).map(([key,ok]) => `${ok ? '+' : '-'}${key}`).join(' ')})`);
+  console.log(`${repo.api_ok ? "ok " : "miss"} #${repo.rank} ${repo.full_name} (${Object.entries(sourceStatus).map(([key,ok]) => `${ok ? '+' : '-'}${key}`).join(" ")})`);
+  consecutiveMiss = repo.api_ok ? 0 : consecutiveMiss + 1;
+  if (!args.stub && consecutiveMiss >= 3) break; // 连续整仓失败，疑似系统性故障
+}
+
+if (rateLimited || (!args.stub && consecutiveMiss >= 3)) {
+  const reason = rateLimited ? "gh api 限流特征" : `连续 ${consecutiveMiss} 个仓库富化失败（非个别 404），疑似系统性故障`;
+  console.error(`[github-trending-weekly] 富化中止：${reason}。周快照未写回（原数据未动），等待配额恢复或排查网络/gh auth 后重跑本步。`);
+  process.exit(3);
 }
 
 const errs = validateWeek(doc, { expectedCount: doc.repos.length });

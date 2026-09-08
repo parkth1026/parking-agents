@@ -96,6 +96,7 @@ console.log("== T3/AC-3 enrich-repos --stub 离线回放 ==");
   check("miss 仓库不残留 readme", miss.readme_excerpt === "");
   const v = run("validate-week.mjs", ["--workspace", T1, "--week", "2026-W36"]);
   check("enrich 后仍过校验器", v.status === 0);
+  check("stub 模式大量 miss 不触发熔断（离线回放语义豁免 exit 3）", r.status === 0);
 }
 
 console.log("== T4/AC-4 update-history 分类/环比/幂等 ==");
@@ -154,6 +155,10 @@ console.log("== T5/AC-5 validate-week 门禁 ==");
 
 console.log("== T6/AC-6,AC-7 build-report 产物 ==");
 {
+  // 模拟 enrich 产物的超长 readme，让截断断言测真实路径（api-mock 现行口径 2400）
+  const t6doc = readWeek(T4, "2026-W36");
+  t6doc.repos.forEach((x) => { x.readme_excerpt = "r".repeat(3000); });
+  writeWeek(T4, t6doc);
   writeFileSync(join(T4, "data", "weeks", "2026-W36.analysis.md"), "## 本周看点\n\n- **delta/new** 是测试仓库\n");
   const r = run("build-report.mjs", ["--workspace", T4]);
   check("exit 0", r.status === 0);
@@ -162,7 +167,7 @@ console.log("== T6/AC-6,AC-7 build-report 产物 ==");
   check("包含全部 3 个历史周", payload.weeks.length === 3 && payload.weeks.map((w) => w.week).join() === "2026-W34,2026-W35,2026-W36");
   check("W36 分析已内联", payload.weeks[2].analysis.includes("delta/new"));
   check("AC-7 无分析周 analysis 为 null 且报告照常生成", payload.weeks[0].analysis === null && payload.weeks[1].analysis === null);
-  check("readme 截断上限生效", payload.weeks[2].repos.every((x) => (x.readme_excerpt ?? "").length <= 900));
+  check("readme 截断上限生效（3000 夹到 2400，api-mock 现行口径）", payload.weeks[2].repos.every((x) => x.readme.length === 2400));
   const html = readFileSync(join(T4, "report", "index.html"), "utf8");
   check("index.html 存在且引用 data.js", html.includes('src="data.js"'));
 }

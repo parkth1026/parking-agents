@@ -72,4 +72,16 @@ export async function runRedesign({check,run,mkws,fixtures}){
  const invalid=structuredClone(doc);invalid.repos[0].tree='bad';invalid.staleAt='not-date';
  check('新可选字段出现即校验',validateWeek(invalid).some(e=>e.includes('tree'))&&validateWeek(invalid).some(e=>e.includes('staleAt')));
  check('正常重建成功且没有新增应用依赖',run('build-report.mjs',['--workspace',ws]).status===0&&!existsSync(join(fixtures,'..','package.json')));
+ console.log('== T15/AC-007 支撑 lint-analysis 格式层 ==');
+ const lw=mkws('lint');
+ copyFileSync(join(fixtures,'golden','2026-W36.json'),join(lw,'data','weeks','2026-W36.json'));
+ copyFileSync(join(fixtures,'golden','2026-W36.analysis.md'),join(lw,'data','weeks','2026-W36.analysis.md'));
+ const ok=run('lint-analysis.mjs',['--workspace',lw,'--week','2026-W36']);
+ check('黄金样本（用户已验收）lint 全绿 exit 0',ok.status===0&&ok.out.includes('0 处违规'));
+ const badText=readFileSync(join(lw,'data','weeks','2026-W36.analysis.md'),'utf8')
+  .replace(/(- \*\*为什么爆\*\*：)/,'$1本周周增 22095 星，数字说明一切。')
+  .replace(/(- \*\*定位\*\*：)([^\n]*)/,(m,a,b)=>a+b+'补一。补二。补三。补四。补五。补六。');
+ writeFileSync(join(lw,'data','weeks','2026-W36.analysis.md'),badText);
+ const bad=run('lint-analysis.mjs',['--workspace',lw,'--week','2026-W36']);
+ check('反例拦截 exit 1（星数复述+定位超句数）',bad.status===1&&/22095/.test(bad.out)&&/句/.test(bad.out));
 }

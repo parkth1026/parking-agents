@@ -43,6 +43,8 @@ node <S>/enrich-repos.mjs
 
 逐仓库 `gh api` 补元数据，以及五信源：README 摘要（前 2500 字符）、顶层 git tree、前 20 contributors、近 90 天最多 100 条 commits 概要、最近 3 releases。输出 `+readme +tree +contrib +commit +release`；单信源失败标记在 `source_status`，其余继续。`api_ok` 保留元数据成功语义；gh 不可用整体退出。证据另记采集时间，晚于榜单的事件不得倒推为当周爆因。
 
+**熔断（exit 3）**：在线模式下 gh stderr 出现限流特征、或连续 ≥3 个仓库整体富化失败（非个别 404）时，拒绝写回、周快照保持原样——宁缺毋滥，不出半富化报告。等待配额恢复或排查网络/`gh auth` 后重跑本步；不要带着 exit 3 续跑后续步骤。
+
 ### Step 3 更新历史与分类
 
 ```bash
@@ -62,6 +64,14 @@ node <S>/validate-week.mjs --full
 ### Step 5 写本周分析（LLM 环节）
 
 读 `data/weeks/<YYYY-Www>.json`，按 `references/analysis-guide.md` 为全部 20 仓写定位、为什么爆、可信度、生态位四字段及受控 nicheTags，并记录完整分类依据。完成标志是每仓有可核查证据且事实与推断分明。缺分析仍能出报告；例行周报和 stale 刷新必须完成此步。
+
+写完先跑格式层 lint，绿了才进 Step 6：
+
+```bash
+node <S>/lint-analysis.mjs
+```
+
+lint 只拦机器可判的口径漂移（字段行齐全、定位句数、为什么爆不复述行内星数、nicheTags 受控、生态位含具体竞品行）；**lint 绿不替代用户对当期分析的全读裁决**——内容质量仍按 AC-007 由用户定夺。
 
 ### Step 6 重建报告
 
@@ -114,7 +124,7 @@ workspace 与 port/host 同走「配置」（CLI > 环境层 > 缺省）。
 ## 常见失败与处理
 
 - **fetch 报"页面不含 Box-row"或条数不符**：先用浏览器/curl 确认页面结构；若 GitHub 改版，更新 `scripts/lib/parse-html.mjs` 的正则并重新固化 `fixtures/trending-weekly.html`，跑 `node run-tests.mjs` 回归。
-- **enrich 大面积 miss**：`gh api rate_limit` 查配额；限流则等待，已成功的字段保留。
+- **enrich exit 3（熔断）**：限流或连续整仓失败，周快照未动。`gh api rate_limit` 查配额，等待恢复后重跑 Step 2；不要跳过熔断带病出报。
 - **validate --full 报历史不一致**：不要手改 JSON，重跑 Step 3（幂等）后再校验。
 - **脚本报「未指定 workspace」**：CLI 与配置层都没给。按报错里的三步引导建 `~/.config/parking-agents/github-trending-weekly.json`，或本次传 `--workspace <dir>`；不要依赖当前目录。
 - **重跑同一周**：Step 1-4 幂等，直接按序重跑即可（同周快照替换不重复）。
