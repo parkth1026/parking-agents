@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>local-mr-squash · 架构与流程对照</title>
+<style>
+  :root{
+    --font-ui: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+    --font-mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  }
+  body{margin:0;padding:24px;background:#f5f5f5;color:#2d3142;font-family:var(--font-ui);}
+  h1{font-size:20px;margin:0 0 4px;}
+  .lede{font-size:12px;color:#7a8399;margin:0 0 24px;}
+  section{margin-bottom:32px;}
+  h2{font-size:16px;margin:0 0 12px;}
+  svg{display:block;background:#ffffff;border:1px solid #e2e5ea;border-radius:8px;max-width:100%;}
+  footer{font-size:12px;color:#4f5d75;border-top:1px solid #e2e5ea;padding-top:16px;line-height:1.7;}
+  footer code{font-family:var(--font-mono);font-size:10px;background:#eef1f6;padding:1px 4px;border-radius:2px;}
+  pre{font-family:var(--font-mono);font-size:10px;background:#ffffff;border:1px solid #e2e5ea;border-radius:6px;padding:12px;overflow-x:auto;color:#2d3142;line-height:1.6;margin:8px 0 0;}
+</style>
+</head>
+<body>
+
+<h1>local-mr-squash · 架构与流程对照</h1>
+<p class="lede">图例：橙 = 本技能新增（核心质询点）· 灰 = 既有（不动）——本技能为全新交付，全图皆新增；accent 预算 ≤2/视图，仅标最需质疑的两处。</p>
+
+<section>
+<h2>架构视图（拓扑事实源）</h2>
+<svg viewBox="0 0 720 260" width="720" role="img" aria-labelledby="dg-arch-title dg-arch-desc">
+  <title id="dg-arch-title">local-mr-squash 架构：调用方驱动技能，技能读 policy、调 git</title>
+  <desc id="dg-arch-desc">四个节点：调用方（既有）、local-mr-squash 技能（新增）、.merge-policy.toml（新增）、git 仓库（既有）。三条依赖边：调用方发合并指令、技能读 policy 规则、技能对 git 执行 merge --squash 与分支前滚。</desc>
+  <defs>
+    <marker id="dg-arch-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4f5d75"/></marker>
+  </defs>
+
+  <!-- 连线（先画，z 序在节点下） -->
+  <!-- 调用方 → 技能：同轴直线 -->
+  <path d="M 144,152 H 216" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#dg-arch-arrow)"/>
+  <rect x="152" y="132" width="56" height="12" fill="#f5f5f5"/>
+  <text x="180" y="142" text-anchor="middle" font-family="ui-monospace, Consolas, monospace" font-size="8" fill="#4f5d75">合并指令</text>
+
+  <!-- 技能 → policy：同轴垂直直线 -->
+  <path d="M 352,112 V 76" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#dg-arch-arrow)"/>
+  <rect x="268" y="86" width="68" height="12" fill="#f5f5f5"/>
+  <text x="302" y="96" text-anchor="middle" font-family="ui-monospace, Consolas, monospace" font-size="8" fill="#4f5d75">读规则·{id}增强</text>
+
+  <!-- 技能 → git：同轴直线 -->
+  <path d="M 448,164 H 508" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#dg-arch-arrow)"/>
+  <rect x="452" y="180" width="60" height="12" fill="#f5f5f5"/>
+  <text x="482" y="190" text-anchor="middle" font-family="ui-monospace, Consolas, monospace" font-size="8" fill="#4f5d75">squash·branch -f</text>
+
+  <!-- 节点 -->
+  <g>
+    <rect x="32" y="120" width="112" height="64" rx="6" fill="#ffffff" stroke="#4f5d75" stroke-width="1.25"/>
+    <rect x="40" y="128" width="40" height="12" rx="2" fill="#eef1f6"/>
+    <text x="60" y="137" text-anchor="middle" font-family="ui-monospace, Consolas, monospace" font-size="8" fill="#4f5d75" letter-spacing="1">USER</text>
+    <text x="88" y="158" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#2d3142">调用方</text>
+    <text x="88" y="174" text-anchor="middle" font-family="ui-monospace, Consolas, monospace" font-size="9" fill="#4f5d75">用户 / agent</text>
+  </g>
+  <g class="changed">
+    <rect x="224" y="112" width="224" height="104" rx="6" fill="#fdf1ec" stroke="#eb6c36" stroke-width="2"/>
+    <rect x="232" y="120" width="40" height="12" rx="2" fill="#f7dfd3"/>
+    <text x="252" y="129" text-anchor="middle" font-family="ui-monospace, Consolas, monospace" font-size="8" fill="#eb6c36" letter-spacing="1">SKILL</text>
+    <text x="336" y="150" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#2d3142">local-mr-squash</text>
+    <text x="336" y="168" text-anchor="middle" font-family="ui-monospace, Consolas, monospace" font-size="9" fill="#eb6c36">状态机六态 · 五步裁决内嵌</text>
+    <text x="336" y="184" text-anchor="middle" font-family="ui-monospace, Consolas, monospace" font-size="9" fill="#eb6c36">台账 .git/merge-ledger/</text>
+  </g>
+  <g class="changed">
+    <rect x="272" y="16" width="160" height="56" rx="6" fill="#fdf1ec" stroke="#eb6c36" stroke-width="2"/>
+    <rect x="280" y="24" width="36" height="12" rx="2" fill="#f7dfd3"/>
+    <text x="298" y="33" text-anchor="middle" font-family="ui-monospace, Consolas, monospace" font-size="8" fill="#eb6c36" letter-spacing="1">TOML</text>
+    <text x="352" y="52" text-anchor="middle" font-family="ui-monospace, Consolas, monospace" font-size="10" fill="#2d3142">.merge-policy.toml</text>
+    <text x="352" y="64" text-anchor="middle" font-family="ui-monospace, Consolas, monospace" font-size="9" fill="#eb6c36">规则主权面 · tracker 声明</text>
+  </g>
+  <g>
+    <rect x="512" y="128" width="144" height="64" rx="6" fill="#ffffff" stroke="#4f5d75" stroke-width="1.25"/>
+    <rect x="520" y="136" width="28" height="12" rx="2" fill="#eef1f6"/>
+    <text x="534" y="145" text-anchor="middle" font-family="ui-monospace, Consolas, monospace" font-size="8" fill="#4f5d75" letter-spacing="1">GIT</text>
+    <text x="584" y="166" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#2d3142">git 仓库</text>
+    <text x="584" y="182" text-anchor="middle" font-family="ui-monospace, Consolas, monospace" font-size="9" fill="#4f5d75">对象 · 引用 · worktree</text>
+  </g>
+</svg>
+<pre>Fidelity ledger（架构视图）
+Detail: balanced · 源 = 5 类组件（调用方/技能/policy/git/台账+tracker） → 4 节点 / 3 边
+Merged: 台账 → 技能节点 sub 标签（内部簿记非外部接口）；tracker 增强 → policy 节点 sub（policy 声明才存在）
+Collapsed: 状态机六态与五步裁决 → 技能节点两行 sub；accent 预算 ≤2 所限
+Dropped: parking-skill-creator 铸造期关系（非运行时依赖）；五步思想为文本内嵌非 import（不画边）
+Kept in full: policy 独立成节点——它是用户唯一编辑面（规则主权），拓扑上必须可质疑</pre>
+</section>
+
+<section>
+<h2>流程视图（behavior.md 变化行的面）</h2>
+<svg viewBox="0 0 820 200" width="820" role="img" aria-labelledby="dg-flow-title dg-flow-desc">
+  <title id="dg-flow-title">local-mr-squash 主流程：六步两分支</title>
+  <desc id="dg-flow-desc">六个步骤节点横排：预检建档、squash 暂存、五步语义裁决、自动检查、单笔 commit、台账与生命周期。有冲突走五步裁决，零冲突经上方跨越边直达自动检查。五步裁决与台账节点为 accent 标注的核心质询点。</desc>
+  <defs>
+    <marker id="dg-flow-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4f5d75"/></marker>
+  </defs>
+
+  <!-- 跨越分支：零冲突（先画，在节点下） -->
+  <path d="M 200,72 V 60 H 456 Q 464,60 464,68 V 68" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#dg-flow-arrow)"/>
+  <rect x="296" y="50" width="60" height="12" fill="#f5f5f5"/>
+  <text x="326" y="60" text-anchor="middle" font-family="ui-monospace, Consolas, monospace" font-size="8" fill="#4f5d75">零冲突跳过</text>
+
+  <!-- 主流向直线 -->
+  <path d="M 120,104 H 148" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#dg-flow-arrow)"/>
+  <path d="M 248,104 H 276" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#dg-flow-arrow)"/>
+  <rect x="248" y="84" width="28" height="12" fill="#f5f5f5"/>
+  <text x="262" y="94" text-anchor="middle" font-family="ui-monospace, Consolas, monospace" font-size="8" fill="#4f5d75">冲突</text>
+  <path d="M 392,104 H 420" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#dg-flow-arrow)"/>
+  <path d="M 520,104 H 548" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#dg-flow-arrow)"/>
+  <path d="M 648,104 H 676" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#dg-flow-arrow)"/>
+
+  <g>
+    <rect x="24" y="72" width="96" height="64" rx="6" fill="#ffffff" stroke="#4f5d75" stroke-width="1.25"/>
+    <text x="72" y="100" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#2d3142">预检建档</text>
+    <text x="72" y="118" text-anchor="middle" font-family="ui-monospace, Consolas, monospace" font-size="9" fill="#4f5d75">变化行 1-3</text>
+  </g>
+  <g>
+    <rect x="152" y="72" width="96" height="64" rx="6" fill="#ffffff" stroke="#4f5d75" stroke-width="1.25"/>
+    <text x="200" y="100" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#2d3142">squash 暂存</text>
+    <text x="200" y="118" text-anchor="middle" font-family="ui-monospace, Consolas, monospace" font-size="9" fill="#4f5d75">变化行 4</text>
+  </g>
+  <g class="changed">
+    <rect x="280" y="72" width="112" height="64" rx="6" fill="#fdf1ec" stroke="#eb6c36" stroke-width="2"/>
+    <text x="336" y="100" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#2d3142">五步语义裁决</text>
+    <text x="336" y="118" text-anchor="middle" font-family="ui-monospace, Consolas, monospace" font-size="9" fill="#eb6c36">变化行 5-7 · 逐条留痕</text>
+  </g>
+  <g>
+    <rect x="424" y="72" width="96" height="64" rx="6" fill="#ffffff" stroke="#4f5d75" stroke-width="1.25"/>
+    <text x="472" y="100" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#2d3142">自动检查</text>
+    <text x="472" y="118" text-anchor="middle" font-family="ui-monospace, Consolas, monospace" font-size="9" fill="#4f5d75">变化行 8-9</text>
+  </g>
+  <g>
+    <rect x="552" y="72" width="96" height="64" rx="6" fill="#ffffff" stroke="#4f5d75" stroke-width="1.25"/>
+    <text x="600" y="100" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#2d3142">单笔 commit</text>
+    <text x="600" y="118" text-anchor="middle" font-family="ui-monospace, Consolas, monospace" font-size="9" fill="#4f5d75">变化行 10</text>
+  </g>
+  <g class="changed">
+    <rect x="680" y="72" width="116" height="64" rx="6" fill="#fdf1ec" stroke="#eb6c36" stroke-width="2"/>
+    <text x="738" y="100" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#2d3142">台账+生命周期</text>
+    <text x="738" y="118" text-anchor="middle" font-family="ui-monospace, Consolas, monospace" font-size="9" fill="#eb6c36">变化行 11 · BOOKKEPT</text>
+  </g>
+</svg>
+<pre>Fidelity ledger（流程视图）
+Detail: balanced · 源 = behavior.md 变化行 12 条 + 边界行 5 条 → 6 节点 / 6 边
+Merged: 变化行 1-3（激活/预检/两类拒跑）→ 节点 1；变化行 6-7（tracker 增强/停问用户）→ 节点 3 sub
+Collapsed: 边界行 B1-B5 不进图（behavior.md 为源，图不另立）
+Dropped: 变化行 9 hold 点（调用方挂起非顺序步骤）；变化行 12 断点续跑（异常路径非主流程）
+Kept in full: 有冲突/零冲突行为分叉——真实分叉必须可质疑（对应 Q2 裁决边界）
+删除清单：无（全新技能，无删除项）</pre>
+</section>
+
+<footer>
+对照物归属：local-mr-squash 访谈 issue <code>2026-09-11-local-mr-squash</code> · 流程行是源、图是面，口径冲突回 <code>behavior.md</code> 对行。
+</footer>
+
+</body>
+</html>
