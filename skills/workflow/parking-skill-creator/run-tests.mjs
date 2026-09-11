@@ -10,6 +10,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildQualityVerdict } from "./scripts/lib/quality.mjs";
 import { runUntilComplete } from "./scripts/lib/run-until-complete.mjs";
+import { machineTreeOffenders } from "./scripts/lib/path-gate.mjs";
 
 const SCRIPTS = join(dirname(fileURLToPath(import.meta.url)), "scripts");
 
@@ -102,6 +103,23 @@ const hardcodedUserDir = /(?:[a-z]:[\\/](?:users|documents and settings)[\\/][^\
 const userPathOffenders = publishedDocPaths.filter((path) => hardcodedUserDir.test(readFileSync(path, "utf8")));
 check(`发布文档不硬编码用户目录绝对路径${userPathOffenders.length ? `: ${userPathOffenders.join(", ")}` : ""}`,
   userPathOffenders.length === 0);
+
+// 机器盘树出厂门禁（2026-09-11 绝对路径审计对策）：分发件 .md/.mjs 不得携带本机真实
+// 工程树绝对路径（个人 GIT 树/GIT_dev/用户配置树/UE 工作区树），占位符与降级句豁免。
+const machineTreeHits = machineTreeOffenders(CREATOR_DIR);
+check(`分发件不携带本机工程树绝对路径${machineTreeHits.length ? `: ${machineTreeHits.join(", ")}` : ""}`,
+  machineTreeHits.length === 0);
+const gateTmp = mkdtempSync(join(tmpdir(), "path-gate-test-"));
+try {
+  mkdirSync(join(gateTmp, "scripts"), { recursive: true });
+  const leakFile = join(gateTmp, "scripts", "leak.mjs");
+  writeFileSync(leakFile, 'const p = "G:/GIT/AI_WorkFlow/leak";\n', "utf8");
+  check("path-gate 抓得出机器盘树泄漏", machineTreeOffenders(gateTmp).length === 1);
+  writeFileSync(leakFile, 'const p = "G:/GIT/AI_WorkFlow/leak"; // 文件不存在时跳过\n', "utf8");
+  check("path-gate 豁免降级句写法", machineTreeOffenders(gateTmp).length === 0);
+} finally {
+  rmSync(gateTmp, { recursive: true, force: true });
+}
 
 const fallbackRoot = mkdtempSync(join(tmpdir(), "headless-probe-test-"));
 try {

@@ -4,6 +4,7 @@
     {
       "date": "2026-09-03T23:52:23+08:00",
       "iteration_ref": "D:\\GIT_dev\\parking-agents\\evals\\github-trending-weekly-workspace\\iteration-1",
+      "ref_tombstone": "2026-09-11 退役注记：D:\\GIT_dev 为异机路径，本机结构性不可回溯；仅作轮次标识",
       "gates": {
         "old_skill": {
           "pass_rate": 1,
@@ -28,6 +29,7 @@
     {
       "date": "2026-09-03T23:53:48+08:00",
       "iteration_ref": "D:\\GIT_dev\\parking-agents\\evals\\github-trending-weekly-workspace\\iteration-1",
+      "ref_tombstone": "2026-09-11 退役注记：D:\\GIT_dev 为异机路径，本机结构性不可回溯；仅作轮次标识",
       "gates": {
         "old_skill": {
           "pass_rate": 1,
@@ -53,6 +55,7 @@
     {
       "date": "2026-09-03T23:54:09+08:00",
       "iteration_ref": "D:\\GIT_dev\\parking-agents\\evals\\github-trending-weekly-workspace\\iteration-1",
+      "ref_tombstone": "2026-09-11 退役注记：D:\\GIT_dev 为异机路径，本机结构性不可回溯；仅作轮次标识",
       "gates": {
         "old_skill": {
           "pass_rate": 1,

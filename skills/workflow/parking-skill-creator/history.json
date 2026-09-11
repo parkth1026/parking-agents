@@ -4,6 +4,7 @@
     {
       "date": "2026-08-17T21:00:56+08:00",
       "iteration_ref": "G:\\GIT\\AI_WorkFlow\\parking-agents\\.agents\\evals\\parking-skill-creator-workspace\\iteration-1",
+      "ref_tombstone": "2026-09-11 退役注记：目录随旧仓 .agents/evals 降级 scratch（commit 0a2b10f 设计决策）清理，原始数据存旧仓 git 历史（c4346d9）；本机回溯不可用，仅作轮次标识",
       "gates": {
         "with_skill": {
           "pass_rate": 1,
@@ -22,6 +23,7 @@
     {
       "date": "2026-08-17T21:54:14+08:00",
       "iteration_ref": "G:\\GIT\\AI_WorkFlow\\parking-agents\\.agents\\evals\\parking-skill-creator-workspace\\iteration-2",
+      "ref_tombstone": "2026-09-11 退役注记：目录随旧仓 .agents/evals 降级 scratch（commit 0a2b10f 设计决策）清理；本机回溯不可用，仅作轮次标识",
       "gates": {
         "with_skill": {
           "pass_rate": 1,
@@ -50,6 +52,7 @@
     {
       "date": "2026-08-27T01:31:29+08:00",
       "iteration_ref": "G:\\GIT\\AI_WorkFlow\\parking-agents-worker\\parking-agents-worker-2\\.agents\\evals\\parking-skill-creator-workspace\\iteration-3",
+      "ref_tombstone": "2026-09-11 退役注记：worker 仓 parking-agents-worker-2 已整体删除，数据不可找回；本机回溯不可用，仅作轮次标识",
       "gates": {
         "with_skill": {
           "pass_rate": 1,

@@ -251,7 +251,7 @@ Kept in full: .changed 节点与 accent 连线的完整样式参数——这是�
 
 ## 出处
 
-- 移植源：diagram-design v2.4.0（本地参考仓库 `G:\GIT\AI_WorkFlow_ref\diagram-design`，
+- 移植源：diagram-design v2.4.0（本地参考仓库 `https://github.com/cathrynlavery/diagram-design`，
   作者 Cathryn Lavery，**MIT License**）。
 - 移植映射：SKILL.md §6 连线六则、§7 网格与复杂度预算、§12 可访问 SVG 契约 →
   本文 §4/§3+§6/§0；源技能 `references/style-guide.md` 的语义角色 → §2；

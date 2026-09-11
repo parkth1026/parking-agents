@@ -4,6 +4,7 @@
     {
       "date": "2026-08-25T18:56:34+08:00",
       "iteration_ref": "G:\\GIT\\AI_WorkFlow\\parking-agents\\evals\\ue-log-analysis-workspace\\iteration-1",
+      "ref_tombstone": "2026-09-11 退役注记：旧仓顶层 evals/ 工作区已清理；本机回溯不可用，仅作轮次标识",
       "gates": {
         "with_skill": {
           "pass_rate": 1,
@@ -23,6 +24,7 @@
     {
       "date": "2026-08-25T22:09:14+08:00",
       "iteration_ref": "G:\\GIT\\AI_WorkFlow\\parking-agents\\evals\\ue-log-analysis-workspace\\iteration-1",
+      "ref_tombstone": "2026-09-11 退役注记：旧仓顶层 evals/ 工作区已清理；本机回溯不可用，仅作轮次标识",
       "gates": {
         "with_skill": {
           "pass_rate": 1,
@@ -43,6 +45,7 @@
     {
       "date": "2026-08-25T22:44:37+08:00",
       "iteration_ref": "G:\\GIT\\AI_WorkFlow\\parking-agents\\evals\\ue-log-analysis-workspace\\iteration-2",
+      "ref_tombstone": "2026-09-11 退役注记：旧仓顶层 evals/ 工作区已清理；本机回溯不可用，仅作轮次标识",
       "gates": {
         "old_skill": {
           "pass_rate": 0.875,
@@ -81,6 +84,7 @@
     {
       "date": "2026-08-26T07:31:37+08:00",
       "iteration_ref": "G:\\GIT\\AI_WorkFlow\\parking-agents\\evals\\ue-log-analysis-workspace\\iteration-3",
+      "ref_tombstone": "2026-09-11 退役注记：旧仓顶层 evals/ 工作区已清理；本机回溯不可用，仅作轮次标识",
       "gates": {
         "old_skill": {
           "pass_rate": 1,

@@ -5,6 +5,7 @@
 import { readFileSync, existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { parseSkillMdFile } from "./lib/frontmatter.mjs";
+import { machineTreeOffenders } from "./lib/path-gate.mjs";
 
 // 宿主实际支持的 skill frontmatter 键。前 6 个来自官方 quick_validate.py；其余逐条
 // 求证自 Claude Code 自身的 changelog（issue #63）。这份清单**不是**判定依据，只用于
@@ -157,6 +158,12 @@ export function validateSkill(skillDir) {
     if (values.compatibility.length > 500) {
       errors.push(`compatibility 超长（${values.compatibility.length} 字符，上限 500）`);
     }
+  }
+
+  // 机器盘树出厂门禁（2026-09-11 绝对路径审计对策）：分发件 .md/.mjs 不得携带本机真实
+  // 工程树绝对路径；占位符与降级句写法豁免，design/evidence*/report 溯源载体不扫。
+  for (const hit of machineTreeOffenders(skillDir)) {
+    errors.push(`分发件含本机工程树绝对路径: ${hit}（占位/示例/降级句写法见 scripts/lib/path-gate.mjs 豁免口径）`);
   }
 
   return {

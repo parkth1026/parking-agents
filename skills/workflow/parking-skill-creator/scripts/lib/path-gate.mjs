@@ -27,12 +27,14 @@ export function machineTreeOffenders(skillDir) {
   const out = [];
   (function walk(dir) {
     for (const e of readdirSync(dir, { withFileTypes: true })) {
-      if (e.isDirectory() && (/^fixtures/.test(e.name) || e.name === "node_modules")) continue;
+      if (e.isDirectory() && (/^fixtures/.test(e.name) || e.name === "node_modules" || e.name === "eval-graders")) continue;
       const p = join(dir, e.name);
       if (e.isDirectory()) { walk(p); continue; }
       if (!/\.(md|mjs)$/.test(e.name)) continue;
       const rel = relative(skillDir, p).replaceAll("\\", "/");
-      if (PROVENANCE_DOC.test("/" + rel)) continue;
+      // run-tests.mjs 豁免：门禁正例夹具必然内含真实签名才能测门禁本身（自指），测试载体同夹具类。
+      // eval-graders 豁免：冻结的零漂移评分尺（如 karpathy v2），改动会毁其证据效力，硬编码属其年代。
+      if (PROVENANCE_DOC.test("/" + rel) || /(^|\/)run-tests\.mjs$/.test(rel)) continue;
       readFileSync(p, "utf8").split(/\r?\n/).forEach((line, i) => {
         if (EXEMPT_LINE.test(line)) return;
         const m = line.match(MACHINE_TREE);

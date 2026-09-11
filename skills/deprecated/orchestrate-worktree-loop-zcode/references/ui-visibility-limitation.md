@@ -89,7 +89,7 @@ ZCode UI" without this caveat anywhere in this skill's docs or tool descriptions
 ## Manual verification checklist (unverified mitigation — do this once, ~10 seconds)
 
 1. Open the ZCode desktop UI and switch to (or open) the workspace tab for
-   `G:\GIT\AI_WorkFlow\parking-agents-worker\parking-agents-worker-3` — if the sidebar's
+   `G:\…\parking-agents-worker\parking-agents-worker-3` — if the sidebar's
    "workspace group" is a different control than a tab, try expanding that group instead,
    and note which of the two actions (if either) is what actually happened.
 2. Check whether the sidebar now shows session `sess_5c353b9a-dcdc-45aa-892f-e6444615784f`
