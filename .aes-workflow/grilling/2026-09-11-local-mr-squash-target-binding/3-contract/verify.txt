@@ -1,0 +1,18 @@
+# verify @ 2026-09-11T16:56:11Z
+# cwd: G:\GIT\AI_WorkFlow\parking-agents-manual
+
+[PASS] AC-001  exit=0  $ node C:/Users/parking/.agents/skills/parking-skill-creator/scripts/quick-validate.mjs C:/Users/parking/.agents/skills/local-mr-squash
+[PASS] AC-002  exit=0  $ node C:/Users/parking/.agents/skills/local-mr-squash/run-tests.mjs
+           ok  四态·漂移：源前进后 exit 1 且「全包含」变红
+         43 passed, 0 failed
+[PASS] AC-003  exit=0  $ node C:/Users/parking/.agents/skills/local-mr-squash/run-tests.mjs
+           ok  四态·漂移：源前进后 exit 1 且「全包含」变红
+         43 passed, 0 failed
+[PASS] AC-004  exit=0  $ node C:/Users/parking/.agents/skills/local-mr-squash/run-tests.mjs
+           ok  四态·漂移：源前进后 exit 1 且「全包含」变红
+         43 passed, 0 failed
+[PASS] AC-005  exit=0  $ node C:/Users/parking/.agents/skills/local-mr-squash/run-tests.mjs
+           ok  四态·漂移：源前进后 exit 1 且「全包含」变红
+         43 passed, 0 failed
+
+绿 5 / 红 0 / 跑不起来 0

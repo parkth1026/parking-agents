@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "slug": "2026-09-11-local-mr-squash-target-binding",
+  "created_at": "2026-09-11T15:32:40Z",
+  "updated_at": "2026-09-11T16:56:35Z",
+  "original_request": null,
+  "goal_oneline": "修订 local-mr-squash：目标显式化（prose 第 1 步+正文措辞泛化到目标分支）、双 worktree 收口改彼处 reset --hard（含已推送护栏）、门禁加「当前检出==源分支」用法错前置校验、run-tests 补双 worktree 演练——使双 worktree dev 目标拓扑每次合并常规走绿",
+  "target": null,
+  "stage": "3-contract",
+  "next_action": "契约 Ready，可按交接指令启动实现",
+  "stage_gates": {
+    "1-interview": {
+      "status": "done",
+      "closed_at": "2026-09-11T16:46:16Z",
+      "self_assessment": {
+        "意图": "已定",
+        "结果": "已定",
+        "边界": "已定",
+        "约束": "已定",
+        "现状": "已定"
+      }
+    },
+    "2-prototype": {
+      "status": "done",
+      "closed_at": "2026-09-11T16:49:26Z",
+      "artifacts_confirmed": [
+        "skill",
+        "verify-squash-merge",
+        "behavior"
+      ]
+    },
+    "3-contract": {
+      "status": "done",
+      "closed_at": "2026-09-11T16:56:35Z"
+    }
+  },
+  "validation": {
+    "status": "valid",
+    "ac_count": 5,
+    "warnings": [],
+    "ran_at": "2026-09-11T16:56:11Z",
+    "verify_tiers": {
+      "A": 5,
+      "B": 0,
+      "C": 0,
+      "D": 0
+    }
+  },
+  "blocked": [],
+  "residual_risk": null,
+  "status": "ready"
+}
