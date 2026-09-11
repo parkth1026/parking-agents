@@ -2,7 +2,7 @@
 // quick-validate.mjs — 技能快速校验（官方 quick_validate.py 规则集逐字移植，去 PyYAML）
 // 用法: node quick-validate.mjs <技能目录>
 // 退出码: 0 合法 / 1 校验失败 / 2 用法错 / 3 无法判定（frontmatter 含解析器支持子集外的构造）
-import { readFileSync, existsSync, statSync } from "node:fs";
+import { readFileSync, existsSync, statSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { parseSkillMdFile } from "./lib/frontmatter.mjs";
 import { machineTreeOffenders } from "./lib/path-gate.mjs";
@@ -177,7 +177,19 @@ export function validateSkill(skillDir) {
 
 // --- CLI（仅直接运行时执行；被 package-skill 等导入时只提供 validateSkill） ---
 import { pathToFileURL } from "node:url";
-const isMain = import.meta.url === pathToFileURL(process.argv[1] || "-").href;
+// isMain 判等必须双向 realpath 归一：经 symlink 挂载路径调用时，node 会把主模块 URL
+// 解析到真实文件而 argv[1] 保留挂载路径，字面判不等 → CLI 整段静默跳过（零输出
+// exit 0 空转假绿，2026-09-12 审计实测）。argv[1] 非文件（realpath 失败）不视为主模块。
+let isMain = false;
+if (process.argv[1]) {
+  try {
+    isMain =
+      pathToFileURL(realpathSync(process.argv[1])).href ===
+      pathToFileURL(realpathSync(new URL(import.meta.url))).href;
+  } catch {
+    isMain = false;
+  }
+}
 if (isMain) {
   const [dir] = process.argv.slice(2);
   if (!dir || dir.startsWith("-")) usage();

@@ -5,7 +5,7 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { tmpdir, homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildQualityVerdict } from "./scripts/lib/quality.mjs";
@@ -119,6 +119,18 @@ try {
   check("path-gate 豁免降级句写法", machineTreeOffenders(gateTmp).length === 0);
 } finally {
   rmSync(gateTmp, { recursive: true, force: true });
+}
+
+// quick-validate 的 isMain 判等经 symlink 挂载路径调用不得空转（2026-09-12 审计实测：
+// 字面判等时 node 把主模块 realpath 到真实树而 argv[1] 留在挂载路径，判不等 → CLI
+// 整段静默跳过，零输出 exit 0 假绿）。有用户级挂载才测，无则跳过。
+const symlinkValidate = join(homedir(), ".agents", "skills", "parking-skill-creator", "scripts", "quick-validate.mjs");
+if (existsSync(symlinkValidate)) {
+  const symRun = runNode(symlinkValidate, [CREATOR_DIR]);
+  check("quick-validate 经 symlink 路径调用不空转（真输出 PASS 且 exit 0）",
+    symRun.code === 0 && /PASS/.test(out(symRun)));
+} else {
+  console.log("  --  跳过 symlink 调用回归（本机无用户级挂载路径）");
 }
 
 const fallbackRoot = mkdtempSync(join(tmpdir(), "headless-probe-test-"));
