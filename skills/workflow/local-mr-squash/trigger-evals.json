@@ -1,0 +1,25 @@
+{
+  "skill": "local-mr-squash",
+  "queries": [
+    { "id": "q01", "text": "用 local-mr-squash 把 dev 分支合进 main", "should_trigger": true },
+    { "id": "q02", "text": "按 local-mr-squash 流程把 feature-x squash 合并到主干", "should_trigger": true },
+    { "id": "q03", "text": "$local-mr-squash 执行本地 PR 合并", "should_trigger": true },
+    { "id": "q04", "text": "用 local-mr-squash 技能处理这次合并，记得留溯源信息", "should_trigger": true },
+    { "id": "q05", "text": "走 local-mr-squash 把 experiment 分支合过来", "should_trigger": true },
+    { "id": "q06", "text": "local-mr-squash 合并 dev-parking 到 main", "should_trigger": true },
+    { "id": "q07", "text": "帮我按 local-mr-squash 的流程做 squash merge", "should_trigger": true },
+    { "id": "q08", "text": "用 local-mr-squash 把这个分支合到 master，门禁跑一下", "should_trigger": true },
+    { "id": "q09", "text": "调用 local-mr-squash 完成分支合并收口", "should_trigger": true },
+    { "id": "q10", "text": "把 dev 分支 squash 合并到 main", "should_trigger": false },
+    { "id": "q11", "text": "本地 PR 流程合并：把 feature-x 压成一个提交合进主干", "should_trigger": false },
+    { "id": "q12", "text": "帮我解决这个 merge 冲突，两个分支都改了 config.yaml", "should_trigger": false },
+    { "id": "q13", "text": "rebase 到 main 上有冲突，怎么处理", "should_trigger": false },
+    { "id": "q14", "text": "把 feature 分支合并进来，用普通 merge 不要 squash", "should_trigger": false },
+    { "id": "q15", "text": "把 dev 合到 main，直接快进就行", "should_trigger": false },
+    { "id": "q16", "text": "撤销刚才的合并提交", "should_trigger": false },
+    { "id": "q17", "text": "看看 feature 分支领先 main 几个提交", "should_trigger": false },
+    { "id": "q18", "text": "把我的分支 rebase 到最新的 main 上", "should_trigger": false },
+    { "id": "q19", "text": "删掉已经合并完的 feature-y 分支", "should_trigger": false },
+    { "id": "q20", "text": "把最近这三个没推送的提交 squash 成一个", "should_trigger": false }
+  ]
+}

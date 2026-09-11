@@ -1,0 +1,7 @@
+interface:
+  display_name: "local-mr-squash"
+  short_description: "本地 squash 合并门禁流程：五步语义合并 + 溯源 commit message + 四项硬门禁"
+  default_prompt: "Use $local-mr-squash to squash-merge a source branch into the target branch with semantic conflict resolution, a provenance commit message, and the hard safety gate."
+
+policy:
+  allow_implicit_invocation: false

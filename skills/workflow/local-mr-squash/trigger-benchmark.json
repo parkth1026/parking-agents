@@ -1,0 +1,58 @@
+{
+  "skill": "local-mr-squash",
+  "split": {
+    "train": [
+      "q03",
+      "q01",
+      "q05",
+      "q09",
+      "q04",
+      "q06",
+      "q10",
+      "q11",
+      "q15",
+      "q17",
+      "q12",
+      "q14",
+      "q19"
+    ],
+    "test": [
+      "q08",
+      "q02",
+      "q07",
+      "q20",
+      "q16",
+      "q13",
+      "q18"
+    ],
+    "seed": 42,
+    "holdout": 0.4
+  },
+  "rounds": [
+    {
+      "description": "仅限用户显式点名时使用：用户原话出现 local-mr-squash（如「用 local-mr-squash 合并」「按 local-mr-squash 流程走」「$local-mr-squash」）才加载本技能；用户未点名时不要自动选它——常规合并分支、squash 压缩提交、解决 merge/rebase 冲突等请求不适用（冲突解决用 resolving-merge-conflicts）。点名后的用途：把源分支以 PR squash 等价方式合入本地主干——五步语义合并裁决冲突、溯源块 commit message、分支收口、四项硬门禁脚本验收。",
+      "valid_probes": 51,
+      "train": {
+        "queries": 13,
+        "evaluated": 13,
+        "trigger_rate_on_should": 1,
+        "false_trigger_rate_on_should_not": 0,
+        "correct": 13,
+        "invalid_queries": 0
+      },
+      "test": {
+        "queries": 7,
+        "evaluated": 7,
+        "trigger_rate_on_should": 1,
+        "false_trigger_rate_on_should_not": 0,
+        "correct": 7,
+        "invalid_queries": 0
+      }
+    }
+  ],
+  "best_description": "仅限用户显式点名时使用：用户原话出现 local-mr-squash（如「用 local-mr-squash 合并」「按 local-mr-squash 流程走」「$local-mr-squash」）才加载本技能；用户未点名时不要自动选它——常规合并分支、squash 压缩提交、解决 merge/rebase 冲突等请求不适用（冲突解决用 resolving-merge-conflicts）。点名后的用途：把源分支以 PR squash 等价方式合入本地主干——五步语义合并裁决冲突、溯源块 commit message、分支收口、四项硬门禁脚本验收。",
+  "best_description_reason": null,
+  "min_test_queries": 6,
+  "valid_probes": 51,
+  "invalid_probes": 9
+}
