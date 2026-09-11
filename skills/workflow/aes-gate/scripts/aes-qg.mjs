@@ -25,7 +25,8 @@ export const LEVEL_RECEIPT_SCHEMA = 'aes.gate.level-receipt/v1';
 export const LEVEL_NAMES = Object.freeze(Array.from({ length: 6 }, (_, i) => `AES-QG-L${i}`));
 const FULL_LEVEL_RE = /^AES-QG-L[0-5]$/;
 const BARE_LEVEL_RE = /^L[0-5]$/;
-const RUN_ACTION_ID = /^[a-z][a-z0-9]*(\.[a-z][a-z0-9]*)*$/;
+// 段文法 = run standard v4 §3.1：段内连字符不得开头/结尾/连续（test.flow-patrol 合法）。
+const RUN_ACTION_ID = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*(?:\.[a-z][a-z0-9]*(?:-[a-z0-9]+)*)*$/;
 const RUN_KINDS = ['task', 'open', 'test', 'gate'];
 const RESERVED_IDS = ['list', 'show', 'doctor', 'help', 'run'];
 export const GATE_DIR_NAME = '.aes-gate';

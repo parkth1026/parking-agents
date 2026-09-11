@@ -37,7 +37,8 @@ const STATUS_LABEL = { green: '绿', red: '红', missing: '缺失', stale: '疑�
 // 1) run.toml：注册真源（run/v1 标准，见 aes-standardize-repo/references/run-standard.md）
 // ---------------------------------------------------------------------------
 
-const RUN_ACTION_ID = /^[a-z][a-z0-9]*(\.[a-z][a-z0-9]*)*$/;
+// 段文法 = run standard v4 §3.1：段内连字符不得开头/结尾/连续（test.flow-patrol 合法）。
+const RUN_ACTION_ID = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*(?:\.[a-z][a-z0-9]*(?:-[a-z0-9]+)*)*$/;
 const RUN_KINDS = ['task', 'open', 'test', 'gate'];
 const RESERVED_IDS = ['list', 'show', 'doctor', 'help', 'run'];
 
