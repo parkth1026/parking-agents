@@ -685,9 +685,12 @@ if (testArgs.contract !== null || testArgs.caseName !== null) {
     runCode(['--repo', tmp]);
     const registry2 = JSON.parse(readFileSync(join(gateDir, 'gate-registry.json'), 'utf8'));
     check('T3 二轮 history=2（追加不覆盖）', registry2.history.length === 2);
+    // report 文件名时间戳为秒级：两次默认采集跨秒边界会产生两个合法 report（覆盖同名），
+    // 「handoff 不落盘」的断言面是 handoff 前后计数不增，不是全目录恰 1 个。
+    const reportsBeforeHandoff = readdirSync(gateDir).filter((f) => /^report-/.test(f)).length;
     const out2 = run(['--handoff', '--repo', tmp]);
     check('T3 二轮 handoff 含历史对比', out2.includes('上次') && /差 [-\d.]+/.test(out2));
-    check('T3 二轮 handoff 仍不新增 report 文件', readdirSync(gateDir).filter((f) => /^report-/.test(f)).length === 1);
+    check('T3 二轮 handoff 仍不新增 report 文件', readdirSync(gateDir).filter((f) => /^report-/.test(f)).length === reportsBeforeHandoff);
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }
