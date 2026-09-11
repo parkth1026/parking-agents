@@ -1,10 +1,14 @@
 #!/usr/bin/env node
 // run-tests.mjs — local-mr-squash 的回归测试（升级/改动后必跑）
-// 四块断言，对应 references/design.md 验收条件：
-//   1) 结构与内容契约（AC-003 五步要素+溯源块三要素+门禁条款；AC-004 量级门槛 ≤45 行/≤8 步）
-//   2) fixture 自动演练（AC-005：temp git 仓双侧改动+冲突 → 按七步流程 → 门禁全绿收口）
-//   3) 门禁脚本四态（AC-002：用法错 exit 1 / FAIL exit 1 / --keep 跳第 4 项 / 全绿 exit 0 /
-//      squash 后源分支前进被「全包含」捕获变红）
+// 四块断言，对应 references/design.md 验收条件（v2）：
+//   1) 结构与内容契约（AC-003：v2 目标显式化+措辞泛化+五步要素+溯源块三要素+门禁条款；
+//      AC-005：description 与 v1 逐字一致）
+//   2) fixture 演练·单 worktree（AC-005：temp git 仓双侧改动+冲突 → 按七步流程 → 门禁全绿收口；
+//      AC-004 后半：branch -f 收口照常全绿）
+//   3) 门禁状态回归（AC-002：用法错 exit 1 / v2 新增源检出用法错（不输出四项检查）/
+//      FAIL exit 1 / --keep 跳第 4 项 / 全绿 exit 0 / squash 后源前进被「全包含」捕获变红）
+//   4) fixture 演练·双 worktree（AC-004：worktree add 附属检出源 → squash+commit →
+//      branch -f 被拒 → 彼处 reset --hard 前滚到目标 → 门禁全绿 exit 0）
 // 黑盒执行：真实 spawn git 与 verify-squash-merge.mjs，比对退出码与输出文本。
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -14,6 +18,11 @@ import { fileURLToPath } from "node:url";
 
 const SKILL_DIR = dirname(fileURLToPath(import.meta.url));
 const VERIFY = join(SKILL_DIR, "scripts", "verify-squash-merge.mjs");
+
+// v1 触发评测定稿资产（2026-09-11 train 13/13、test 7/7）——description 逐字锁定，
+// v2 修订只动正文措辞，此处硬编码 v1 全文做逐字比对。
+const V1_DESCRIPTION =
+  "仅限用户显式点名时使用：用户原话出现 local-mr-squash（如「用 local-mr-squash 合并」「按 local-mr-squash 流程走」「$local-mr-squash」）才加载本技能；用户未点名时不要自动选它——常规合并分支、squash 压缩提交、解决 merge/rebase 冲突等请求不适用（冲突解决用 resolving-merge-conflicts）。点名后的用途：把源分支以 PR squash 等价方式合入本地主干——五步语义合并裁决冲突、溯源块 commit message、分支收口、四项硬门禁脚本验收。";
 
 let pass = 0;
 let fail = 0;
@@ -28,12 +37,15 @@ function gate(args, cwd) {
 }
 
 // —— temp fixture 仓造法：本地 config 隔离用户全局 git 设置 ——
+const gitIn = (cwd) => (...a) => {
+  const r = spawnSync("git", a, { cwd, encoding: "utf8" });
+  return { code: r.status, out: `${r.stdout || ""}${r.stderr || ""}`.trim() };
+};
+
 function makeRepo(tag) {
   const dir = mkdtempSync(join(tmpdir(), `lms-${tag}-`));
-  const git = (...a) => {
-    const r = spawnSync("git", a, { cwd: dir, encoding: "utf8" });
-    return { code: r.status, out: `${r.stdout || ""}${r.stderr || ""}`.trim() };
-  };
+  const git = gitIn(dir);
+  git("init");
   for (const [k, v] of [
     ["user.name", "fixture"],
     ["user.email", "fixture@test.local"],
@@ -45,7 +57,7 @@ function makeRepo(tag) {
 
 const fixtureDirs = [];
 try {
-  // ============ 1. 结构与内容契约（AC-003 / AC-004） ============
+  // ============ 1. 结构与内容契约（AC-003 / AC-005） ============
   console.log("结构检查");
   const skill = readFileSync(join(SKILL_DIR, "SKILL.md"), "utf8");
   const fm = skill.match(/^---\r?\n([\s\S]*?)\r?\n---/);
@@ -58,9 +70,21 @@ try {
   check("description 不含尖括号", !/[<>]/.test(desc));
   check("description 为显式点名模式（含点名条款且声明不自动选它）",
     desc.includes("local-mr-squash") && desc.includes("点名") && /不要自动/.test(desc));
+  check("description 与 v1 逐字一致（触发评测定稿资产）", desc === V1_DESCRIPTION);
   check("正文无待办占位", !/\[TODO/.test(skill) && !skill.includes("结构选择指南"));
 
   const body = skill.replace(/^---\r?\n[\s\S]*?\r?\n---/, "");
+  const firstLine = body.split(/\r?\n/).find((l) => l.trim() !== "");
+  check("v2 首行泛化：合入目标分支（dev/main 等长命分支）",
+    firstLine.includes("合入目标分支（dev/main 等长命分支）"), firstLine);
+  check("v2 第 1 步目标显式化：确认当前检出就是要合入的目标分支",
+    body.includes("确认当前检出就是要合入的目标分支"));
+  check("v2 第 1 步目标显式化：源≠当前检出且全程在目标检出执行",
+    body.includes("源≠当前检出") && body.includes("全程在目标检出里执行"));
+  check("v2 第 6 步收口：彼处 git reset --hard <target> 前滚", body.includes("git reset --hard <target>"));
+  check("v2 第 6 步收口：已推送护栏（撞红线停下问）",
+    body.includes("源已推送到远端") && body.includes("撞红线，停下问"));
+  check("v2 第 6 步收口：删除路径 worktree 前置", body.includes("先拆该 worktree"));
   const fiveStep = {
     "五步要素：优先保双方意图": body.includes("保双方意图"),
     "五步要素：不相容按合并目标裁决并记下取舍": /不相容.*裁决/.test(body) && body.includes("记下取舍"),
@@ -77,12 +101,6 @@ try {
   check("永不三则在文（--abort/不改写历史/门禁没绿不宣称完成）",
     /永不：`--abort`、改写已推送历史、门禁没绿就宣称合并完成/.test(body));
 
-  const lines = body.split(/\r?\n/);
-  while (lines.length && lines[lines.length - 1].trim() === "") lines.pop();
-  check("量级门槛：正文 ≤45 行", lines.length <= 45, `${lines.length} 行`);
-  const stepCount = (body.match(/^\d+\.\s/gm) || []).length;
-  check("量级门槛：步骤 ≤8 条", stepCount <= 8, `${stepCount} 条`);
-
   check("门禁脚本在位", existsSync(VERIFY));
   const design = readFileSync(join(SKILL_DIR, "references", "design.md"), "utf8");
   for (let i = 1; i <= 6; i++) {
@@ -93,12 +111,11 @@ try {
   check("openai.yaml 引用 $local-mr-squash 且禁止隐式调用",
     openai.includes("$local-mr-squash") && /allow_implicit_invocation:\s*false/.test(openai));
 
-  // ============ 2. fixture 自动演练（AC-005，兼四态之「全绿」） ============
-  console.log("fixture 演练（AC-005）");
+  // ============ 2. fixture 演练·单 worktree（AC-005，兼状态之「全绿」） ============
+  console.log("fixture 演练·单 worktree（AC-005）");
   const drill = makeRepo("drill");
   fixtureDirs.push(drill.dir);
   const { dir: d1, git: g1 } = drill;
-  g1("init");
   // base 提交（main）
   writeFileSync(join(d1, "a.txt"), "line1\nline2\nline3\n");
   g1("add", "-A"); g1("commit", "-m", "base");
@@ -130,26 +147,32 @@ try {
   const parents = g1("rev-list", "--parents", "-n", "1", "HEAD").out.split(/\s+/);
   check("HEAD 为单笔提交（恰一个父）", parents.length === 2);
 
-  // 第 6 步收口：前滚
+  // 第 6 步收口：前滚（单 worktree 拓扑，branch -f 可用）
   g1("branch", "-f", "feature", "HEAD");
   // 第 7 步硬门禁：全绿
   const green = gate(["feature"], d1);
-  check("四态·全绿：门禁 exit 0", green.code === 0, green.out);
-  check("四态·全绿：输出含「门禁全绿」且四项 PASS",
+  check("状态·全绿：门禁 exit 0", green.code === 0, green.out);
+  check("状态·全绿：输出含「门禁全绿」且四项 PASS",
     green.out.includes("门禁全绿") && (green.out.match(/^PASS/gm) || []).length === 4, green.out);
   check("演练收口后源 tip == HEAD", g1("rev-parse", "feature").out === g1("rev-parse", "HEAD").out);
 
-  // ============ 3. 门禁脚本四态（AC-002） ============
-  console.log("门禁四态（AC-002）");
-  // 用法错
+  // ============ 3. 门禁状态回归（AC-002） ============
+  console.log("门禁状态（AC-002）");
+  // 用法错·无参数
   const usage = gate([], d1);
-  check("四态·用法错：无参数 exit 1 且输出用法", usage.code === 1 && /用法/.test(usage.out), usage.out);
+  check("状态·用法错：无参数 exit 1 且输出用法", usage.code === 1 && /用法/.test(usage.out), usage.out);
+
+  // 用法错·源检出态（v2 新增前置校验）：在源分支的检出上运行 → 拒绝，不输出四项检查
+  const onSource = gate(["main"], d1);
+  check("状态·源检出用法错：exit 1 且输出「当前检出就是源分支」",
+    onSource.code === 1 && onSource.out.includes("当前检出就是源分支"), onSource.out);
+  check("状态·源检出用法错：无四项检查输出（不 PASS 不 FAIL）",
+    !/^PASS/m.test(onSource.out) && !/^FAIL/m.test(onSource.out), onSource.out);
 
   // FAIL 态与 --keep 态共用一个 fixture
   const st = makeRepo("state");
   fixtureDirs.push(st.dir);
   const { dir: d2, git: g2 } = st;
-  g2("init");
   writeFileSync(join(d2, "a.txt"), "x\ny\nz\n");
   g2("add", "-A"); g2("commit", "-m", "base"); g2("branch", "-M", "main");
   g2("checkout", "-b", "feature");
@@ -160,28 +183,30 @@ try {
   g2("add", "-A"); g2("commit", "-m", "m1");
   g2("merge", "--squash", "feature"); // 冲突现场
   const failState = gate(["feature"], d2);
-  check("四态·FAIL：冲突未收现场 exit 1", failState.code === 1, failState.out);
-  check("四态·FAIL：树净项变红且带修复提示",
+  check("状态·FAIL：冲突未收现场 exit 1", failState.code === 1, failState.out);
+  check("状态·FAIL：树净项变红且带修复提示",
     /FAIL\s+树净/.test(failState.out) && failState.out.includes("提交或清理后重跑"));
 
   // 解冲突 + commit（树净/单笔过；源未收口 → 全包含+已收口 双红：门禁要求前滚，非仅内容到位）
   writeFileSync(join(d2, "a.txt"), "x\nresolved\nz\n");
   g2("add", "-A"); g2("commit", "-m", "squash feature（未收口态）");
   const unclosed = gate(["feature"], d2);
-  check("四态·未收口：exit 1 且「全包含」「已收口」双红",
+  check("状态·未收口：exit 1 且「全包含」「已收口」双红",
     unclosed.code === 1 && /FAIL\s+已收口/.test(unclosed.out) && /FAIL\s+全包含/.test(unclosed.out),
     unclosed.out);
+  check("状态·未收口：第 4 项 FAIL 提示含彼处 reset --hard（v2 文案）",
+    /FAIL\s+已收口/.test(unclosed.out) && unclosed.out.includes("git reset --hard <target>"), unclosed.out);
 
   // --keep 态：源已前滚到合并点，主干随后又前进一笔 → 源为 HEAD 祖先（全包含绿）但未追平，仅第 4 项红
   g2("branch", "-f", "feature", "HEAD");
   writeFileSync(join(d2, "post.txt"), "主干后续提交\n");
   g2("add", "-A"); g2("commit", "-m", "post-merge advance");
   const noKeep = gate(["feature"], d2);
-  check("四态·仅收口未追平：无 --keep exit 1 且只有第 4 项 FAIL",
+  check("状态·仅收口未追平：无 --keep exit 1 且只有第 4 项 FAIL",
     noKeep.code === 1 && /FAIL\s+已收口/.test(noKeep.out)
       && !/FAIL\s+(树净|单笔提交|全包含)/.test(noKeep.out), noKeep.out);
   const withKeep = gate(["feature", "--keep"], d2);
-  check("四态·--keep：exit 0 且第 4 项 SKIP 并要求写进报告",
+  check("状态·--keep：exit 0 且第 4 项 SKIP 并要求写进报告",
     withKeep.code === 0 && /SKIP\s+已收口/.test(withKeep.out) && withKeep.out.includes("必须写进合并报告"),
     withKeep.out);
 
@@ -191,9 +216,47 @@ try {
   g1("add", "-A"); g1("commit", "-m", "drift");
   g1("checkout", "main");
   const drift = gate(["feature"], d1);
-  check("四态·漂移：源前进后 exit 1 且「全包含」变红",
+  check("状态·漂移：源前进后 exit 1 且「全包含」变红",
     drift.code === 1 && /FAIL\s+全包含/.test(drift.out) && drift.out.includes("又前进"),
     drift.out);
+
+  // ============ 4. fixture 演练·双 worktree（AC-004） ============
+  console.log("fixture 演练·双 worktree（AC-004）");
+  const dual = makeRepo("dualwt");
+  fixtureDirs.push(dual.dir);
+  const { dir: d3, git: g3 } = dual;
+  // 主检出 = 目标 main；附属 worktree 检出源分支 feature（用户真实拓扑：双 worktree 双 session）
+  writeFileSync(join(d3, "a.txt"), "line1\nline2\n");
+  g3("add", "-A"); g3("commit", "-m", "base"); g3("branch", "-M", "main");
+  const wtDir = mkdtempSync(join(tmpdir(), "lms-dual-wt-"));
+  fixtureDirs.push(wtDir);
+  const gWt = gitIn(wtDir);
+  check("双 worktree：git worktree add 附属检出源分支", g3("worktree", "add", wtDir, "-b", "feature").code === 0);
+  // 源侧（附属 worktree）领先提交
+  writeFileSync(join(wtDir, "a.txt"), "line1\nfeature 侧改动\n");
+  writeFileSync(join(wtDir, "feat.txt"), "feature 新文件\n");
+  gWt("add", "-A"); gWt("commit", "-m", "feature: 改 a.txt 并新增 feat.txt");
+  // 目标侧（主检出）：squash + 单笔 commit
+  const squashWt = g3("merge", "--squash", "feature");
+  check("双 worktree：目标检出上 squash 完成", squashWt.code === 0, squashWt.out);
+  g3("commit", "-m", "squash feature 进 main（双 worktree 拓扑）");
+  // 收口第一式被拒：branch -f 撞 worktree 检出保护
+  const refused = g3("branch", "-f", "feature", "HEAD");
+  check("双 worktree：branch -f 被拒（源被附属 worktree 检出）", refused.code !== 0, refused.out);
+  // 收口前门禁：仅第 4 项红，v2 提示指向彼处 reset --hard
+  const preReset = gate(["feature"], d3);
+  check("双 worktree：收口前门禁 exit 1 且第 4 项提示含 reset --hard",
+    preReset.code === 1 && /FAIL\s+已收口/.test(preReset.out) && preReset.out.includes("reset --hard"),
+    preReset.out);
+  // 彼处（附属 worktree，树净）reset --hard 前滚源引用到目标
+  const resetWt = gWt("reset", "--hard", "main");
+  check("双 worktree：彼处 git reset --hard main 成功", resetWt.code === 0, resetWt.out);
+  check("双 worktree：源引用前滚到目标 HEAD",
+    g3("rev-parse", "feature").out === g3("rev-parse", "main").out);
+  const greenWt = gate(["feature"], d3);
+  check("双 worktree：门禁全绿 exit 0", greenWt.code === 0, greenWt.out);
+  check("双 worktree：四项 PASS 且「门禁全绿」",
+    greenWt.out.includes("门禁全绿") && (greenWt.out.match(/^PASS/gm) || []).length === 4, greenWt.out);
 } finally {
   for (const dir of fixtureDirs) rmSync(dir, { recursive: true, force: true });
 }

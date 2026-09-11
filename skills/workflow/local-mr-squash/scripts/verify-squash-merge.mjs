@@ -3,6 +3,8 @@
 // CLI 契约：
 //   node verify-squash-merge.mjs <source-branch> [--keep]
 //   退出码 0 = 四项全绿，合并算完成；1 = 有 FAIL（含用法错）。
+//   用法错两态（均 exit 1，不输出四项检查）：未给 source；当前检出 == source
+//   （门禁必须在目标分支的检出上运行，源检出上四项检查同义反复假绿）。
 //   --keep = 显式跳过第 4 项（分支收口），用于「明知未收口仍放行」，
 //            调用方必须把用了 --keep 这件事说进最终报告。
 //
@@ -28,6 +30,21 @@ if (!source) {
 
 const git = (...gitArgs) =>
 	execFileSync("git", gitArgs, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+
+// 前置校验（用法错）：门禁必须在目标分支的检出上运行。
+// 在源分支检出上四项检查会同义反复假绿（合并前实测全绿 exit 0），必须拒绝。
+try {
+	const currentBranch = git("rev-parse", "--abbrev-ref", "HEAD").trim();
+	if (currentBranch === source) {
+		console.error(
+			`用法错：当前检出就是源分支 ${source}——门禁必须在目标分支的检出上运行（源检出上四项检查同义反复假绿）`,
+		);
+		process.exit(1);
+	}
+} catch (error) {
+	console.error(`FAIL  门禁无法执行：${error.message.split("\n")[0]}`);
+	process.exit(1);
+}
 
 const results = [];
 const check = (name, pass, failHint) => {
@@ -84,7 +101,7 @@ try {
 			check(
 				`已收口（${source} tip == HEAD，前滚到位）`,
 				srcTip === head,
-				`收口三选一：git branch -f ${source} HEAD（未被 worktree 检出时）/ 在其 worktree 里 git merge（树净且 tip 未前进）/ git branch -D ${source}（短命流）；或 --keep 显式放行`,
+				`收口三选一：git branch -f ${source} HEAD（未被 worktree 检出时）/ 在其 worktree 里 git reset --hard <target>（彼处树净且 tip 未前进）/ git branch -D ${source}（短命流，源被 worktree 检出时先拆该 worktree）；或 --keep 显式放行`,
 			);
 		}
 	}
