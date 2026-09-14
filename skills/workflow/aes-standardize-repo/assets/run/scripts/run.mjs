@@ -338,15 +338,17 @@ async function executeAction(config, requested, dryRun, asJson) {
 
   // TEST_TMP_ROOT 临时落点路由（run-standard §9.7）：动作执行前解析——已设且有效
   // → 注入子进程 TMP/TEMP + stderr 路由行；未设 → 回退提示行（零配置仅多一行提示，
-  // 子进程走机器默认 tmp，行为同无此层）；漂移/水位告警回退不失败。诊断信息一律
-  // stderr（§7.1 stdout 纯净），--json 模式下路由行同样只落 stderr。
+  // 子进程走机器默认 tmp，行为同无此层）；漂移（已设但不可建/不可写）→ 漂移告警行
+  // 已由上方 warnings 循环打印，此处不再打「not set」（与 AntHub run 层同形态——
+  // 变量明明设了不能说它没设）。诊断信息一律 stderr（§7.1 stdout 纯净），
+  // --json 模式下路由行同样只落 stderr。
   const tmpRoute = resolveRoutedRoot({ variable: TEST_TMP_ROOT_VAR });
   for (const warning of tmpRoute.warnings) process.stderr.write(`${warning}\n`);
   let childEnv = process.env;
   if (tmpRoute.source === "variable") {
     childEnv = { ...process.env, TMP: tmpRoute.root, TEMP: tmpRoute.root };
     process.stderr.write(`[tmp-route] ${TEST_TMP_ROOT_VAR}=${tmpRoute.root} → 注入子进程 TMP/TEMP\n`);
-  } else {
+  } else if (tmpRoute.variableValue === null) {
     process.stderr.write(`[tmp-route] ${TEST_TMP_ROOT_VAR} not set → 不注入，子进程回退 os.tmpdir() = ${tmpRoute.root}\n`);
   }
 
