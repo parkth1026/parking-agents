@@ -1,6 +1,6 @@
 # run 命令执行标准 v4（跨仓库）
 
-> 状态：v1 定稿（2026-08-17）；v1→v2 动词域修订（2026-08-26，见 12.2 迁移表）；v2→v3 脚本语言政策修订（2026-09-04，见 12.2）；v3→v4 desc 契约字段修订（2026-09-07，见 12.2）。草案经四路红队对抗校验后修订：事实核查 ×2（35 条引述逐条回源）、标准攻击（15 项缺陷）、落地审查（对照参照实现逐行核对）。校验结论与修订记录见附录 D。
+> 状态：v1 定稿（2026-08-17）；v1→v2 动词域修订（2026-08-26，见 12.2 迁移表）；v2→v3 脚本语言政策修订（2026-09-04，见 12.2）；v3→v4 desc 契约字段修订（2026-09-07，见 12.2）；v4.1 限定词治理（2026-09-07，§4）与 TEST_TMP_ROOT 临时落点路由增补（2026-09-15，§9.7——行为条款，不涉 schema/动词域/退出码，不升主版本）。草案经四路红队对抗校验后修订：事实核查 ×2（35 条引述逐条回源）、标准攻击（15 项缺陷）、落地审查（对照参照实现逐行核对）。校验结论与修订记录见附录 D。
 > 证据方法：best-practice-research 工作流 —— 官方/上游证据优先，四路 researcher 并行调研（npm/pnpm、yarn/cargo、make/just/Task/git/go/docker/kubectl、PowerShell/POSIX/GNU/clig.dev）。所有实质性规则在附录 A 标注先例、来源与置信度；无官方先例的自定项在附录 B 诚实列出。
 > 适用范围：本人全部 git 仓库的统一执行入口 —— 仓库根 `run.toml`（声明式动作清单）+ `run`/`run.cmd`（wrapper）+ `scripts/run.mjs`（runner）。
 > 参照实现：AntAgent2（runner v1.3.0，run/v2）。本标准与参照实现的**主要**差异与已知缺口见第 13 节。
@@ -193,9 +193,16 @@ run = ["node", "./scripts/run/dev-server.mjs"]  # 显式 argv，非空字符串�
 1. 子进程一律 `shell:false` + 显式 argv。
 2. Windows 上解析到 `.cmd`/`.bat`（如 npm/npx）时经 `cmd.exe /d /s /c` 中转；转义覆盖空白与引号（`\"`），**cmd 元字符（`& | < > ^ %`）在无空白参数中不转义、`%VAR%` 会被 cmd 展开**——`run` 数组应避免 cmd 元字符，该盲区见第 13 节 G9。
 3. `node` 命令特判映射为 `process.execPath`；PATH 搜索使用 `PATHEXT`。
-4. 动作执行 cwd 固定为仓库根；环境变量原样透传（不增不改）。
+4. 动作执行 cwd 固定为仓库根；环境变量原样透传（不增不改）——**唯一例外**：`TEST_TMP_ROOT` 临时落点路由对子进程 TMP/TEMP 的注入（9.7）。
 5. runner 依赖 Node 运行时：语法层面要求 Node ≥14.8（顶层 await），但各仓实际下限由其依赖树决定（参照实现为 22.13+/24+，与三处 package.json `engines.node` 对齐——依据 vite 8 / eslint 10 / jsdom 29 的 engines 交集）。前置检查双层（参照实现 runner v1.3.0 起，G12 落地）：wrapper 在 `exec node` 前 fail-fast 探测 Node 存在性（缺失→69 UNAVAILABLE + nodejs.org 安装指引，不裸报 9009/command not found）；runner 在动作执行前校验版本下限（过老→69 + 重装 LTS 指引）。dry-run/list/show/doctor 不受版本门限——诊断与契约读取在任何 Node 上可达，版本下限由 doctor 呈现（10 节）。无 Node 的仓库（纯 Rust/C#）不能直接复用 wrapper，需等价实现（第 14 节适用边界）。
 6. 退出用 `process.exitCode = await main()` 而非 `process.exit()`（Node.js 官方警告强制退出会截断挂起的异步 I/O）。
+7. **`TEST_TMP_ROOT` 临时落点路由（v4.1，2026-09-15）**：测试临时落点的唯一决策变量是跨项目标准名 `TEST_TMP_ROOT`（不认仓库名前缀变体——同名跨仓统一是它的存在意义）。语义（与参照实现 AntHub 2026-09-14 契约的实证形态一致）：
+   - **解析链**：变量 > 回退 `os.tmpdir()`；变量值做探针可写校验；目录缺失自动重建（RAM 盘重启自洁属常态，盘在即建）；盘符不在/不可写 = 配置漂移 → 告警 + 回退，测试不因漂移失败；解析根剩余空间 <15% 水位告警不失败（`statfsSync` 能力探测，Node 过老或网络盘不可得即跳过）。
+   - **runner 行为**：动作执行前经 `scripts/run/lib/tmp-root.mjs`（自包含单源，仅 node: 内置依赖）解析——已设且有效 → 注入子进程 `TMP`/`TEMP` = 解析根 + stderr 路由行 `[tmp-route] TEST_TMP_ROOT=<root> → 注入子进程 TMP/TEMP`；未设 → 回退提示行（零配置机器仅多一行提示，子进程走机器默认 tmp）。路由/告警行一律 stderr（7.1 stdout 纯净），`--json` 模式同样。
+   - **直呼形态**：`node scripts/run/lib/tmp-root.mjs --print` 首行=解析根绝对路径、随后逐行告警、退出码恒 0——供 PowerShell 等入口消费。
+   - **建议条款（各仓可选，标准不带代码）**：入口脚本自解析（裸直呼不经 ./run 的 .mjs 调 `selfResolveTmp`——双保险第二险）+ 机械守卫（禁裸读 `process.env.TEMP/TMP`/`$env:TEMP`/`GetTempPath()`、禁盘符字面量、直呼入口自解析断言）。测试/gate 重的仓建议采纳；轻量仓 run 层路由单保险即可。
+   - **desc 契约联动（6.2）**：动作 desc 涉及临时落点时写 `TEST_TMP_ROOT` 语义（落哪/回退哪），与实际注入行为分叉即假契约。
+   - **存量仓**：已被标准化的仓不自动获得路由层——重新跑生成器或手抄 `scripts/run/lib/tmp-root.mjs` + runner 注入两处即可。
 
 ## 10. doctor（环境体检）
 
@@ -214,6 +221,7 @@ run = ["node", "./scripts/run/dev-server.mjs"]  # 显式 argv，非空字符串�
 | `run`（sh 入口） | `#!/usr/bin/env sh` + `set -eu`，Node 存在性 fail-fast（缺失→69 + nodejs.org 指引，9.5），`exec node "$RUN_ROOT/scripts/run.mjs" "$@"`；**必须带可执行位提交**（`git update-index --chmod=+x run`），仓库需 `.gitattributes` 保证其为 LF |
 | `run.cmd` | `@echo off` + Node 存在性 fail-fast（同上）+ 透传 `%errorlevel%`；**内容必须纯 ASCII**——cmd 按活动代码页逐字节解析，CJK 双字节序列（GBK/UTF-8 皆然）的第二字节可撞 `&`/`|` 等元字符，把 rem/echo 行拆成命令执行，指引文案因此用英文（sh 侧 UTF-8 无此问题，可中文） |
 | `scripts/run.mjs` | runner（或等价实现，遵守本标准交互面/输出/退出码契约） |
+| `scripts/run/lib/tmp-root.mjs` | TEST_TMP_ROOT 临时落点路由层（9.7；自包含单源，随 runner 一起由模板生成——2026-09-15 起的模板增量） |
 
 两个 wrapper 内嵌 `run-wrapper-version:` 与 runner 版本对齐（doctor 校验）。
 
@@ -269,7 +277,7 @@ run = ["node", "./scripts/run/dev-server.mjs"]  # 显式 argv，非空字符串�
 1. **动作并发与互斥**：v1 无锁、无互斥声明。同族动作互斥（如 `dev.server` 与 `prod.server` 端口冲突、`build` 与 `dev` 并发写 dist）是仓库脚本自身的责任，标准只要求 name 中可声明。
 2. **monorepo 分层**：v1 仅支持仓库根单份 `run.toml`；子包操作经根清单的动作表达（转发型动作的正式位，见 6.4）。分层 schema 是 v2 议题。
 3. **动作平台适用性**：v1 无 platform/变体字段。跨平台仓库应保证动作跨平台——编排脚本以 node 编写（v3 6.5），凡有 Node 的平台即可运行；或在 name 中声明平台限定。Linux 上 doctor 报 unavailable 属预期行为而非标准违规。
-4. **环境变量注入**：v1 只透传不增不改；需要注入的动作自行包装脚本。
+4. **环境变量注入**：只透传不增不改；唯一的标准内建注入是 `TEST_TMP_ROOT` 临时落点路由（9.7——run 层统一路由，非按动作定制）；其余需要注入的动作自行包装脚本。
 5. **编排原语**：v1 无 depends_on/组合原语（P5 显式优先）；过渡方案见 6.4。
 
 ## 附录 A：证据映射表

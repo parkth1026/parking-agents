@@ -1,6 +1,6 @@
 ---
 name: aes-standardize-repo
-description: 手动调用的仓库标准化工具：分析代码状态（形态/脚本面/CI），定制并落地零安装 run 接口（跨平台 wrapper + run.toml + 机器可读 schema），`./run` 发现与执行动作，`-n` 预览，`--json` 机器可读；涉及改造用户脚本时逐项访谈确认。
+description: 手动调用的仓库标准化工具：分析代码状态（形态/脚本面/CI），定制并落地零安装 run 接口（跨平台 wrapper + run.toml + 机器可读 schema），`./run` 发现与执行动作，`-n` 预览，`--json` 机器可读；runner 内建 TEST_TMP_ROOT 临时落点路由层（run-standard §9.7）；涉及改造用户脚本时逐项访谈确认。
 disable-model-invocation: true
 ---
 
@@ -61,7 +61,7 @@ node <skill-dir>/scripts/standardize_repo.mjs <repo> --project-id <namespace/nam
 node <skill-dir>/scripts/standardize_repo.mjs <repo> --create --project-id <namespace/name>
 ```
 
-生成器从 `assets/run/` 复制模板（wrapper、runner、以及供下游软件校验 `run.toml` 用的机器可读 `run.schema.json`），创建带动词域头注释的 `run.toml`，逐字节保留既有 `AGENTS.md`，只追加这两行集成说明（主句 `./run` POSIX 形态——`.\run` 在 Git Bash 解析失败，run-standard G16）：
+生成器从 `assets/run/` 复制模板（wrapper、runner、TEST_TMP_ROOT 临时落点路由层 `scripts/run/lib/tmp-root.mjs`、以及供下游软件校验 `run.toml` 用的机器可读 `run.schema.json`），创建带动词域头注释的 `run.toml`，逐字节保留既有 `AGENTS.md`，只追加这两行集成说明（主句 `./run` POSIX 形态——`.\run` 在 Git Bash 解析失败，run-standard G16）：
 
 ```text
 本仓库标准操作：`./run` 发现，`./run <id> -n` 预览，`./run <id>` 执行，`--json` 机器可读。
@@ -99,7 +99,7 @@ node <skill-dir>/scripts/standardize_repo.mjs <repo> --create --project-id <name
 .\run <typo-id>
 ```
 
-macOS 或 Linux 用 `./run`。确认：裸 run 能列出动作；doctor 报 wrapper 对齐（v1.3.0）且 `node` 检查展示本仓核定的 `required` range；预览不启动子进程；JSON stdout 恰好解析为一个 JSON 文档；`show` 展示完整 desc 契约；敲一个 typo id（如 `buidl`）得到 did-you-mean 建议。至少真实执行一个安全动作并核对退出码不变。在 Windows 上，这个真实动作必须选一个可执行文件经 PATHEXT 解析为 `.cmd`/`.bat` 的（通常是 npm）——在 Node 18.20+/20.12+ 上，doctor 报可用并不证明可执行，因为这些版本拒绝无 shell 地 spawn 批处理文件。无 Node 场景按 run-standard 9.5 抽验（可选）：`env PATH=/nonexistent /bin/sh ./run` 应得安装指引与退出码 69，而非 command not found。
+macOS 或 Linux 用 `./run`。确认：裸 run 能列出动作；doctor 报 wrapper 对齐（v1.3.0）且 `node` 检查展示本仓核定的 `required` range；预览不启动子进程；JSON stdout 恰好解析为一个 JSON 文档；`show` 展示完整 desc 契约；敲一个 typo id（如 `buidl`）得到 did-you-mean 建议。至少真实执行一个安全动作并核对退出码不变。在 Windows 上，这个真实动作必须选一个可执行文件经 PATHEXT 解析为 `.cmd`/`.bat` 的（通常是 npm）——在 Node 18.20+/20.12+ 上，doctor 报可用并不证明可执行，因为这些版本拒绝无 shell 地 spawn 批处理文件。执行时 stderr 应出现 `[tmp-route]` 路由行：机器已设 `TEST_TMP_ROOT` → 注入子进程 TMP/TEMP，未设 → 回退提示行（零配置仅多一行提示，行为同旧模板，见 run-standard §9.7）。无 Node 场景按 run-standard 9.5 抽验（可选）：`env PATH=/nonexistent /bin/sh ./run` 应得安装指引与退出码 69，而非 command not found。
 
 命名一致性用本 skill 的校验器闭环（结构归 `run.schema.json`，"义"归它）：
 

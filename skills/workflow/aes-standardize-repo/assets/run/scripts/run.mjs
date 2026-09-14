@@ -7,6 +7,7 @@ import { delimiter, dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { REQUIRED_NODE_RANGE, nodeSatisfies } from "./run/lib/node-version.mjs";
+import { TEST_TMP_ROOT_VAR, resolveRoutedRoot } from "./run/lib/tmp-root.mjs";
 
 const require = createRequire(import.meta.url);
 const toml = require("./vendor/toml/index.cjs");
@@ -335,10 +336,24 @@ async function executeAction(config, requested, dryRun, asJson) {
   }
   if (!action.available) throw new RunError(`action '${action.id}' is unavailable because '${action.run[0]}' was not found`, EXIT.UNAVAILABLE, { action: action.id, executable: action.run[0] });
 
+  // TEST_TMP_ROOT 临时落点路由（run-standard §9.7）：动作执行前解析——已设且有效
+  // → 注入子进程 TMP/TEMP + stderr 路由行；未设 → 回退提示行（零配置仅多一行提示，
+  // 子进程走机器默认 tmp，行为同无此层）；漂移/水位告警回退不失败。诊断信息一律
+  // stderr（§7.1 stdout 纯净），--json 模式下路由行同样只落 stderr。
+  const tmpRoute = resolveRoutedRoot({ variable: TEST_TMP_ROOT_VAR });
+  for (const warning of tmpRoute.warnings) process.stderr.write(`${warning}\n`);
+  let childEnv = process.env;
+  if (tmpRoute.source === "variable") {
+    childEnv = { ...process.env, TMP: tmpRoute.root, TEMP: tmpRoute.root };
+    process.stderr.write(`[tmp-route] ${TEST_TMP_ROOT_VAR}=${tmpRoute.root} → 注入子进程 TMP/TEMP\n`);
+  } else {
+    process.stderr.write(`[tmp-route] ${TEST_TMP_ROOT_VAR} not set → 不注入，子进程回退 os.tmpdir() = ${tmpRoute.root}\n`);
+  }
+
   if (!asJson) process.stderr.write(`[run] ${action.id} -> ${commandText(action.run)}\n`);
   const target = resolveSpawnTarget(action.run);
   const exitCode = await new Promise((resolveExit, reject) => {
-    const child = spawn(target.file, target.args, { cwd: root, env: process.env, shell: false, stdio: asJson ? ["inherit", "pipe", "pipe"] : "inherit", windowsVerbatimArguments: target.verbatim });
+    const child = spawn(target.file, target.args, { cwd: root, env: childEnv, shell: false, stdio: asJson ? ["inherit", "pipe", "pipe"] : "inherit", windowsVerbatimArguments: target.verbatim });
     if (asJson) {
       child.stdout.on("data", (chunk) => process.stderr.write(chunk));
       child.stderr.on("data", (chunk) => process.stderr.write(chunk));
