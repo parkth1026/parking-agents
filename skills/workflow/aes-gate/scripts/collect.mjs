@@ -10,7 +10,7 @@
 import { spawnSync } from 'node:child_process';
 import {
   accessSync, constants, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync,
-  rmSync, statSync, writeFileSync,
+  realpathSync, rmSync, statSync, writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, isAbsolute, join, resolve } from 'node:path';
@@ -816,7 +816,18 @@ async function main() {
 }
 
 // 直接执行时跑 main；被 import（run-tests/self-test 复用）时不跑。
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+// 经 junction/符号链接安装调用时（如 Windows 的 ~/.agents/skills），argv[1] 是链接路径、
+// import.meta.url 被 Node 解析为真实路径：两侧一律 realpath 后比较，
+// 否则守卫恒假、main 永不执行（0.07s 静默 exit 0、零输出零落盘）。
+const invokedAsSelf = (() => {
+  if (!process.argv[1]) return false;
+  try {
+    return realpathSync(resolve(process.argv[1])) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+})();
+if (invokedAsSelf) {
   main().then((code) => process.exit(code)).catch((error) => {
     if (error.code === 'BLOCKED') {
       console.error(`[aes-gate] BLOCKED：${error.message}——不产出半份报告`);

@@ -9,7 +9,7 @@
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
-  existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync,
+  existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync,
 } from 'node:fs';
 import { createRequire } from 'node:module';
 import { delimiter, dirname, isAbsolute, join, resolve } from 'node:path';
@@ -960,7 +960,17 @@ async function main() {
   return result.exitCode;
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+// 同 collect.mjs：junction/符号链接安装下 argv[1]（链接路径）≠ import.meta.url（真实路径），
+// 两侧 realpath 后比较，否则守卫恒假、main 永不执行（静默 exit 0）。
+const invokedAsSelf = (() => {
+  if (!process.argv[1]) return false;
+  try {
+    return realpathSync(resolve(process.argv[1])) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+})();
+if (invokedAsSelf) {
   main().then((code) => process.exit(code)).catch((error) => {
     console.error(`[AES-QG] 内部错误：${error.stack || error.message}`);
     process.exit(1);
