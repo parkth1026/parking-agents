@@ -1,5 +1,7 @@
 #!/usr/bin/env node
-// export-dossier.mjs — 从家族真源生成自包含决策档案 HTML（两载体共用同一投影库）
+// export-dossier.mjs — 从家族真源生成决策档案 HTML（两载体共用同一投影库）
+//   档案是契约的轻量可视化预览：轨迹、候选、决定与契约原文投影进页面；来源文件（mock / diagram / 附件）
+//   按相对路径引用，不内嵌正文——档案必须与 issue 目录同放才能看到原型。
 //
 //   node export-dossier.mjs --issue-dir <issue> [--output <html>]
 //

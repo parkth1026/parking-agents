@@ -115,6 +115,45 @@ try {
     '缺契约标题或目标节');
   check('export/开放歧义数归零',
     afterHtml.includes('开放歧义 0'), '歧义未归零');
+
+  // 场景三：原型节、契约渲染与相对路径——
+  //   manifest 用带/不带扩展名混写的确认名（与 session.mjs 口径一致）；diagram-detail 在盘上但未确认；
+  //   contract.md 含围栏代码里的假标题与带 \| 的表格；--output 指到 issue 之外两层的目录。
+  mkdirSync(join(dir, '2-prototype'), { recursive: true });
+  writeFileSync(join(dir, '2-prototype', 'mock.html'), '<!doctype html><title>mock</title><p>mock</p>', 'utf8');
+  writeFileSync(join(dir, '2-prototype', 'diagram-detail.html'), '<!doctype html><title>detail</title>', 'utf8');
+  writeFileSync(join(dir, '2-prototype', 'behavior.md'), '# 行为\n\n| 输入 | 行为 |\n|-|-|\n| a \\| b | `x \\| y` |\n', 'utf8');
+  const withPrototype = JSON.parse(readFileSync(manifestPath, 'utf8'));
+  withPrototype.stage_gates = { ...(withPrototype.stage_gates ?? {}), '2-prototype': { status: 'done', artifacts_confirmed: ['mock', 'Behavior.md'] } };
+  writeFileSync(manifestPath, `${JSON.stringify(withPrototype, null, 2)}\n`, 'utf8');
+  writeFileSync(join(dir, '3-contract', 'contract.md'), [
+    '# 目标契约', '',
+    '## 目标', '把访谈流程做成可交付的契约，三阶段门禁全绿后交接。', '',
+    '## 验收条件', '```', '## 不是标题', '```', '',
+    '## 尾节', '正文。', '',
+  ].join('\n'), 'utf8');
+  const outside = join(ROOT, 'out', 'deep', 'dossier.html');
+  const third = run(EXPORT, '--issue-dir', dir, '--output', outside);
+  check('export/--output 到 issue 之外也能导出', third.status === 0, third.stderr);
+  const thirdHtml = readFileSync(outside, 'utf8');
+  check('export/原型节：确认名不分扩展名与大小写，未确认的不冒充确认版',
+    /确认版对照物 · \d+ bytes · <a href="[^"]*mock\.html"/.test(thirdHtml)
+      && /确认版对照物 · \d+ bytes · <a href="[^"]*behavior\.md"/.test(thirdHtml)
+      && /阶段产物 · \d+ bytes · <a href="[^"]*diagram-detail\.html"/.test(thirdHtml),
+    '确认标记不符');
+  check('export/HTML 原型按相对路径 iframe 引用，前缀随输出位置变化',
+    thirdHtml.includes('<iframe class="prototype" src="../../.aes-workflow/grilling/2026-01-01-%E6%A1%A3%E6%A1%88%E6%B5%8B%E8%AF%95/2-prototype/mock.html"'),
+    '缺相对路径 iframe');
+  check('export/表格渲染且 \\| 是字面管道',
+    thirdHtml.includes('<td>a | b</td>') && thirdHtml.includes('<td><code>x | y</code></td>'), '表格单元格不对');
+  const tocTitles = [...thirdHtml.matchAll(/<a href="#contract-section-(\d+)">([^<]*)<\/a>/g)].map((m) => `${m[1]}:${m[2]}`);
+  const headingIds = [...thirdHtml.matchAll(/<h3 id="contract-section-(\d+)">([^<]*)<\/h3>/g)].map((m) => `${m[1]}:${m[2]}`);
+  check('export/目录与正文锚点一一对应，围栏代码里的 ## 不计',
+    tocTitles.join('|') === '0:目标|1:验收条件|2:尾节' && headingIds.join('|') === tocTitles.join('|'),
+    `toc=${tocTitles} ids=${headingIds}`);
+  check('export/五个页签且 hash 路由脚本在场',
+    (thirdHtml.match(/<section class="tab-panel" id="tab-/g) ?? []).length === 5 && thirdHtml.includes("addEventListener('hashchange', route)"),
+    '页签结构不对');
 } finally {
   rmSync(ROOT, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
 }

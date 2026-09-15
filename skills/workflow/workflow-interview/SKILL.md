@@ -85,7 +85,7 @@ finalize 会被当场拒。
 同时交出决策档案：`finalize` 通过后跑
 `node <skill-dir>/scripts/export-dossier.mjs --issue-dir <issue>`，把导出路径和
 `dossier_digest` 一并报告。档案由任务原文、全部轮次、候选优劣势与契约重投影而成，
-离线可读——它和契约同级，是访谈的交付物，不是 Web 载体的附属品：纯对话访谈一样
+与 issue 目录同放即可离线打开（mock、diagram 等来源按相对路径引用，不内嵌）——它和契约同级，是访谈的交付物，不是 Web 载体的附属品：纯对话访谈一样
 产出，与 `$workflow-interview-web` 共用同一投影实现。
 
 `finalize` 列出的非 `[A]` 档验收条件要一并报给用户，点名是哪几条。它们在长时程执行
