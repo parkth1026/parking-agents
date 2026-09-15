@@ -278,10 +278,22 @@ function v4RepositoryGateDetail(qa, candidateCommit, changedPaths, gatePolicy) {
   if (rg.outcome === 'FAILED' && qa.outcome !== 'FAIL') {
     return { ok: false, detail: `复算矛盾：repositoryGate.outcome=FAILED 而 receipt outcome=${qa.outcome || 'NOT_SET'}` };
   }
-  // 义务②：requiredLevel 与目标仓 gate-policy 声明对账（policy 可读时）。
-  if (declaredRequired && gatePolicy?.supportedThrough && AES_QG_FULL_LEVEL.test(gatePolicy.supportedThrough)
-    && aesQgLevelIndex(required) > aesQgLevelIndex(gatePolicy.supportedThrough)) {
-    return { ok: false, detail: `对账：requiredLevel=${required} 超出目标仓 gate-policy supported_through=${gatePolicy.supportedThrough}` };
+  // 义务②（api-mock「消费侧复算三义务」②，无「提供时」豁免）：声明了 requiredLevel 就必须
+  // 能与目标仓 gate-policy 声明目标级对账——policy 不存在/存在性不可核实/supported_through
+  // 不可解析都算对账无法执行，fail closed 拒收（信息缺失≠比对通过，与 not-onboarded 防伪同族；
+  // 引擎对 policy 缺失或 supported_through 不合法一律 BLOCKED 不产等级，referenced receipt
+  // 合法存在的前提就是 policy 存在且可解析）。
+  if (declaredRequired) {
+    if (gatePolicy?.present !== true) {
+      const presentLabel = gatePolicy?.present === undefined ? '未提供' : String(gatePolicy.present);
+      return { ok: false, detail: `对账：声明了 requiredLevel=${required} 但 gate-policy 对账输入不可执行（present=${presentLabel}），义务②无法复算，fail closed 拒收` };
+    }
+    if (!AES_QG_FULL_LEVEL.test(gatePolicy.supportedThrough || '')) {
+      return { ok: false, detail: `对账：目标仓 gate-policy.toml 存在但 supported_through 不可解析（${gatePolicy.supportedThrough ?? 'NOT_SET'}），义务②无法复算，fail closed 拒收` };
+    }
+    if (aesQgLevelIndex(required) > aesQgLevelIndex(gatePolicy.supportedThrough)) {
+      return { ok: false, detail: `对账：requiredLevel=${required} 超出目标仓 gate-policy supported_through=${gatePolicy.supportedThrough}` };
+    }
   }
   return { ok: true, detail: `required=${declaredRequired ? required : '未声明（achieved 即结论）'} ≤ achieved=${rg.achievedLevel}，digest 绑定 candidate` };
 }

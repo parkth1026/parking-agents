@@ -424,8 +424,10 @@ QA 内另含一个 AES-QG repository gate level 子门（同样不新增顶层�
 `"none"` 却有 product bytes 变化（tracker-only 路径白名单默认拒绝）均 fail closed。
 `aes.qa.receipt/v4` 显式认：`repositoryGate.status` 三态闭集（`referenced` 同套 digest/candidate
 校验；`not-onboarded` 需非空 reason + trackerOnly 布尔，并与目标仓 `gate-policy.toml` 存在性
-对账——仓有 policy 而自称未接入即 fail closed 拒收）；未达声明门级显式
-`failureClass=gate-shortfall` 拒合并（消费侧机械复算 requiredLevel 比较、三裁决位一致性）；
+对账——仓有 policy 而自称未接入即 fail closed 拒收，存在性不可核实同样拒收）；未达声明门级显式
+`failureClass=gate-shortfall` 拒合并（消费侧机械复算三义务：requiredLevel 机械比较、与目标仓
+gate-policy 对账——声明了 requiredLevel 而 policy 缺失/存在性不可核实/supported_through 不可
+解析一律 fail closed（引擎无合法 policy 即 BLOCKED 不产等级）、三裁决位一致性）；
 截图义务轮校验 `companionShots` 完整性（shots/ + shots-manifest.json + manifestSha256 +
 对象化 secretsScan）。版本判别是已知版本白名单（v1/v2/v3/v4），未知版本 fail closed 拒收，
 不再保留「非 v3 即 legacy」黑名单。v1/v2 历史 QaReceipt 冻结豁免该子门；v3/v4 缺

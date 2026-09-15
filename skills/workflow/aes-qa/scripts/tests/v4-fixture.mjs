@@ -9,15 +9,17 @@ export const SKILL_DIR = dirname(dirname(HERE)); // skills/workflow/aes-qa
 export const WORKFLOW_DIR = dirname(SKILL_DIR); // skills/workflow
 export const AES_GATE_ENGINE = join(WORKFLOW_DIR, 'aes-gate', 'scripts', 'aes-qg.mjs');
 export const BOARD_MERGE_POLICY = join(WORKFLOW_DIR, 'aes-worktree-board', 'scripts', 'merge-policy.mjs');
+export const BOARD_MASTER = join(WORKFLOW_DIR, 'aes-worktree-board', 'scripts', 'master.mjs');
 
 export function peersMissing() {
-  return [AES_GATE_ENGINE, BOARD_MERGE_POLICY].filter((path) => !existsSync(path));
+  return [AES_GATE_ENGINE, BOARD_MERGE_POLICY, BOARD_MASTER].filter((path) => !existsSync(path));
 }
 
 export async function loadPeers() {
   const qg = await import(pathToFileURL(AES_GATE_ENGINE).href);
   const { evaluateMechanicalGate } = await import(pathToFileURL(BOARD_MERGE_POLICY).href);
-  return { qg, evaluateMechanicalGate };
+  const { resolveGatePolicyFacts } = await import(pathToFileURL(BOARD_MASTER).href);
+  return { qg, evaluateMechanicalGate, resolveGatePolicyFacts };
 }
 
 export const CANDIDATE = '7d9c0b4'.padEnd(40, '0');

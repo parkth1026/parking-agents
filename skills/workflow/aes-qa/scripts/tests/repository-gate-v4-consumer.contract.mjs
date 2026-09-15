@@ -6,6 +6,9 @@
 import {
   makeAsserter, makeGreenGate, peersMissing, qaV4, companionShotsBlock, buildEngineReceipt, loadPeers, gateOutcomeOf,
 } from './v4-fixture.mjs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 const CONTRACT = 'repository-gate-level';
 const CASE = 'v4-consumer-gate-verdict';
@@ -15,7 +18,7 @@ const assert = makeAsserter({ contract: CONTRACT, contractCase: CASE, resultSche
 if (peersMissing().length) {
   assert.skipped(`peer skill missing: ${peersMissing().join(', ')}`);
 }
-const { qg, evaluateMechanicalGate } = await loadPeers();
+const { qg, evaluateMechanicalGate, resolveGatePolicyFacts } = await loadPeers();
 const greenGateWith = makeGreenGate(evaluateMechanicalGate);
 
 const engineReceipt = buildEngineReceipt(qg);
@@ -74,6 +77,42 @@ assert.check('复算②policy 对账：requiredLevel 超出仓 supported_through
 
 const withinSupported = gateOutcomeOf(greenGateWith(qaV4({ receiptDigest }), { gatePolicy: { present: true, supportedThrough: 'AES-QG-L3' } }));
 assert.check('policy 对账通过：required ≤ supported_through → PASS', withinSupported.qa === 'PASS' && withinSupported.allGreen, withinSupported.detail);
+
+// 义务②对账输入不可执行矩阵（钢人回炉：信息缺失≠比对通过，同族 fail-open 全关）。
+// 引擎对 policy 缺失/不合规一律 BLOCKED 不产等级——referenced receipt 合法存在的前提
+// 就是 policy 存在且 supported_through 可解析，声明了 requiredLevel 却给不出可对账输入
+// 一律 fail closed。
+const declaredGate = { requiredLevel: 'AES-QG-L3', achievedLevel: 'AES-QG-L3', gateReceiptDigest: `sha256:${'e'.repeat(64)}`, outcome: 'PASS' };
+
+const unparsablePolicy = gateOutcomeOf(greenGateWith(qaV4({ receiptDigest, repositoryGate: declaredGate }), { gatePolicy: { present: true, supportedThrough: null } }));
+assert.check('复算②policy 存在但 supported_through 不可解析 → fail closed（不静默跳过）', unparsablePolicy.qa === 'FAIL' && /supported_through 不可解析/.test(unparsablePolicy.detail), unparsablePolicy.detail);
+
+const noFactsDeclared = gateOutcomeOf(greenGateWith(qaV4({ receiptDigest, repositoryGate: declaredGate })));
+assert.check('复算②对账输入未提供而声明了 requiredLevel → fail closed（义务②必须可执行）', noFactsDeclared.qa === 'FAIL' && /义务②无法复算/.test(noFactsDeclared.detail), noFactsDeclared.detail);
+
+const absentPolicyDeclared = gateOutcomeOf(greenGateWith(qaV4({ receiptDigest, repositoryGate: declaredGate }), { gatePolicy: { present: false, supportedThrough: null } }));
+assert.check('复算②仓无 policy 而声明 requiredLevel → fail closed（引擎无 policy 即 BLOCKED，referenced 无从成立）', absentPolicyDeclared.qa === 'FAIL' && /义务②无法复算/.test(absentPolicyDeclared.detail), absentPolicyDeclared.detail);
+
+// master 侧对账输入解析：引擎按完整 TOML 解析，单/双引号都合法——正则漏读会让合法
+// policy 被误判成不可解析（义务②误拒合法 receipt）。
+const factsDir = mkdtempSync(join(tmpdir(), 'v4-policy-facts-'));
+try {
+  const singleDir = join(factsDir, 'single'); mkdirSync(singleDir);
+  writeFileSync(join(singleDir, 'gate-policy.toml'), "schema = \"aes-gate-policy/v1\"\nsupported_through = 'AES-QG-L3'\n", 'utf8');
+  const singleFacts = resolveGatePolicyFacts(singleDir);
+  assert.check('resolveGatePolicyFacts：单引号 TOML（引擎合法形态）读出 supportedThrough', singleFacts.present === true && singleFacts.supportedThrough === 'AES-QG-L3', JSON.stringify(singleFacts));
+
+  const doubleDir = join(factsDir, 'double'); mkdirSync(doubleDir);
+  writeFileSync(join(doubleDir, 'gate-policy.toml'), 'supported_through = "AES-QG-L1"', 'utf8');
+  const doubleFacts = resolveGatePolicyFacts(doubleDir);
+  assert.check('resolveGatePolicyFacts：双引号照旧读出', doubleFacts.present === true && doubleFacts.supportedThrough === 'AES-QG-L1', JSON.stringify(doubleFacts));
+
+  const emptyDir = join(factsDir, 'empty'); mkdirSync(emptyDir);
+  const absentFacts = resolveGatePolicyFacts(emptyDir);
+  assert.check('resolveGatePolicyFacts：无 policy 文件 → present=false（核实性不存在）', absentFacts.present === false && absentFacts.supportedThrough === null, JSON.stringify(absentFacts));
+} finally {
+  rmSync(factsDir, { recursive: true, force: true });
+}
 
 // —— not-onboarded 对账（无条件防伪，AC-001 交叉锚定）——
 const forged = gateOutcomeOf(greenGateWith(qaV4({ repositoryGate: { status: 'not-onboarded' } }), { gatePolicy: { present: true, supportedThrough: null } }));

@@ -1132,14 +1132,16 @@ export function respondHumanRequest(options = {}) {
 // supported_through（只读存在性 + 单值正则，不解析 TOML 全文——文法所有权在 aes-gate）。
 // not-onboarded 防伪（仓有 policy 却自称未接入 → fail closed）与 requiredLevel 对账
 // 都依赖它；文件不存在时 present=false。读取失败 present=null（信息不可得）：v1/v2/v3
-// 不消费此输入不受影响；v4 not-onboarded 轮会被 merge-policy fail closed 拒收
-// （存在性不可核实 ≠ 无 policy，防伪检查不因信息缺失静默跳过）。
-function resolveGatePolicyFacts(repoRoot) {
+// 不消费此输入不受影响；v4 not-onboarded 防伪与义务②对账都会被 merge-policy fail
+// closed 拒收（存在性不可核实 ≠ 无 policy，信息缺失 ≠ 比对通过）。正则同时认双引号
+// 与单引号——aes-gate 引擎按完整 TOML 解析、两种引号都合法；只认一种会让合法 policy
+// 的 supported_through 漏读成 null，义务②被迫拒收合法 receipt。
+export function resolveGatePolicyFacts(repoRoot) {
   try {
     const policyPath = join(resolve(repoRoot), 'gate-policy.toml');
     if (!existsSync(policyPath)) return { present: false, supportedThrough: null };
     const text = readFileSync(policyPath, 'utf8');
-    const match = /^supported_through\s*=\s*"(AES-QG-L[0-5])"/m.exec(text);
+    const match = /^supported_through\s*=\s*["'](AES-QG-L[0-5])["']/m.exec(text);
     return { present: true, supportedThrough: match ? match[1] : null };
   } catch {
     return { present: null, supportedThrough: null };
