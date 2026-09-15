@@ -29,3 +29,16 @@ fail closed 拒收（merge-policy.mjs）；master.mjs resolveGatePolicyFacts 注
 复跑全绿：repository-gate-level 71/71（v4-gate-three-states 20→22，新增 present:null 拒收与
 gatePolicy 缺省拒收两断言）、screenshot-evidence 97/97、aes-qa-v4-schema 32/32；board 侧
 screenshot-evidence-gate 9 pass 0 fail、selftest-v4、selftest contract/dispatch、selftest-trajectory 全绿。
+
+# 追记 @ 2026-09-15 第二轮（用户令 subagent 彻底反思后）
+双路钢人审计：正方 7/7 实锤（版本隔离/referenced 无副作用/常量等价/调用面盘点/present=false 可信度/
+companion 交互/入口白名单）；反方击穿同族残留洞——义务②对账在 present=true 而 supported_through
+不可解析时静默跳过（master 正则只认双引号、引擎按完整 TOML 认单引号，伪造 referenced receipt 可
+越过对账）。修复=commit 2480243：义务②声明 requiredLevel 即必须可执行（policy 缺失/不可核实/
+不可解析一律 fail closed）+ master 正则认双/单引号并导出直测；契约 +6 断言（义务②三态拒收、
+resolveGatePolicyFacts 单/双引号/无文件），repository-gate-level 71→77。
+变异测试实锤（第三路 subagent）：三个变异各自还原缺陷形态（not-onboarded 第二段 if 删除/义务②
+还原静默跳过/正则退回双引号）→ 测试分别红 75/77、74/77、76/77 且失败断言与修复语义一一对应；
+还原后全量绿（97+77+32、selftest-v4、screenshot-evidence-gate 9/0、工作区零残留）。无假绿。
+已知残留（尺子未锁、留给用户裁决）：referenced+present=false 且未声明 requiredLevel 的镜像矛盾
+不拒收（义务②空转放行；误拒风险=未跟踪 policy 在多 worktree 分裂形态）。
