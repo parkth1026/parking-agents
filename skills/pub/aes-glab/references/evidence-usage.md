@@ -46,6 +46,25 @@
 | `glab search -h` | COMMANDS 仅 `semantic`（beta，AI 代码搜索，付费面）；help 明示 beta 警告 | 裁决入节：无全局 issue/MR 搜索子命令 |
 | `glab api "search?scope=issues&search=CUDA"` | JSON 数组，命中 issue #20「发布包 CUDA 后端…」 | ✓ REST 退路可用，入节 |
 
+## A 组补测：/search 中文关键词 500（2026-09-14 · 升级回归会话）
+
+执行环境：Windows 10，glab v1.113.0，双实例对照——升级测试实例 `10.100.20.59`
+（19.3.2-ee，项目 neon/ueb id 2283，`GITLAB_HOST` 显式指定）与既有实例
+`git.51vr.local`（15.0.5-ee，同项目同 id）。以下均为只读查询。
+
+| 命令 | 输出摘要 | 裁决 |
+| --- | --- | --- |
+| `glab api "search?scope=issues&search=生命周期"`（新实例） | `{"message":"500 Internal Server Error"}`，两次复现稳定 | 中文关键词 × `/search` = 500，硬约束入节 |
+| `glab api "search?scope=projects&search=升级"`（旧实例对照） | 同样 500 | 15.0.5 已存在——非升级回归，双实例共有既有缺陷 |
+| `glab api "projects/2283/search?scope=blobs&search=构建"`（新实例） | 500；wiki_blobs / commits / merge_requests 各 scope 同 | 故障面 = 所有 scope，全局与项目级同 |
+| `glab api "search?scope=issues&search=upgrade"`（新实例） | JSON 数组正常返回（命中其它项目真实 issue） | ASCII 关键词一切正常 |
+| `glab issue list --all --search "生命周期"`（新实例，克隆内） | 命中 issue #1「[升级测试] Issue 生命周期验证」 | 列表端点 LIKE 匹配中文可用，入节为仓库内替代路径 |
+| 附带现象：`glab api "search?scope=issues&search=GitLab 升级"` | 代理层 400 Bad Request | glab 不自动 URL 编码空格，调用侧自行编码 |
+
+根因定位（判断）：中文数据无损——中文标题 issue、中文 commit message、中文文件内容的
+写入/展示/clone 全部正常，故障仅在搜索链路对多字节查询词的处理；服务端修复属实例级运维项，
+技能侧对策 = ASCII 关键词 / 仓库内 list 搜索 / label 过滤。
+
 ## 断言升级复盘（iteration-2 后提出 · iteration-3 已落地 · 2026-08-30）
 
 **已落地 1（评分器收编）**：六条断言评分器收编为技能自带脚本

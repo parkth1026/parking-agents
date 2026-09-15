@@ -75,7 +75,7 @@ description: glab 命令行（自建 GitLab 实例 git.51vr.local）安装、配
 - **release**：`glab release list` ✓ 可用（形态正确；本仓库暂无 release）。
 - **pipeline**：`glab pipeline list` ✓ 可用；`glab ci status` 在当前分支无 pipeline 且无关联 MR 时报错——先 `pipeline list` 确认有再 `ci status`。
 - **snippet**：v1.115 仅 `create` 一个子命令，**没有 list**；列 snippet 走 `glab api snippets`（项目级 ✓ 实测返回 `[]`；`personal_snippets` 端点在 15.0.5 上 404）。
-- **search**：v1.115 无全局 issue/MR 搜索子命令（仅 `semantic` beta AI 代码搜索，付费面）。跨仓库搜索走 REST：`glab api "search?scope=issues&search=<词>"` ✓ 实测命中真实 issue。
+- **search**：v1.115 无全局 issue/MR 搜索子命令（仅 `semantic` beta AI 代码搜索，付费面）。跨仓库搜索走 REST：`glab api "search?scope=issues&search=<词>"` ✓ 实测命中真实 issue——**但关键词必须 ASCII**：`/search` 端点所有 scope（issues/MR/项目名/blobs 代码/wiki/commits）查询词含任意中文字符即稳定 HTTP 500（15.0.5-ee 与 19.3.2-ee 双实例实测同现，属既有缺陷非升级引入；中文数据写入/展示本身无损）。仓库内搜索不受此限：`glab issue list --search "中文词"` 走列表端点 LIKE 匹配，中文可用。跨仓库找中文标题的 issue/MR 无直接解——按 `--label` 过滤或逐仓 `issue list` 后本地过滤。证据见 references/evidence-usage.md（2026-09-14 补测节）。
 - **api 回退**：`glab api` 支持 `--paginate` 与 `--output ndjson`（与 gh 同名同义）；项目路径要 URL 编码（如 `neon%2FTWE%2FAesMetaTool`）。`--page/--per-page` 仅 list 类命令（见怪癖节）。
 - **多账号**：每 host 一令牌（config `hosts:` 每主机单 user），同 host 多账号不支持；临时换身份用 `GITLAB_TOKEN` 环境变量压钥匙串。
 
@@ -83,8 +83,9 @@ description: glab 命令行（自建 GitLab 实例 git.51vr.local）安装、配
 
 ## 免费档链接裁决
 
-- `relates_to` 免费可用。`blocks`/`blocked_by` 在**所有已发布版本**都是 Premium（实证跨度：官方文档源码 v15.11 至 v19.2 各 tag 加现行文档；功能 12.1/2019 引入）——**升级永不解锁**，只随付费 license 生效。阻塞语义永久走 `Blocked by: #<n>, #<n>` 文本行。
+- `relates_to` 免费可用。`blocks`/`blocked_by` 在**所有已发布版本**都是 Premium（实证跨度：官方文档源码 v15.11 至 v19.2 各 tag 加现行文档；功能 12.1/2019 引入）——**升级永不解锁**，只随付费 license 生效。阻塞语义永久走 `Blocked by: #<n>, #<n>` 文本行。**19.3.2-ee 升级实例实测（2026-09-14，EE 构建未挂 license）**：`blocks` 返回 `Blocked issues not available for current license`，`link_type=blocked_by` 直接被判非法值，quick action `/blocked_by #<n>` 发帖成功但**静默不建链**——免费档三条路全堵，正文文本行是唯一规范路径。
 - `glab api -f` 在 issue 链接端点上静默丢参——改用 curl：
   `curl -s -X POST -H "PRIVATE-TOKEN: $T" "http://git.51vr.local/api/v4/projects/项目id/issues/编号/links" --data-urlencode "target_project_id=项目id" --data-urlencode "target_issue_iid=编号" --data-urlencode "link_type=relates_to"`
 - 15.0 上链接查询返回扁平对象数组（每项带 `link_type` 字段），不是 source/target 对。
+- `target_project_id` 参数在 **19.x 必带、15.x 可省**——19.3.2 实测缺参报 `target_project_id is missing`（2026-09-14）；上方 curl 范式已含该参数，双版本通用。
 - 真子票（issue 挂 issue）任何档位都不存在。伪子票 = 子票正文首行 `Part of #<n>` + `relates_to` 布线做界面导航。
