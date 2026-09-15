@@ -151,6 +151,50 @@ candidate 上重新执行的 PASS、marker VERIFIED、claim-complete 且其他 Q
 READY_TO_MERGE；close 使用同一判据。这个条件是 QA 门的条件子门，不把截图变成每张 Issue
 的必需物。
 
+## 伴随目录冻结（tracker 无关保留，v4）
+
+GitLab note 是发布面，不是唯一保留面。`aes.qa.receipt/v4` 的截图义务轮在 marker
+`VERIFIED` 后，把终态截图冻结为**伴随目录**（tracker 无关、随 receipt 同生命周期）：
+
+```text
+<目标仓>/.aes-worktree-board/receipts/<jobId>/<attemptId>/
+  qa-receipt.json        v4（含 companionShots 块）
+  shots/<sha256>.png     终态截图冻结副本（claim-complete 的 unique blobs）
+  shots-manifest.json    清单：candidateSha、逐图 sha256、secretsScan
+  qa-report.html         一等伴随产物（出票必产；模板复制渲染零 LLM）
+```
+
+入口 `scripts/companion-freeze.mjs`（`--spool <run-spool> --dest <attempt-dir>
+--receipt <qa-receipt.json>`），产物是 receipt 的 `companionShots` 块：
+
+```json
+"companionShots": { "dir": "shots/", "manifest": "shots-manifest.json",
+  "manifestSha256": "sha256:<清单 canonical JSON 摘要>", "count": 4,
+  "secretsScan": { "result": "CLEAR", "scope": ["filename","metadata","extractable-text"], "ocr": false } }
+```
+
+- 冻结前置：marker `VERIFIED`、batchId/frozenManifestSha256 与 spool 一致、
+  `marker.candidateSha === receipt.commitSha`（同 candidate 双绑定）；幂等重冻同
+  candidate 返回既有清单，**candidate 变更拒绝**（旧伴随目录随旧 receipt 同批作废，
+  STALE_EVIDENCE 同源，新 candidate 必须新 attempt 重跑截图）。
+- secretsScan 是对象：`result ∈ {CLEAR, BLOCKED}` + 已声明 `scope` + `ocr:false`。
+  扫描范围=文件名 + PNG 文本元数据（tEXt/zTXt/iTXt）+ 可提取字符串（strings 式），
+  模式族=token/凭据正则（GitHub/GitLab PAT、xox、AKIA、AIza、sk-、私钥头、JWT、
+  Bearer、通用赋值式，见 `scripts/secrets-scan.mjs`）。**CLEAR 语义=已声明 scope 内
+  未检出**；像素内渲染内容（截屏画面里显示的凭据）是已声明盲区——零依赖约束下不做
+  OCR。正则族非穷尽：未命中不证明无凭据，入库前建议人工抽查；命中即 BLOCKED——
+  receipt 必须 `outcome=FAIL`，截图不得入库。findings 只记 patternId/scope 层/位置，
+  永不回显命中内容。
+- 容量上限沿用上游批次口径：截图 ≤16 张、合计 ≤100 MiB（第二份保留面不放宽）。
+- 清理策略：伴随目录与 receipt 同生命周期，不做自动删除；attempt 作废即整目录作废，
+  建议 stale（>30 天且已作废）attempt 目录人工清理。
+- `qa-report.html` 单文件、系统字体、零外链、断网双击可开；图片按 `shots/` 相对
+  路径引用不内嵌；只落本地，不发布任何 tracker；随 receipt 同批作废。重渲染入口
+  `scripts/qa-report.mjs --receipt <path> [--out <dir>]`。
+
+GitLab 发布链路（U upload + 1 note + strict readback 2U+2 + aggregate marker）与
+伴随冻结**并行、互不替代**：发布面零收窄，伴随面补 tracker 无关的本地保留。
+
 ## Balanced limits 与成本
 
 首次 GitLab 请求前按真实 UTF-8 内容做合取 preflight：

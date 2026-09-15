@@ -1,6 +1,6 @@
 ---
 name: aes-qa
-description: worker 闭环内唯一的验证角色，三种调用形态：循环轮逐轮验证实现（只出 finding）、最终轮为唯一 candidate commit 出具绑定 SHA 的 typed QaReceipt（按影响面决定自动/live/人工）、打回修复后回归重验。如实记录未执行项与人工债务，绝不把 NOT_RUN 说成 PASS。当 aes-issue-worker 在实现循环中逐轮验证、commit 后出具最终 receipt，或需要为一次交付产出可审计的 QA 证据时使用；实际执行 screenshot check 时按 AES GitLab terminal batch 发布并要求 VERIFIED，未跑截图不触发。
+description: worker 闭环内唯一的验证角色，三种调用形态：循环轮逐轮验证实现（只出 finding）、最终轮为唯一 candidate commit 出具绑定 SHA 的 typed QaReceipt（按影响面决定自动/live/agent-live/人工，v4 起等级栏三态收口 AES-QG 等级语言、agent-live 断言必带内容寻址托底、截图义务轮冻结伴随目录并必产 qa-report.html）、打回修复后回归重验。如实记录未执行项与人工债务，绝不把 NOT_RUN 说成 PASS。当 aes-issue-worker 在实现循环中逐轮验证、commit 后出具最终 receipt，或需要为一次交付产出可审计的 QA 证据时使用；实际执行 screenshot check 时按 AES GitLab terminal batch 发布并要求 VERIFIED，未跑截图不触发。
 ---
 
 # AES QA
@@ -61,8 +61,9 @@ Master 的机械门会检查这些：`checks[]` 里出现 `NOT_RUN`、或 `unexe
 | --- | --- | --- |
 | 纯内部逻辑、有单测覆盖 | `automated` | 跑既有回归入口 |
 | CLI / 报文 / 文件格式 | `automated` + 端到端 | 真实调用一次，比对输出 |
-| GitHub identity、权限、外部 API | `live` | 真实环境验证正例与反例（错误账号必须 fail closed） |
+| GitHub identity、权限、外部 API | `live` | 真实环境验证正例与反例（错误账号必须 fail closed），操作配方见 [业务真实验收](references/business-acceptance.md) |
 | 界面、交互、视觉 | `live` + 人工 | 若实际执行 screenshot，固定视口截图进入 GitLab 证据分支；人工确认仍由人完成 |
+| agent 驱动的业务旅程（真实浏览器/进程） | `agent-live` | driver + 每条断言四层托底 + 内容寻址 digest（v4，见下与 [业务真实验收](references/business-acceptance.md)） |
 | 无法自动断言的判断（观感、措辞、业务正确性） | `manual` | `humanChecklist` |
 
 选 `automated` 却改了 identity，等于没验。选 `manual` 却本可以自动断言，
@@ -137,6 +138,60 @@ gate 原子引用：
   fail closed，不降级成旧 receipt 处理。
 - 等级与发布资格正交：`AES-QG L5 PASS` 不等于 release-qualified，正交证据另由
   release profile 裁决。
+
+## `aes.qa.receipt/v4`：等级三态 + agent-live + 伴随证据
+
+v4 = v2 全部义务（`baseCommit` 强制）＋等级栏三态强制＋agent-live 托底断言＋截图
+伴随保留。普通轮（非 v3 opt-in）也用 v4 收口等级语言：
+
+```json
+{
+  "schemaVersion": "aes.qa.receipt/v4",
+  "jobId": "job-2026-09-12-171", "attemptId": "att-3",
+  "commitSha": "7d9c0b4…", "baseCommit": "c1d2e3f…",
+  "repositoryGate": {
+    "status": "referenced", "standardVersion": "AES-QG/1",
+    "requiredLevel": "AES-QG-L3", "achievedLevel": "AES-QG-L3",
+    "gateReceiptDigest": "sha256:<引擎收据 canonical JSON 摘要>",
+    "candidateCommitSha": "7d9c0b4…", "outcome": "PASS"
+  },
+  "checks": [
+    { "id": "agent-journey-login", "kind": "agent-live", "outcome": "PASS",
+      "driver": { "model": "glm-5.3", "capabilitySkill": "browser-use:control-browser" },
+      "assertions": [
+        { "claim": "名单内模型真实 spawn", "backing": { "layer": "sidecar-session", "pointer": "…log", "digest": "sha256:<被指工件摘要>" } }
+      ] }
+  ],
+  "screenshotEvidence": { "required": false },
+  "outcome": "PASS", "unexecuted": [], "manualDebt": [], "failureClass": null
+}
+```
+
+- **等级栏三态**（`repositoryGate.status` 闭集，缺字段 fail closed）：
+  `referenced`——引擎同源原子引用（digest 内容寻址 + 同 candidate 双绑定，跑
+  `node ../aes-gate/scripts/aes-qg.mjs --repo <repo> gate.l3` 拿收据，不手抄）；
+  `not-onboarded`——非空 `reason` + `trackerOnly` 布尔，验收单有效（v3 的 `"none"`
+  语义冻结在 v3，v4 用此态表达；治理=计量+复盘不设硬门，消费侧对账 `gate-policy.toml`
+  存在性，仓有 policy 而自称未接入即拒收）。
+- **gate-shortfall**：声明 `requiredLevel` 且引擎实跑未达时，`outcome=FAIL` +
+  `failureClass=gate-shortfall`（新枚举，仅此场景）——门级不够≠功能缺陷，打回回
+  引擎重跑；未声明 `requiredLevel` 时 achieved 即结论，无此失败语义。
+- **agent-live**：`driver{model, capabilitySkill}` 仅该 kind 允许；进 receipt 的断言
+  `backing` 必含 `layer`（四值闭集 dom-assertion/server-trace/read-model/
+  sidecar-session）+ `pointer` + `digest`（`sha256:<64hex>` 内容寻址）。无 digest
+  视同无托底，整条降档 humanChecklist（`AWAITING_HUMAN` + `demotedFrom`/
+  `demotionReason`，用 `scripts/v4-receipt.mjs` 的降档工具，agent 不得代答）。
+  操作配方见 [业务真实验收](references/business-acceptance.md)。
+- **伴随截图保留**：`screenshotEvidence.required=true` 的最终轮 VERIFIED 后跑
+  `scripts/companion-freeze.mjs` 冻结伴随目录（`shots/` + `shots-manifest.json` +
+  `qa-report.html` 出票必产），`companionShots` 块进 receipt；`secretsScan` 对象化
+  （CLEAR=已声明 scope 内未检出，像素盲区显式声明），BLOCKED 则 receipt FAIL、不入库；
+  candidate 变更后旧伴随目录同批作废。详见
+  [截图证据协议·伴随目录冻结](references/screenshot-evidence.md)。
+- **qa-report.html**：一等伴随产物，双击即可人类可读消费全部结果与截图（单文件、
+  零外链、断网可开、图片 `shots/` 相对引用）；只落本地，不发布 tracker。
+- 出票前用 `validateQaReceiptV4`（`scripts/v4-receipt.mjs`）自校验；消费侧
+  GATE-qa 对 v4 走全套机械复算（版本白名单、三态、对账、companionShots 完整性）。
 
 ## 需要人的时候
 

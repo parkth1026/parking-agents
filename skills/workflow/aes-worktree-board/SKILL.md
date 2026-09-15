@@ -421,8 +421,15 @@ QA 内另含一个 AES-QG repository gate level 子门（同样不新增顶层�
 必须携带 `requiredRepositoryGate`（完整 `AES-QG-L[0-5]` 或 `"none"`）与 `repositoryGate` 原子引用
 （`standardVersion=AES-QG/1`、`achievedLevel ≥ required`、`gateReceiptDigest=sha256:<64hex>`、
 `candidateCommitSha` 等于当前 candidate、`outcome=PASS`）；缺级、旧证据、NOT_RUN、裸 `Lx`、
-`"none"` 却有 product bytes 变化（tracker-only 路径白名单默认拒绝）均 fail closed。v1/v2
-历史 QaReceipt 冻结豁免该子门；v3 缺 `baseCommit` 在 `stage qa` 入口即 `MISSING_BASE_COMMIT`
+`"none"` 却有 product bytes 变化（tracker-only 路径白名单默认拒绝）均 fail closed。
+`aes.qa.receipt/v4` 显式认：`repositoryGate.status` 三态闭集（`referenced` 同套 digest/candidate
+校验；`not-onboarded` 需非空 reason + trackerOnly 布尔，并与目标仓 `gate-policy.toml` 存在性
+对账——仓有 policy 而自称未接入即 fail closed 拒收）；未达声明门级显式
+`failureClass=gate-shortfall` 拒合并（消费侧机械复算 requiredLevel 比较、三裁决位一致性）；
+截图义务轮校验 `companionShots` 完整性（shots/ + shots-manifest.json + manifestSha256 +
+对象化 secretsScan）。版本判别是已知版本白名单（v1/v2/v3/v4），未知版本 fail closed 拒收，
+不再保留「非 v3 即 legacy」黑名单。v1/v2 历史 QaReceipt 冻结豁免该子门；v3/v4 缺
+`baseCommit` 在 `stage qa` 入口即 `MISSING_BASE_COMMIT`
 （不降级成旧 receipt 处理）。标准所有权与规范在 [aes-gate AES-QG](../aes-gate/references/aes-qg.md)；
 等级与发布资格正交，level 子门不裁决 release。
 

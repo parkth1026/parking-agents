@@ -1,0 +1,31 @@
+# verify @ 2026-09-12T14:45:35Z
+# cwd: G:\GIT\AI_WorkFlow\parking-agents-manual
+
+[PASS] AC-001  exit=0  $ node skills/workflow/aes-qa/run-tests.mjs --contract repository-gate-level --case v4-gate-three-states
+         PASS v4-gate-three-states: 20/20 assertions passed
+[PASS] AC-002  exit=0  $ node skills/workflow/aes-qa/run-tests.mjs --contract repository-gate-level --case v4-gate-shortfall
+         PASS v4-gate-shortfall: 8/8 assertions passed
+[PASS] AC-003  exit=0  $ node skills/workflow/aes-qa/run-tests.mjs --contract aes-qa-v4-schema --case agent-live-backing
+         PASS agent-live-backing: 14/14 assertions passed
+[PASS] AC-005  exit=0  $ node skills/workflow/aes-qa/run-tests.mjs --contract screenshot-evidence --case companion-shots-freeze
+         PASS companion-shots-freeze: 17/17 assertions passed
+[PASS] AC-006  exit=0  $ node skills/workflow/aes-qa/run-tests.mjs --contract repository-gate-level --case v4-consumer-gate-verdict
+         PASS v4-consumer-gate-verdict: 15/15 assertions passed
+[PASS] AC-007  exit=0  $ node skills/workflow/aes-qa/run-tests.mjs --contract aes-qa-v4-schema --case qa-report-render
+         PASS qa-report-render: 18/18 assertions passed
+
+绿 6 / 红 0 / 跑不起来 0
+默认套件回归（三条合同全量）：repository-gate-level 69/69、aes-qa-v4-schema 32/32、screenshot-evidence 97/97 全绿；
+消费仓 board 侧：screenshot-evidence-gate.test、selftest-v4、selftest(contract/dispatch/trajectory) 全绿
+（selftest orchestration 的 runner-lifecycle 失败为预存环境问题：技能目录缺 .gitignore，基线复跑同样失败，与本票无关）。
+
+另有 3 段非 [A] 档没跑：AC-004 [D]（已机械核验六要素在文）、AC-004 [C]·内嵌（交接后由用户执行）、AC-007 [C]·内嵌（交接后由用户执行）
+
+# 追记 @ 2026-09-15（implement 流程 code-review 修复后复跑）
+code-review 抓到消费侧防伪对账 fail-open 缺口：gate-policy.toml 读取失败（present=null）或
+对账输入未提供时，not-onboarded 防伪检查静默跳过——与 api-mock.md 义务②「防伪，无条件」不符。
+修复：not-onboarded 仅在核实性不存在（present=false）时放行；present=true / null / 未提供一律
+fail closed 拒收（merge-policy.mjs）；master.mjs resolveGatePolicyFacts 注释同步。
+复跑全绿：repository-gate-level 71/71（v4-gate-three-states 20→22，新增 present:null 拒收与
+gatePolicy 缺省拒收两断言）、screenshot-evidence 97/97、aes-qa-v4-schema 32/32；board 侧
+screenshot-evidence-gate 9 pass 0 fail、selftest-v4、selftest contract/dispatch、selftest-trajectory 全绿。

@@ -7,9 +7,12 @@ import { fileURLToPath } from 'node:url';
 const HERE = dirname(fileURLToPath(import.meta.url));
 
 // 合同注册表：新增合同走这里，保持统一的 usage/JSON 语义。
-// - screenshot-evidence：截图证据协议契约（live-u2-strict 默认排除，需显式点名）。
+// - screenshot-evidence：截图证据协议契约（live-u2-strict 默认排除，需显式点名；
+//   companion-shots-freeze 为 v4 伴随冻结新增，进默认套件）。
 // - repository-gate-level：AES-QG repository gate 同一证据合同（生成= aes-gate 引擎，
 //   消费= aes-worktree-board GATE-qa level 子门；缺同伴技能时如实 SKIPPED）。
+//   v4 三 case：三态（AC-001）/ gate-shortfall（AC-002）/ 消费侧全套（AC-006）。
+// - aes-qa-v4-schema：v4 报文自身契约（agent-live 托底 AC-003 / qa-report 渲染 AC-007）。
 const CONTRACTS = {
   'screenshot-evidence': {
     resultSchema: 'aes.screenshot-evidence-contract-result/v1',
@@ -20,16 +23,29 @@ const CONTRACTS = {
       ['preflight-bounds', 'preflight-bounds.contract.mjs'],
       ['recovery-cost-pilot', 'recovery-cost-pilot.contract.mjs'],
       ['live-u2-strict', 'live-u2-strict.contract.mjs'],
+      ['companion-shots-freeze', 'companion-shots.contract.mjs'],
     ]),
-    defaultCases: ['terminal-boundary', 'claim-gate', 'preflight-bounds', 'recovery-cost-pilot'],
+    defaultCases: ['terminal-boundary', 'claim-gate', 'preflight-bounds', 'recovery-cost-pilot', 'companion-shots-freeze'],
   },
   'repository-gate-level': {
     resultSchema: 'aes.repository-gate-level-contract-result/v1',
     suiteSchema: 'aes.repository-gate-level-contract-suite-result/v1',
     cases: new Map([
       ['generation-and-consumption', 'repository-gate.contract.mjs'],
+      ['v4-gate-three-states', 'repository-gate-v4-three-states.contract.mjs'],
+      ['v4-gate-shortfall', 'repository-gate-v4-shortfall.contract.mjs'],
+      ['v4-consumer-gate-verdict', 'repository-gate-v4-consumer.contract.mjs'],
     ]),
-    defaultCases: ['generation-and-consumption'],
+    defaultCases: ['generation-and-consumption', 'v4-gate-three-states', 'v4-gate-shortfall', 'v4-consumer-gate-verdict'],
+  },
+  'aes-qa-v4-schema': {
+    resultSchema: 'aes.qa-v4-schema-contract-result/v1',
+    suiteSchema: 'aes.qa-v4-schema-contract-suite-result/v1',
+    cases: new Map([
+      ['agent-live-backing', 'agent-live-backing.contract.mjs'],
+      ['qa-report-render', 'qa-report-render.contract.mjs'],
+    ]),
+    defaultCases: ['agent-live-backing', 'qa-report-render'],
   },
 };
 

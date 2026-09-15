@@ -7,7 +7,7 @@
 // 而不是相信可能在崩溃前没写完的状态位。这是「无重复 merge / 无假完成」的真正依据。
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { HEADLESS_CHILD_OPTIONS } from './headless.mjs';
 import {
@@ -51,10 +51,15 @@ export const QA_RECEIPT_SCHEMA_V2 = 'aes.qa.receipt/v2';
 // v3：新增 repository gate level 义务（requiredRepositoryGate/repositoryGate 原子引用
 // GateReceipt，AES-QG/1）。v1/v2 历史语义永久冻结；v3 缺字段不降级成旧 receipt 处理。
 export const QA_RECEIPT_SCHEMA_V3 = 'aes.qa.receipt/v3';
+// v4（#171 三支柱）：repositoryGate 三态（referenced/not-onboarded）+ agent-live 托底
+// 断言 + 截图伴随保留（companionShots + qa-report.html）。消费侧全套校验在
+// merge-policy（版本白名单、not-onboarded 对账、gate-shortfall、companionShots 完整性）；
+// 这里只做入口 schema 分派与 v2 起的 baseCommit 义务（v4 继承）。
+export const QA_RECEIPT_SCHEMA_V4 = 'aes.qa.receipt/v4';
 export const REVIEW_RETURN_SCHEMA = 'aes.issue-worker.review-return/v1';
 export const REVIEWER_INDEPENDENCE_VALUES = Object.freeze(['same-session', 'independent', 'unknown']);
 const ACCEPTED_STAGE_RESULT_SCHEMAS = Object.freeze([STAGE_RESULT_SCHEMA_V1, STAGE_RESULT_SCHEMA_V2]);
-const ACCEPTED_QA_RECEIPT_SCHEMAS = Object.freeze([QA_RECEIPT_SCHEMA_V1, QA_RECEIPT_SCHEMA_V2, QA_RECEIPT_SCHEMA_V3]);
+const ACCEPTED_QA_RECEIPT_SCHEMAS = Object.freeze([QA_RECEIPT_SCHEMA_V1, QA_RECEIPT_SCHEMA_V2, QA_RECEIPT_SCHEMA_V3, QA_RECEIPT_SCHEMA_V4]);
 
 function git(cwd, args) {
   return spawnSync('git', args, { ...HEADLESS_CHILD_OPTIONS, cwd, encoding: 'utf8' });
@@ -591,8 +596,11 @@ export function recordCandidate(options = {}) {
 
 // B11: stage 失败必须分类。分类决定烧哪一本预算 —— 环境污染与真实缺陷共用一本
 // 预算，正是历史上「三次机械 BLOCK 后 handoff」把环境问题误判成实现问题的根因。
-export const FAILURE_CLASSES = Object.freeze(['must-fix', 'retryable', 'environment']);
-const BUDGET_BY_CLASS = Object.freeze({ 'must-fix': 'reviewLoops', retryable: null, environment: 'environmentRetries' });
+// gate-shortfall（#171）：未达声明门级的专属失败类——门级不够 ≠ 功能缺陷，打回路由
+// 要回引擎重跑而不是改代码；烧 QA 轮预算（qaLoops），与 must-fix 的语义区分在
+// 「修的是证据不是产品」。
+export const FAILURE_CLASSES = Object.freeze(['must-fix', 'retryable', 'environment', 'gate-shortfall']);
+const BUDGET_BY_CLASS = Object.freeze({ 'must-fix': 'reviewLoops', retryable: null, environment: 'environmentRetries', 'gate-shortfall': 'qaLoops' });
 
 function emptyBudgetUsage() {
   return { reviewLoops: 0, qaLoops: 0, environmentRetries: 0, modelUpgrades: 0 };
@@ -784,12 +792,13 @@ export function recordStageResult(options = {}) {
   }
   const { dir } = ctx(options);
   const payload = options.payload;
-  // qa 与 review 各自的 v1→v3 接受集：review v2 起强制 baseCommit（AC-007）与
-  // reviewerSessionId（#65）；qa v2 起强制 baseCommit，v3 再加 repository gate 义务
-  // （GATE-qa 的 level 子门消费；recordStageResult 只做 schema/绑定面校验）。
+  // qa 与 review 各自的 v1→v4 接受集：review v2 起强制 baseCommit（AC-007）与
+  // reviewerSessionId（#65）；qa v2 起强制 baseCommit，v3 再加 repository gate 义务，
+  // v4 改为三态等级栏 + agent-live + 伴随截图保留（GATE-qa 的 level 子门消费；
+  // recordStageResult 只做 schema/绑定面校验，语义校验在 merge-policy）。
   const isQa = options.stage === 'qa';
   const accepted = isQa ? ACCEPTED_QA_RECEIPT_SCHEMAS : ACCEPTED_STAGE_RESULT_SCHEMAS;
-  const latest = isQa ? QA_RECEIPT_SCHEMA_V3 : STAGE_RESULT_SCHEMA_V2;
+  const latest = isQa ? QA_RECEIPT_SCHEMA_V4 : STAGE_RESULT_SCHEMA_V2;
   return updateV4Registry(dir, (registry) => {
     const attempt = currentAttempt(registry, options.jobId);
     if (!attempt) throw storeError('NO_CURRENT_ATTEMPT', `job ${options.jobId} 无当前 attempt`, { jobId: options.jobId });
@@ -1119,6 +1128,24 @@ export function respondHumanRequest(options = {}) {
 
 // ---------------------------------------------------------------- merge gate
 
+// v4 消费侧对账输入（#171 钢人回炉）：解析目标仓 gate-policy.toml 的存在性与
+// supported_through（只读存在性 + 单值正则，不解析 TOML 全文——文法所有权在 aes-gate）。
+// not-onboarded 防伪（仓有 policy 却自称未接入 → fail closed）与 requiredLevel 对账
+// 都依赖它；文件不存在时 present=false。读取失败 present=null（信息不可得）：v1/v2/v3
+// 不消费此输入不受影响；v4 not-onboarded 轮会被 merge-policy fail closed 拒收
+// （存在性不可核实 ≠ 无 policy，防伪检查不因信息缺失静默跳过）。
+function resolveGatePolicyFacts(repoRoot) {
+  try {
+    const policyPath = join(resolve(repoRoot), 'gate-policy.toml');
+    if (!existsSync(policyPath)) return { present: false, supportedThrough: null };
+    const text = readFileSync(policyPath, 'utf8');
+    const match = /^supported_through\s*=\s*"(AES-QG-L[0-5])"/m.exec(text);
+    return { present: true, supportedThrough: match ? match[1] : null };
+  } catch {
+    return { present: null, supportedThrough: null };
+  }
+}
+
 export function evaluateGate(options = {}) {
   const { dir, config, repoRoot } = ctx(options);
   const registry = readV4Registry(dir);
@@ -1150,6 +1177,7 @@ export function evaluateGate(options = {}) {
     baseCommit: job.baseCommit || null,
     integrationHead,
     changedPaths,
+    gatePolicy: resolveGatePolicyFacts(repoRoot),
   });
 
   const decision = decideMerge({ mechanical, policy, humanApproval: job.humanGateApproval || null });

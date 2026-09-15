@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "slug": "2026-09-12-aes-qa-sqa-three-pillars",
+  "created_at": "2026-09-12T07:48:14Z",
+  "updated_at": "2026-09-12T13:58:31Z",
+  "original_request": "按前面的顺序，我们开始走正式的 interview 流程，最后走到 goal contract。（任务=GitHub issue #171 aes-qa SQA 优化三支柱，含本会话 steelman 裁决修正）",
+  "goal_oneline": "为 aes-qa 落地 #171 三支柱：receipt 升 v4（等级栏引擎同源收口+未接入显式态）、business-acceptance reference 落地（agent 驱动验收+证据分层托底）、终态截图伴随目录保留+qa-report.html 一等伴随产物（模板复制零 LLM、仅 HTML 人类可读格式），含消费侧 GATE-qa 同步，契约测试全绿",
+  "target": null,
+  "stage": "3-contract",
+  "next_action": "契约 v2（钢人回炉版）Ready：按 finalize 生成的交接指令启动实现，建议挂 #171",
+  "stage_gates": {
+    "1-interview": {
+      "status": "done",
+      "closed_at": "2026-09-12T12:11:11Z",
+      "self_assessment": {
+        "意图": "已定",
+        "结果": "已定",
+        "边界": "已定",
+        "约束": "已定",
+        "现状": "已定"
+      }
+    },
+    "2-prototype": {
+      "status": "done",
+      "closed_at": "2026-09-12T10:35:41Z",
+      "artifacts_confirmed": [
+        "behavior",
+        "api-mock",
+        "example-run",
+        "diagram"
+      ]
+    },
+    "3-contract": {
+      "status": "done",
+      "reason": "契约起草中用户新增材料需求：v4 验收单需 HTML 渲染件（模板复制零 LLM、图片相对引用、参照 dossier 形态）——需回访谈澄清定位/格式策略/边界后重拟 AC",
+      "reverted_at": "2026-09-12T11:12:07Z",
+      "closed_at": "2026-09-12T13:58:31Z"
+    }
+  },
+  "validation": {
+    "status": "valid",
+    "ac_count": 7,
+    "warnings": [],
+    "ran_at": "2026-09-12T13:58:17Z",
+    "verify_tiers": {
+      "A": 6,
+      "B": 0,
+      "C": 2,
+      "D": 1
+    }
+  },
+  "blocked": [],
+  "residual_risk": null,
+  "status": "ready"
+}

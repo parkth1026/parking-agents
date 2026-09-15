@@ -1,0 +1,176 @@
+<!-- draft v1 | published 2026-09-12T09:00:00Z
+     用户意见：待质疑
+     状态：draft -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>aes-qa 三支柱 · 架构与流程视图（draft v1）</title>
+<style>
+  :root{
+    --paper:#f5f5f5; --ink:#2d3142; --muted:#4f5d75; --soft:#7a8399;
+    --accent:#eb6c36; --accent-tint:#fdf1ec;
+    --font-ui:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
+    --font-mono:ui-monospace,"Cascadia Mono",Consolas,monospace;
+  }
+  body{margin:0;padding:24px;background:var(--paper);color:var(--ink);font-family:var(--font-ui);}
+  h1{font-size:20px;margin:0 0 4px;}
+  .lede{font-size:12px;color:var(--soft);margin-bottom:24px;}
+  section{margin-bottom:40px;}
+  h2{font-size:16px;margin:0 0 12px;}
+  .ledger{font-family:var(--font-mono);font-size:10px;color:var(--muted);
+    border-top:1px solid #d8dce4;margin-top:12px;padding-top:8px;white-space:pre-line;}
+  svg{background:#ffffff;border:1px solid #e2e5ea;border-radius:8px;}
+</style>
+</head>
+<body>
+<h1>aes-qa 三支柱：v4 收口 · 业务真实验收 · 截图伴随保留</h1>
+<p class="lede">图例：橙 = 本次新增/变更，灰 = 既有（不动）。行是源、图是面：口径冲突先回 behavior.md 对行。</p>
+
+<section>
+<h2>架构视图（拓扑事实源 · 改后态）</h2>
+<svg viewBox="0 0 640 400" width="640" height="400" role="img" aria-labelledby="arch-title arch-desc">
+  <title id="arch-title">aes-qa v4 收口后的技能族拓扑</title>
+  <desc id="arch-desc">展示 aes-qa 会话、aes-gate 引擎与收据、v4 receipt、GitLab 截图链路、伴随目录、GATE-qa 消费门七个模块及依赖边；v4 receipt 与伴随目录为本次新增，冻结副本边为本次新增数据流。</desc>
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4f5d75"/></marker>
+    <marker id="ar-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#eb6c36"/></marker>
+  </defs>
+
+  <!-- 连线（先画，z 序在节点下） -->
+  <path d="M 96,112 V 180" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#ar)"/>
+  <rect x="104" y="140" width="48" height="12" fill="#f5f5f5"/><text x="128" y="150" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75">调用判级</text>
+
+  <path d="M 168,216 H 228" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#ar)"/>
+  <rect x="176" y="198" width="40" height="12" fill="#f5f5f5"/><text x="196" y="208" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75">落盘</text>
+
+  <path d="M 304,184 V 140" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#ar)"/>
+  <rect x="312" y="156" width="48" height="12" fill="#f5f5f5"/><text x="336" y="166" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75">digest 引用</text>
+
+  <path d="M 168,76 H 228" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#ar)"/>
+  <rect x="176" y="58" width="48" height="12" fill="#f5f5f5"/><text x="200" y="68" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75">产出 v4</text>
+
+  <path d="M 528,248 V 292" fill="none" stroke="#eb6c36" stroke-width="1.75" marker-end="url(#ar-a)"/>
+  <rect x="536" y="262" width="48" height="12" fill="#f5f5f5"/><text x="560" y="272" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#eb6c36">冻结副本</text>
+
+  <path d="M 392,92 H 416 Q 424,92 424,100 V 272 Q 424,280 416,280 H 352 Q 344,280 344,288 V 292" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#ar)"/>
+  <rect x="344" y="262" width="72" height="12" fill="#f5f5f5"/><text x="380" y="272" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75">stage qa 提交</text>
+
+  <!-- 节点 -->
+  <g>
+    <rect x="24" y="40" width="144" height="72" rx="6" fill="#ffffff" stroke="#4f5d75" stroke-width="1.25"/>
+    <rect x="32" y="48" width="44" height="12" rx="2" fill="#eef1f6"/><text x="54" y="57" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75" letter-spacing="1">AGENT</text>
+    <text x="96" y="80" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" font-weight="600" fill="#2d3142">aes-qa 会话</text>
+    <text x="96" y="96" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#4f5d75">capability 组合·collapsed</text>
+  </g>
+  <g class="changed">
+    <rect x="232" y="48" width="160" height="88" rx="6" fill="#fdf1ec" stroke="#eb6c36" stroke-width="2"/>
+    <rect x="240" y="56" width="48" height="12" rx="2" fill="#f7dfd3"/><text x="264" y="65" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#eb6c36" letter-spacing="1">NEW·v4</text>
+    <text x="312" y="86" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" font-weight="600" fill="#2d3142">v4 receipt</text>
+    <text x="312" y="102" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#eb6c36">repositoryGate 三态</text>
+    <text x="312" y="114" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#eb6c36">companionShots</text>
+    <text x="312" y="126" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#eb6c36">agent-live·driver</text>
+  </g>
+  <g>
+    <rect x="24" y="184" width="144" height="64" rx="6" fill="#ffffff" stroke="#4f5d75" stroke-width="1.25"/>
+    <rect x="32" y="192" width="52" height="12" rx="2" fill="#eef1f6"/><text x="58" y="201" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75" letter-spacing="1">ENGINE</text>
+    <text x="96" y="222" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" font-weight="600" fill="#2d3142">aes-gate 引擎</text>
+    <text x="96" y="238" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#4f5d75">AES-QG/1 判级</text>
+  </g>
+  <g>
+    <rect x="232" y="184" width="144" height="64" rx="6" fill="#ffffff" stroke="#4f5d75" stroke-width="1.25"/>
+    <rect x="240" y="192" width="40" height="12" rx="2" fill="#eef1f6"/><text x="260" y="201" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75" letter-spacing="1">JSON</text>
+    <text x="304" y="222" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" font-weight="600" fill="#2d3142">gate receipt</text>
+    <text x="304" y="238" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#4f5d75">.aes-gate/runs/</text>
+  </g>
+  <g>
+    <rect x="456" y="184" width="144" height="64" rx="6" fill="#ffffff" stroke="#4f5d75" stroke-width="1.25"/>
+    <rect x="464" y="192" width="60" height="12" rx="2" fill="#eef1f6"/><text x="494" y="201" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75" letter-spacing="1">EVIDENCE</text>
+    <text x="528" y="222" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" font-weight="600" fill="#2d3142">GitLab 截图链路</text>
+    <text x="528" y="238" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#4f5d75">note+marker·既有</text>
+  </g>
+  <g class="changed">
+    <rect x="456" y="296" width="144" height="56" rx="6" fill="#fdf1ec" stroke="#eb6c36" stroke-width="2"/>
+    <rect x="464" y="304" width="36" height="12" rx="2" fill="#f7dfd3"/><text x="482" y="313" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#eb6c36" letter-spacing="1">NEW</text>
+    <text x="528" y="334" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" font-weight="600" fill="#2d3142">伴随目录</text>
+    <text x="528" y="348" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#eb6c36">shots/ + manifest</text>
+  </g>
+  <g>
+    <rect x="232" y="296" width="144" height="64" rx="6" fill="#ffffff" stroke="#4f5d75" stroke-width="1.25"/>
+    <rect x="240" y="304" width="40" height="12" rx="2" fill="#eef1f6"/><text x="260" y="313" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75" letter-spacing="1">GATE</text>
+    <text x="304" y="334" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" font-weight="600" fill="#2d3142">GATE-qa</text>
+    <text x="304" y="350" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#4f5d75">merge-policy.mjs</text>
+  </g>
+</svg>
+<p class="ledger">Fidelity ledger
+Detail: balanced · 源 = 影响面 5 项变更 + 三路调研技能拓扑 → 绘制 7 节点 / 6 边
+Merged: 能力技能（browser-use / computer-use / playwright-cli）→ 并入「aes-qa 会话」节点内 capability 组合注记
+Collapsed: v4 receipt 内部字段（repositoryGate 三态 / companionShots / agent-live·driver）→ 节点内 sub 注记三行
+Dropped: QA 会话→GitLab 截图链路的驱动边（布局冲突，且非本次改动焦点）；GATE-qa→merge 终局边（⑧ 为终点）
+Kept in full: digest 引用边（⑤→③，v3 既有拓扑不变的事实）与冻结副本边（⑥→⑦，本次唯一新数据流）——两处正是待质疑对象</p>
+</section>
+
+<section>
+<h2>流程视图（behavior.md 变化行 1/2/3 之面）</h2>
+<svg viewBox="0 0 640 240" width="640" height="240" role="img" aria-labelledby="flow-title flow-desc">
+  <title id="flow-title">最终轮等级栏判定流程（改后态）</title>
+  <desc id="flow-desc">candidate 登记后按「仓是否已注册 gate」分叉：已注册走引擎判级得 referenced 等级栏，未注册记 not-onboarded 与原因；声明门级未达时 receipt 判 FAIL（gate-shortfall），达成或未接入均出 v4 receipt。</desc>
+  <defs>
+    <marker id="fr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4f5d75"/></marker>
+  </defs>
+
+  <!-- 分叉边 -->
+  <path d="M 136,108 H 156 Q 164,108 164,100 V 68 Q 164,60 172,60 H 188" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#fr)"/>
+  <rect x="108" y="44" width="64" height="12" fill="#f5f5f5"/><text x="140" y="54" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75">是·已注册</text>
+
+  <path d="M 136,124 H 156 Q 164,124 164,132 V 172 Q 164,180 172,180 H 188" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#fr)"/>
+  <rect x="100" y="188" width="76" height="12" fill="#f5f5f5"/><text x="138" y="198" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75">否·未接入门禁</text>
+
+  <path d="M 352,48 H 404" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#fr)"/>
+  <rect x="354" y="28" width="52" height="12" fill="#f5f5f5"/><text x="380" y="38" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#eb6c36">未达声明级</text>
+
+  <path d="M 352,80 H 440 Q 448,80 448,88 V 100" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#fr)"/>
+  <rect x="356" y="88" width="68" height="12" fill="#f5f5f5"/><text x="390" y="98" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75">达声明级</text>
+
+  <path d="M 352,180 H 368 Q 376,180 376,172 V 140 Q 376,132 384,132 H 388" fill="none" stroke="#4f5d75" stroke-width="1.5" marker-end="url(#fr)"/>
+
+  <!-- 步骤节点 -->
+  <g>
+    <rect x="24" y="96" width="112" height="56" rx="6" fill="#ffffff" stroke="#4f5d75" stroke-width="1.25"/>
+    <rect x="32" y="104" width="32" height="12" rx="2" fill="#eef1f6"/><text x="48" y="113" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75" letter-spacing="1">既有</text>
+    <text x="80" y="134" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" font-weight="600" fill="#2d3142">candidate 登记</text>
+  </g>
+  <g class="changed">
+    <rect x="192" y="32" width="160" height="64" rx="6" fill="#fdf1ec" stroke="#eb6c36" stroke-width="2"/>
+    <rect x="200" y="40" width="48" height="12" rx="2" fill="#f7dfd3"/><text x="224" y="49" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#eb6c36" letter-spacing="1">变化行1</text>
+    <text x="272" y="70" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" font-weight="600" fill="#2d3142">引擎判级 → 等级栏</text>
+    <text x="272" y="86" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#eb6c36">referenced·digest 引用</text>
+  </g>
+  <g class="changed">
+    <rect x="192" y="152" width="160" height="56" rx="6" fill="#fdf1ec" stroke="#eb6c36" stroke-width="2"/>
+    <rect x="200" y="160" width="48" height="12" rx="2" fill="#f7dfd3"/><text x="224" y="169" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#eb6c36" letter-spacing="1">变化行2</text>
+    <text x="272" y="190" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" font-weight="600" fill="#2d3142">not-onboarded</text>
+    <text x="272" y="202" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#eb6c36">reason 必填·单据有效</text>
+  </g>
+  <g>
+    <rect x="408" y="16" width="128" height="48" rx="6" fill="#ffffff" stroke="#4f5d75" stroke-width="1.25"/>
+    <rect x="416" y="24" width="48" height="12" rx="2" fill="#eef1f6"/><text x="440" y="33" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75" letter-spacing="1">变化行3</text>
+    <text x="472" y="52" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" font-weight="600" fill="#2d3142">receipt FAIL</text>
+  </g>
+  <g>
+    <rect x="392" y="104" width="144" height="56" rx="6" fill="#ffffff" stroke="#4f5d75" stroke-width="1.25"/>
+    <rect x="400" y="112" width="32" height="12" rx="2" fill="#eef1f6"/><text x="416" y="121" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="8" fill="#4f5d75" letter-spacing="1">出票</text>
+    <text x="464" y="142" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" font-weight="600" fill="#2d3142">出 v4 receipt</text>
+    <text x="464" y="154" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="9" fill="#4f5d75">att/qa-receipt.json+shots/</text>
+  </g>
+</svg>
+<p class="ledger">Fidelity ledger
+Detail: balanced · 源 = behavior.md 变化行 1/2/3 → 绘制 5 节点 / 5 边
+Merged: 无
+Collapsed: 引擎判级内部六步（复用扫描、逐级实跑、聚合、看板）→ 并入「引擎判级」节点
+Dropped: accent 预算——receipt FAIL 节点未标橙（预算 2 已用于两条新定级路径；失败语义由「未达声明级」边标签承载）
+Kept in full: 定级两分支（已注册/未接入）与「未达声明级」失败边——Q2 裁决的可视化，必须逐处可点</p>
+</section>
+
+</body>
+</html>

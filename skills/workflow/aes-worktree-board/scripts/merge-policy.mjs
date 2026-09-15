@@ -57,12 +57,22 @@ function declaresScreenshotEvidenceObligation(qa) {
 }
 
 // ---------------------------------------------------------------- AES-QG level 子门
-// aes.qa.receipt/v3 的 repository gate level 子门（并入既有 GATE-qa，不新增第九道顶层门）。
+// aes.qa.receipt 的 repository gate level 子门（并入既有 GATE-qa，不新增第九道顶层门）。
 // 标准所有权在 aes-gate（AES-QG/1）；此处只做机械消费面：required/achieved 可比较、
 // GateReceipt digest 合法、candidate 一致、缺级/旧证据/NOT_RUN 均 fail closed。
 // v1/v2 历史语义永久冻结：不携带 repository gate 义务，豁免本子门（向下兼容，不是漏检）。
+// 版本判别是已知版本白名单（v1/v2/v3/v4）——未知版本 fail closed 拒收，不保留
+// 「非 v3 即 legacy」黑名单结构（否则 v5 出现时会像 v4 曾那样被误判 legacy 豁免）。
 const AES_QG_FULL_LEVEL = /^AES-QG-L[0-5]$/;
 const SHA256_DIGEST = /^sha256:[0-9a-f]{64}$/i;
+const QA_RECEIPT_KNOWN_VERSIONS = Object.freeze(['v1', 'v2', 'v3', 'v4']);
+const V4_REPOSITORY_GATE_STATUSES = Object.freeze(['referenced', 'not-onboarded']);
+const V4_SECRETS_SCAN_SCOPE = Object.freeze(['filename', 'metadata', 'extractable-text']);
+
+function qaReceiptVersion(qa) {
+  const match = /\/(v[0-9]+)$/.exec(String(qa?.schemaVersion ?? ''));
+  return match ? match[1] : null;
+}
 
 function aesQgLevelIndex(level) {
   return AES_QG_FULL_LEVEL.test(String(level || '')) ? Number(String(level).slice(-1)) : -1;
@@ -83,9 +93,16 @@ export function isTrackerOnlyPath(path) {
   return TRACKER_ONLY_PATH_RE.some((re) => re.test(normalized));
 }
 
-export function repositoryGateLevelGate(qa, candidateCommit, changedPaths = null) {
-  if (!qa?.schemaVersion?.endsWith('/v3')) {
+export function repositoryGateLevelGate(qa, candidateCommit, changedPaths = null, gatePolicy = null) {
+  const version = qaReceiptVersion(qa);
+  if (!QA_RECEIPT_KNOWN_VERSIONS.includes(version)) {
+    return { ok: false, detail: `schemaVersion=${qa?.schemaVersion || 'NOT_SET'} 不在已知版本白名单（v1/v2/v3/v4），fail closed 拒收` };
+  }
+  if (version === 'v1' || version === 'v2') {
     return { ok: true, legacy: true, detail: `schemaVersion=${qa?.schemaVersion || 'NOT_SET'} 为 v1/v2 历史语义，无 repository gate 义务（豁免）` };
+  }
+  if (version === 'v4') {
+    return repositoryGateV4Gate(qa, candidateCommit, changedPaths, gatePolicy);
   }
   const required = qa.requiredRepositoryGate;
   if (required === undefined || required === null || required === '') {
@@ -135,6 +152,138 @@ export function repositoryGateLevelGate(qa, candidateCommit, changedPaths = null
     return { ok: false, detail: `required=${required} > achieved=${rg.achievedLevel}（缺级不得跨越）` };
   }
   return { ok: true, detail: `required=${required} ≤ achieved=${rg.achievedLevel}，GateReceipt digest 绑定 candidate` };
+}
+
+// v4 子门：等级栏三态 + 消费侧复算三义务 + companionShots 完整性。
+// 无论 receipt 自称什么，这里独立机械复算：①声明了 requiredLevel 即比较 achieved；
+// ②requiredLevel 与目标仓 gate-policy 声明对账（gatePolicy.supportedThrough 提供时）；
+// ③outcome / repositoryGate.outcome / failureClass 三裁决位一致性，矛盾拒收。
+function repositoryGateV4Gate(qa, candidateCommit, changedPaths, gatePolicy) {
+  const companion = companionShotsV4Gate(qa);
+  const rgDetail = v4RepositoryGateDetail(qa, candidateCommit, changedPaths, gatePolicy);
+  if (!rgDetail.ok) return rgDetail;
+  if (companion && !companion.ok) return companion;
+  return {
+    ok: true,
+    detail: `${rgDetail.detail}${companion ? `；${companion.detail}` : ''}`,
+  };
+}
+
+function companionShotsV4Gate(qa) {
+  if (qa?.screenshotEvidence?.required !== true) return null;
+  const cs = qa.screenshotEvidence.companionShots;
+  if (!cs || typeof cs !== 'object') {
+    return { ok: false, detail: 'v4 截图义务轮缺 companionShots（伴随目录冻结证明：shots/ + shots-manifest.json），fail closed' };
+  }
+  if (cs.dir !== 'shots/' || cs.manifest !== 'shots-manifest.json') {
+    return { ok: false, detail: `companionShots.dir/manifest 必须为 shots/ 与 shots-manifest.json，实际：${cs.dir ?? 'NOT_SET'}/${cs.manifest ?? 'NOT_SET'}` };
+  }
+  if (typeof cs.manifestSha256 !== 'string' || !SHA256_DIGEST.test(cs.manifestSha256)) {
+    return { ok: false, detail: 'companionShots.manifestSha256 必须是 sha256:<64hex> 内容寻址摘要' };
+  }
+  if (!Number.isInteger(cs.count) || cs.count < 1) {
+    return { ok: false, detail: `companionShots.count 必须是 ≥1 的整数，实际：${cs.count ?? 'NOT_SET'}` };
+  }
+  const scan = cs.secretsScan;
+  const scanShapeOk = scan && typeof scan === 'object' && ['CLEAR', 'BLOCKED'].includes(scan.result)
+    && scan.ocr === false && Array.isArray(scan.scope)
+    && scan.scope.every((entry) => V4_SECRETS_SCAN_SCOPE.includes(entry));
+  if (!scanShapeOk) {
+    return { ok: false, detail: 'companionShots.secretsScan 必须是对象 {result: CLEAR|BLOCKED, scope:[filename,metadata,extractable-text], ocr:false}（CLEAR=已声明 scope 内未检出）' };
+  }
+  if (scan.result === 'BLOCKED') {
+    return { ok: false, detail: 'companionShots.secretsScan=BLOCKED：截图含疑似凭据模式，receipt 必须 FAIL，截图不得入库' };
+  }
+  return { ok: true, detail: `companionShots 完整（count=${cs.count}，secretsScan=CLEAR）` };
+}
+
+function v4RepositoryGateDetail(qa, candidateCommit, changedPaths, gatePolicy) {
+  const rg = qa.repositoryGate;
+  if (!rg || typeof rg !== 'object') {
+    return { ok: false, detail: 'v4 缺 repositoryGate（status 闭集 {referenced, not-onboarded}），fail closed 不降级' };
+  }
+  if (rg.status === undefined) {
+    return { ok: false, detail: 'v4 缺 repositoryGate.status，fail closed' };
+  }
+  if (rg.status === 'not-onboarded') {
+    if (typeof rg.reason !== 'string' || !rg.reason.trim()) {
+      return { ok: false, detail: 'not-onboarded 必须携带非空 reason（未接入门禁的原因要可读）' };
+    }
+    if (typeof rg.trackerOnly !== 'boolean') {
+      return { ok: false, detail: 'not-onboarded 必须携带布尔 trackerOnly（tracker-only 工作记 true）' };
+    }
+    const carried = ['standardVersion', 'requiredLevel', 'achievedLevel', 'gateReceiptDigest', 'candidateCommitSha', 'outcome']
+      .filter((field) => rg[field] !== undefined);
+    if (carried.length) {
+      return { ok: false, detail: `not-onboarded 不得携带 referenced 独有字段：${carried.join(', ')}` };
+    }
+    // 防伪对账（api-mock 义务②「防伪，无条件」）：not-onboarded 只有在核实性
+    // 不存在（present=false）时放行——仓有 policy（present=true）矛盾拒收；
+    // 存在性不可核实（present=null：读取失败/对账输入未提供）同样 fail closed，
+    // 防伪检查不得因信息缺失静默跳过。
+    if (gatePolicy?.present === true) {
+      return { ok: false, detail: '目标仓存在 gate-policy.toml 而 receipt 声称 not-onboarded——对账矛盾，fail closed 拒收' };
+    }
+    if (gatePolicy?.present !== false) {
+      return { ok: false, detail: 'gate-policy.toml 存在性不可核实（读取失败或对账输入未提供）——not-onboarded 声称无法验证，fail closed 拒收' };
+    }
+    if (rg.trackerOnly === true && Array.isArray(changedPaths)) {
+      const productPaths = changedPaths.filter((p) => !isTrackerOnlyPath(p));
+      if (productPaths.length > 0) {
+        return { ok: false, detail: `trackerOnly=true 但 candidate 存在 product bytes 变化（${productPaths.slice(0, 3).join(', ')}${productPaths.length > 3 ? '…' : ''}），不得声明 tracker-only` };
+      }
+    }
+    return { ok: true, detail: `not-onboarded：${rg.reason}（trackerOnly=${rg.trackerOnly}；治理=计量+复盘，不设硬门）` };
+  }
+  if (!V4_REPOSITORY_GATE_STATUSES.includes(rg.status)) {
+    return { ok: false, detail: `repositoryGate.status=${String(rg.status)} 不在闭集 {${V4_REPOSITORY_GATE_STATUSES.join(', ')}}，fail closed` };
+  }
+  if (rg.standardVersion !== 'AES-QG/1') {
+    return { ok: false, detail: `repositoryGate.standardVersion=${rg.standardVersion || 'NOT_SET'}，必须是 AES-QG/1` };
+  }
+  const required = rg.requiredLevel;
+  const declaredRequired = required !== undefined && required !== null && required !== '';
+  if (declaredRequired && !AES_QG_FULL_LEVEL.test(required)) {
+    return { ok: false, detail: `repositoryGate.requiredLevel 可空，但声明时必须是完整 AES-QG-L[0-5]，实际：${required}` };
+  }
+  if (!AES_QG_FULL_LEVEL.test(rg.achievedLevel || '')) {
+    return { ok: false, detail: `repositoryGate.achievedLevel=${rg.achievedLevel || 'NOT_SET'} 必须是完整 AES-QG-L[0-5]（裸 Lx 不算）` };
+  }
+  if (typeof rg.gateReceiptDigest !== 'string' || !SHA256_DIGEST.test(rg.gateReceiptDigest)) {
+    return { ok: false, detail: 'repositoryGate.gateReceiptDigest 必须是 sha256:<64hex> 内容寻址摘要' };
+  }
+  if (!candidateCommit || rg.candidateCommitSha !== candidateCommit) {
+    return { ok: false, detail: `repositoryGate candidate=${rg.candidateCommitSha || 'NOT_BOUND'} current=${candidateCommit || 'NOT_RUN'}，旧证据/未绑定 fail closed` };
+  }
+  if (!['PASS', 'FAILED'].includes(rg.outcome)) {
+    return { ok: false, detail: `repositoryGate.outcome=${rg.outcome || 'NOT_SET'}，闭集 {PASS, FAILED}，NOT_RUN fail closed` };
+  }
+  // 义务①：声明即比较——不信任 receipt 自称，机械复算缺级。
+  const shortfall = declaredRequired && aesQgLevelIndex(rg.achievedLevel) < aesQgLevelIndex(required);
+  if (shortfall) {
+    const honest = rg.outcome === 'FAILED' && qa.outcome === 'FAIL' && qa.failureClass === 'gate-shortfall';
+    if (!honest) {
+      return { ok: false, detail: `复算：required=${required} > achieved=${rg.achievedLevel}（缺级不得跨越），receipt 必须 outcome=FAIL + failureClass=gate-shortfall + repositoryGate.outcome=FAILED，实际 outcome=${qa.outcome || 'NOT_SET'} failureClass=${qa.failureClass || 'NOT_SET'} gate=${rg.outcome}——矛盾拒收` };
+    }
+    return { ok: false, detail: `gate-shortfall：required=${required} > achieved=${rg.achievedLevel}，缺级不得跨越，拒合并（失败已在 receipt 可读，路由回引擎重跑）` };
+  }
+  // 无 shortfall 时 gate 必须 PASS：FAILED 而不缺级 = 三裁决位矛盾。
+  if (rg.outcome !== 'PASS') {
+    return { ok: false, detail: `复算矛盾：required=${declaredRequired ? required : '未声明'} ≤ achieved=${rg.achievedLevel} 但 repositoryGate.outcome=${rg.outcome}` };
+  }
+  // 义务③：三裁决位一致性（gate-shortfall 仅允许缺级场景，此处已排除）。
+  if (qa.failureClass === 'gate-shortfall') {
+    return { ok: false, detail: `复算矛盾：achieved=${rg.achievedLevel} 未低于 required=${declaredRequired ? required : '未声明'}，failureClass 不得为 gate-shortfall（该枚举仅缺级场景）` };
+  }
+  if (rg.outcome === 'FAILED' && qa.outcome !== 'FAIL') {
+    return { ok: false, detail: `复算矛盾：repositoryGate.outcome=FAILED 而 receipt outcome=${qa.outcome || 'NOT_SET'}` };
+  }
+  // 义务②：requiredLevel 与目标仓 gate-policy 声明对账（policy 可读时）。
+  if (declaredRequired && gatePolicy?.supportedThrough && AES_QG_FULL_LEVEL.test(gatePolicy.supportedThrough)
+    && aesQgLevelIndex(required) > aesQgLevelIndex(gatePolicy.supportedThrough)) {
+    return { ok: false, detail: `对账：requiredLevel=${required} 超出目标仓 gate-policy supported_through=${gatePolicy.supportedThrough}` };
+  }
+  return { ok: true, detail: `required=${declaredRequired ? required : '未声明（achieved 即结论）'} ≤ achieved=${rg.achievedLevel}，digest 绑定 candidate` };
 }
 
 function screenshotEvidenceGate(qa, candidateCommit) {
@@ -239,7 +388,7 @@ export function applyWaiver(resolution, waiver) {
 export function evaluateMechanicalGate({
   slotOk, slotReason, commitFresh, commitReason, integrationOk, integrationReason,
   acceptance = [], acceptanceCommit = null, review = null, qa = null, candidateCommit = null, baseCommit = null, integrationHead = null,
-  changedPaths = null,
+  changedPaths = null, gatePolicy = null,
 }) {
   const checks = [];
   const push = (id, ok, detail) => checks.push({ id, outcome: ok ? 'PASS' : 'FAIL', detail });
@@ -289,9 +438,10 @@ export function evaluateMechanicalGate({
   // runtime=NOT_RUN 不得伪装 PASS（不变清单）。
   const screenshotRequired = declaresScreenshotEvidenceObligation(qa);
   const screenshotGate = screenshotRequired ? screenshotEvidenceGate(qa, candidateCommit) : null;
-  // AES-QG repository gate level 子门（v3 义务；v1/v2 冻结豁免）——detail 并入 GATE-qa，
-  // 不新增顶层第九道机械门。
-  const repoGate = repositoryGateLevelGate(qa, candidateCommit, changedPaths);
+  // AES-QG repository gate level 子门（v3/v4 义务；v1/v2 冻结豁免；未知版本 fail closed）
+  // ——detail 并入 GATE-qa，不新增顶层第九道机械门。gatePolicy 是 v4 not-onboarded
+  // 防伪对账与 requiredLevel 对账的输入（master 侧解析目标仓 gate-policy.toml 存在性）。
+  const repoGate = repositoryGateLevelGate(qa, candidateCommit, changedPaths, gatePolicy);
   const qaOk = qa && qa.outcome === 'PASS'
     && candidateCommit && qa.commitSha === candidateCommit
     && !(qa.checks || []).some((check) => check.outcome === 'NOT_RUN')
@@ -303,10 +453,10 @@ export function evaluateMechanicalGate({
     : 'QA 证据缺失');
 
   // QA 必须在当前 integration base 上取证；base 前进使旧证据失效（AC-007/AC-2）。
-  // v2 与 v3 都承诺 baseCommit（v3 是 repository gate 语义的最低字段集）；v1 豁免
-  // （向下兼容，理由见 GATE-review-base 处注释）。缺 baseCommit 的 v3 不降级成旧
-  // receipt 处理——recordStageResult 已 fail closed，这里同样按不匹配拒绝。
-  const qaDeclaresBase = Boolean(qa?.schemaVersion?.endsWith('/v2') || qa?.schemaVersion?.endsWith('/v3'));
+  // v2/v3/v4 都承诺 baseCommit（v3 是 repository gate 语义的最低字段集，v4 继承）；
+  // v1 豁免（向下兼容，理由见 GATE-review-base 处注释）。缺 baseCommit 的 v3/v4
+  // 不降级成旧 receipt 处理——recordStageResult 已 fail closed，这里同样按不匹配拒绝。
+  const qaDeclaresBase = ['v2', 'v3', 'v4'].includes(qaReceiptVersion(qa));
   const qaBaseOk = !qa ? false : (!qaDeclaresBase || qa.baseCommit === baseCommit);
   const qaBaseReason = !qa
     ? 'QA 证据缺失'
