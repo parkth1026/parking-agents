@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Mock: dossier trajectory 四态渲染 + 生命周期聚合</title>
+<style>
+  :root{
+    --ok:#16a34a; --ok-bg:#f0fdf4;
+    --hold:#d97706; --hold-bg:#fffbeb;
+    --open:#dc2626; --open-bg:#fef2f2;
+    --auto:#64748b; --auto-bg:#f1f5f9;
+    --changed:#ea580c; --changed-bg:#fff7ed;
+    --ink:#0f172a; --muted:#64748b; --line:#e2e8f0;
+  }
+  *{box-sizing:border-box}
+  body{font:14px/1.65 "Segoe UI",system-ui,sans-serif;color:var(--ink);margin:0;padding:28px;background:#f8fafc;max-width:980px;margin-inline:auto}
+  h1{font-size:19px;margin:0 0 4px}
+  h2{font-size:15px;margin:30px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+  .sub{color:var(--muted);font-size:12.5px;margin-bottom:18px}
+  .card{background:#fff;border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin:10px 0}
+  .changed{outline:2px solid var(--changed);outline-offset:2px;background:var(--changed-bg)}
+  .tag{display:inline-block;font-size:11.5px;padding:1px 8px;border-radius:99px;margin-right:6px;vertical-align:1px}
+  .tag.ok{background:var(--ok-bg);color:var(--ok);border:1px solid var(--ok)}
+  .tag.hold{background:var(--hold-bg);color:var(--hold);border:1px solid var(--hold)}
+  .tag.open{background:var(--open-bg);color:var(--open);border:1px solid var(--open)}
+  .tag.auto{background:var(--auto-bg);color:var(--auto);border:1px solid var(--auto)}
+  .tag.meta{background:#fff;color:var(--muted);border:1px solid var(--line)}
+  .q{font-weight:600}
+  .ans{margin-top:6px;padding:6px 10px;border-radius:6px;font-size:13px}
+  .ans.ok{background:var(--ok-bg)}
+  .ans.hold{background:var(--hold-bg)}
+  .ans.open{background:var(--open-bg)}
+  .ans.auto{background:var(--auto-bg)}
+  .verbatim{color:var(--muted);font-style:italic}
+  .lifecycle{border-left:3px solid var(--line);margin:8px 0 4px 8px;padding-left:16px}
+  .step{position:relative;padding:6px 0 6px 4px}
+  .step::before{content:"";position:absolute;left:-20.5px;top:14px;width:8px;height:8px;border-radius:50%;background:#fff;border:2px solid var(--muted)}
+  .step.ok::before{border-color:var(--ok);background:var(--ok)}
+  .step.hold::before{border-color:var(--hold);background:var(--hold)}
+  .carry{font-size:12px;color:var(--hold)}
+  table{border-collapse:collapse;width:100%;background:#fff;font-size:13px}
+  th,td{border:1px solid var(--line);padding:6px 10px;text-align:left;vertical-align:top}
+  th{background:var(--auto-bg);font-weight:600}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;margin:10px 0 0;color:var(--muted)}
+  footer{margin-top:34px;font-size:12.5px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px}
+</style>
+</head>
+<body>
+
+<h1>dossier · trajectory 视图（改后形态 Mock）</h1>
+<p class="sub">示例数据写死自 issue149 会话真实记录（2026-09-14/15）。橙框 = 本次改动的渲染点；灰/绿/黄/红 = 四种答案状态。</p>
+
+<div class="legend">
+  <span><span class="tag ok">已答</span>用户真实选择/确认</span>
+  <span><span class="tag hold">⏸ 暂缓</span>拒当场答、要求补条件（问题保持开放直至承接轮落答）</span>
+  <span><span class="tag open">悬而未决</span>真待用户表态</span>
+  <span><span class="tag auto">默认生效</span>机制性默认，非未回答</span>
+</div>
+
+<h2>一、决策生命周期（新增视图：同 q_id 跨轮聚合）</h2>
+<div class="card changed">
+  <div class="q">Q1 · speed/eta 两个恒空转断言怎么处置 <span class="tag meta">1-interview</span></div>
+  <div class="lifecycle">
+    <div class="step hold">
+      <span class="tag hold">⏸ 暂缓 · r1</span>
+      要求补充：行业最佳实践调研
+      <div class="verbatim">「不好选 再深度调研一下 行业最佳实践」</div>
+      <div class="carry">↳ 问题保持开放 · 轮组状态：待补证据</div>
+    </div>
+    <div class="step ok">
+      <span class="tag ok">已答 · r2</span>
+      选择 B（数值锚+身份锚 — 52%）
+      <div class="carry">↻ 本轮为重发：triggered_by = r1 暂缓（要求行业调研）——调研结论作为证据基座随选项交付</div>
+    </div>
+  </div>
+  <div style="margin-top:6px"><span class="tag ok">生命周期：已关闭</span><span class="tag meta">历时 2 轮 · 含 1 次暂缓</span></div>
+</div>
+
+<div class="card">
+  <div class="q">Q-gate · 修完后的门跑形态 <span class="tag meta">3-contract / 补裁轮</span></div>
+  <div class="lifecycle">
+    <div class="step auto">
+      <span class="tag auto">默认生效 · r1</span>
+      gate.full 一次收尾 <span class="tag meta">默认区</span>
+      <div class="carry">↳ 已发出可反对窗口 · 未记录反对</div>
+    </div>
+    <div class="step ok">
+      <span class="tag ok">翻案 · r3 补裁</span>
+      「l4 先行 + full 合入前」
+      <div class="carry">↻ 补裁轮触发：dossier trajectory 暴露悬空决定 · overturned_recommendation=true</div>
+    </div>
+  </div>
+  <div style="margin-top:6px"><span class="tag ok">生命周期：已关闭</span><span class="tag meta">默认被用户翻案 · 翻案已进契约</span></div>
+</div>
+
+<h2>二、轮次轨迹卡片（答案区四态渲染，对照现状）</h2>
+
+<div class="card">
+  <div class="q">1-interview · 第 1 轮 · 默认区清单</div>
+  <div class="ans auto changed"><span class="tag auto">默认生效</span>待办 2（Resolving 单调）不再动代码 — 未记录反对（窗口已过）</div>
+  <div class="ans auto changed"><span class="tag auto">默认生效</span>spec 注释与元数据同步 — 未记录反对（窗口已过）</div>
+  <div class="ans auto changed"><span class="tag auto">默认生效</span>边界不动面 — 未记录反对（窗口已过）</div>
+  <div class="ans open changed"><span class="tag open">悬而未决</span>四锚断言不改 — 真待用户表态（补裁轮反问顶回，无任何回应信号）</div>
+  <div class="verbatim">现状：以上全部渲染为「用户决定尚未回答」——机制性沉默与悬而未决混淆。</div>
+</div>
+
+<div class="card">
+  <div class="q">2-prototype · 对照物确认</div>
+  <div class="ans ok changed"><span class="tag ok">已确认</span>「确认，锁定对照物」——user 字段命中约定值 '确认'（原记录失真已在补录轮修正）</div>
+</div>
+
+<div class="card">
+  <div class="q">1-interview · 补录轮 · 实跑悬空信息</div>
+  <div class="ans ok changed"><span class="tag ok">已答</span>「有实跑结果」+ 宿主自查注记：2026-09-10 dev5 手动真桌面实录；无含 stage-gate 的门级跑</div>
+</div>
+
+<h2>三、default 行 user 值渲染约定（新增对照表）</h2>
+<table class="changed">
+  <tr><th>rounds 行数据形态</th><th>改前渲染</th><th>改后渲染</th></tr>
+  <tr><td>ask · user_choice="B"</td><td>选择 B</td><td>选择 B（不变）</td></tr>
+  <tr><td>ask · user_choice="defer" + verbatim</td><td>custom：原文（伪装成答案）</td><td><span class="tag hold">⏸ 暂缓</span>原因=verbatim · 开放，直至同 q_id 后续轮落答</td></tr>
+  <tr><td>ask · 无 choice 无 verbatim</td><td>尚未回答</td><td><span class="tag open">悬而未决</span>（仅 ask 行保留此态）</td></tr>
+  <tr><td>default · user="未反对"</td><td>尚未回答</td><td><span class="tag auto">默认生效</span></td></tr>
+  <tr><td>default · user="确认"</td><td>尚未回答</td><td><span class="tag ok">已确认</span></td></tr>
+  <tr><td>default · user=&lt;其他文本&gt;</td><td>尚未回答（user 有值也白搭：<b>现状一律 veto</b>）</td><td><span class="tag ok">翻案</span>文本如实展示（补录长文本不再被误渲染为 veto）</td></tr>
+  <tr><td>default · 无 user 字段（历史行）</td><td>尚未回答</td><td><span class="tag auto">未记录反应</span>诚实模糊态（无法区分已读未反对/未被读到——数据缺失不猜测）</td></tr>
+</table>
+
+<footer>
+新增：① 生命周期聚合视图（同 q_id 跨轮 + triggered_by 因果标注）② 答案四态（已答/⏸暂缓/悬而未决/默认生效）③ default 行 user 约定值渲染（未反对/确认/翻案文本）④ 历史无 user 行的「未记录反应」模糊态。
+不变：轮次分组结构、卡片字段（question/known_facts/options/pct）、openAmbiguities 统计口径（本就排除 default 行）、整体版式与配色基调。
+</footer>
+
+</body>
+</html>

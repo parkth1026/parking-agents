@@ -1,0 +1,17 @@
+# verify @ 2026-09-15T05:57:37Z
+# cwd: G:\GIT\AI_UE_Workflow\AntHub-dev3
+
+[FAIL] AC-001  exit=1  $ grep -q defer "C:/Users/parking/.agents/skills/workflow-interview/scripts/export-dossier.test.mjs"
+[FAIL] AC-001 [A·内嵌]  exit=1  $ grep -q defer "C:/Users/parking/.agents/skills/workflow-interview/scripts/session.mjs"
+[FAIL] AC-002  exit=1  $ grep -q 未记录反应 "C:/Users/parking/.agents/skills/workflow-interview/scripts/export-dossier.test.mjs"
+[FAIL] AC-003  exit=1  $ grep -q 生命周期 "C:/Users/parking/.agents/skills/workflow-interview/scripts/export-dossier.test.mjs"
+[PASS] AC-004  exit=0  $ node "C:/Users/parking/.agents/skills/workflow-interview/scripts/export-dossier.test.mjs"
+         ok   export/目录与正文锚点一一对应，围栏代码里的 ## 不计
+         ok   export/五个页签且 hash 路由脚本在场
+         19/19 通过
+[PASS] AC-004 [A·内嵌]  exit=0  $ node "C:/Users/parking/.agents/skills/workflow-interview/scripts/session.test.mjs"
+         ok   caliber/逐像素无规格源只警告
+         93/93 通过
+
+绿 2 / 红 4 / 跑不起来 0
+另有 1 段非 [A] 档没跑：AC-001 [C]·内嵌

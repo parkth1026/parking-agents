@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "slug": "20260915-dossier-defer-lifecycle",
+  "created_at": "2026-09-14T16:50:24Z",
+  "updated_at": "2026-09-15T05:57:56Z",
+  "original_request": "dossier 轨迹记录失真：defer 型回应（不好选再调研）被伪装成 custom 答案、default 行机制性沉默渲染成尚未回答、同一问题跨轮生命周期（暂缓→重发→落选）被轮次分组割裂——修复 rounds schema/dossier 渲染/aes-interview 文档三层缺口",
+  "goal_oneline": "dossier trajectory 如实呈现决策生命周期：四态显示（已答/暂缓/悬而未决/机制性默认）+q_id 跨轮聚合+triggered_by 连线；schema 放行 user_choice:defer；aes-interview 文档补 user 字段约定；issue149 已闭环行补状态",
+  "target": null,
+  "stage": "3-contract",
+  "next_action": "契约 Ready：改 dossier.mjs 四态+聚合 / session.mjs defer 校验+警告 / aes-interview 文档 / issue149 数据补齐——交执行 Agent",
+  "stage_gates": {
+    "1-interview": {
+      "status": "done",
+      "closed_at": "2026-09-15T05:40:21Z",
+      "self_assessment": {
+        "意图": "已定",
+        "结果": "已定",
+        "边界": "已定",
+        "约束": "已定",
+        "现状": "已定"
+      }
+    },
+    "2-prototype": {
+      "status": "done",
+      "closed_at": "2026-09-15T05:50:57Z",
+      "artifacts_confirmed": [
+        "mock",
+        "behavior",
+        "api-mock",
+        "example-run"
+      ]
+    },
+    "3-contract": {
+      "status": "done",
+      "closed_at": "2026-09-15T05:57:56Z"
+    }
+  },
+  "validation": {
+    "status": "valid",
+    "ac_count": 4,
+    "warnings": [],
+    "ran_at": "2026-09-15T05:57:37Z",
+    "verify_tiers": {
+      "A": 6,
+      "B": 0,
+      "C": 1,
+      "D": 0
+    }
+  },
+  "blocked": [],
+  "residual_risk": null,
+  "status": "ready"
+}
