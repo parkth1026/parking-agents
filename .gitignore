@@ -22,3 +22,4 @@ node_modules/
 
 # aes-gate runtime (运行产物不入库；验收证据副本入 references/bootstrap-report.md)
 /.aes-gate/
+*.DS_Store
