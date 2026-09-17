@@ -115,7 +115,7 @@ function inferActions(target, pkg) {
   const actions = [{
     id: "setup",
     name: `安装依赖（${manager} install）`,
-    desc: `生成器候选稿：${manager} install 直转发；覆盖面（root 还是含子包/测试目录多处全装）评审时按仓库事实补全`,
+    desc: `生成器候选稿：${manager} install 直转发；覆盖面（root 还是含子包/测试目录多处全装）评审时按仓库事实补全；构建工具链非致命探测面按 run-standard §9.8 评审补全（含 Node 外工具链的仓必须加，纯 Node 仓显式确认探测面为空）`,
     kind: "task",
     run: manager === "npm" ? ["npm", "install"] : [manager, "install"],
   }];

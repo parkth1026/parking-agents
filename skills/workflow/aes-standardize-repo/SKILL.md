@@ -1,6 +1,6 @@
 ---
 name: aes-standardize-repo
-description: 手动调用的仓库标准化工具：分析代码状态（形态/脚本面/CI），定制并落地零安装 run 接口（跨平台 wrapper + run.toml + 机器可读 schema），`./run` 发现与执行动作，`-n` 预览，`--json` 机器可读；runner 内建 TEST_TMP_ROOT 临时落点路由层（run-standard §9.7）；涉及改造用户脚本时逐项访谈确认。
+description: 手动调用的仓库标准化工具：分析代码状态（形态/脚本面/CI），定制并落地零安装 run 接口（跨平台 wrapper + run.toml + 机器可读 schema），`./run` 发现与执行动作，`-n` 预览，`--json` 机器可读；runner 内建 TEST_TMP_ROOT 临时落点路由层（run-standard §9.7）；setup 按形态信号定制构建工具链非致命探测（run-standard §9.8）；涉及改造用户脚本时逐项访谈确认。
 disable-model-invocation: true
 ---
 
@@ -22,7 +22,7 @@ disable-model-invocation: true
 
 ## 一、探索：先读仓，绝不冷问
 
-1. **形态信号**（判定产品形态集，决定命名）：`src-tauri`/tauri.conf=desktop；`package.json` `bin` 字段 / Cargo `[[bin]]`=cli；vite+`index.html`=web；server 入口/监听代码=server；`packages/*` workspace=多形态候选；`.sln`/electron 目录等历史信号只作参考。形态集是 R1 命名规则（action-naming 第 8 条）的判定输入。
+1. **形态信号**（判定产品形态集，决定命名）：`src-tauri`/tauri.conf=desktop；`package.json` `bin` 字段 / Cargo `[[bin]]`=cli；vite+`index.html`=web；server 入口/监听代码=server；`packages/*` workspace=多形态候选；`.sln`/electron 目录等历史信号只作参考。形态集是 R1 命名规则（action-naming 第 8 条）的判定输入。形态信号同时推导 setup 的构建工具链探测面（run-standard §9.8：`Cargo.toml`/`src-tauri`→rustc/cargo+Windows MSVC 伴生件、`.sln`/`.csproj`→dotnet、`go.mod`→go；纯 Node 仓探测面为空，评审时显式确认）。
 2. **脚本面**（任何类型都要收）：package.json scripts；ps1/bat/sh/mjs 入口脚本；Makefile/justfile/Taskfile；CI workflows（`.github/workflows/*`、`.gitlab-ci.yml`）——每个可人工触发的 job step 都是潜在动作。
 3. **现状**：已有 run 接口→增量；git 脏工作区→先提示再动；`README*`/`AGENTS.md` 快速开始段=用户真实习惯。
 4. 只提取仓库级操作：环境准备、开发/启动、构建、检查、类型检查、测试/门禁、分发；动作必须映射到这些既有业务，而不是发明平行命令。动作清单里不放 Git 命令。
@@ -68,11 +68,11 @@ node <skill-dir>/scripts/standardize_repo.mjs <repo> --create --project-id <name
 （Windows：cmd 用 `run`，PowerShell 用 `.\run.cmd`；POSIX 用 `./run`。）
 ```
 
-除非用户明确授权替换既有 run 接口，否则不要传 `--force`。仓库专属 argv 评审通过之前，生成的 `run.toml` 只算候选稿。**候选稿的两个已知盲区**（增量路径必须人工对照）：① 只机械映射 package.json scripts——原 run.toml 的直 argv 动作（不经 npm script，如 `vp check`）天然不可见，逐一对照旧动作清单防丢失；② setup 的 argv 按 lockfile 探测的包管理器直写（如 `pnpm install`），不继承原动作的旗标语义（如 `--frozen-lockfile`）——评审时逐旗标核对。skipped 清单里的动词域外脚本（start/typecheck/fmt 等）不是噪音，每条都要归位或显式排除。
+除非用户明确授权替换既有 run 接口，否则不要传 `--force`。仓库专属 argv 评审通过之前，生成的 `run.toml` 只算候选稿。**候选稿的三个已知盲区**（增量路径必须人工对照）：① 只机械映射 package.json scripts——原 run.toml 的直 argv 动作（不经 npm script，如 `vp check`）天然不可见，逐一对照旧动作清单防丢失；② setup 的 argv 按 lockfile 探测的包管理器直写（如 `pnpm install`），不继承原动作的旗标语义（如 `--frozen-lockfile`）——评审时逐旗标核对；③ setup 候选稿只有包管理器 install，无构建工具链探测（生成器语言无关）——含 Node 外工具链的仓按 run-standard §9.8 评审补齐（setup 末尾非致命探测 + desc 写明），纯 Node 仓在评审记录里显式确认探测面为空。skipped 清单里的动词域外脚本（start/typecheck/fmt 等）不是噪音，每条都要归位或显式排除。
 
 生成的 runner 用 `scripts/vendor/toml/` 下内置的零运行时依赖 TOML 解析器解析 `run.toml`，接受完整 TOML 1.0 语法（多行数组、注释、带引号的键、内联表、日期时间字面量）；`run/v2` schema 会把文档限制在 `[project].id` 与带 `id`、`name`、`desc`、`kind`、字符串数组 `run` 的 `[[actions]]` 条目——`desc` 必填（run standard v4）：有效行为契约（做什么/数据落哪/默认档与量级/旗标/边界），缺失或空白在加载期报 CONFIG。runner 内建 did-you-mean 未知 id 建议（唯一前缀/家族前缀/动词近邻/编辑距离四层，见 [references/run-standard.md](references/run-standard.md) §2.3），`--json` error 的 `details.suggestion`/`details.family` 同步携带。
 
-模板还内建**双层 Node 前置**（v1.3.0，run-standard 9.5/G12）：wrapper 在 `exec node` 前 fail-fast 探测 Node 存在性——缺失时输出 nodejs.org 安装指引（下载页默认 LTS 即可）并以 69 退出，绝不裸报 9009/command not found；runner 在动作执行前经 `scripts/run/lib/node-version.mjs` 校验版本下限，过老同样 69 + 重装 LTS 指引（dry-run/list/show/doctor 不受门限——诊断与契约读取始终可达）。文案原则：人面只指路「装 LTS」，精确 range 留给机器面（doctor 的 `checks.node.required` 与 `--json` details）。`run.cmd` 内容必须保持**纯 ASCII**——cmd 按活动代码页逐字节解析，CJK 双字节序列的第二字节可撞 `&`/`|` 等元字符，把 rem/echo 行拆成命令执行（实测复现）；指引文案用英文，sh 侧（UTF-8）无此问题可用中文。
+模板还内建**双层 Node 前置**（v1.3.0，run-standard 9.5/G12）：wrapper 在 `exec node` 前 fail-fast 探测 Node 存在性——缺失时输出 nodejs.org 安装指引（下载页默认 LTS 即可）并以 69 退出，绝不裸报 9009/command not found；runner 在动作执行前经 `scripts/run/lib/node-version.mjs` 校验版本下限，过老同样 69 + 重装 LTS 指引（dry-run/list/show/doctor 不受门限——诊断与契约读取始终可达）。文案原则：人面只指路「装 LTS」，精确 range 留给机器面（doctor 的 `checks.node.required` 与 `--json` details）。`run.cmd` 内容必须保持**纯 ASCII**——cmd 按活动代码页逐字节解析，CJK 双字节序列的第二字节可撞 `&`/`|` 等元字符，把 rem/echo 行拆成命令执行（实测复现）；指引文案用英文，sh 侧（UTF-8）无此问题可用中文。Node 之外构建工具链的前置检测在动作层而非 runner 层：setup 末尾非致命探测（run-standard §9.8）——就绪打印版本与伴生件（如 Windows msvc host 的 VS C++ 工具链）、缺失 warn 指路不挡退出码、构建类动作的缺工具链报错同源附指引（fail-closed 不变）；标准只规定行为契约，探测实现各仓自持（参照实现 `scripts/run/lib/rust-toolchain.mjs` 单源）。
 
 ## 五、评审动作映射
 
@@ -85,6 +85,7 @@ node <skill-dir>/scripts/standardize_repo.mjs <repo> --create --project-id <name
 7. 不要用 JSON 冒充 TOML 数组绕路。TOML 解析归生成的 runner 所有；格式化工具写出的多行数组与注释都是合法输入。
 8. **desc 契约纪律（v4）**：生成器写入的"候选稿"desc（机械转发描述）只是占位。评审时逐动作替换为真实有效行为契约——做什么、数据落哪、默认档与量级、直呼旗标、边界承诺；长驻动作写明数据空间，有旗标的写全旗标清单。desc 与实际行为分叉是最严重违例（假契约比缺契约更糟）。
 9. **核定 Node 下限（v1.3.0）**：`scripts/run/lib/node-version.mjs` 的常量与 `REQUIRED_NODE_RANGE` 是模板默认值（2026-09 前端生态水位 22.13/24）。按目标仓依赖树 `engines` 交集核定改写该文件，并与各 `package.json` 的 `engines.node` 同笔同步——两处分叉即假契约。纯 node 编排仓可放宽，但不得低于 runner 语法要求（顶层 await，≥14.8）。
+10. **setup 必须带构建工具链非致命探测（run-standard §9.8）**：探测面从形态信号推导（见一、1）；含 Node 外工具链的仓，setup 编排脚本在依赖安装完成后探测之——就绪打印版本/关键伴生件（如 Windows msvc host 的 VS C++ 工具链），缺失 warn + 官方安装指引、不挡退出码；构建类动作的缺工具链报错同源附安装指引（fail-closed 语义不变）。desc 写明探测面与 warn 语义，与实际行为分叉即假契约。纯 Node 仓在评审记录里显式确认探测面为空。
 
 ## 六、验证结果
 

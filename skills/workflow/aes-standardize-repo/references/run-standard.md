@@ -1,6 +1,6 @@
 # run 命令执行标准 v4（跨仓库）
 
-> 状态：v1 定稿（2026-08-17）；v1→v2 动词域修订（2026-08-26，见 12.2 迁移表）；v2→v3 脚本语言政策修订（2026-09-04，见 12.2）；v3→v4 desc 契约字段修订（2026-09-07，见 12.2）；v4.1 限定词治理（2026-09-07，§4）与 TEST_TMP_ROOT 临时落点路由增补（2026-09-15，§9.7——行为条款，不涉 schema/动词域/退出码，不升主版本）。草案经四路红队对抗校验后修订：事实核查 ×2（35 条引述逐条回源）、标准攻击（15 项缺陷）、落地审查（对照参照实现逐行核对）。校验结论与修订记录见附录 D。
+> 状态：v1 定稿（2026-08-17）；v1→v2 动词域修订（2026-08-26，见 12.2 迁移表）；v2→v3 脚本语言政策修订（2026-09-04，见 12.2）；v3→v4 desc 契约字段修订（2026-09-07，见 12.2）；v4.1 限定词治理（2026-09-07，§4）与 TEST_TMP_ROOT 临时落点路由增补（2026-09-15，§9.7——行为条款，不涉 schema/动词域/退出码，不升主版本）；v4.2 setup 构建工具链非致命探测（2026-09-17，§9.8——行为条款，不涉 schema/动词域/退出码，不升主版本）。草案经四路红队对抗校验后修订：事实核查 ×2（35 条引述逐条回源）、标准攻击（15 项缺陷）、落地审查（对照参照实现逐行核对）。校验结论与修订记录见附录 D。
 > 证据方法：best-practice-research 工作流 —— 官方/上游证据优先，四路 researcher 并行调研（npm/pnpm、yarn/cargo、make/just/Task/git/go/docker/kubectl、PowerShell/POSIX/GNU/clig.dev）。所有实质性规则在附录 A 标注先例、来源与置信度；无官方先例的自定项在附录 B 诚实列出。
 > 适用范围：本人全部 git 仓库的统一执行入口 —— 仓库根 `run.toml`（声明式动作清单）+ `run`/`run.cmd`（wrapper）+ `scripts/run.mjs`（runner）。
 > 参照实现：AntAgent2（runner v1.3.0，run/v2）。本标准与参照实现的**主要**差异与已知缺口见第 13 节。
@@ -68,7 +68,7 @@ run [list | show <id> | doctor | help | run <id> | <id>] [-n|--dry-run] [--json]
 
 | 动词 | 语义 | kind | 行业先例 |
 |---|---|---|---|
-| `setup` | 环境准备：进入可开发状态的一次性/幂等准备（依赖安装、初始化） | task | 对应物先例：GNU make 惯例目标 `install`、npm `install` / pnpm `add`。**命名反证须知**：PowerShell 把 `Setup` 列为 `Install` 与 `Initialize` 的避免同义词——本标准仍用 `setup` 取更宽语义"准备就绪"且不设 `install` 动词避免撞义，此命名属自定（附录 B） |
+| `setup` | 环境准备：进入可开发状态的一次性/幂等准备（依赖安装、初始化；含 Node 外构建工具链的非致命探测——9.8） | task | 对应物先例：GNU make 惯例目标 `install`、npm `install` / pnpm `add`。**命名反证须知**：PowerShell 把 `Setup` 列为 `Install` 与 `Initialize` 的避免同义词——本标准仍用 `setup` 取更宽语义"准备就绪"且不设 `install` 动词避免撞义，此命名属自定（附录 B） |
 | `dev` | 带热重载的开发场景（纯前端/桌面/分离服务），长驻 | open | cargo 内置 profile `dev`："used for normal development and debugging"（"dev=开发形态"的官方命名先例）；PowerShell `Start`（异步） |
 | `prod` | 生产形态启动：真实数据目录+真实产物，无热重载，长驻；与 `dev` 构成意图环境轴，限定词沿用形态维度（`prod.desktop`/`prod.server`） | open | Node.js `NODE_ENV=production` / ASP.NET Core `ASPNETCORE_ENVIRONMENT=Production` 的环境二元惯例；cargo `--release` profile（参照实现显式区分：release profile 只代表编译优化，不决定运行环境）；PowerShell `Start`（异步）。v2 入域（12.2） |
 | `build` | 产物构建 | task | GNU/make `build` 惯例；cargo/go/docker `build`；PowerShell `Build`（Lifecycle 组，PS6 新增）："Creates an artifact (usually a binary or document) out of some set of input files (usually source code or declarative documents.)" |
@@ -203,6 +203,12 @@ run = ["node", "./scripts/run/dev-server.mjs"]  # 显式 argv，非空字符串�
    - **建议条款（各仓可选，标准不带代码）**：入口脚本自解析（裸直呼不经 ./run 的 .mjs 调 `selfResolveTmp`——双保险第二险）+ 机械守卫（禁裸读 `process.env.TEMP/TMP`/`$env:TEMP`/`GetTempPath()`、禁盘符字面量、直呼入口自解析断言）。测试/gate 重的仓建议采纳；轻量仓 run 层路由单保险即可。
    - **desc 契约联动（6.2）**：动作 desc 涉及临时落点时写 `TEST_TMP_ROOT` 语义（落哪/回退哪），与实际注入行为分叉即假契约。
    - **存量仓**：已被标准化的仓不自动获得路由层——重新跑生成器或手抄 `scripts/run/lib/tmp-root.mjs` + runner 注入两处即可。
+8. **setup 构建工具链非致命探测（v4.2，2026-09-17）**：「进入可开发状态」对含编译型工具链的仓不止 `npm install`——Node 是 runner 自身的前置（9.5 双层），仓库构建工具链（Rust/C#/Go/…）的前置检测落在动作层：**setup 动作在依赖安装完成后必须非致命探测本仓 Node 之外的构建工具链**（探测面从形态信号推导：`Cargo.toml`/`src-tauri`→rustc/cargo、`.sln`/`.csproj`→dotnet、`go.mod`→go 等；纯 Node 仓探测面为空，本条无操作）。语义边界：
+   - **warn 不 fail**：工具链缺失/异常只打警告 + 官方安装指引（rustup.rs / dotnet.microsoft.com / go.dev/dl 等），不改变 setup 退出码——setup 主职仍是依赖安装，主语言链路（纯 JS/脚本消费者）不被挡；工具链消费方是构建类动作（build/dev/prod/gate 等）。
+   - **伴生件轻探测**：就绪时打印版本与关键伴生件——如 Windows `*-msvc` host 的 VS C++ 工具链（vswhere 问 VC.Tools 负载），未检出同样 warn 提示并附「独立 clang/lld 链路可忽略」豁免语；只探主命令会把失败推迟到链接期（假绿）。
+   - **消费方报错翻译**：构建类动作撞工具链缺失时 fail-closed 语义不变（非零退出照旧），但报错必须附同源安装指引——不允许裸 spawn ENOENT/exit code 形态落到用户面；探测与指引文案单源（参照实现 `scripts/run/lib/rust-toolchain.mjs`）。
+   - **desc 契约联动（6.2）**：setup 的 desc 写明探测面（探什么、伴生件）、缺失形态（warn 指路不挡退出码）与消费方清单；desc 与实际探测行为分叉即假契约。
+   - **存量仓**：不自动获得——重新评审 setup 时按本条补齐（参照实现 2026-09-17 落地）。
 
 ## 10. doctor（环境体检）
 
@@ -350,6 +356,7 @@ run = ["node", "./scripts/run/dev-server.mjs"]  # 显式 argv，非空字符串�
 9. **JSON 信封字段结构**：无正式标准，仅社区先例（clig.dev/jsonlines）。
 10. **大小写不敏感匹配/旗标比较**（含子命令分派）：无官方背书的宽容行为，第 1 节已划定其与 P5 的边界。
 11. **doctor 对 gate 的宽容**（5.4）：影响退出码的实质行为规则，自定。
+12. **setup 工具链探测的 warn-not-fail 语义**（9.8，v4.2）：行业对应物只到「安装器自检」（rustup-init 探测 MSVC、VS Installer 探测依赖），没有「依赖安装动作末尾非致命探测构建工具链」的官方先例；语义边界（setup 探测为 warn、构建动作为 fail-closed）是本标准的设计决策。
 12. **`run run` 缺操作数退化为列出**（2.6）：自定的不对称宽容。
 13. **`setup` 动词命名**：PowerShell 官方将 `Setup` 列为避免同义词（反证已知悉）；取"准备就绪"宽语义保留，自定。
 14. **project.id 的 namespace/name 形态**：自定。
