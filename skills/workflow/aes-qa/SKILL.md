@@ -1,6 +1,6 @@
 ---
 name: aes-qa
-description: worker 闭环内唯一的验证角色，三种调用形态：循环轮逐轮验证实现（只出 finding）、最终轮为唯一 candidate commit 出具绑定 SHA 的 typed QaReceipt（按影响面决定自动/live/agent-live/人工，v4 起等级栏三态收口 AES-QG 等级语言、agent-live 断言必带内容寻址托底、截图义务轮冻结伴随目录并必产 qa-report.html）、打回修复后回归重验。如实记录未执行项与人工债务，绝不把 NOT_RUN 说成 PASS。当 aes-issue-worker 在实现循环中逐轮验证、commit 后出具最终 receipt，或需要为一次交付产出可审计的 QA 证据时使用；实际执行 screenshot check 时按 AES GitLab terminal batch 发布并要求 VERIFIED，未跑截图不触发。
+description: AES worker 闭环的验证角色——实现循环逐轮验证只出 finding；最终轮为唯一 candidate commit 出具绑定 SHA 的 typed QaReceipt（按影响面定自动/live/agent-live/人工档）；打回后回归重验。如实记录未执行项与人工债务，不把 NOT_RUN 记成 PASS。
 ---
 
 # AES QA

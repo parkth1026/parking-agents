@@ -1,6 +1,6 @@
 ---
 name: log-error-summary
-description: 统计构建/服务日志中的错误分布，输出 markdown 频次表（错误模式/次数/代表样例，同型错误归并计数）。用户想看一份日志里有哪些错误、各出现多少次、哪类错误最高频时使用——典型场景是 Jenkins 构建日志、服务运行日志的错误排查第一步。
+description: 统计构建/服务日志的错误分布，输出 markdown 频次表（错误模式/次数/代表样例，同型归并计数）——Jenkins 构建日志与服务日志排查的第一步。
 ---
 
 # Log Error Summary

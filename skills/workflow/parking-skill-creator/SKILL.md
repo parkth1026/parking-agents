@@ -1,6 +1,6 @@
 ---
 name: parking-skill-creator
-description: 本机技能生产流水线：创建、校验、评测、迭代和打包技能。用于用户要新建或修改技能、运行技能评测、检查触发准确率、比较 with_skill/without_skill 结果、优化技能的 description，或生成 .skill 分发包。覆盖确定性脚手架、回归测试、同宿主 subagent 探针评测、浏览器评审和历史成绩沉淀。脚本仅使用 Node 内置模块，不依赖 npm 或 Python。
+description: 本机技能生产流水线——创建、校验、评测、迭代与打包技能；含触发准确率检查、with/without skill 对比、description 优化、.skill 分发包，只依赖 Node 内置模块。
 ---
 
 # parking-skill-creator：技能生产流水线

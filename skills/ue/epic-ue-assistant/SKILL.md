@@ -1,14 +1,6 @@
 ---
 name: epic-ue-assistant
-description: |
-  Query Epic Games' official UE AI assistant (dev.epicgames.com) for authoritative
-  answers about UE5 compilation errors, engine features, and APIs.
-
-  **Use this skill when:**
-  (1) User asks about a UE5/UE4 compilation, linker, or C++ error code (C2061, LNK2019, etc.)
-  (2) User wants to look up UE5 engine features, APIs, or best practices
-  (3) Another skill needs official Epic guidance on an error
-  (4) User mentions "ask Epic", "UE docs", or "Unreal documentation"
+description: 查询 Epic 官方 UE AI 助手（dev.epicgames.com），获取 UE5/UE4 编译/链接/C++ 错误码、引擎特性、API 与最佳实践的权威答案。
 ---
 
 # Epic UE Assistant

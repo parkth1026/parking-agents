@@ -1,11 +1,6 @@
 ---
 name: jenkins-pair-analyze
-description: |
-  分析一个 FAILURE→SUCCESS Jenkins 构建对：下载日志、提取错误、验证修复、
-  关联修复提交、查询 Epic 官方助手、评分并写知识文件。
-
-  由 jenkins-log-auto-learning 编排调用（其阶段 1 的执行者）；
-  用户点名"分析这个构建对 / 这对构建 / 分析 fail=X fix=Y"时也独立可用。
+description: 分析单个 FAILURE→SUCCESS Jenkins 构建对——下载日志、提取错误、验证修复、关联修复提交、查询 Epic 官方助手、评分写知识文件；由 jenkins-log-auto-learning 编排，也可点名独立调用。
 ---
 
 # 构建对分析（jenkins-log-auto-learning 阶段 1 执行者）

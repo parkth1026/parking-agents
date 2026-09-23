@@ -1,6 +1,6 @@
 ---
 name: aes-glab
-description: glab 命令行（自建 GitLab 实例 git.51vr.local）安装、配置与使用全流程范式。从未安装 glab 要从零安装、找不到 glab 命令、想知道 glab 配置文件在哪、auth status 出现多余 gitlab.com 段，或要登录认证、碰上 token 失效、401、No token found、环境变量 GITLAB_TOKEN、新机器配置、想用浏览器或 OAuth 登录，或要做 issue/MR/label/milestone/release/pipeline/snippet/search/api 操作时使用：winget 安装渠道与落点、PAT+系统钥匙串登录引导、配置文件事实、命令怪癖与免费档链接裁决、使用面实测范式。
+description: 自建 GitLab（git.51vr.local）的 glab 命令行全流程——winget 安装、PAT+钥匙串登录、token 失效/401/GITLAB_TOKEN 排查、配置文件事实与命令怪癖，及 issue/MR/label/milestone/pipeline/api 操作范式。
 ---
 
 # glab 全流程范式（安装·配置·使用）

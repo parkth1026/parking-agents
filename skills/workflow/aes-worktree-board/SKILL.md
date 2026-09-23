@@ -1,6 +1,6 @@
 ---
 name: aes-worktree-board
-description: 在主仓巡检并编排本仓既有 worktree（同级或嵌套在子目录里）：采集全仓 Issue Map/List 与队员坐标，用 Desktop create_thread 派发可见 Task，以 registry/inbox/三维 verdict/熔断/全局停止协议恢复和审计执行，并启动需求星图看板。用户要查看所有 worktree、Issue frontier、调度实现与独立 review、判断并执行受门禁保护的合并、恢复中断编排或打开看板时使用。
+description: 主仓 worktree 编排总管——采集全仓 Issue Map 与队员坐标，Desktop create_thread 派发可见 Task，以 registry/inbox/三维 verdict/熔断/全局停止协议恢复与审计执行，启动需求星图看板；含受门禁保护的合并。
 ---
 
 # AES Worktree Board

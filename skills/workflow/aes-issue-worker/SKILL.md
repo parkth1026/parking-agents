@@ -1,6 +1,6 @@
 ---
 name: aes-issue-worker
-description: 在一个 owner session 内把一张 typed IssueWorkOrder 跑成 typed 终局：tdd/diagnosing-bugs 实现 ⇄ aes-qa 循环轮验证，simplify 后单次 candidate commit，aes-qa 最终轮出绑定 SHA 的 QaReceipt，READY_TO_MERGE terminal 进 registry；code-review 与 merge 归 aes-merge-worker。当收到 aes-worktree-board 总管派发的 IssueWorkOrder，或需要在单个 worktree 内闭环消化一个 contract-complete 的 ready-for-agent Issue 时使用。本技能不 merge、不写 GitHub、不自行挑选 Issue。
+description: 单 owner session 内把一张 typed IssueWorkOrder 跑成 typed 终局——tdd/diagnosing-bugs 实现 ⇄ aes-qa 循环验证，simplify 后单次 candidate commit，READY_TO_MERGE terminal 进 registry；code-review 与 merge 归 aes-merge-worker，不 merge、不写 GitHub、不自行挑 Issue。
 ---
 
 # AES Issue Worker

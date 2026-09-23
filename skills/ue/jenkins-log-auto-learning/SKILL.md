@@ -1,15 +1,6 @@
 ---
 name: jenkins-log-auto-learning
-description: |
-  批量扫描 Jenkins CI 任务，寻找 FAILURE→SUCCESS 构建对，提取错误模式，
-  通过 git 提交验证修复，并生成带评分的知识文件。
-
-  **在以下场景使用此技能：**
-  (1) 批量扫描或从 Jenkins 日志自动学习
-  (2) 检查知识库进度、剩余未分析构建或跟踪状态
-  (3) 查找 FAILURE→SUCCESS 构建对或构建知识库
-
-  **不适用于单次构建诊断** —— 请使用 `ue-error-solver`。
+description: 批量扫描 Jenkins CI 任务找 FAILURE→SUCCESS 构建对，提取错误模式、经 git 提交验证修复并生成带评分的知识文件；含知识库进度与状态跟踪。单次构建诊断用 ue-error-solver。
 ---
 
 # Jenkins 日志自动学习技能 v6.0（编排器）

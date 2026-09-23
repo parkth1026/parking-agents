@@ -1,14 +1,6 @@
 ---
 name: karpathy-llm-wiki
-description: |
-  维护一个持久化、互链的 markdown 知识 wiki，覆盖 LLM/AI/深度学习知识。
-  提供工作流、页面模板、校验脚本与质量评分，用于搭建 Karpathy 式知识库。
-
-  **在以下场景使用此技能：**
-  (1) 创建、充实、更新或查询 LLM/AI/ML 知识 wiki
-  (2) 把文章、论文、转录稿或笔记 ingest 进 wiki
-  (3) 校验 wikilink、lint 页面、修复断链或检查 wiki 质量
-  (4) 用户提到 "wiki"、"知识库"、"Karpathy"、"整理到wiki" 或 "ingest"，且要做的是 wiki 操作（整理、录入、查询、校验）——只是翻译这类文章、讲解 wikilink 语法、或把内容保存到 wiki 之外时，不需要本技能
+description: 维护持久化互链的 markdown 知识 wiki（Karpathy 式）——提供工作流、页面模板、校验脚本与质量评分；覆盖建库、增量 ingest、wikilink lint 与查询。
 ---
 
 # Karpathy LLM Wiki
