@@ -1,0 +1,7 @@
+interface:
+  display_name: "lixiang-ceo-grill"
+  short_description: "以李想 CEO 三层九模块方法论为尺子，一次一题拷问产品方向符合度"
+  default_prompt: "Use $lixiang-ceo-grill to grill the current product against Li Xiang's CEO methodology (cognition/strategy/business, 9 modules)."
+
+policy:
+  allow_implicit_invocation: true
