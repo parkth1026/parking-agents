@@ -4,6 +4,9 @@
 *.sh text eol=lf
 hooks/session-start text eol=lf
 
+# macOS double-click launchers — same shebang/CRLF failure mode as *.sh above.
+*.command text eol=lf
+
 # The polyglot wrapper is parsed by BOTH cmd.exe and bash — it must keep LF.
 *.cmd text eol=lf
 
