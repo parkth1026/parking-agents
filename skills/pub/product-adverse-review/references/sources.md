@@ -31,3 +31,40 @@
 | S25 | Learning from Tay's introduction · Microsoft · 2016-03 | 案例/企业声明 | Tay 上线后遭对抗性滥用并被下线的公司说明 | 不提供完整独立事故调查 |
 | S26 | Saying goodbye to Carousel and Mailbox · Dropbox · 2015-12 | 案例/企业声明 | 关停独立产品、聚焦协作及迁移能力的公告 | 未披露完整单品损益，不能断言无用户价值 |
 | S27 | A Scientific Approach to Entrepreneurial Decision Making: RCT · Camuffo 等 / Management Science · 2020 | 研究/随机实验 | 早期意大利创业样本随机实验（116 家），S09 的起点 | 其样本包含在 S09 的 759 家中，不能相加当独立证据 |
+
+## 成功篇来源索引（B2B 商业化报告）
+
+对应《To B 产品商业化：从组织购买到可重复经营》§20（30 项，检索与核验截至 2026-09-24）。**B 编号与上文 S 编号分属两份不同报告，互不通用**；`positive-signals.md` 中的 [Bxx] 引用按本表解析。财务案例的财年截止日以「日期/期间」为准，不将其称为各公司最新季度。
+
+| 编号 | 来源 | 类型 | 支持范围 | 限制 |
+| --- | --- | --- | --- | --- |
+| B01 | The B2B Buying Journey · Gartner | 研究综述 | 组织采购的非线性、验证与共识任务 | 不把大型采购特征外推到所有小企业 |
+| B02 | The B2B Elements of Value · Bain/HBR · 2018-02 | 研究/方法 | 企业购买同时包含功能、个人与主观价值 | 价值分类不是已证明的成功公式 |
+| B03 | The surprising economics of B2B growth · McKinsey · 2026-05 | 原始调查 | 近 4,000 名决策者、13 国的渠道与增长关系 | 相关不等于因果；不代表中国每一细分行业 |
+| B04 | Five fundamental truths · McKinsey · 2024-09 | 原始调查 | 线下、远程与数字自助渠道并存 | 调查分布不是每家企业的渠道配比 |
+| B05 | What's a Startup? First Principles · Steve Blank · 2010-01 | 方法原文 | 客户开发与可重复商业模式搜索 | 创业实践观点，非方法随机排名 |
+| B06 | Jobs to Be Done · Christensen Institute | 方法原文 | 任务、情境与期望进步 | 源报告的企业任务卡为原创改编 |
+| B07 | The Mom Test · Rob Fitzpatrick | 方法介绍 | 访谈应寻求具体行为和事实 | 未转载原书全文或完整模板 |
+| B08 | Validate your ideas with the Test Card · Strategyzer | 方法原文 | 假设、实验、指标与门槛 | 试点协议与教学数值是应用示例，非行业基准 |
+| B09 | The Four Big Risks · SVPG · 2017-12 | 方法原文 | 价值、可用性、可行性、商业可持续性 | 实践框架 |
+| B10 | SPICED Framework · Winning by Design | 方法原文 | 理解客户处境（处境/痛点/影响/关键事件/决策） | 不等于完整产品方法 |
+| B11 | MEDDPICC Sales Methodology · MEDDICC | 方法原文 | 复杂交易的角色、手续与推动者检查 | 不把销售资格认证误作 PMF |
+| B12 | A Quickstart Guide to Positioning · April Dunford | 方法原文 | 替代项、差异价值、适配客户 | 定位句为源报告原创演示 |
+| B13 | Opportunity Solution Trees · Product Talk | 方法原文 | 结果—机会—方案—假设测试 | 需有目标与客户接触条件 |
+| B14 | The Stage-Gate Model: An Overview · Stage-Gate International | 方法原文 | 分阶段投入与关口决策 | 不引用其营销成功率作因果证据 |
+| B15 | Q4 and FY2026 Financial Results · Atlassian / SEC 附件 · 财年截至 2026-06-30 | 公司财务披露 | 收入、销售与营销费用、GAAP 净亏损 | 公司级指标不能归因到单一获客动作 |
+| B16 | Service Collection Pricing · Atlassian 官方页 | 官方产品/条款 | 免费入口、分层套餐、Enterprise 联系销售 | 页面内容与报价可能变化 |
+| B17 | Q4 and FY2026 Results · Veeva · 财年截至 2026-01-31 | 公司财务披露 | 年度收入与 GAAP 净利润 | Veeva 财年不等于自然年 |
+| B18 | FY2026 Form 10-K · Veeva / SEC · 财年截至 2026-01-31 | 监管申报年报 | 共同软件版本与服务分部；订阅 87%/服务 18% 毛利口径 | 分部口径不同于单品 |
+| B19 | Q4 and Full-Year 2025 Results · ServiceNow · 自然年 2025 | 公司财务披露 | 年度总收入 | ACV、订阅收入、订单不混用；不引用无口径解释的续费率 |
+| B20 | IT Service Management · ServiceNow 官方页 | 官方产品说明 | 事件、请求、问题、变更等工作流能力 | 产品说明不是客户效果的独立审计 |
+| B21 | Q4 and FY2026 Financial Results · Samsara / Business Wire · 财年截至 2026-01-31 | 公司财务披露 | 年度收入、GAAP 净亏损 | ARR、季度与年度盈利分别处理 |
+| B22 | Connected Operations Products · Samsara 官方页 | 官方产品说明 | 车联网、视频安全、设备与维护能力 | 厂商客户收益宣传不当普遍 ROI |
+| B23 | 2025 Annual Update · Stripe | 公司年度经营更新 | 平台企业 1.9 万亿美元业务规模 | 不是 Stripe 公司收入或利润 |
+| B24 | Get Started Documentation · Stripe 官方文档 | 官方开发文档 | 开发者接入与测试入口 | 测试成功≠生产中持续获得商业结果 |
+| B25 | Security Documentation · Stripe 官方文档 | 官方技术/安全文档 | 安全责任与接入说明 | 非法律或认证建议 |
+| B26 | 2025 Sales Result · Hilti · 自然年 2025 | 公司经营披露 | 集团销售额与汇率口径 | 未披露 Fleet Management 独立利润 |
+| B27 | Fleet Management · Hilti UK 官方页 | 官方产品/服务说明 | 月度费用及工具、维修维护构成 | 具体服务与责任以当地合同为准（限英国市场） |
+| B28 | Global Products and Solutions · Kingdee 官方页 | 官方产品说明 | 财务、供应链、制造等产品与伙伴生态 | 不把累计服务客户量当当期付费客户数 |
+| B29 | 金蝶 2025 年报转述 · 经济参考报 · 2026-03 | 权威媒体转述 | 总收入 70.06 亿元、订阅收入 35.56 亿元 | 媒体转述低于监管申报等级；调整后利润≠法定净利润 |
+| B30 | Pricing · Stripe 官方定价页 | 官方定价说明 | 标准与定制收费、交易型计价 | 不以某地区费率代表全部地区或客户 |

@@ -78,9 +78,41 @@ for (const k of ["成功定义核查", "证据盘点", "18 机制审查", "最�
   check(`报告模板含「${k}」节`, fmt.includes(k));
 }
 
+// --- positive-signals.md：三层成立 / 八课关口 / 七案例 / 十假象 / B 编号 ---
+const pos = read("references/positive-signals.md");
+check("positive-signals.md 在位且含三层成立词表（生意/产品/自助）",
+  pos.includes("生意成立") && pos.includes("产品成立") && pos.includes("自助成立"));
+const lessons = ["1 付费任务", "2 角色系统", "3 价值账", "4 最小完整结果", "5 试点", "6 可重复交付", "7 一张账", "8 持续性与扩张"];
+const lessonRowsOk = lessons.every((L) => {
+  const row = pos.split("\n").find((l) => l.includes(`| ${L} `) || l.includes(`| ${L} |`));
+  return row !== undefined && /(?:0[1-9]|1[0-8])(?:\/(?:0[1-9]|1[0-8]))*/.test(row);
+});
+check("八课关口行齐全且各行含机制交叉引用", lessonRowsOk);
+check("验证重量 2×2（购买复杂度 × 交付复杂度）在列",
+  pos.includes("购买复杂") && pos.includes("交付复杂"));
+check("七个案例卡齐全（Atlassian/Veeva/ServiceNow/Samsara/Stripe/Hilti/金蝶）",
+  ["Atlassian", "Veeva", "ServiceNow", "Samsara", "Stripe", "Hilti", "金蝶"].every((k) => pos.includes(k)));
+const caseRows = ["Atlassian", "Veeva", "ServiceNow", "Samsara", "Stripe", "Hilti", "金蝶"]
+  .map((k) => pos.split("\n").find((l) => l.startsWith("|") && l.includes(k)))
+  .map((row) => (row ? (row.split("|")[3] ?? "").trim() : ""));
+check("案例表含「不能照搬」边界列且七行均有实质内容",
+  pos.includes("| 不能照搬 |") && caseRows.every((c) => c.length >= 15));
+check("十种 To B 假象与纠偏在列", pos.includes("十种 To B 假象") && pos.includes("NRR 高于 100%"));
+const bIds = [...src.matchAll(/^\| (B\d{2}) \|/gm)].map((m) => m[1]);
+check("成功篇来源索引 30 项（B01–B30）", new Set(bIds).size === 30);
+const usedB = [...new Set([...pos.matchAll(/\[(B\d{2})\]/g)].map((m) => m[1]))];
+check(`positive-signals B 引用全部可解析（${usedB.length} 项）`,
+  usedB.filter((id) => !bIds.includes(id)).length === 0);
+check("S/B 编号分立声明（两文件均含「互不通用」）",
+  src.includes("互不通用") && pos.includes("互不通用"));
+check("报告模板含「成功信号对照」节与三层词表输出纪律",
+  fmt.includes("成功信号对照") && fmt.includes("生意`、`产品`、`自助"));
+check("SKILL.md Step 3 含正例对照并引用 positive-signals.md",
+  skill.includes("正例对照") && skill.includes("positive-signals.md"));
+
 // --- 其余资源在位 ---
 check("references/design.md 在位且含 AC 验收表",
-  existsSync(join(SKILL_DIR, "references/design.md")) && /AC-8/.test(read("references/design.md")));
+  existsSync(join(SKILL_DIR, "references/design.md")) && /AC-10/.test(read("references/design.md")));
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
