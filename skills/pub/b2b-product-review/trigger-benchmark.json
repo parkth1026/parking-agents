@@ -1,5 +1,5 @@
 {
-  "skill": "product-adverse-review",
+  "skill": "b2b-product-review",
   "split": {
     "train": [
       "q3",
@@ -30,7 +30,7 @@
   "rounds": [
     {
       "description": null,
-      "valid_probes": 54,
+      "valid_probes": 48,
       "train": {
         "queries": 12,
         "evaluated": 12,
@@ -52,6 +52,6 @@
   "best_description": null,
   "best_description_reason": null,
   "min_test_queries": 6,
-  "valid_probes": 54,
-  "invalid_probes": 3
+  "valid_probes": 48,
+  "invalid_probes": 12
 }
