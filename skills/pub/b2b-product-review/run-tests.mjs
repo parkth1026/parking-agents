@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// run-tests.mjs — product-adverse-review 的回归测试（升级/改动后必跑）
+// run-tests.mjs — b2b-product-review 的回归测试（升级/改动后必跑）
 // 审查报告是主观判断产物，不硬上输出断言；本测试做客观结构自检：
 // references 完整性（18 机制×六层×五要素）、固定词表、frontmatter 合法、无待办占位。
 import { existsSync, readFileSync } from "node:fs";
@@ -19,7 +19,7 @@ function check(name, cond) {
 // --- SKILL.md frontmatter ---
 const skill = read("SKILL.md");
 const fmName = /^name:\s*(\S+)/m.exec(skill)?.[1];
-check("SKILL.md name 与目录名一致", fmName === "product-adverse-review");
+check("SKILL.md name 与目录名一致", fmName === "b2b-product-review");
 const desc = /^description:\s*(.+)$/m.exec(skill)?.[1] ?? "";
 check("description 存在且 ≤1024 字符", desc.length > 0 && desc.length <= 1024);
 check("description 无尖括号", !/[<>]/.test(desc));
@@ -60,6 +60,8 @@ for (const k of ["企业级 B2B", "自助消费与创作产品", "开发者工�
 }
 check("AI 四种口径偷换在列",
   ["能稳定交付", "任务结果已发生", "产品价值提高", "全流程无需人工"].every((k) => adj.includes(k)));
+check("B2G 政企边界段在列（需专项验证清单口径）",
+  adj.includes("B2G / 政企客户的额外边界") && adj.includes("需专项验证"));
 
 // --- sources.md：S 编号解析表覆盖机制卡全部引用 ---
 const src = read("references/sources.md");

@@ -1,7 +1,0 @@
-interface:
-  display_name: "product-adverse-review"
-  short_description: "产品方案逆向审查：18 类失败机制核查证据状态，产出关键假设与投入决策建议"
-  default_prompt: "Use $product-adverse-review to 审查这份产品方案（失败预演）."
-
-policy:
-  allow_implicit_invocation: true

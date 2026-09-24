@@ -1,0 +1,7 @@
+interface:
+  display_name: "b2b-product-review"
+  short_description: "B 端产品方案逆向审查：18 类失败机制 + 成功信号对照，产出关键假设与投入决策建议"
+  default_prompt: "Use $b2b-product-review to 审查这份 B 端产品方案（失败预演）."
+
+policy:
+  allow_implicit_invocation: true
