@@ -19,6 +19,44 @@
       "vs_previous": null,
       "bank_epoch": 1,
       "current_best": true
+    },
+    {
+      "date": "2026-09-24T21:00:33+08:00",
+      "iteration_ref": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\evals\\product-adverse-review-workspace\\iteration-2",
+      "gates": {
+        "old_skill": {
+          "pass_rate": 1,
+          "mean_ms": 362050,
+          "mean_tokens": 473644.5
+        },
+        "with_skill": {
+          "pass_rate": 1,
+          "mean_ms": 409680.5,
+          "mean_tokens": 450393.5
+        },
+        "without_skill": {
+          "pass_rate": 1,
+          "mean_ms": 241272,
+          "mean_tokens": 225493.5
+        }
+      },
+      "vs_previous": {
+        "evals_total": 2,
+        "won": 0,
+        "lost": 0,
+        "tie": 2,
+        "detail": [
+          {
+            "eval": "eval-标品提案v0逆向审查",
+            "result": "tie"
+          },
+          {
+            "eval": "eval-立项汇报v4逆向审查",
+            "result": "tie"
+          }
+        ]
+      },
+      "bank_epoch": 1
     }
   ],
   "current_best": "runs[0]"
