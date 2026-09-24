@@ -1,6 +1,6 @@
 ---
 name: lark-meeting-refine
-description: 飞书会议双文档处理——完整下载（媒体本地化）保真转 markdown 镜像落 agent/evidence/，以逐字稿为唯一事实基准逐条核对智能纪要，产出保留纪要骨架、带时间戳与修正对照表的修正稿。
+description: 飞书会议纪要按逐字稿核对修正
 ---
 
 # lark-meeting-refine：飞书会议 → 本地镜像 + 修正稿
