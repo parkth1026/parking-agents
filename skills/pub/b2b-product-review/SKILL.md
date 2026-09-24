@@ -25,16 +25,16 @@ description: 对 B 端产品方案（B2B / B2G、标品）做逆向审查（失�
 
 ### Step 2 逐层审查 18 类机制
 
-读 `references/mechanisms.md`，按 A→F 六层逐条核对，每条输出：
+读 `references/mechanisms.md`，按 A→F 六层逐条核对。**展开有度（硬指令，控 token）**：预警未命中且方案未提及的条目只写一行——编号 + 机制名 + 状态 + 「方案未提及」，不展开五要素分析；只对命中预警的条目输出：
 
 - 状态四值之一：`未知 / 证据不足`、`初步支持`、`出现反证`、`本阶段不适用`（附理由）。
 - 一句依据，引用方案原文或既有证据；找不到依据就保持未知，**不编造、不把「方案没写」当「方案错了」**。
-- 命中预警的条目，先过该条「反面提醒」确认不是机械套用，再定状态（例如早期人工交付本身不是失败证据）。
+- 先过该条「反面提醒」确认不是机械套用，再定状态（例如早期人工交付本身不是失败证据）。
 
 ### Step 3 适配：阶段、产品类型与正例对照
 
 - 用 `references/evidence-rules.md` 的六阶段表检查两个方向的错配：是否用上一阶段的成绩越级申请下一阶段的资源；是否用成熟期指标（如日活、短期成交）扼杀探索期方案。
-- 按方案的产品类型读 `references/context-adjustments.md` 调整证据口径（B2B 采购链、消费自然复用、AI 任务验收等）。方案含 AI 能力时必查四种口径偷换。
+- 按方案的产品类型读 `references/context-adjustments.md` **的适用行**（B 端常见形态只读对应行；政企方案另读 B2G 段），不全文通读。方案含 AI 能力时必查四种口径偷换。
 - **正例对照**（B 端方案必做）：读 `references/positive-signals.md`——判定方案主张的成立层级（生意 / 产品 / 自助）与证据实际支持的层级；逐项过八课决策关口，通不过的关口即候选关键假设；方案引用成功案例时用案例卡核对其「不能照搬」边界（如免费入口≠无销售成本、平台业务规模≠公司收入）。正例学的是证据形态，不是收入数字与计价方式。政企（B2G）客户的额外边界见 `references/context-adjustments.md`。
 
 ### Step 4 聚焦：选出最能改变决策的假设
@@ -72,10 +72,15 @@ description: 对 B 端产品方案（B2B / B2G、标品）做逆向审查（失�
 
 ## Resources
 
+**审查时必读**（按 Step 顺序）：
+
 - `references/mechanisms.md` — 18 类失败机制审查表（Step 2 主表）
 - `references/evidence-rules.md` — 失败定义、证据矩阵、阶段标准、决策出口（Step 0/1/3/4/5）
-- `references/context-adjustments.md` — 产品类型适配、指标口径、AI 口径偷换、B2G 政企边界（Step 3）
-- `references/positive-signals.md` — 成功信号与正例对照：三层成立、八课关口、七案例卡、十种假象（Step 3，To B / 标品必做）
+- `references/positive-signals.md` — 成功信号与正例对照：三层成立、八课关口、七案例卡、十种假象（Step 3，B 端必做）
 - `references/report-format.md` — 报告模板与词表（Step 6）
-- `references/sources.md` — 来源索引（机制卡 S 编号与正例 B 编号的解析表，分属两份报告互不通用）
-- `references/design.md` — 设计取舍与验收条件（评测断言的锚点）
+
+**按需才读**（不要在审查开始时通读，控 token）：
+
+- `references/context-adjustments.md` — 只读适用产品类型行与 B2G 段（Step 3）
+- `references/sources.md` — S/B 编号解析表，仅在报告需要转述某来源的「支持范围 / 限制」时按编号查阅
+- `references/design.md` — 设计取舍与验收条件，评测断言的锚点，审查时不读

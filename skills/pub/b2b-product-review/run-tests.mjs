@@ -111,6 +111,10 @@ check("报告模板含「成功信号对照」节与三层词表输出纪律",
   fmt.includes("成功信号对照") && fmt.includes("生意`、`产品`、`自助"));
 check("SKILL.md Step 3 含正例对照并引用 positive-signals.md",
   skill.includes("正例对照") && skill.includes("positive-signals.md"));
+check("按需展开硬指令在列（SKILL Step 2 与报告模板）",
+  skill.includes("展开有度") && fmt.includes("展开有度") && fmt.includes("不得省略编号与状态"));
+check("Resources 分必读/按需读取两层（sources/design 非审查必读）",
+  skill.includes("按需才读") && skill.includes("审查时不读"));
 
 // --- 其余资源在位 ---
 check("references/design.md 在位且含 AC 验收表",
