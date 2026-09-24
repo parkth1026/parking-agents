@@ -1,0 +1,25 @@
+{
+  "skill": "product-adverse-review",
+  "runs": [
+    {
+      "date": "2026-09-24T00:58:59+08:00",
+      "iteration_ref": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\evals\\product-adverse-review-workspace\\iteration-1",
+      "gates": {
+        "with_skill": {
+          "pass_rate": 1,
+          "mean_ms": 353949.5,
+          "mean_tokens": 288498.5
+        },
+        "without_skill": {
+          "pass_rate": 1,
+          "mean_ms": 346450,
+          "mean_tokens": 257639
+        }
+      },
+      "vs_previous": null,
+      "bank_epoch": 1,
+      "current_best": true
+    }
+  ],
+  "current_best": "runs[0]"
+}

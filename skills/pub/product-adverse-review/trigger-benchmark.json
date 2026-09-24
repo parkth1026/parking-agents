@@ -1,0 +1,57 @@
+{
+  "skill": "product-adverse-review",
+  "split": {
+    "train": [
+      "q3",
+      "q1",
+      "q5",
+      "q9",
+      "q4",
+      "q6",
+      "q17",
+      "q19",
+      "q16",
+      "q11",
+      "q14",
+      "q18"
+    ],
+    "test": [
+      "q8",
+      "q2",
+      "q7",
+      "q13",
+      "q12",
+      "q15",
+      "q10"
+    ],
+    "seed": 42,
+    "holdout": 0.4
+  },
+  "rounds": [
+    {
+      "description": null,
+      "valid_probes": 54,
+      "train": {
+        "queries": 12,
+        "evaluated": 12,
+        "trigger_rate_on_should": 1,
+        "false_trigger_rate_on_should_not": 0,
+        "correct": 12,
+        "invalid_queries": 0
+      },
+      "test": {
+        "queries": 7,
+        "evaluated": 7,
+        "trigger_rate_on_should": 1,
+        "false_trigger_rate_on_should_not": 0,
+        "correct": 7,
+        "invalid_queries": 0
+      }
+    }
+  ],
+  "best_description": null,
+  "best_description_reason": null,
+  "min_test_queries": 6,
+  "valid_probes": 54,
+  "invalid_probes": 3
+}

@@ -1,0 +1,24 @@
+{
+  "skill": "product-adverse-review",
+  "queries": [
+    { "id": "q1", "text": "下周投委会要过这份立项汇报，正式上会前帮我做一次失败预演，把里面证据站不住的主张都挑出来", "should_trigger": true },
+    { "id": "q2", "text": "帮我挑刺这份 PRD：哪些关键假设其实没验证过？这个功能该不该继续投人做", "should_trigger": true },
+    { "id": "q3", "text": "销售说有 3 个意向客户就要扩团队，我觉得证据不够硬，帮我系统地审一遍这个扩投决定", "should_trigger": true },
+    { "id": "q4", "text": "我们要不要把这条产品线扩到医疗行业？先别写方案，帮我逆向推演一下最可能死在哪几个环节", "should_trigger": true },
+    { "id": "q5", "text": "premortem 一下这个 AI agent 产品的立项：假设一年后它死了，最可能是哪几个原因、现在该验证什么", "should_trigger": true },
+    { "id": "q6", "text": "这份 B2B 标品提案访谈反馈都不错，老板让我正式评审前冷静挑一下风险，别只听客户说好", "should_trigger": true },
+    { "id": "q7", "text": "这个方向马上要追加 200 万投入，投前帮我做个逆向审查：哪些结论目前没有证据支撑、下一步怎么验证", "should_trigger": true },
+    { "id": "q8", "text": "评审这份新渠道拓展方案，重点看它有没有把客户意向当成采购验证，最后给个继续还是暂停的建议", "should_trigger": true },
+    { "id": "q9", "text": "帮我把这份产品方案当反方批一遍，产出一份可以直接拿去团队评审的问题清单和投入建议", "should_trigger": true },
+    { "id": "q10", "text": "用李想三层九模块复盘一下我最近的产品方向思考，逐模块对照标准看我缺了什么", "should_trigger": false },
+    { "id": "q11", "text": "按李想 CEO 公开课的尺子过一遍我的产品决策，给我逐模块符合度裁定和层间断裂点", "should_trigger": false },
+    { "id": "q12", "text": "我很犹豫要不要做这个独立开发产品，正反两边都帮我把论证做到最强，再点出最关键的分歧让我回答", "should_trigger": false },
+    { "id": "q13", "text": "grill me on this product launch plan，别客气，往死里问", "should_trigger": false },
+    { "id": "q14", "text": "我有个产品想法还在脑子里，你来拷问我，帮我把它想清楚", "should_trigger": false },
+    { "id": "q15", "text": "产品失败一般有哪些常见原因？给我讲讲新手怎么避坑", "should_trigger": false },
+    { "id": "q16", "text": "review 一下这个分支的改动有没有符合仓库规范", "should_trigger": false },
+    { "id": "q17", "text": "把昨天产品评审会的录音转写整理成正式纪要发到飞书", "should_trigger": false },
+    { "id": "q18", "text": "把这份审查报告翻译成英文发给海外投资人", "should_trigger": false },
+    { "id": "q19", "text": "帮我评审一下这个新写的 SKILL.md 能不能达到打包发布的质量", "should_trigger": false }
+  ]
+}
