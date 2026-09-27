@@ -1,0 +1,7 @@
+interface:
+  display_name: "use-deepseek"
+  short_description: "通过已登录的 chat.deepseek.com 与 DeepSeek 多轮来回协作"
+  default_prompt: "Use $use-deepseek"
+
+policy:
+  allow_implicit_invocation: true
