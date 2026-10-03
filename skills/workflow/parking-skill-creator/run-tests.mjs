@@ -65,6 +65,9 @@ console.log("中文 Prompt 术语边界：");
 check("SKILL.md 声明 Chinese-first 与四道 conversion gate", ["中文 Prompt 的语言与术语边界", "Named concept", "Execution impact", "English information gain", "Stable mapping"].every((s) => creatorDoc.includes(s)));
 check("SKILL.md 声明短 Prompt/长文档的转换上限", creatorDoc.includes("最多 2 个 English terms") && creatorDoc.includes("最多 5 个"));
 check("writing guide 固化不凑数和 semantic nucleus", ["转换预算", "硬上限，不是最低配额", "没有值得转换的词就使用 0 个", "semantic nucleus", "双向钢人分析（steelman）", "分歧核心（crux）"].every((s) => writingGuide.includes(s)));
+check("SKILL.md 第 1 步固化触发模式三选一", ["手动专用", "名字触发", "语境触发"].every((s) => creatorDoc.includes(s))
+  && creatorDoc.includes("定案记进 design.md"));
+check("writing guide 固化模式表与宿主开关", ["触发模式先定调", "allow_implicit_invocation", "disable-model-invocation", "没点名不触发是设计"].every((s) => writingGuide.includes(s)));
 check("UI default prompt 保持中文且保留 skill name contract", creatorInterface.includes("使用 $parking-skill-creator") && creatorInterface.includes("创建、评测、迭代或打包"));
 check("parking-skill-creator 自身 description 保持中文优先", creatorDescription.length < 450
   && ["with_skill/without_skill", "description", "subagent", ".skill", "Node"].every((s) => creatorDescription.includes(s))
@@ -81,6 +84,10 @@ check("SKILL.md 指针提到无嵌套 Agent 的降级路径", creatorDoc.include
 check("trigger-eval.md 把无嵌套 Agent 路由到 fallback 或主会话",
   triggerEvalDoc.includes("references/headless-trigger-fallback.md")
   && triggerEvalDoc.includes("交回主会话直跑"));
+check("trigger-eval 题库按触发模式取材且手动专用不进本流程",
+  triggerEvalDoc.includes("按 design.md 记的触发模式取材")
+  && triggerEvalDoc.includes("记成误触发")
+  && triggerEvalDoc.includes("不进本流程"));
 check("fallback 文档固化三禁、单轮与扫描边界", [
   "不得读取、备份、修改或恢复 `~/.zcode/cli/config.json`",
   "凭据只进进程环境",
@@ -376,6 +383,12 @@ try {
   const interfaceYaml = readFileSync(join(genDir, "agents", "openai.yaml"), "utf8");
   check("openai.yaml 含三项 interface 元数据", ["display_name:", "short_description:", "default_prompt:", "$demo-gen"].every((s) => interfaceYaml.includes(s)));
   check("openai.yaml display_name 与技能名一致", interfaceYaml.includes('display_name: "demo-gen"'));
+  check("init 默认 allow_implicit_invocation: true", interfaceYaml.includes("allow_implicit_invocation: true"));
+  const manualGen = runFile("init-skill.mjs", ["Manual Skill", "--invocation", "manual", "--path", join(root3, "manual")]);
+  const manualYaml = readFileSync(join(root3, "manual", "manual-skill", "agents", "openai.yaml"), "utf8");
+  check("init --invocation manual 置 allow_implicit_invocation: false", manualGen.code === 0 && manualYaml.includes("allow_implicit_invocation: false"));
+  const badInvocation = runFile("init-skill.mjs", ["Bad Invocation", "--invocation", "lazy", "--path", join(root3, "badinv")]);
+  check("init 拒绝非法 invocation 值", badInvocation.code === 2 && out(badInvocation).includes("只接受 auto 或 manual"));
   const aliasAttempt = runFile("init-skill.mjs", ["Alias Demo", "--interface", "display_name=别名", "--path", join(root3, "locked")]);
   check("init 拒绝 display_name 别名", aliasAttempt.code === 2 && out(aliasAttempt).includes("display_name 固定为技能目录名"));
   check("init stdout 报 design/openai 产物行", gen.stdout.includes("references/design.md") && gen.stdout.includes("agents/openai.yaml") && gen.stdout.includes("AC-N"));

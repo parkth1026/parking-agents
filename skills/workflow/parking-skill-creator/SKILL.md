@@ -1,6 +1,6 @@
 ---
 name: parking-skill-creator
-description: 本机技能生产流水线——创建、校验、评测、迭代与打包技能；含触发准确率检查、with/without skill 对比、description 优化、.skill 分发包，只依赖 Node 内置模块。
+description: 本机技能生产流水线——创建、校验、评测、迭代与打包技能；含触发准确率检查、with_skill/without_skill 对比、subagent 评测、description 优化、.skill 分发包，只依赖 Node 内置模块；仅当用户点名或明确要求创建/评测/打包技能时使用。
 ---
 
 # parking-skill-creator：技能生产流水线
@@ -17,7 +17,7 @@ description: 本机技能生产流水线——创建、校验、评测、迭代�
 - 「把这个技能打包」→ 直接进打包章节。
 - 用户只想聊聊不想跑评测？跟着走就是了，流程是骨架不是枷锁。
 
-与用户沟通时按对方熟悉度调整措辞：「评测」「基准」可以直接用；「JSON」「断言」这类词确认对方懂再用，或顺手一句话解释。
+与用户沟通按对方熟悉度调整措辞：「评测」「基准」直接用；「JSON」「断言」确认对方懂再用或顺手解释一句。
 
 ## 六步主线总览
 
@@ -28,7 +28,7 @@ description: 本机技能生产流水线——创建、校验、评测、迭代�
 5. **quick-validate + 自带测试** — 规则校验与回归测试，越早发现问题越便宜。
 6. **输出评测循环** — gate 问询与并行对照、评分、聚合并沉淀历史（--history）、结构审查、浏览器评审、迭代。
 
-本文所有 `node scripts/…`、`node eval-viewer/…` 命令都在**本技能目录**下执行；下文 `<skill-dir>` 指当前技能目录；init 缺省输出目录按脚本自身位置解析，与当前工作目录无关。
+本文所有 `node scripts/…`、`node eval-viewer/…` 命令都在**本技能目录**下执行；init 缺省输出目录按脚本自身位置解析，与当前工作目录无关。
 
 ## 副作用分层与确认
 
@@ -44,14 +44,14 @@ description: 本机技能生产流水线——创建、校验、评测、迭代�
 
 ## 第 1 步：理解意图与具体例子
 
-当前会话里可能已经有想捕获的工作流（用户说「把刚才这套做成技能」）——先从会话历史提取：用了哪些工具、步骤顺序、用户纠正过什么、观察到的输入输出格式。然后再问缺口，逐条确认：
+当前会话里可能已经有想捕获的工作流（用户说「把刚才这套做成技能」）——先从会话历史提取：工具、步骤顺序、用户纠正、输入输出格式，然后再问缺口，逐条确认：
 
 1. 这个技能让 agent 能做什么？
-2. 什么情况下触发？（用户会说什么话、什么上下文）
+2. 触发模式三选一——手动专用（仅用户显式调用，command 型）/名字触发（点名或明确要求才触发，本仓默认）/语境触发（从上下文自动抽取），各模式写法见 writing-guide；用户会说什么话按模式取材，定案记进 design.md「意图与触发场景」。
 3. 期望的输出形态？
 4. 测试用例：产出客观可验的技能（文件转换、数据抽取、固定流程）**必须**把测试固化进技能（第 4 步写进 `run-tests.mjs`，升级校验全靠它）；产出主观的技能（文风、设计）通常不需要，向用户说明后跳过。
 
-一次别问太多——先问最重要的，逐步补。避免臆想例子：请用户给出真实用法例子（「能举两个你会这么用的说法吗？」），或你生成例子后请用户确认。使用模式已经清楚时（改既有技能且用户说得具体）可跳过本步。
+一次别问太多，先问最重要的再逐步补。例子要真实：请用户给（「举两个你会这么用的说法」）或你生成后请用户确认，不臆想。改既有技能且用户说得具体时可跳过本步。
 
 结束标志：技能应支持的功能有了清晰共识。
 
@@ -83,18 +83,18 @@ node scripts/init-skill.mjs <技能名> --structure <workflow|task|reference|cap
 
 - 名字自动归一化 kebab-case（`Log Classifier` → `log-classifier`），超 64 字符退出码 2。
 - 默认输出到本技能同级的技能目录；目标已存在且非空时拒绝（退出码 1，不覆盖）。
-- 产出：含待办占位与「结构选择指南」节的 SKILL.md + 技能目录根部 `run-tests.mjs` 回归测试骨架 + `references/design.md` 设计文档骨架（四节：意图与触发场景/设计取舍/验收条件 AC-N/迭代记录）+ `agents/openai.yaml`（`display_name` 使用技能名标识，default prompt 引用 `$<技能名>`）+ 按结构生成的 scripts/references/assets 占位 README。模板是**通用**的，不带本仓库假设——本仓库惯例见文末「本仓库使用提示」。
+- 产出：含待办占位与「结构选择指南」节的 SKILL.md + 技能目录根部 `run-tests.mjs` 回归测试骨架 + `references/design.md` 设计文档骨架（四节：意图与触发场景/设计取舍/验收条件 AC-N/迭代记录）+ `agents/openai.yaml`（`display_name` 用技能名，default prompt 引用 `$<技能名>`；手动专用加 `--invocation manual`）+ 按结构生成的 scripts/references/assets 占位 README。模板是**通用**的，不带本仓库假设——本仓库惯例见文末「本仓库使用提示」。
 
 ## 第 4 步：写资源再写 SKILL.md
 
-动手前先把 `references/design.md` 的四节骨架填成真实内容（不是留 TODO 的骨架）：这个技能为什么存在、关键取舍是什么、验收条件编号 AC-1…AC-N。SKILL.md 会频繁迭代，设计意图与验收依据固化在 design.md 里不随波逐流——它也是后续评测断言的锚点（断言用 `ac` 字段引用 AC 编号）。
+动手前先把 `references/design.md` 的四节骨架填成真实内容（不是留 TODO 的骨架）：这个技能为什么存在、关键取舍是什么、验收条件编号 AC-1…AC-N。SKILL.md 会频繁迭代，设计意图与验收依据固化在 design.md 里不随波逐流——它也是后续评测断言的锚点。
 
-然后实现第 2 步清单里的资源（这步常需要用户提供材料：品牌资产、模板、文档），再写 SKILL.md 把它们串起来。加入的脚本必须真实跑过至少一个代表性用例，不许「应该能跑」；跑通的用例当场固化进技能目录根部的 `run-tests.mjs`（新建技能：init 已生成骨架；既有技能没有该文件时按同结构补建。check() 计数器 + 黑盒执行，fixtures/ 放黄金输入与 expected）——测试随技能分发，是后续反复升级校验的依据。
+然后实现第 2 步清单里的资源（这步常需要用户提供材料：品牌资产、模板、文档），再写 SKILL.md 把它们串起来。加入的脚本必须真实跑过至少一个代表性用例，不许「应该能跑」；跑通的用例当场固化进技能根部的 `run-tests.mjs`（init 已生成骨架；既有技能缺该文件时按同结构补建。check() 计数器 + 黑盒执行，fixtures/ 放黄金输入与 expected）——测试随技能分发，是升级校验的依据。
 
 写 SKILL.md 的完整方法论见 `references/writing-guide.md`，核心：
 
 - **渐进披露**：description 常驻上下文；正文 <500 行；细节进 references 并在正文留「何时读哪个文件」的指针。
-- **description 是主触发机制**：做什么+何时用都写进去，主动一点（agent 天生漏触发）；所有「何时使用」信息在 description，不写正文节。
+- **description 是主触发机制**：做什么+何时用都写进去，「何时用」按第 1 步定的触发模式收放——语境触发才主动招揽（agent 天生漏触发），名字触发只收显式点名/明确要求；所有「何时使用」信息在 description，不写正文节。
 - **风格**：祈使句；解释为什么而不是堆 MUST；从反馈泛化而不是过拟合测试例子；写完初稿用新眼光重读一遍。
 
 frontmatter 只允许 name/description（必需）+ license/allowed-tools/metadata/compatibility（可选）。
@@ -119,13 +119,13 @@ node scripts/quick-validate.mjs <技能目录>
 
 支持子集的边界、键分诊的阈值与全仓复扫回归见 `references/gate-rules.md`——改校验器或想知道某个写法为什么被拦时读它。
 
-PASS 但缺 `run-tests.mjs` 或 `references/design.md` 时给警告、SKILL.md 仍含待办占位时给提示（都不挡退出码——存量老技能照常工作，升级时补上；新技能必须齐）。修完再跑直到 PASS。PASS 后跑 `node <技能目录>/run-tests.mjs`，自带测试全过才算过本步（主观无测试的技能除外）；此后每次升级改动，先跑它做回归。
+PASS 但缺 `run-tests.mjs` 或 `references/design.md` 时给警告、SKILL.md 仍含待办占位时给提示（都不挡退出码——存量技能升级时补，新技能必须齐）。修完再跑直到 PASS。PASS 后跑 `node <技能目录>/run-tests.mjs`，自带测试全过才算过本步（主观无测试的技能除外）；此后每次升级改动，先跑它做回归。
 
 ## 第 6 步：输出评测循环
 
 题目依赖 Web、外部 API、快照或实时数据时，先读 `references/evidence.md`，再做 evidence preflight/materialize；创建或改进 skill 时，把文档风险写成质量假设并用相关 gate/runs 验证，静态审查不直接给质量 PASS。
 
-评测结果默认放 skills 祖先父级的 `evals/<技能名>-workspace/`（与 skills 根平行，向上找 skills 祖先，任意嵌套深度）；workspace 在技能扫描根之外，评测产物/夹具里出现再多的 `SKILL.md` 也不会被宿主识别成技能。workspace 是 scratch、不入库（.gitignore 已忽略）——持久评测依据住技能目录，clean 前先把成绩沉淀进去（见「迭代依据的发现约定」）。若显式沿用扫描根内的旧 workspace，跑完 iteration 要用 `check-shadow-skills` 复查产物有没有冒充技能。按迭代组织（`iteration-1/`、`iteration-2/`…），每个测试用例一个 `eval-<描述性名>/` 目录。目录随用随建，不要预先全铺。
+评测结果默认放 skills 祖先父级的 `evals/<技能名>-workspace/`（向上找 skills 祖先，任意嵌套深度）；workspace 在技能扫描根之外，评测产物/夹具里出现再多的 `SKILL.md` 也不会被宿主识别成技能。workspace 是 scratch、不入库（.gitignore 已忽略）——持久评测依据住技能目录，clean 前先把成绩沉淀进去。若显式沿用扫描根内的旧 workspace，跑完 iteration 要用 `check-shadow-skills` 复查产物有没有冒充技能。按迭代组织（`iteration-1/`、`iteration-2/`…），每个测试用例一个 `eval-<描述性名>/` 目录。目录随用随建，不要预先全铺。
 
 ### 6.1 解析低成本 profile，分批 spawn run
 
@@ -154,7 +154,7 @@ headless run 传 `--completion-file outputs/completion.json`；launcher 等标�
 
 目录布局对齐聚合器口径：`<config>/run-<K>/outputs/`（run 序号从 1 起，同一 eval 重跑多个 run 时递增）——聚合器只认 `run-<数字>` 子目录，产物直接放 `<config>/outputs/` 会收不到。重要轮次（发版验收、疑似 flaky 的 eval）可在同一 eval 下同轮追加 `run-2` 再跑一臂，聚合器自动池化多 run 统计——同轮方差不用等跨轮才看见。
 
-不带技能的 gate（如 `without_skill`）：同 prompt 去掉「技能路径」一行，产物存对应 gate 目录。改进既有技能的 `old_skill` gate 用改动前快照：`node scripts/snapshot-skill.mjs <技能目录> [<workspace>]`（workspace 缺省为 skills 祖先父级的 `evals/<技能名>-workspace`；快照目录 `skill-snapshot`，已占用自动递增 `-v2`、`-v3`）。脚本会把快照里的 `SKILL.md` 改名 `SKILL.md.bak`——技能扫描器按 `SKILL.md` 文件名认技能，若 workspace 沿用扫描根内的旧同级位置，快照里留活的 `SKILL.md` 会冒出同名双技能、污染触发评测的技能清单；新缺省位置虽在扫描根外，改名仍是双保险。别徒手复制目录造快照。old_skill run 的「技能路径」填快照目录，prompt 注明技能文档读 `SKILL.md.bak`，产物存 `old_skill/run-1/outputs/`。怀疑技能清单混进了快照/评测产物冒充的技能时，运行 `node scripts/check-shadow-skills.mjs <扫描根>` 复查。
+不带技能的 gate（如 `without_skill`）：同 prompt 去掉「技能路径」一行，产物存对应 gate 目录。改进既有技能的 `old_skill` gate 用改动前快照：`node scripts/snapshot-skill.mjs <技能目录> [<workspace>]`（workspace 缺省为 skills 祖先父级的 `evals/<技能名>-workspace`；快照目录 `skill-snapshot`，已占用自动递增）。脚本会把快照里的 `SKILL.md` 改名 `SKILL.md.bak`——技能扫描器按 `SKILL.md` 文件名认技能，若 workspace 沿用扫描根内的旧同级位置，快照里留活的 `SKILL.md` 会冒出同名双技能、污染触发评测的技能清单；新缺省位置虽在扫描根外，改名仍是双保险。别徒手复制目录造快照。old_skill run 的「技能路径」填快照目录，prompt 注明技能文档读 `SKILL.md.bak`，产物存 `old_skill/run-1/outputs/`。怀疑技能清单混进了快照/评测产物冒充的技能时，运行 `node scripts/check-shadow-skills.mjs <扫描根>` 复查。
 
 每个 eval 目录写 `eval_metadata.json`（断言可先空，见 6.2）：
 
@@ -230,7 +230,7 @@ node eval-viewer/generate-review.mjs <workspace>/iteration-<N> [--history <技�
 - 默认起 `http://127.0.0.1:3117`，端口被占自动换下一个空闲端口，Windows 下用 start 开浏览器，Ctrl+C 停。
 - `--port` 必须是 1~65535 的整数；非法端口退出码 2，避免 NaN 或越界端口把服务器变成未处理异常。
 - 迭代 ≥2 加 `--previous-workspace <workspace>/iteration-<N-1>`，页面会出现上轮输出与留言的折叠对照。
-- 加 `--history <技能目录>` 读 `history.json`：评审页顶部出现**历史轨迹**折叠区——历次评测 pass_rate/mean_ms/mean_tokens 表 + 本轮 vs 上轮 won/lost/tie + 逐 eval 明细（含 dropped），跨轮对比在评审页直接看。读不到 history.json 时显示「无历史轨迹（首次评测）」，不报错；不带该旗标则整个历史区不出现。标题技能名的优先级：`--skill-name` 显式 > history.json 的 skill 字段 > 目录名推断。
+- 加 `--history <技能目录>` 读 `history.json`：评审页顶部出现**历史轨迹**折叠区——历次评测 pass_rate/mean_ms/mean_tokens 表 + 本轮 vs 上轮 won/lost/tie + 逐 eval 明细（含 dropped），跨轮对比在评审页直接看。读不到 history.json 显示「无历史轨迹（首次评测）」不报错；不带该旗标则历史区不出现。标题技能名的优先级：`--skill-name` 显式 > history.json 的 skill 字段 > 目录名推断。
 - 本轮做过结构审查（6.5）时，Benchmark 页上方自动出现**结构审查建议卡片**（读 `<iteration>/structure-review.json`，带「仅建议 · 未执行」标记）。
 - 无浏览器/远程环境加 `--static <输出.html>`：单文件自包含，反馈改走对话（你按同结构手写 feedback.json）。
 
@@ -253,7 +253,7 @@ node eval-viewer/generate-review.mjs <workspace>/iteration-<N> [--history <技�
 
 description 是技能的主触发机制。技能做完后主动提议跑一轮；用户说「触发不准 / 和别的技能抢」时直接进这里。
 
-完整流程读 `references/trigger-eval.md`——同宿主 subagent 探针、约 20 条题库的写法（含 near-miss 取材）、
+完整流程读 `references/trigger-eval.md`——同宿主 subagent 探针、约 20 条题库的写法（正负样本按触发模式取材、含 near-miss）、
 分批并发纪律、防泄漏红线、`aggregate-trigger.mjs` 的分层统计与样本下限、description 迭代收敛，
 以及宿主没有嵌套 Agent 工具时的降级路径（`references/headless-trigger-fallback.md`，能力或授权不足就交回主会话直跑）。
 ## 前向测试（复杂技能上线前）

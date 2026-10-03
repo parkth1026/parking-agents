@@ -1,19 +1,6 @@
 # 技能写作指南（融合方法论）
 
-写 SKILL.md 时通读本指南。来源：claude skill-creator 的写作章节 + codex skill-creator 的精简原则，按本仓库实践融合。
-
-## 目录
-
-1. [渐进披露](#渐进披露)
-2. [三类资源](#三类资源)
-3. [自由度分级](#自由度分级)
-4. [frontmatter 与 description](#frontmatter-与-description)
-5. [写作模式](#写作模式)
-6. [写作风格](#写作风格)
-7. [不该写什么](#不该写什么)
-8. [前向测试与防泄漏](#前向测试与防泄漏)
-
----
+写 SKILL.md 时通读本指南。
 
 ## 渐进披露
 
@@ -28,16 +15,7 @@
 - SKILL.md 逼近 500 行时，把细节拆层并在正文留清晰的「何时去读哪个文件」指针，而不是继续堆。
 - 大参考文件（>300 行）在文件头放目录，读者预览即可见全貌。
 - 信息只放一处：SKILL.md 或 references，不要两边重复。
-- 多领域/多变体技能按变体组织，读者只读相关文件：
-
-```
-cloud-deploy/
-├── SKILL.md (工作流 + 选择指引)
-└── references/
-    ├── aws.md
-    ├── gcp.md
-    └── azure.md
-```
+- 多领域/多变体技能按变体组织，读者只读相关文件（如 cloud-deploy 的 SKILL.md 写工作流与选择指引，aws/gcp/azure 细节分置 references/ 各文件）。
 
 ## 三类资源
 
@@ -47,7 +25,7 @@ cloud-deploy/
 | `references/` | agent 工作时应查阅的资料 | schema、API 文档、领域知识、详细流程指南 |
 | `assets/` | 会进入最终产出的文件 | 模板、图标、字体、样板工程（不载入上下文，直接使用） |
 
-判断方法：对每个具体使用例子问「从零执行这个例子时，什么资料/代码会被反复重造？」——答案就是资源清单。跨 test case 观察到 subagent 各自重写了相似脚本，是最强的「该进 scripts/」信号。
+判断方法：对每个使用例子问「从零执行时什么资料/代码会被反复重造？」——答案即资源清单。跨 test case 见 subagent 各自重写了相似脚本，是最强的「该进 scripts/」信号。
 
 ## 自由度分级
 
@@ -57,17 +35,23 @@ cloud-deploy/
 - **中自由度（伪代码/带参脚本）**：有首选模式但允许变化。例：有参数的流程脚本。
 - **低自由度（具体脚本+固定参数）**：操作脆弱易错、一致性关键、必须按特定顺序。例：打包、统计聚合。
 
-比喻：窄桥加悬崖需要护栏（低自由度），开阔田野随便走（高自由度）。默认假设 agent 已经很聪明——只加它不知道的上下文，每段内容都要回答「这值得它的 token 成本吗」。
+默认假设 agent 已经很聪明——只加它不知道的上下文，脆弱操作才上低自由度护栏；每段内容都要回答「这值得它的 token 成本吗」。
 
 ## frontmatter 与 description
 
 - `name`：kebab-case，小写字母/数字/连字符，≤64 字符，动词开头的短语优先，目录名与 name 一致。
-- `description`：触发的主要机制，同时写清「做什么」与「何时用」：
-  - 所有「何时使用」的信息都在这里，不放正文（正文触发后才加载）。
-  - agent 对技能普遍偏「漏触发」——description 要写得略「主动」一点：把用户会提到的关键词、场景、相邻说法都覆盖进去，即使用户没点名要这个技能。
-  - 官方示例：「How to build a simple fast dashboard…」不如「…whenever the user mentions dashboards, data visualization, internal metrics, or wants to display any kind of company data, even if they don't explicitly ask for a 'dashboard'.」
-  - 校验红线：≤1024 字符、不含尖括号。
-- 除 name/description 外只允许 license/allowed-tools/metadata/compatibility。
+- `description`：触发的主要机制，同时写清「做什么」与「何时用」；所有「何时使用」的信息都在这里，不放正文（正文触发后才加载）。校验红线：≤1024 字符、不含尖括号。
+- **触发模式先定调**——创建第 1 步与用户三选一，定案记进 design.md「意图与触发场景」；「何时用」按模式收放：
+
+| 模式 | 语义 | description 写法 / 代价 |
+| --- | --- | --- |
+| 手动专用 | 模型不自行触发，仅用户显式调用（command 型） | 只写做什么，并注明「仅当用户显式调用本技能时使用」。代价：对话随口点名不触发；触发评测考不了 |
+| 名字触发（本仓默认） | 用户点名技能名或明确要求该能力才触发 | 「做什么」写全；「何时用」只收显式点名/明确要求——没点名不触发是设计，不是漏触发 |
+| 语境触发 | 期望模型从上下文自动抽取 | 主动招揽：用户会提的关键词、场景、相邻说法全覆盖，没点名也触发；误触发面变大，靠触发评测 near-miss 收口 |
+
+- 语境触发才用宽招揽句式（官方示例：「…whenever the user mentions dashboards, data visualization…, even if they don't explicitly ask for a 'dashboard'.」）；名字触发禁用此式。
+- 手动专用优先用宿主开关硬关，description 只作兜底：init 传 `--invocation manual` 置 `agents/openai.yaml` 的 `allow_implicit_invocation: false`；宿主另有 frontmatter 调用开关（如 Claude 的 `disable-model-invocation: true`）时写入宿主键，quick-validate 对宿主新增键只警告不挡。
+- 除 name/description 外只允许 license/allowed-tools/metadata/compatibility；宿主调用策略键按上条例外。
 
 ## 中文 Prompt 的术语克制
 
@@ -82,7 +66,7 @@ cloud-deploy/
 3. `English information gain`：English 增加边界、检索性或跨工具一致性。
 4. `Stable mapping`：当前上下文存在可靠、可解释的 English mapping。
 
-任一项不成立，就保留中文。`problem framing`、`current hypothesis`、`key decision variables` 等虽然有 English mapping，但如果当前中文已经足够清楚，不要为了“术语化”而替换。
+任一项不成立，就保留中文。当前中文已足够清楚时，不要为了「术语化」而替换。
 
 ### 转换预算
 
@@ -103,11 +87,11 @@ cloud-deploy/
 
 只有 nucleus 单独不足以表达概念时，才扩展为完整 English phrase。`name`、enum、CLI flag、schema field、API、identifier、provider name、path、URL、版本号和命令必须原样保留；它们属于 machine contract，不属于术语润色。
 
-反过来说，中文的自然句子、动作、判断和普通领域词一律保留原样——**不要逐句 bilingualize**。把每个中文词都配一个英文，读者要付双份阅读成本，却一个歧义都没消掉。
+反过来说，中文的自然句子、动作、判断和普通领域词一律保留原样——**不要逐句 bilingualize**（双份阅读成本，零歧义消解）。
 
 ### 拿不准的词怎么办
 
-术语候选不等于行业标准。某个 English mapping 是否真的通用、在当前上下文是否指同一件事，拿不准时标成 `context-dependent` 或 `unverified`，**不要用英文替换制造确定感**——一个看起来很专业的错译，比保留中文更难被下一个人发现。
+术语候选不等于行业标准。某个 English mapping 是否真的通用、在当前上下文是否指同一件事，拿不准时标成 `context-dependent` 或 `unverified`，**不要用英文替换制造确定感**——专业感十足的错译比保留中文更难被发现。
 
 ### 输出纪律
 
@@ -115,16 +99,7 @@ cloud-deploy/
 
 ## 写作模式
 
-**输出格式模板**——要求稳定结构时直接给模板：
-
-```markdown
-## Report structure
-ALWAYS use this exact template:
-# [Title]
-## Executive summary
-## Key findings
-## Recommendations
-```
+**输出格式模板**——要求稳定结构时直接给模板，如 `## Report structure — ALWAYS use this exact template: # [Title] / ## Executive summary / ## Key findings / ## Recommendations`。
 
 **示例模式**——给 Input/Output 对，比长解释有效：
 
@@ -156,7 +131,7 @@ Output: feat(auth): implement JWT-based authentication
 
 用 subagent 前向测试复杂技能时，把它当**评测面**：目标是验证技能能否泛化，而不是另一个 agent 能否从泄漏的上下文里重建答案。
 
-- 探针/测试 subagent 不应知道自己在测试技能——prompt 长得像用户直接派活：「用 /path/to/skill-x 解决问题 y」，而不是「评审这个技能；假设用户要求你…」。
+- 探针/测试 subagent 不应知道自己在测试技能——prompt 长得像用户直接派活：「用 /path/to/skill-x 解决问题 y」。
 - 传**原始工件**（示例 prompt、输出、diff、日志），不传你的结论、预期答案、疑似 bug、预期修法。
 - 每轮迭代后从源工件重建上下文；清理上一轮 subagent 留下的工件，避免污染下一轮。
 - 如果前向测试只有在 subagent 看得到泄漏上下文时才通过，先收紧技能或测试设置，再信任结果。

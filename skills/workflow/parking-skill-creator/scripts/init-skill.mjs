@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // init-skill.mjs — 通用技能脚手架（codex init_skill.py 移植，模板语言无关、不带本仓库假设）
-// 用法: node init-skill.mjs <name> [--structure workflow|task|reference|capabilities] [--path <目录>]
+// 用法: node init-skill.mjs <name> [--structure workflow|task|reference|capabilities] [--path <目录>] [--invocation auto|manual]
 // 退出码: 0 成功 / 1 拒绝（目录已存在且非空）/ 2 用法错（名字非法/超限）
 import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join, resolve, dirname } from "node:path";
@@ -19,6 +19,7 @@ function usage() {
   console.log(`  --structure 结构模式（默认 task）: ${Object.keys(STRUCTURES).join(" | ")}`);
   console.log("  --path     输出目录（默认: 本技能目录的同级技能目录）");
   console.log("  --interface key=value  覆盖 agents/openai.yaml 的 short_description 或 default_prompt（可重复；display_name 固定为技能目录名）");
+  console.log("  --invocation auto|manual  触发模式（默认 auto）：manual 置 allow_implicit_invocation: false（仅用户显式调用）");
   console.log("示例: node init-skill.mjs log-classifier --structure task");
   process.exit(2);
 }
@@ -37,7 +38,7 @@ function titleCase(name) {
 
 const SKILL_TEMPLATE = (name) => `---
 name: ${name}
-description: "[TODO: 写清楚这个技能做什么、何时触发。包含具体场景、文件类型或任务类型——所有「何时使用」的信息都放这里，正文在触发后才加载。]"
+description: "[TODO: 写清楚这个技能做什么、何时触发——「何时」按 design.md 定的触发模式收放（名字触发只收点名/明确要求，语境触发才写具体场景、文件类型）。所有「何时使用」的信息都放这里，正文在触发后才加载。]"
 ---
 
 # ${titleCase(name)}
@@ -127,7 +128,7 @@ const RESOURCE_README = {
 const DESIGN_TEMPLATE = (name) => `# design: ${name}
 
 ## 意图与触发场景
-[TODO: 为什么有这个技能;用户会说什么话、什么上下文触发;期望产出形态]
+[TODO: 为什么有这个技能;触发模式（手动专用/名字触发/语境触发）及该模式下用户会说什么话、什么上下文触发;期望产出形态]
 
 ## 设计取舍
 [TODO: 关键决定与自由度分级（哪部分用脚本/固定参数锁死，哪部分留给文字判断）;每条一句话「为什么没选别的」]
@@ -147,14 +148,15 @@ const OPENAI_INTERFACE_KEYS = new Set(["short_description", "default_prompt"]);
 function yamlString(value) {
   return JSON.stringify(String(value));
 }
-function openaiYaml(name, overrides) {
+function openaiYaml(name, overrides, invocation = "auto") {
   const title = titleCase(name);
   const values = {
     display_name: name,
     short_description: overrides.short_description ?? `Create and use the ${title} skill`,
     default_prompt: overrides.default_prompt ?? `Use $${name} to handle a ${title} task.`,
   };
-  return `interface:\n  display_name: ${yamlString(values.display_name)}\n  short_description: ${yamlString(values.short_description)}\n  default_prompt: ${yamlString(values.default_prompt)}\n\npolicy:\n  allow_implicit_invocation: true\n`;
+  const allowImplicit = invocation === "manual" ? "false" : "true";
+  return `interface:\n  display_name: ${yamlString(values.display_name)}\n  short_description: ${yamlString(values.short_description)}\n  default_prompt: ${yamlString(values.default_prompt)}\n\npolicy:\n  allow_implicit_invocation: ${allowImplicit}\n`;
 }
 
 /** 技能根回归测试骨架：零依赖 Node，check() 计数器，退出码 0=全过/1=有失败 */
@@ -183,7 +185,7 @@ console.log(\`\\n\${pass} passed, \${fail} failed\`);
 process.exit(fail ? 1 : 0);
 `;
 
-function parseArgs(argv) {  const args = { name: null, structure: "task", path: null, interface: {} };
+function parseArgs(argv) {  const args = { name: null, structure: "task", path: null, interface: {}, invocation: "auto" };
   const rest = [...argv];
   if (rest.length === 0 || rest[0].startsWith("-")) return { args, error: "missing-name" };
   args.name = rest.shift();
@@ -197,6 +199,10 @@ function parseArgs(argv) {  const args = { name: null, structure: "task", path: 
       const v = rest.shift();
       if (!v) return { args, error: "bad-path" };
       args.path = v;
+    } else if (a === "--invocation") {
+      const v = rest.shift();
+      if (v !== "auto" && v !== "manual") return { args, error: "bad-invocation" };
+      args.invocation = v;
     } else if (a === "--interface") {
       const pair = rest.shift();
       const equal = pair?.indexOf("=") ?? -1;
@@ -221,6 +227,7 @@ if (error) {
     "bad-path": "--path 需要一个目录参数",
     "bad-interface": "--interface 需要 key=value",
     "display-name-locked": "display_name 固定为技能目录名，不允许使用别名",
+    "bad-invocation": "--invocation 只接受 auto 或 manual",
   };
   console.log(hint[error] ?? (error.startsWith("bad-structure")
     ? `未知结构模式: ${error.slice("bad-structure:".length)}（允许: ${Object.keys(STRUCTURES).join(" | ")}）`
@@ -277,7 +284,7 @@ mkdirSync(join(skillDir, "references"), { recursive: true });
 writeFileSync(join(skillDir, "references", "design.md"), DESIGN_TEMPLATE(skillName), "utf8");
 console.log("  references/design.md  (设计文档骨架,验收条件编号 AC-N,eval 断言引用 ac 字段)");
 mkdirSync(join(skillDir, "agents"), { recursive: true });
-writeFileSync(join(skillDir, "agents", "openai.yaml"), openaiYaml(skillName, args.interface), "utf8");
+writeFileSync(join(skillDir, "agents", "openai.yaml"), openaiYaml(skillName, args.interface, args.invocation), "utf8");
 console.log("  agents/openai.yaml  (技能列表 UI 元数据)");
 
 const resources = STRUCTURES[args.structure].resources;
