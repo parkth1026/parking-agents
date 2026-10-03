@@ -180,3 +180,5 @@
 新：| AC-23 | slim执行在首次写用户答案前成功全文读取SKILL、简明诊断页与全部输入，wiki_policy=disabled且实际不读取Wiki；保留必读清单须独立审阅，轨迹绑定最终安装源指纹 | runtime |
 
 | 2026-10-03 | 按两轮止损授权，日常运行缩为材料事实/范围、查实限制和行动；不再强制全景扫描与固定长模板，完整知识原件保留 | slim真实质量、运行与费用底线待独立新验证；不计第三有效效果轮 | 不声称归档单模块自身无收益 |
+| 2026-10-03 | 严格测试前置修复：50 个 Wiki 分发页与 coverage 页的来源路径去除本机盘符前缀（G:/GIT/AI_WorkFlow/product-research/ → product-research/），SHA-256 溯源字段不变；quick-validate 由 FAIL 58 处转 PASS、run-tests 95/95 | 无效果轮：机械替换不改知识内容；与 wiki-disabled 裁决「原字节保留」的张力见当轮评测报告 | 无 |
+| 2026-10-03 | iteration-8 严格测试轮（slim 首次独立效果验证，三臂 with=slim/old=pre-slim 快照/without）：slim 0.944（37/39）、old 1.000（39/39）、without 0.821；vs iteration-4 won 0 / lost 2 / tie 4；触发评测含分流句新 description 重验 train 12/12、test 8/8、误触发 0，60 探针（50 valid/10 invalid 协议偏差） | slim 相对不带技能 +12.3pt、token 227.6k 低于 without 287.2k 且仅为 old 537.6k 的 42%；代价＝A 复制题漏质疑「商场先做」上游前提（AC-2，old 经八层地图+症状索引抓到）、C 题泄漏「八个方面」内部框架计数（AC-14 单处）；AC-23 读取合规仅自述+token 佐证、无轨迹级验证 | 四信号未命中无需拆分；slim vs full 质量代价的取舍待用户裁定 |

@@ -178,6 +178,60 @@
       },
       "bank_epoch": 1,
       "current_best": true
+    },
+    {
+      "date": "2026-10-03T17:51:47+08:00",
+      "iteration_ref": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\evals\\ceo-copilot-workspace\\iteration-8",
+      "gates": {
+        "old_skill": {
+          "pass_rate": 1,
+          "mean_ms": 359468.3333,
+          "mean_tokens": 537616.8333
+        },
+        "with_skill": {
+          "pass_rate": 0.9444,
+          "mean_ms": 276469.8333,
+          "mean_tokens": 227616.5
+        },
+        "without_skill": {
+          "pass_rate": 0.8125,
+          "mean_ms": 312218.3333,
+          "mean_tokens": 287180.6667
+        }
+      },
+      "vs_previous": {
+        "evals_total": 6,
+        "won": 0,
+        "lost": 2,
+        "tie": 4,
+        "detail": [
+          {
+            "eval": "eval-A全面诊断",
+            "result": "tie"
+          },
+          {
+            "eval": "eval-A复制下游提问",
+            "result": "lost"
+          },
+          {
+            "eval": "eval-A定价下游提问",
+            "result": "tie"
+          },
+          {
+            "eval": "eval-C留出卡下游提问",
+            "result": "lost"
+          },
+          {
+            "eval": "eval-农险复盘",
+            "result": "tie"
+          },
+          {
+            "eval": "eval-无材料随口提问",
+            "result": "tie"
+          }
+        ]
+      },
+      "bank_epoch": 1
     }
   ],
   "current_best": "runs[3]"
