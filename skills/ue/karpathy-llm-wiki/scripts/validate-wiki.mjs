@@ -5,6 +5,26 @@
 // 用法: node validate-wiki.mjs --wiki <path/to/wiki> [--config <path/to/config.json>] [--raw <path/to/rawDir>]
 // 退出码: 0 = PASS（总分 >= minScore 且断链为 0），1 = FAIL
 //
+// v7.2 变更（2026-10-03 v7.1 三路 subagent 验收后修复——对抗组实锤 1 高危误报 + 3 中危）:
+//  21. [[#heading]] 页内跳转合法化（F1 高危）：Obsidian 官方语法，页面段为空时解析为
+//      当前文件——不计断链/出链/入链，不报 Self References（显式自名是冗余写法、空页面段
+//      是语法性跳转），锚点对当前文件校验；index/log/SCHEMA 扫描同口径指向脚手架自身
+//  22. 多级锚点 [[Page#H1#H2]] 逐段独立命中（F2）：Obsidian 官方子标题路径，宽松校验
+//  23. 锚点段显示别名剥除（F3）：[[Page#H|alias]] 是官方「锚点+别名」组合，alias 不参与
+//      校验；无锚点的 [[Page|alias]] 维持规范既定「不支持」整串判断链不变
+//  24. 锚点匹配视图遮蔽（L1/L2/L4）：headingExists 改用 去 frontmatter + 去代码区 的
+//      视图——代码围栏内的 ## 标题、YAML 注释行不再是假命中
+//  25. block-id 整词匹配（L3）：`^real` 不再命中 `^realabc` 前缀
+//  26. 自链锚点不再免检（L6）：[[Self#坏锚点]] 计自引用的同时进 advisory
+//
+// v7.1 变更（2026-10-03 ceo-copilot wiki 锚点断链审计后修复）:
+//  20. 锚点链接语法支持：`[[Page Name#heading]]` / `[[Page Name#^block-id]]` 是 Obsidian 原生
+//      合法语法（图结构摘要与未建链提及自 v7.0 起已在用 split(/[|#]/) 剥锚点算边，断链维度
+//      没跟上——锚点整串当文件名找，把合法链接判成断链）。现四处链接扫描（正文/index/脚手架）
+//      统一剥 `#` 后按页面名精确解析；`|alias` 别名语法维持规范既定口径不变（仍判断链）。
+//      锚点目标存在性独立校验：heading/block-id 在目标页不存在时报 advisory（不计断链分），
+//      页面名不存在仍按断链硬门处理
+//
 // v7.0 变更（2026-09-02 wiki-top5 图谱审计后修复——342 页星型拓扑拿 10/10，暴露质量模型只看
 //        「每页合规」不看「库是图」的盲区；见 skill 会话审计报告）:
 //  14. 脚手架链接纳入断链：log.md / SCHEMA.md 的 [[wikilink]] 此前完全不被扫描
@@ -123,10 +143,52 @@ function stripFrontmatter(content) {
 }
 const isCJKName = (s) => /^[\u4e00-\u9fff]/.test(s);
 
+// ---- v7.1/v7.2 工具：锚点链接拆解 ----
+// `[[Page#heading]]` → { page: "Page", anchor: "heading" }；`[[Page]]` → anchor 为 null。
+// v7.2：锚点段的显示别名被剥掉（`[[Page#H|alias]]` 是 Obsidian 官方「锚点+别名」组合，
+// alias 段不参与校验）；页面段的 `|alias`（无锚点别名）仍不剥——规范维持不支持，
+// 带 `|` 的整串继续按断链处理。页面段为空（`[[#heading]]`）是 Obsidian 官方页内跳转语法，
+// 由各扫描点就近解析为「当前文件」。
+function splitAnchor(raw) {
+  const i = raw.indexOf("#");
+  if (i === -1) return { page: raw, anchor: null };
+  let anchor = raw.slice(i + 1);
+  const bar = anchor.indexOf("|");
+  if (bar !== -1) anchor = anchor.slice(0, bar);
+  return { page: raw.slice(0, i).trim(), anchor: anchor.trim() };
+}
+
+// 锚点存在性（v7.2 视图与口径；v7.3 候选正则修正先行落地：N1/N2/N3/N5）：
+// - 匹配视图 = 去 frontmatter + 去代码区（L1/L2/L4 对抗发现：代码围栏内的 ## 标题、
+//   YAML 注释行都不是真 heading，此前用原始全文匹配造成假命中）
+// - heading 提取：ATX（允许 ≤3 空格缩进、剥行尾关闭序列 ## ... ##、[ \t] 分隔不跨行——
+//   N3/N2/N5 对抗发现 \s+ 会吞换行把孤立 ## 行的下一行普通文本捕获成标题）+
+//   setext 下划线标题（Title\n====，N1）
+// - 多级锚点 `[[Page#H1#H2]]` 逐段独立命中即过（宽松校验）；空段忽略
+// - `^block-id` 整词匹配且前置须为行首/空白（N4：行中 a^id 不是块 id）；`^real`
+//   不命中 `^realabc` 前缀（L3）
+const ATX_RE = /^ {0,3}#{1,6}[ \t]+(.+?)[ \t]*(?:#{1,6}[ \t]*)?$/gm;
+const SETEXT_RE = /^(.+?)[ \t]*\r?\n[=-]{2,}[ \t]*$/gm;
+const headingExists = (rawContent, anchor) => {
+  if (!anchor) return true;
+  const content = stripCodeSpans(stripFrontmatter(rawContent));
+  if (anchor.startsWith("^")) {
+    const id = anchor.slice(1);
+    if (!id) return true; // 裸 `^` 视为无锚点
+    return new RegExp(`(?:^|[ \\t])\\^${escapeRegExp(id)}(?![A-Za-z0-9_-])`, "m").test(content);
+  }
+  const segs = anchor.toLowerCase().split("#").map((s) => s.trim()).filter(Boolean);
+  if (segs.length === 0) return true;
+  const found = new Set();
+  for (const m of content.matchAll(ATX_RE)) found.add(m[1].trim().toLowerCase());
+  for (const m of content.matchAll(SETEXT_RE)) found.add(m[1].trim().toLowerCase());
+  return segs.every((s) => found.has(s));
+};
+
 // ---- 入口 ----
 const { wiki: wikiPath, config: configPath, raw: rawArg } = parseArgs(process.argv.slice(2));
 
-console.log(C.cyan("=== Wiki Validation Script v7.0 ==="));
+console.log(C.cyan("=== Wiki Validation Script v7.2 ==="));
 if (!existsSync(wikiPath)) {
   console.error(`Wiki path does not exist: ${wikiPath}`);
   process.exit(1);
@@ -223,6 +285,21 @@ const inboundCount = new Map();
 const organicInboundCount = new Map();
 const outboundCount = new Map();
 
+// v7.1：锚点存在性校验（advisory，不计断链分）——目标页内容缓存避免重复 IO
+const anchorIssues = [];
+const pageContentCache = new Map();
+function cachedRead(name) {
+  if (!pageContentCache.has(name)) {
+    const f = allPageNames.get(name);
+    pageContentCache.set(name, f ? read(f) : "");
+  }
+  return pageContentCache.get(name);
+}
+function checkAnchor(fromFile, linkText, canonicalPage, anchor) {
+  if (headingExists(cachedRead(canonicalPage), anchor)) return;
+  anchorIssues.push({ File: fromFile, Link: linkText, Target: canonicalPage });
+}
+
 for (const file of allFiles) {
   allPageNames.set(baseName(file), file);
   inboundCount.set(baseName(file), 0);
@@ -263,28 +340,37 @@ for (const file of allFiles) {
 
   for (const link of links) {
     const linkText = link[1];
+    // v7.1：剥 `#锚点` 取页面名（别名 `|` 仍不剥，维持规范口径）
+    const { page: pagePart, anchor } = splitAnchor(linkText);
 
     // 维度 2: 自引用（不计出链、不计断链分母；v6.2 大小写不敏感——[[transformer]]
-    // 在 Transformer.md 内同样是自引用，且不再自充入链）
-    if (linkText.toLowerCase() === baseName(file).toLowerCase()) {
-      selfReferences.push({ File: basename(file), Link: linkText });
+    // 在 Transformer.md 内同样是自引用，且不再自充入链；v7.1 起 [[self#heading]]
+    // 页内跳转同计自引用；v7.2 起 [[#heading]]（Obsidian 官方页内跳转语法，页面段为空）
+    // 同样不计出链/断链/入链，但不报 Self References 违例——显式自名是冗余写法，
+    // 空页面段是语法性跳转。两类都对当前页做锚点 advisory 校验（L6：自链锚点不再免检）
+    const isExplicitSelf = pagePart !== "" && pagePart.toLowerCase() === baseName(file).toLowerCase();
+    const isSamePageJump = pagePart === "";
+    if (isExplicitSelf || isSamePageJump) {
+      if (isExplicitSelf) selfReferences.push({ File: basename(file), Link: linkText });
+      if (anchor) checkAnchor(basename(file), linkText, baseName(file), anchor);
       continue;
     }
     totalLinkSum++;
     outbound++;
 
-    // 检查链接目标是否存在
+    // 检查链接目标是否存在（v7.1：按剥锚点后的页面名解析）
     let found = false;
     for (const dir of SEARCH_DIRS) {
-      const targetPath = join(wikiPath, dir, `${linkText}.md`);
+      const targetPath = join(wikiPath, dir, `${pagePart}.md`);
       if (existsSync(targetPath)) { found = true; break; }
     }
 
     if (found) {
-      const canonical = pageByLower.get(linkText.toLowerCase());
+      const canonical = pageByLower.get(pagePart.toLowerCase());
       if (canonical) {
         inboundCount.set(canonical, inboundCount.get(canonical) + 1);
         organicInboundCount.set(canonical, organicInboundCount.get(canonical) + 1);
+        if (anchor) checkAnchor(basename(file), linkText, canonical, anchor);
       }
     } else {
       brokenLinks.push({ File: basename(file), Link: linkText });
@@ -296,17 +382,29 @@ for (const file of allFiles) {
 // index.md 的目录链接：纳入断链检查（消除校验盲区）；按配置计入入链
 // （index 是 catalog of all pages，目录行视为官方入链；关闭开关可回退旧行为）
 if (existsSync(indexPath)) {
+  const indexRaw = read(indexPath);
   for (const target of indexedPages) {
+    // v7.1：index 目录链接同样剥锚点解析页面名；v7.2：[[#heading]] 页内跳转
+    // 解析为 index.md 自身（不计断链，锚点对 index.md 校验）
+    const { page: pagePart, anchor } = splitAnchor(target);
+    if (pagePart === "") {
+      totalLinkSum++;
+      if (anchor && !headingExists(indexRaw, anchor)) {
+        anchorIssues.push({ File: "index.md", Link: target, Target: "index.md (self)" });
+      }
+      continue;
+    }
     let found = false;
     for (const dir of SEARCH_DIRS) {
-      if (existsSync(join(wikiPath, dir, `${target}.md`))) { found = true; break; }
+      if (existsSync(join(wikiPath, dir, `${pagePart}.md`))) { found = true; break; }
     }
     totalLinkSum++;
     if (found) {
-      const canonical = pageByLower.get(target.toLowerCase());
+      const canonical = pageByLower.get(pagePart.toLowerCase());
       if (indexCountsAsInbound && canonical) {
         inboundCount.set(canonical, inboundCount.get(canonical) + 1);
       }
+      if (anchor && canonical) checkAnchor("index.md", target, canonical, anchor);
     } else {
       brokenLinks.push({ File: "index.md", Link: target });
     }
@@ -322,13 +420,26 @@ for (const scaffoldName of ["log.md", "SCHEMA.md"]) {
   if (!existsSync(scaffoldPath)) continue;
   const prose = stripCodeSpans(read(scaffoldPath));
   for (const m of prose.matchAll(/\[\[([^\]]+)\]\]/g)) {
-    const target = m[1];
+    // v7.1：脚手架链接同样剥锚点解析页面名；v7.2：[[#heading]] 页内跳转
+    // 解析为脚手架文件自身
+    const { page: pagePart, anchor } = splitAnchor(m[1]);
     totalLinkSum++;
+    if (pagePart === "") {
+      if (anchor && !headingExists(prose, anchor)) {
+        anchorIssues.push({ File: scaffoldName, Link: m[1], Target: `${scaffoldName} (self)` });
+      }
+      continue;
+    }
     let found = false;
     for (const dir of SEARCH_DIRS) {
-      if (existsSync(join(wikiPath, dir, `${target}.md`))) { found = true; break; }
+      if (existsSync(join(wikiPath, dir, `${pagePart}.md`))) { found = true; break; }
     }
-    if (!found) brokenLinks.push({ File: scaffoldName, Link: target });
+    if (!found) {
+      brokenLinks.push({ File: scaffoldName, Link: m[1] });
+    } else if (anchor) {
+      const canonical = pageByLower.get(pagePart.toLowerCase());
+      if (canonical) checkAnchor(scaffoldName, m[1], canonical, anchor);
+    }
   }
 }
 
@@ -346,9 +457,9 @@ for (const [page] of allPageNames) {
   if (organicInboundCount.get(page) === 0) organicOrphans.push(page);
 }
 
-// === 维度 4: index 完整性（大小写不敏感）===
+// === 维度 4: index 完整性（大小写不敏感；v7.1 剥锚点后比对页面名）===
 const missingFromIndex = [];
-const indexedLower = new Set(indexedPages.map((s) => s.toLowerCase()));
+const indexedLower = new Set(indexedPages.map((s) => splitAnchor(s).page.toLowerCase()));
 for (const [page] of allPageNames) {
   if (!indexedLower.has(page.toLowerCase())) missingFromIndex.push(page);
 }
@@ -689,6 +800,16 @@ if (ambiguousNames.length === 0) {
   if (!ambiguousNamesEnforce) {
     console.log(C.yellow("  (report-only — set scoring.ambiguousNamesEnforce=true to hard-gate)"));
   }
+}
+
+// === v7.1: 锚点链接存在性（advisory）===
+console.log("\n" + C.cyan("=== Anchor Links (advisory) ==="));
+if (anchorIssues.length === 0) {
+  console.log(C.green("  No broken anchors — every [[Page#heading]] target resolves to a real heading/block in the target page."));
+} else {
+  console.log(C.yellow(`  Broken Anchors (${anchorIssues.length}) — target page exists but the heading/block-id after '#' was not found:`));
+  for (const a of anchorIssues) console.log(C.yellow(`    ${a.File} -> [[${a.Link}]] (target page: ${a.Target})`));
+  console.log(C.yellow("  (advisory — not counted as broken links; fix by matching the exact heading text in the target page)"));
 }
 
 // === v7: 有机孤儿报告 ===

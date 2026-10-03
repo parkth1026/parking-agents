@@ -508,5 +508,96 @@ function run(args) {
   check("report-only 不拦 PASS", r.code === 0, `code=${r.code}`);
 }
 
+// ============ 场景 19: v7.1 锚点链接（合法锚点解析 + advisory + 别名仍判断链 + 锚点自链计自引用） ============
+{
+  const wiki = join(ROOT, "anchor-wiki");
+  mkdirSync(join(wiki, "concepts"), { recursive: true });
+  writeFileSync(join(wiki, "SCHEMA.md"), "# Schema\n## Tags\n- architecture\n");
+  writeFileSync(join(wiki, "index.md"), "# Index\n- [[Alpha]] — x\n- [[Beta]] — x\n- [[Gamma]] — x\n");
+  writeFileSync(join(wiki, "log.md"), "# Log\n");
+  // Alpha：好锚点（目标 heading 存在）+ 页内锚点自链（v7.1 计自引用）
+  writeFileSync(join(wiki, "concepts", "Alpha.md"),
+    "---\ntitle: Alpha\ntype: concept\ntags: [architecture]\n---\n# Alpha\nSee [[Beta#机制说明]] and [[Alpha#自我小节]] and [[Gamma]].\n\n## 自我小节\n");
+  // Beta：坏锚点指向 Alpha 不存在的标题（页面存在 → advisory，不判断链）
+  writeFileSync(join(wiki, "concepts", "Beta.md"),
+    "---\ntitle: Beta\ntype: concept\ntags: [architecture]\n---\n# Beta\nSee [[Alpha#不存在的标题]] and [[Gamma#^block01]] and [[Alpha]].\n\n## 机制说明\n");
+  writeFileSync(join(wiki, "concepts", "Gamma.md"),
+    "---\ntitle: Gamma\ntype: concept\ntags: [architecture]\n---\n# Gamma\nSee [[Alpha]] and [[Beta]].\n\n^block01\n");
+  const r = run(["--wiki", wiki]);
+  console.log("\n[19] v7.1 anchor links");
+  check("合法 heading/block 锚点不判断链（断链 0）", !r.stdout.includes("Broken Links ("));
+  check("坏锚点进 advisory 而非断链", r.stdout.includes("Broken Anchors (1)") && r.stdout.includes("不存在的标题"));
+  check("advisory 点名目标页", r.stdout.includes("(target page: Alpha)"));
+  check("页内锚点自链计自引用", r.stdout.includes("Self References (1)") && r.stdout.includes("Alpha#自我小节"));
+  check("断链 0 + advisory 不拦 → PASS", r.code === 0, `code=${r.code}`);
+  // 别名对照组：同 wiki 的 Alpha 加一条 [[Beta|别名]] —— v7.1 只支持锚点，别名仍判断链
+  writeFileSync(join(wiki, "concepts", "Alpha.md"),
+    "---\ntitle: Alpha\ntype: concept\ntags: [architecture]\n---\n# Alpha\nSee [[Beta#机制说明]] and [[Alpha#自我小节]] and [[Gamma]] and [[Beta|别名]].\n\n## 自我小节\n");
+  const rAlias = run(["--wiki", wiki]);
+  check("别名 [[Page|alias]] 仍判断链（断链 1、FAIL）", rAlias.code === 1 && rAlias.stdout.includes("Broken Links (1)") && rAlias.stdout.includes("Beta|别名"));
+}
+
+// ============ 场景 20: v7.2 对抗验收回归（页内跳转/多级/组合别名/遮蔽视图/block-id 整词/自链锚点/D3 脚手架活锚点） ============
+{
+  const wiki = join(ROOT, "anchor-v72-wiki");
+  mkdirSync(join(wiki, "concepts"), { recursive: true });
+  writeFileSync(join(wiki, "SCHEMA.md"), "# Schema\n## Tags\n- architecture\n");
+  // D3：index 放活锚点（页面解析 + 计入链）与页内跳转锚点
+  writeFileSync(join(wiki, "index.md"), "# Index\n- [[Alpha]] — x\n- [[Beta]] — x\n- [[Gamma]] — x\n- [[Beta#机制说明]] — 分层入口\n- [[#目录]] — 本页跳转\n\n## 目录\n");
+  // D3：log 放反引号外的活锚点（页面存在→不断链、入链不计）与反引号内示例（豁免）
+  writeFileSync(join(wiki, "log.md"), "# Log\n\n- linked [[Beta#机制说明]] once\n- syntax example `[[Beta#不存在]]` in backticks\n");
+  // Alpha：页内跳转（好锚点 + 坏锚点）、显式自链坏锚点（计自引用且进 advisory）、
+  // block-id 整词（^real 不命中 ^realabc）、大小写归一（deep learning 命中 Deep Learning）
+  writeFileSync(join(wiki, "concepts", "Alpha.md"),
+    "---\ntitle: Alpha\ntype: concept\ntags: [architecture]\n---\n# Alpha\n\n## 本页小节\n\nSee [[#本页小节]] and [[#坏页内锚点]] and [[Alpha#坏自链锚点]] and [[Beta#^real]] and [[Beta#deep learning]] and [[Gamma]].\n\n```md\n## 围栏假标题\n^fenced-id\n```\n");
+  // Beta：机制说明（真 heading）；Deep Learning（归一命中目标）；多级锚点两级都存在与只存一级；
+  // 组合别名；^realabc（前缀陷阱——^real 不得命中它）
+  writeFileSync(join(wiki, "concepts", "Beta.md"),
+    "---\ntitle: Beta\ntype: concept\ntags: [architecture]\n---\n# Beta\nSee [[Alpha]] and [[Gamma]].\n\n## 机制说明\n\n## Deep Learning\n\n## 一级\n\n### 二级\n\n内容块 ^realabc\n");
+  writeFileSync(join(wiki, "concepts", "Gamma.md"),
+    "---\ntitle: Gamma\ntype: concept\ntags: [architecture]\n---\n# Gamma\nSee [[Beta#一级#二级]] and [[Beta#一级#不存在]] and [[Beta#机制说明|显示名]] and [[Alpha#围栏假标题]] and [[Alpha]].\n");
+  const r = run(["--wiki", wiki]);
+  console.log("\n[20] v7.2 adversarial regressions");
+  check("[[#heading]] 页内跳转不判断链", !r.stdout.includes("Broken Links ("));
+  check("[[#heading]] 不报 Self References（恰好 1 条自引用=显式自链）", r.stdout.includes("Self References (1)") && !r.stdout.includes("[[#本页小节]]"));
+  check("[[#坏页内锚点]] 进 advisory（对当前页校验）", r.stdout.includes("[[#坏页内锚点]]"));
+  check("显式自链坏锚点既计自引用又进 advisory（L6）", r.stdout.includes("Self References (1)") && r.stdout.includes("Alpha#坏自链锚点"));
+  check("^real 不命中 ^realabc 前缀（block-id 整词，L3 → advisory）", r.stdout.includes("Beta#^real"));
+  check("围栏内假标题不命中（L1 → advisory）", r.stdout.includes("Alpha#围栏假标题"));
+  check("大小写归一命中（deep learning → Deep Learning，不进 advisory）", !r.stdout.includes("Beta#deep learning"));
+  check("多级锚点全存在不进 advisory（#一级#二级）", !r.stdout.includes("一级#二级"));
+  check("多级锚点缺段进 advisory（#一级#不存在）", r.stdout.includes("一级#不存在"));
+  check("组合别名剥除后校验锚点（机制说明存在→不进 advisory）", !r.stdout.includes("机制说明|显示名") && !r.stdout.includes("显示名"));
+  check("index 活锚点解析成功且计入链（无断链）", !r.stdout.includes("index.md -> [[Beta#机制说明]]"));
+  check("log 活锚点页面解析成功（无断链）", !r.stdout.includes("log.md -> [[Beta"));
+  check("log 反引号内示例豁免（无 advisory）", !r.stdout.includes("Beta#不存在"));
+  check("advisory 恰好 5 条（坏页内/坏自链/^real/缺段/围栏）", r.stdout.includes("Broken Anchors (5)"));
+  check("断链 0 + 自引用 1 条扣分后仍 PASS", r.code === 0, `code=${r.code}`);
+}
+
+// ============ 场景 21: v7.2 轮2对抗新发现的 heading 提取修正（N1/N2/N3/N4/N5） ============
+{
+  const wiki = join(ROOT, "heading-v72-wiki");
+  mkdirSync(join(wiki, "concepts"), { recursive: true });
+  writeFileSync(join(wiki, "SCHEMA.md"), "# Schema\n## Tags\n- architecture\n");
+  writeFileSync(join(wiki, "index.md"), "# Index\n- [[Alpha]] — x\n- [[Beta]] — x\n");
+  writeFileSync(join(wiki, "log.md"), "# Log\n");
+  // Beta：setext 标题（N1）、带关闭序列的 ATX（N2）、3 空格缩进 ATX（N3）、
+  // 行中 a^fakemid 不是块 id（N4）、孤立 ## 行下一行普通文本不被吞（N5）
+  writeFileSync(join(wiki, "concepts", "Beta.md"),
+    "---\ntitle: Beta\ntype: concept\ntags: [architecture]\n---\n# Beta\nSee [[Alpha]].\n\nSetext Title\n===========\n\n## Trailing ##\n\n   ## Indented Heading\n\n孤立行下一行普通文本\n## \n\na^fakemid b\n\n真块尾 ^realid\n");
+  writeFileSync(join(wiki, "concepts", "Alpha.md"),
+    "---\ntitle: Alpha\ntype: concept\ntags: [architecture]\n---\n# Alpha\nSee [[Beta#Setext Title]] and [[Beta#Trailing]] and [[Beta#Indented Heading]] and [[Beta#^realid]] and [[Beta#孤立行下一行普通文本]] and [[Beta#^fakemid]] and [[Beta]].\n");
+  const r = run(["--wiki", wiki]);
+  console.log("\n[21] heading extraction fixes (N1-N5)");
+  check("setext 标题命中（N1）", !r.stdout.includes("Setext Title"));
+  check("ATX 关闭序列剥除（N2：## Trailing ## → Trailing）", !r.stdout.includes("Beta#Trailing"));
+  check("≤3 空格缩进 ATX 命中（N3）", !r.stdout.includes("Indented Heading"));
+  check("行中 a^fakemid 不算块 id（N4 → advisory）", r.stdout.includes("Beta#^fakemid"));
+  check("孤立 ## 行不吞下一行文本（N5 → advisory）", r.stdout.includes("孤立行下一行普通文本"));
+  check("advisory 恰好 2 条（^fakemid + 被吞行）", r.stdout.includes("Broken Anchors (2)"));
+  check("断链 0 → PASS", r.code === 0, `code=${r.code}`);
+}
+
 console.log(`\n=== ${pass} passed, ${fail} failed ===`);
 process.exit(fail === 0 ? 0 : 1);

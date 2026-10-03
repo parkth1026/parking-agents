@@ -227,6 +227,7 @@ wiki 可能被共享——NAS 后端的 `wikiDir` 会被其他会话和技能
 
 1. **运行 `validate-wiki.mjs`** — 覆盖以下量化检查：
    - 断链 `[[wikilink]]`（指向不存在页面的链接，**含 `index.md` 目录链接**；v7 起 log.md / SCHEMA.md 的活链接同口径计入，代码围栏与反引号内的语法示例豁免）
+   - **锚点链接**（v7.1，advisory）：`[[Page#heading]]` 的页面名按断链硬门解析；`#` 后的 heading/block-id 在目标页对不上时独立报告，不计断链分
    - 自引用（页面链向自己）
    - 孤儿页（入链为零的页面；除非 `scoring.indexCountsAsInbound` 为 `false`，`index.md` 目录链接计入入链）
    - **有机孤儿**（v7，独立报告）：除 index.md 外零入链的页面——默认配置下孤儿检查与 index 完整性互为充要（逻辑恒真），本节才是图连通性的真实度量；`scoring.organicOrphansEnforce: true` 时 FAIL
@@ -368,6 +369,16 @@ staleness 判定（存在对应 raw 证据时，缺失 `updated` 按 stale 处�
   链入它们的链接按断链算）。放在这些目录之外的页面按断链算
 - `[[Page Name]]` 必须是精确的页面标题：不支持别名语法
   （`[[Page|alias]]`），括号内不许换行
+- 锚点链接 `[[Page Name#heading]]` / `[[Page Name#^block-id]]` 合法：`#` 前的
+  页面名按精确标题解析断链；`#` 后的 heading/block-id 应与目标页内真实标题一致，
+  validator 校验并在对不上时报 advisory（不计断链分）。细节口径：
+  - 页内跳转 `[[#heading]]`（页面段为空）解析为当前文件，不计断链/出链/入链，
+    也不报 Self References（显式自名 `[[Self#h]]` 才计）；两类都做锚点校验
+  - 多级锚点 `[[Page#H1#H2]]`（子标题路径）逐段独立命中即过
+  - 锚点段的显示别名被剥除：`[[Page#H|alias]]` 只校验 `H`；无锚点的
+    `[[Page|alias]]` 仍不受支持、整串判断链
+  - heading 匹配忽略大小写与首尾空白；代码围栏内的标题与 frontmatter 注释行
+    不算命中；block-id 整词匹配（`^real` 不命中 `^realabc`）
 - source 页与 concept/entity 页同名时，给 **source** 页改名消歧
   （如用作品全名或加 `(paper)` 限定词）；不同目录下两个同名
   basename 的页面会让 `[[Title]]` 解析产生歧义

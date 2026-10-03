@@ -21,7 +21,7 @@ node {skill-dir}/scripts/validate-wiki.mjs --wiki "{wikiDir}" --config "{skill-d
 
 | 维度 | 权重 | 检查什么 |
 |-----------|--------|----------------|
-| Broken Links | 25% | `[[wikilink]]` 指向不存在的页面（v7 起 **含 log.md / SCHEMA.md 的活链接**；代码围栏与反引号内的语法示例豁免——log/SCHEMA 是审计/规范文档，合法引用语法。index.md 沿用 v6.2 硬口径：反引号内也计入） |
+| Broken Links | 25% | `[[wikilink]]` 指向不存在的页面（v7 起 **含 log.md / SCHEMA.md 的活链接**；代码围栏与反引号内的语法示例豁免——log/SCHEMA 是审计/规范文档，合法引用语法。index.md 沿用 v6.2 硬口径：反引号内也计入。v7.1 起锚点链接 `[[Page#heading]]` 按 `#` 前的页面名解析——别名 `[[Page\|alias]]` 仍不受支持，整串判断链） |
 | Self References | 10% | 页面链向自己 |
 | Orphan Pages | 10% | 入链为零的页面（`indexCountsAsInbound=true` 默认下与 Index Completeness 互为充要——逻辑恒真，不能证明连通性，见 Organic Orphans） |
 | Index Completeness | 15% | 每个页面都列进了 index.md |
@@ -41,6 +41,17 @@ node {skill-dir}/scripts/validate-wiki.mjs --wiki "{wikiDir}" --config "{skill-d
 默认 report-only（逐名点名冲突文件）；`scoring.ambiguousNamesEnforce: true` 时
 存在同名歧义直接 FAIL——与 staleness 同过渡策略。自引用检测自 v6.2 起
 大小写不敏感：`[[transformer]]` 在 `Transformer.md` 内同样计入 Self References。
+
+**v7.1/v7.2 锚点链接（advisory，不计分）**：`[[Page#heading]]` / `[[Page#^block-id]]`
+按页面名解析断链后，`#` 后的目标在目标页内独立校验。对不上时报 Broken Anchors
+（advisory，不计断链分）。口径细节：
+- 页内跳转 `[[#heading]]`（页面段空）解析为当前文件：不计断链/出链/入链，
+  不报 Self References；显式自名 `[[Self#h]]` 计自引用——两类都做锚点校验
+- 多级锚点 `#H1#H2` 逐段独立命中；锚点段的 `|alias` 显示别名剥除后校验
+  （无锚点 `[[Page|alias]]` 维持整串判断链）
+- 匹配视图 = 去 frontmatter + 去代码区；heading 忽略大小写与首尾空白；
+  block-id 整词匹配（`^real` 不命中 `^realabc`）
+修复口径：把 `#` 后文本改成目标页内真实标题的逐字文本。
 
 **v7 图结构体检（2026-09-02 wiki-top5 审计后新增：342 页星型拓扑拿 10/10，
 暴露质量模型只看「每页合规」不看「库是图」的盲区）**：
