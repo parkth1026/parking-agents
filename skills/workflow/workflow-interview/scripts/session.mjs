@@ -427,6 +427,11 @@ function cmdRound(argv) {
 
 // ─────────────────────────────── stage ───────────────────────────────
 
+function contractIsBlocked(dir) {
+  const path = join(dir, '3-contract', 'contract.md');
+  return existsSync(path) && /^- Status:\s*Blocked\s*$/mi.test(readFileSync(path, 'utf8'));
+}
+
 function cmdStage(argv) {
   const dir = resolveIssueDir(argv[0]);
   const stage = argv[1];
@@ -494,7 +499,7 @@ function cmdStage(argv) {
     // 打回撤销的不只是阶段：顶层 ready 和 validation 描述的都是被打回前的那份契约。
     // 残留着，list 和续跑判断就会拿旧结论误导（2026-08-31 实锤：打回后 status 仍 ready、
     // validation 仍是打回前的存量）。ready 回落、validation 标 stale（不删历史）。
-    if (m.status === 'ready') m.status = 'in_progress';
+    if (m.status === 'ready' || m.status === 'blocked') m.status = 'in_progress';
     if (m.validation) {
       m.validation.stale = true;
       m.validation.stale_reason = flags.reason || `${stage} 被打回`;
@@ -508,7 +513,7 @@ function cmdStage(argv) {
   } else if (status === 'done' || status === 'skipped') {
     const next = STAGES.find((s) => !['done', 'skipped'].includes(m.stage_gates[s].status));
     m.stage = next || stage;
-    if (!next) m.status = 'ready';
+    if (!next) m.status = contractIsBlocked(dir) ? 'blocked' : 'ready';
   } else {
     m.stage = stage;
   }
@@ -690,11 +695,10 @@ function cmdRebuild(argv) {
   m.slug = slug;
   m.stage_gates = gates;
   m.stage = STAGES.find((s) => !['done', 'skipped'].includes(gates[s].status)) || STAGES[STAGES.length - 1];
-  // ready 是「三阶段全闭」的推论，rebuild 重算 gates 后必须跟着回落——闸门被降级时
-  // 它若残留，list 会拿着 ready 的旧结论误导续跑判断。
-  if (m.status === 'ready' && STAGES.some((s) => !['done', 'skipped'].includes(gates[s].status))) {
-    m.status = 'in_progress';
-  }
+  // 阶段闭合只代表契约已校验；契约声明 Blocked 时不能把它重新点亮成 ready。
+  m.status = STAGES.every((s) => ['done', 'skipped'].includes(gates[s].status))
+    ? (contractIsBlocked(dir) ? 'blocked' : 'ready')
+    : 'in_progress';
 
   const rounds = existsSync(roundsPath(dir))
     ? readFileSync(roundsPath(dir), 'utf8').split(/\r?\n/).filter(Boolean).length
@@ -861,8 +865,16 @@ function cmdFinalize(argv) {
 
   m.validation.verify_tiers = tiers;
   if (m.validation.status === 'valid' && !failed) {
-    m.status = 'ready';
-    m.next_action = `契约已就绪，把交接指令发给执行 Agent。契约：${cpath}`;
+    const blocked = /^- Status:\s*Blocked\s*$/mi.test(md);
+    m.blocked = blocked
+      ? (extractSection(md, '挡着的事') || '').split(/\r?\n/)
+        .filter((line) => /^-\s+/.test(line))
+        .map((line) => line.replace(/^-\s+/, '').trim())
+      : [];
+    m.status = blocked ? 'blocked' : 'ready';
+    m.next_action = blocked
+      ? `契约已校验，但仍有阻塞项；解除后重新核验再交接。契约：${cpath}`
+      : `契约已就绪，把交接指令发给执行 Agent。契约：${cpath}`;
     // 重新走完全部闸门的这份 validation 是现行的，打回标记随之解除。
     delete m.validation.stale;
     delete m.validation.stale_reason;

@@ -413,6 +413,23 @@ function forceReady(dir, contract) {
 }
 
 {
+  const dir = mkIssue({ interview: true, impact: true });
+  doneInterview(dir);
+  const blockedContract = VALID_CONTRACT
+    .replace('# Goal Contract: 测试占位', '# Goal Contract: 测试占位\n\n- Status: Blocked')
+    + '\n## 挡着的事\n\n- 缺少原生导出环境。\n';
+  forceReady(dir, blockedContract);
+  expect('blocked/finalize 校验成功', run('finalize', dir), 0);
+  check('blocked/finalize 不点亮 ready',
+    manifest(dir).status === 'blocked' && manifest(dir).blocked.length === 1,
+    JSON.stringify({ status: manifest(dir).status, blocked: manifest(dir).blocked }));
+  expect('blocked/stage done 保留阻塞', run('stage', dir, '3-contract', 'done'), 0);
+  check('blocked/stage done 不点亮 ready', manifest(dir).status === 'blocked', manifest(dir).status);
+  expect('blocked/rebuild 保留阻塞', run('rebuild', dir), 0);
+  check('blocked/rebuild 不点亮 ready', manifest(dir).status === 'blocked', manifest(dir).status);
+}
+
+{
   const dir = mkIssue();
   writeFileSync(join(dir, '3-contract', 'contract.md'),
     '## 验收条件\n\n- AC-001: 界面按 mock 呈现\n  - Verify: [C] 人工对照 mock 逐处看；[A] `node -e "process.exit(1)"` → 退出码 1\n', 'utf8');
