@@ -1,6 +1,6 @@
 ---
 name: aes-standardize-repo
-description: 仓库标准化——分析代码状态（形态/脚本面/CI），定制落地零安装 run 接口（跨平台 wrapper + run.toml + 机器可读 schema）；./run 执行动作、-n 预览、--json 输出；含临时落点路由层与构建工具链探测；改造用户脚本前逐项访谈确认。
+description: 仓库标准化——分析代码状态（形态/脚本面/CI），定制落地零安装 run 接口（跨平台 wrapper + run.toml + 机器可读 schema）；./run 执行动作、-n 预览、--json 输出；含临时落点路由层与构建工具链探测；改造用户脚本前逐项访谈确认。仅当用户点名 aes-standardize-repo 或明确要求仓库标准化时使用。
 disable-model-invocation: true
 ---
 

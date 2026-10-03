@@ -1,6 +1,6 @@
 ---
 name: aes-issue-worker
-description: 单 owner session 内把一张 typed IssueWorkOrder 跑成 typed 终局——tdd/diagnosing-bugs 实现 ⇄ aes-qa 循环验证，simplify 后单次 candidate commit，READY_TO_MERGE terminal 进 registry；code-review 与 merge 归 aes-merge-worker，不 merge、不写 GitHub、不自行挑 Issue。
+description: 单 owner session 内把一张 typed IssueWorkOrder 跑成 typed 终局——tdd/diagnosing-bugs 实现 ⇄ aes-qa 循环验证，simplify 后单次 candidate commit，READY_TO_MERGE terminal 进 registry；code-review 与 merge 归 aes-merge-worker，不 merge、不写 GitHub、不自行挑 Issue。仅当用户点名 aes-issue-worker 或明确要求认领某张工单时使用。
 ---
 
 # AES Issue Worker

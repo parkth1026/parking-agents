@@ -1,6 +1,6 @@
 ---
 name: aes-qa
-description: AES worker 闭环的验证角色——实现循环逐轮验证只出 finding；最终轮为唯一 candidate commit 出具绑定 SHA 的 typed QaReceipt（按影响面定自动/live/agent-live/人工档）；打回后回归重验。如实记录未执行项与人工债务，不把 NOT_RUN 记成 PASS。
+description: AES worker 闭环的验证角色——实现循环逐轮验证只出 finding；最终轮为唯一 candidate commit 出具绑定 SHA 的 typed QaReceipt（按影响面定自动/live/agent-live/人工档）；打回后回归重验。如实记录未执行项与人工债务，不把 NOT_RUN 记成 PASS。仅当用户点名 aes-qa 或明确要求循环验证/出 QaReceipt 时使用。
 ---
 
 # AES QA

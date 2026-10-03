@@ -1,6 +1,6 @@
 ---
 name: aes-gate
-description: 门禁建设者——盘点项目门禁基建（测试命令/CI/checks/evals 基线），逐门实跑定红绿，六维评分产出缺口清单（不做二值判定）；aes-qa 开测前的 gate 盘点与缺口移交。
+description: 门禁建设者——盘点项目门禁基建（测试命令/CI/checks/evals 基线），逐门实跑定红绿，六维评分产出缺口清单（不做二值判定）；aes-qa 开测前的 gate 盘点与缺口移交。仅当用户点名 aes-gate 或明确要求记 gate/做门禁体检时使用，未点名不自动选它。
 ---
 
 # aes-gate：门禁建设者

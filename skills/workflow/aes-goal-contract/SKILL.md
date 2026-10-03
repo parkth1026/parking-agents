@@ -1,6 +1,6 @@
 ---
 name: aes-goal-contract
-description: 锁定验收——把确认版对照物聚成验收条件，逐条问清「这条错了会怎样、怎么验」，落盘自包含 Goal Contract，跑结构校验与 [A] 档冒烟，生成交接指令；需先有上游确认版对照物。
+description: 锁定验收——把确认版对照物聚成验收条件，逐条问清「这条错了会怎样、怎么验」，落盘自包含 Goal Contract，跑结构校验与 [A] 档冒烟，生成交接指令；需先有上游确认版对照物。仅当用户点名 aes-goal-contract 或明确要求锁定验收/出 Goal Contract 时使用。
 ---
 
 # 锁定验收
