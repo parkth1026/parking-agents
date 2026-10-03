@@ -54,7 +54,7 @@ try {
     question: '契约要锁到哪一层？',
     known_facts: '仓库已有三阶段门禁',
     options: [
-      { key: 'A', text: '只锁目标与验收', pct: 40, recommended: true, covers: '中间实现自由', cons: ['歧义要靠执行者补'] },
+      { key: 'A', text: '只锁目标与验收', pct: 40, recommended: true, covers: '中间实现自由', pros: '实施范围清楚', cons: '歧义要靠执行者补' },
       { key: 'B', text: '锁到文件级路径', pct: 60, covers: '交接零歧义', cons: ['实现失去自由度'] },
     ],
     user_choice: 'B', user_verbatim: '锁到文件级路径', overturned_recommendation: true,
@@ -95,6 +95,9 @@ try {
   check('export/候选与用户决定成对呈现',
     beforeHtml.includes('锁到文件级路径') && beforeHtml.includes('选择 B') && beforeHtml.includes('选择 REQ、DEC'),
     '缺选项或答案');
+  check('export/候选好处与代价同时接受字符串和数组',
+    beforeHtml.includes('实施范围清楚') && beforeHtml.includes('歧义要靠执行者补') && beforeHtml.includes('可复盘'),
+    '字符串或数组字段未渲染');
   check('export/翻推荐与默认接受可见',
     beforeHtml.includes('✓ B.') && beforeHtml.includes('未反对，按默认接受'), '缺选中标记或默认接受');
   check('export/机器 JSON 与原文都在',

@@ -514,10 +514,11 @@ function answerSummary(answer, booleanLabels) {
 function renderOptions(item, answer) {
   const selected = new Set(answer?.type === 'choice' ? [answer.choice] : answer?.type === 'multi' ? answer.choices : []);
   if (!(item.options ?? []).length) return '';
+  const detail = (value) => Array.isArray(value) ? value.join(' · ') : value || '未说明';
   return `<div class="option-records">${item.options.map((option) => `
     <article class="option-record ${selected.has(option.key) ? 'selected' : ''}">
       <header><strong>${selected.has(option.key) ? '✓ ' : ''}${escapeHtml(option.key)}. ${escapeHtml(option.text)}</strong>${option.pct !== undefined ? `<span>${escapeHtml(option.pct)}%</span>` : ''}</header>
-      <dl><div><dt>覆盖</dt><dd>${escapeHtml(option.covers || '未说明')}</dd></div><div><dt>好处</dt><dd>${escapeHtml(option.pros?.join(' · ') || '未说明')}</dd></div><div><dt>代价</dt><dd>${escapeHtml(option.cons?.join(' · ') || '未说明')}</dd></div></dl>
+      <dl><div><dt>覆盖</dt><dd>${escapeHtml(option.covers || '未说明')}</dd></div><div><dt>好处</dt><dd>${escapeHtml(detail(option.pros))}</dd></div><div><dt>代价</dt><dd>${escapeHtml(detail(option.cons))}</dd></div></dl>
     </article>`).join('')}</div>`;
 }
 
