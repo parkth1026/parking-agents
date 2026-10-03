@@ -1,0 +1,184 @@
+{
+  "skill": "ceo-copilot",
+  "runs": [
+    {
+      "date": "2026-09-30T16:12:40+08:00",
+      "iteration_ref": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\evals\\ceo-copilot-workspace\\iteration-1",
+      "gates": {
+        "with_skill": {
+          "pass_rate": 0.9583,
+          "mean_ms": 178954,
+          "mean_tokens": 166859
+        },
+        "without_skill": {
+          "pass_rate": 0.6889,
+          "mean_ms": 53775.3333,
+          "mean_tokens": 59661.8333
+        }
+      },
+      "vs_previous": null,
+      "bank_epoch": 1,
+      "current_best": true
+    },
+    {
+      "date": "2026-09-30T20:43:08+08:00",
+      "iteration_ref": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\evals\\ceo-copilot-workspace\\iteration-2",
+      "gates": {
+        "old_skill": {
+          "pass_rate": 0.6567,
+          "mean_ms": 206021.5,
+          "mean_tokens": 187923
+        },
+        "with_skill": {
+          "pass_rate": 0.872,
+          "mean_ms": 150230.3333,
+          "mean_tokens": 153103.8333
+        },
+        "without_skill": {
+          "pass_rate": 0.6954,
+          "mean_ms": 69044.5,
+          "mean_tokens": 61493.6667
+        }
+      },
+      "vs_previous": {
+        "evals_total": 6,
+        "won": 0,
+        "lost": 4,
+        "tie": 2,
+        "detail": [
+          {
+            "eval": "eval-A全面诊断",
+            "result": "lost"
+          },
+          {
+            "eval": "eval-A复制下游提问",
+            "result": "lost"
+          },
+          {
+            "eval": "eval-A定价下游提问",
+            "result": "lost"
+          },
+          {
+            "eval": "eval-C留出卡下游提问",
+            "result": "lost"
+          },
+          {
+            "eval": "eval-农险复盘",
+            "result": "tie"
+          },
+          {
+            "eval": "eval-无材料随口提问",
+            "result": "tie"
+          }
+        ]
+      },
+      "bank_epoch": 1
+    },
+    {
+      "date": "2026-09-30T21:00:06+08:00",
+      "iteration_ref": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\evals\\ceo-copilot-workspace\\iteration-3",
+      "gates": {
+        "with_skill": {
+          "pass_rate": 0.9722,
+          "mean_ms": 107171.6667,
+          "mean_tokens": 132191
+        },
+        "without_skill": {
+          "pass_rate": 0.6369,
+          "mean_ms": 52382.3333,
+          "mean_tokens": 59480.6667
+        }
+      },
+      "vs_previous": {
+        "evals_total": 6,
+        "won": 4,
+        "lost": 0,
+        "tie": 2,
+        "detail": [
+          {
+            "eval": "eval-A全面诊断",
+            "result": "won"
+          },
+          {
+            "eval": "eval-A复制下游提问",
+            "result": "won"
+          },
+          {
+            "eval": "eval-A定价下游提问",
+            "result": "won"
+          },
+          {
+            "eval": "eval-C留出卡下游提问",
+            "result": "won"
+          },
+          {
+            "eval": "eval-农险复盘",
+            "result": "tie"
+          },
+          {
+            "eval": "eval-无材料随口提问",
+            "result": "tie"
+          }
+        ]
+      },
+      "bank_epoch": 1,
+      "current_best": true
+    },
+    {
+      "date": "2026-10-01T02:15:07+08:00",
+      "iteration_ref": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\evals\\ceo-copilot-workspace\\iteration-4",
+      "gates": {
+        "old_skill": {
+          "pass_rate": 1,
+          "mean_ms": 147709.6667,
+          "mean_tokens": 651857.1667
+        },
+        "with_skill": {
+          "pass_rate": 1,
+          "mean_ms": 141527.3333,
+          "mean_tokens": 605475.1667
+        },
+        "without_skill": {
+          "pass_rate": 0.7748,
+          "mean_ms": 66543.1667,
+          "mean_tokens": 137773.1667
+        }
+      },
+      "vs_previous": {
+        "evals_total": 6,
+        "won": 1,
+        "lost": 0,
+        "tie": 5,
+        "detail": [
+          {
+            "eval": "eval-A全面诊断",
+            "result": "tie"
+          },
+          {
+            "eval": "eval-A复制下游提问",
+            "result": "tie"
+          },
+          {
+            "eval": "eval-A定价下游提问",
+            "result": "tie"
+          },
+          {
+            "eval": "eval-C留出卡下游提问",
+            "result": "tie"
+          },
+          {
+            "eval": "eval-农险复盘",
+            "result": "tie"
+          },
+          {
+            "eval": "eval-无材料随口提问",
+            "result": "won"
+          }
+        ]
+      },
+      "bank_epoch": 1,
+      "current_best": true
+    }
+  ],
+  "current_best": "runs[3]"
+}

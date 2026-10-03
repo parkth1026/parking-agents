@@ -1,0 +1,7 @@
+interface:
+  display_name: "ceo-copilot"
+  short_description: "商业副驾：全景扫描、上溯根因、检查商业证明闭环，给带判定线的下一步，也能复盘过去的决定"
+  default_prompt: "Use $ceo-copilot to 诊断这个产品的商业问题，先找到最上游的根因。"
+
+policy:
+  allow_implicit_invocation: true

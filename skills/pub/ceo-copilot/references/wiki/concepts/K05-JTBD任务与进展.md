@@ -1,0 +1,41 @@
+---
+title: "K05 JTBD 任务与进展"
+type: concept
+tags: [customer-research, product-discovery, v3, official-source, report-source]
+created: 2026-10-01
+updated: 2026-10-01
+layers: [v3]
+report_lines: "545-571"
+sources: ["report: 545-571", "https://www.christenseninstitute.org/theory/jobs-to-be-done/"]
+---
+# K05 JTBD 任务与进展
+
+## 核心命题
+
+用户在具体情境中“雇用”一种做法，帮助自己取得进展。任务可能同时涉及功能、情感和社会结果；人口标签或功能清单通常不足以解释切换行为。
+
+## 拿它问什么
+
+- 最近一次触发这项任务的事件是什么？
+- 用户之前如何完成任务，花了什么代价，哪里不满意？
+- 他最后选择了什么，为什么暂时不换？
+
+## 在诊断中怎么用
+
+从真实事件重建触发、尝试、比较、决定和使用过程。把免费方案、人工凑合、拖延和不购买都纳入替代项，再据此定义产品要改善的结果。
+
+## 误用边界
+
+“任务”不能成为把所有困难都叫刚需的标签。一段访谈或对功能的兴趣不能推出市场规模、付费意愿或重复需求。
+
+## 来源与深度
+
+- 报告：第 545–571 行；包含情境中的任务、替代和转换阻力概要。
+- 公开来源：[Christensen Institute，Jobs to Be Done](https://www.christenseninstitute.org/theory/jobs-to-be-done/)，理论机构原始说明；访问日 2026-10-01。页面含匿名奶昔与住宅搬迁案例说明，不给案例增加未核实身份。
+
+## 关联页面
+
+- [[B07-与运气竞争]]
+- [[K07-事实访谈]]
+- [[C11-匿名奶昔情境任务]]
+- [[C12-住宅搬迁采用阻力]]

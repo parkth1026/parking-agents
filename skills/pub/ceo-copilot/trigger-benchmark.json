@@ -1,0 +1,58 @@
+{
+  "skill": "ceo-copilot",
+  "split": {
+    "train": [
+      "q03",
+      "q02",
+      "q09",
+      "q10",
+      "q05",
+      "q07",
+      "q11",
+      "q12",
+      "q16",
+      "q18",
+      "q13",
+      "q15"
+    ],
+    "test": [
+      "q01",
+      "q08",
+      "q04",
+      "q06",
+      "q20",
+      "q17",
+      "q14",
+      "q19"
+    ],
+    "seed": 42,
+    "holdout": 0.4
+  },
+  "rounds": [
+    {
+      "description": "商业副驾：面向产品立项、定价、复制、获客、继续投入与历史决策复盘，先回答用户当前问题，再按从为什么做、做哪个、真实需求、解法、付费、采用、复制到规模与优势的地图定位上游根因，检查商业证明链，给出带成立与不成立判据的下一步。仅涉及竞争应对、融资现金或一般增长执行时，照答并标明经验前提。",
+      "valid_probes": 60,
+      "train": {
+        "queries": 12,
+        "evaluated": 12,
+        "trigger_rate_on_should": 0.8333,
+        "false_trigger_rate_on_should_not": 0,
+        "correct": 11,
+        "invalid_queries": 0
+      },
+      "test": {
+        "queries": 8,
+        "evaluated": 8,
+        "trigger_rate_on_should": 1,
+        "false_trigger_rate_on_should_not": 0,
+        "correct": 8,
+        "invalid_queries": 0
+      }
+    }
+  ],
+  "best_description": "商业副驾：面向产品立项、定价、复制、获客、继续投入与历史决策复盘，先回答用户当前问题，再按从为什么做、做哪个、真实需求、解法、付费、采用、复制到规模与优势的地图定位上游根因，检查商业证明链，给出带成立与不成立判据的下一步。仅涉及竞争应对、融资现金或一般增长执行时，照答并标明经验前提。",
+  "best_description_reason": null,
+  "min_test_queries": 6,
+  "valid_probes": 60,
+  "invalid_probes": 0
+}

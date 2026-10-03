@@ -1,0 +1,266 @@
+{
+  "schema_version": 2,
+  "skill": "ceo-copilot",
+  "canonical_names": [
+    "ceo-copilot",
+    "lixiang-ceo-grill",
+    "b2b-product-review",
+    "none"
+  ],
+  "scoring": {
+    "expected_name_comparison": "exact_string",
+    "aliases": "count_as_incorrect_without_normalization",
+    "probes_per_query": 3,
+    "query_decision": "strict_majority_of_all_three_valid_probes",
+    "minimum_correct_queries": 18,
+    "minimum_correct_neighbor_queries": 5
+  },
+  "queries": [
+    {
+      "id": "q01",
+      "text": "我有一份新产品方向材料，想知道商业逻辑能不能跑通，需求、产品、谁付钱、获客和复制到底卡在哪；请先给总判断，再告诉我下一步该验证什么。",
+      "should_trigger": true,
+      "expected_skill": "ceo-copilot",
+      "group": "target",
+      "source": {
+        "kind": "retained_baseline",
+        "file": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\evals\\ceo-copilot-workspace\\issue31-closure\\baseline\\skill\\trigger-evals.json",
+        "question_id": "q01"
+      }
+    },
+    {
+      "id": "q02",
+      "text": "我们做商场室内导航，准备按建筑面积年订阅，一个十万平米的商场定多少钱合适？按海外同类产品的价格折算行不行？",
+      "should_trigger": true,
+      "expected_skill": "ceo-copilot",
+      "group": "target",
+      "source": {
+        "kind": "retained_baseline",
+        "file": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\evals\\ceo-copilot-workspace\\issue31-closure\\baseline\\skill\\trigger-evals.json",
+        "question_id": "q02"
+      }
+    },
+    {
+      "id": "q03",
+      "text": "商场场景先做出来之后，同一套空间数据底座怎么复制到园区和景区？哪些环节该标准化，哪些可能还是项目制？",
+      "should_trigger": true,
+      "expected_skill": "ceo-copilot",
+      "group": "target",
+      "source": {
+        "kind": "retained_baseline",
+        "file": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\evals\\ceo-copilot-workspace\\issue31-closure\\baseline\\skill\\trigger-evals.json",
+        "question_id": "q03"
+      }
+    },
+    {
+      "id": "q04",
+      "text": "我们已经形成医院、商场、工业园三条新业务候选，手头的调研分别列了用户任务、付款方线索、现有替代和访谈记录。帮我比较哪条商业逻辑更成立，真正卡在上游哪一环，下一步先验证什么。",
+      "should_trigger": true,
+      "expected_skill": "ceo-copilot",
+      "group": "target",
+      "source": {
+        "kind": "retained_baseline",
+        "file": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\evals\\ceo-copilot-workspace\\issue31-closure\\baseline\\skill\\trigger-evals.json",
+        "question_id": "q04"
+      }
+    },
+    {
+      "id": "q05",
+      "text": "我们投了半年，注册量涨了，付费几乎没动。先别直接给拉新方案，帮我判断问题更可能在需求、产品结果、采购、采用还是交付复制，并给出取证顺序。",
+      "should_trigger": true,
+      "expected_skill": "ceo-copilot",
+      "group": "target",
+      "source": {
+        "kind": "retained_baseline",
+        "file": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\evals\\ceo-copilot-workspace\\issue31-closure\\baseline\\skill\\trigger-evals.json",
+        "question_id": "q05"
+      }
+    },
+    {
+      "id": "q06",
+      "text": "去年我们把农险无人机作业定成高潜力业务，现在发现单区只有两三倍效率提升、竞标公司很多、保险公司只按亩买作业。当时哪些信号已经足以拦住投资？我们的判断方法要改哪里？",
+      "should_trigger": true,
+      "expected_skill": "ceo-copilot",
+      "group": "target",
+      "source": {
+        "kind": "retained_baseline",
+        "file": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\evals\\ceo-copilot-workspace\\issue31-closure\\baseline\\skill\\trigger-evals.json",
+        "question_id": "q06"
+      }
+    },
+    {
+      "id": "q07",
+      "text": "我们想做给社区诊所用的预约和复诊 SaaS。院长说有兴趣，医生嫌麻烦，患者还在用电话；现在没有正式提案，只有这些一线反馈。请从这句业务问题往上找真正卡点，再建议先补什么证据。",
+      "should_trigger": true,
+      "expected_skill": "ceo-copilot",
+      "group": "target",
+      "source": {
+        "kind": "retained_baseline",
+        "file": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\evals\\ceo-copilot-workspace\\issue31-closure\\baseline\\skill\\trigger-evals.json",
+        "question_id": "q07"
+      }
+    },
+    {
+      "id": "q08",
+      "text": "企业 API 产品想从按调用量收费改成按业务结果收费。谁会为结果买单、客户如何采购、交付风险和毛利会怎样变？我该先拿什么证据再改价格？",
+      "should_trigger": true,
+      "expected_skill": "ceo-copilot",
+      "group": "target",
+      "source": {
+        "kind": "retained_baseline",
+        "file": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\evals\\ceo-copilot-workspace\\issue31-closure\\baseline\\skill\\trigger-evals.json",
+        "question_id": "q08"
+      }
+    },
+    {
+      "id": "q09",
+      "text": "我们做的排班 SaaS 目前靠积累的数据和调度流程拉开差距，但通用模型降价后，竞品也可能很快复制。请判断这是真正能维持利润的优势，还是暂时领先，并指出最先该验证哪条证据。",
+      "should_trigger": true,
+      "expected_skill": "ceo-copilot",
+      "group": "target",
+      "source": {
+        "kind": "retained_baseline",
+        "file": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\evals\\ceo-copilot-workspace\\issue31-closure\\baseline\\skill\\trigger-evals.json",
+        "question_id": "q09"
+      }
+    },
+    {
+      "id": "q10",
+      "text": "我做了一款给独立咖啡馆用的会员积分小程序，按月 99 元，现在有 12 家店在用。接下来怎么判断应该先把产品做深，还是赶快扩大销售？",
+      "should_trigger": true,
+      "expected_skill": "ceo-copilot",
+      "group": "target",
+      "source": {
+        "kind": "retained_baseline",
+        "file": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\evals\\ceo-copilot-workspace\\issue31-closure\\baseline\\skill\\trigger-evals.json",
+        "question_id": "q10"
+      }
+    },
+    {
+      "id": "q11",
+      "text": "我们做医院设备管理产品。我已经写过用户需求、产品和商业模式的思考，想按李想创业公开课的专业 CEO 三层九模块逐项复盘：引用我已有原话对照原文标准，只有缺口再问，最后给逐模块裁定。",
+      "should_trigger": false,
+      "expected_skill": "lixiang-ceo-grill",
+      "group": "neighbor",
+      "source": {
+        "kind": "new_near_miss_from_published_capability",
+        "file": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\skills\\pub\\lixiang-ceo-grill\\SKILL.md",
+        "source_sha256": "06c2c01c6c6219f972ae26849fda27f24752ecb447253a903262eec66fea87b4",
+        "rationale": "固定课程标准、用户原话对照、逐模块复盘"
+      }
+    },
+    {
+      "id": "q12",
+      "text": "这个园区 SaaS 方向我讲了几轮，先别换一套商业诊断框架。请用李想的专业 CEO 方法论核对我已表达的思考，检查三层之间是否断裂；问题只补我没想清楚的模块。",
+      "should_trigger": false,
+      "expected_skill": "lixiang-ceo-grill",
+      "group": "neighbor",
+      "source": {
+        "kind": "new_near_miss_from_published_capability",
+        "file": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\skills\\pub\\lixiang-ceo-grill\\SKILL.md",
+        "source_sha256": "06c2c01c6c6219f972ae26849fda27f24752ecb447253a903262eec66fea87b4",
+        "rationale": "固定课程标准、用户原话对照、逐模块复盘"
+      }
+    },
+    {
+      "id": "q13",
+      "text": "我准备继续投这个产品。请按专业 CEO 的三层九模块做一次方向复盘，把我在文档和对话里的原话摆在李想的课程标准旁，给各模块符合度与层间断裂点。",
+      "should_trigger": false,
+      "expected_skill": "lixiang-ceo-grill",
+      "group": "neighbor",
+      "source": {
+        "kind": "new_near_miss_from_published_capability",
+        "file": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\skills\\pub\\lixiang-ceo-grill\\SKILL.md",
+        "source_sha256": "06c2c01c6c6219f972ae26849fda27f24752ecb447253a903262eec66fea87b4",
+        "rationale": "固定课程标准、用户原话对照、逐模块复盘"
+      }
+    },
+    {
+      "id": "q14",
+      "text": "这里是一份给连锁医院的 B2B 标品立项提案，准备下月扩团队。请做失败预演，逐项挑出证据越级、阶段错配、指标口径偷换，找出会让下一笔投入失败的关键假设，再给继续、限额取证、改向、暂停或退出的建议。",
+      "should_trigger": false,
+      "expected_skill": "b2b-product-review",
+      "group": "neighbor",
+      "source": {
+        "kind": "new_near_miss_from_published_capability",
+        "file": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\skills\\pub\\b2b-product-review\\SKILL.md",
+        "source_sha256": "ad4dda6af442d6588e313bfc36a83a9a2e899405772dbd37a44434c67b81df80",
+        "rationale": "已有 B 端方案、失败预演、机制与阶段证据审查"
+      }
+    },
+    {
+      "id": "q15",
+      "text": "请投前挑刺这份政务仓库核货 B2G 产品 PRD。别只说商业逻辑卡在哪，要按失败机制核查已有证据，对照阶段关口，列出最可能推翻方案的假设和有区分力的验证。",
+      "should_trigger": false,
+      "expected_skill": "b2b-product-review",
+      "group": "neighbor",
+      "source": {
+        "kind": "new_near_miss_from_published_capability",
+        "file": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\skills\\pub\\b2b-product-review\\SKILL.md",
+        "source_sha256": "ad4dda6af442d6588e313bfc36a83a9a2e899405772dbd37a44434c67b81df80",
+        "rationale": "已有 B 端方案、失败预演、机制与阶段证据审查"
+      }
+    },
+    {
+      "id": "q16",
+      "text": "我们已有一份新能源巡检标品方案，要决定扩投还是关停。帮我做 premortem，逆向审查为什么它可能失败，核对客户成功、交易和重复性的证据状态，给五选项投入建议。",
+      "should_trigger": false,
+      "expected_skill": "b2b-product-review",
+      "group": "neighbor",
+      "source": {
+        "kind": "new_near_miss_from_published_capability",
+        "file": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\skills\\pub\\b2b-product-review\\SKILL.md",
+        "source_sha256": "ad4dda6af442d6588e313bfc36a83a9a2e899405772dbd37a44434c67b81df80",
+        "rationale": "已有 B 端方案、失败预演、机制与阶段证据审查"
+      }
+    },
+    {
+      "id": "q17",
+      "text": "把这些整数从小到大排序：19、2、45、11、7。",
+      "should_trigger": false,
+      "expected_skill": "none",
+      "group": "unrelated",
+      "source": {
+        "kind": "retained_baseline",
+        "file": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\evals\\ceo-copilot-workspace\\issue31-closure\\baseline\\skill\\trigger-evals.json",
+        "question_id": "q17"
+      }
+    },
+    {
+      "id": "q18",
+      "text": "写一首关于秋雨的四行短诗，不要押韵。",
+      "should_trigger": false,
+      "expected_skill": "none",
+      "group": "unrelated",
+      "source": {
+        "kind": "retained_baseline",
+        "file": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\evals\\ceo-copilot-workspace\\issue31-closure\\baseline\\skill\\trigger-evals.json",
+        "question_id": "q18"
+      }
+    },
+    {
+      "id": "q19",
+      "text": "北京时间 16:20 到 19:05 之间有多少小时多少分钟？",
+      "should_trigger": false,
+      "expected_skill": "none",
+      "group": "unrelated",
+      "source": {
+        "kind": "retained_baseline",
+        "file": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\evals\\ceo-copilot-workspace\\issue31-closure\\baseline\\skill\\trigger-evals.json",
+        "question_id": "q19"
+      }
+    },
+    {
+      "id": "q20",
+      "text": "给朋友写一句简短提醒，请他这周末把借的书还给我。",
+      "should_trigger": false,
+      "expected_skill": "none",
+      "group": "unrelated",
+      "source": {
+        "kind": "retained_baseline",
+        "file": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\evals\\ceo-copilot-workspace\\issue31-closure\\baseline\\skill\\trigger-evals.json",
+        "question_id": "q20"
+      }
+    }
+  ]
+}
