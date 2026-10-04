@@ -2,9 +2,11 @@
 
 ## 意图与触发场景
 
+- 触发模式：仅显式点名（名字触发的严格变体：明确要求把 clone 转成 worktree 但未点名也不触发）——2026-10-04 用户定案收紧，取代 2026-10-03 批量定案的名字触发（点名或明确要求均触发）。
+
 用户有一个与当前仓库同 remote 的独立 clone（典型动机：两份完整 `.git` 对象库浪费磁盘、fetch 双份、分支管理割裂），想把它**原地**转换成当前仓库的 linked worktree：路径不变、分支不变、ignored 本地产物（`.env`、`target/`、`node_modules/`、`vcpkg_installed/`、submodule 检出等）原样保留。
 
-触发语例如：「把 D:\X\repo-dev 这个 clone 转成当前仓库的 worktree」「这两个 clone 是同一个仓的，合成 worktree 吧」「repo-dev 是单独 clone 的，有点浪费」。输入就是一个目标 git 路径；产出是转换报告（JSON）+ 可用的 worktree。
+触发语例如：「用 clone-to-worktree 转换 D:\X\repo-dev」「按 clone-to-worktree 流程走」。near-miss（不触发）：明确要求转换但未点名的说法——「把 D:\X\repo-dev 这个 clone 转成当前仓库的 worktree」「这两个 clone 是同一个仓的，合成 worktree 吧」「repo-dev 是单独 clone 的，有点浪费」。输入就是一个目标 git 路径；产出是转换报告（JSON）+ 可用的 worktree。
 
 真实蓝本：2026-09-04 SuperTools-dev 转换实战（顶层目录被进程 CWD 锁住、gitfile 型 submodule 手术、`refs/t3/*` 独有 refs 搬运、45G `target/` 构建缓存因路径不变而指纹有效）。
 
@@ -43,3 +45,4 @@
 | 日期 | 改了什么 | 轮次结果 | 拆分建议 |
 | --- | --- | --- | --- |
 | 2026-09-04 | 首版：preflight/inventory/convert 三脚本 + 临时仓 fixture 端到端测试（AC-1..9） | 首轮 | 无 |
+| 2026-10-04 | 触发模式收紧为仅显式点名（description 同步重写）；分叉收口：09-04 创建即 pub/workflow 双落，09-08 脚本修复（inventory 嵌套剔除、preflight realpath 防假绿）与 10-03 触发收紧各打一边——本日裁定 pub 为正本（用户定：与 workflow 家族无关）、workflow 副本删除，两笔脚本修复保留在 pub | 未跑评测轮 | 无 |

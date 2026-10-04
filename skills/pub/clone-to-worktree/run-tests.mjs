@@ -11,6 +11,12 @@ import { fileURLToPath } from "node:url";
 const SKILL_DIR = path.dirname(fileURLToPath(import.meta.url));
 const SCRIPTS = path.join(SKILL_DIR, "scripts");
 
+// git ≥2.38.1 默认禁止 file 协议，fixture 的本地路径 submodule clone 会 fatal；
+// 经 env 注入只放开本测试进程树（含被测脚本内部的 git 子进程），不动机器全局配置。
+process.env.GIT_CONFIG_COUNT = "1";
+process.env.GIT_CONFIG_KEY_0 = "protocol.file.allow";
+process.env.GIT_CONFIG_VALUE_0 = "always";
+
 let pass = 0;
 let fail = 0;
 function check(name, cond, detail) {
