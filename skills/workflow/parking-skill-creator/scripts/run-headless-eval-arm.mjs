@@ -71,7 +71,9 @@ const commandArgs = args.host === "codex"
   ? ["exec", "--ephemeral", "--skip-git-repo-check", "--sandbox", "workspace-write", "--model", args.model,
       ...(args.effort ? ["--config", `model_reasoning_effort=${JSON.stringify(args.effort)}`] : []), "--cd", args.runDir, prompt]
   : args.host === "claude"
-    ? ["--print", "--no-session-persistence", "--permission-mode", "acceptEdits", "--output-format", "json", "--model", args.model,
+    ? ["--print", "--no-session-persistence", "--permission-mode", "acceptEdits",
+        "--allowedTools", "Read,Edit,Write,Glob,Grep",
+        "--output-format", "json", "--model", args.model,
         ...(args.effort ? ["--effort", args.effort] : []), prompt]
     : ["--prompt", prompt, "--cwd", args.runDir, "--mode", "yolo", "--no-color"];
 const childEnv = args.host === "zcode" ? { ...process.env, ZCODE_MODEL: args.model } : process.env;

@@ -1,0 +1,58 @@
+{
+  "skill": "lixiang-product-grill",
+  "split": {
+    "train": [
+      "q01",
+      "q06",
+      "q07",
+      "q03",
+      "q05",
+      "q09",
+      "q13",
+      "q19",
+      "q10",
+      "q12",
+      "q17",
+      "q15",
+      "q11"
+    ],
+    "test": [
+      "q04",
+      "q02",
+      "q18",
+      "q14",
+      "q20",
+      "q16",
+      "q08"
+    ],
+    "seed": 42,
+    "holdout": 0.4
+  },
+  "rounds": [
+    {
+      "description": "lixiang-product-grill / 李想产品复盘",
+      "valid_probes": 63,
+      "train": {
+        "queries": 13,
+        "evaluated": 13,
+        "trigger_rate_on_should": 1,
+        "false_trigger_rate_on_should_not": 0.375,
+        "correct": 10,
+        "invalid_queries": 0
+      },
+      "test": {
+        "queries": 7,
+        "evaluated": 7,
+        "trigger_rate_on_should": 1,
+        "false_trigger_rate_on_should_not": 0.2,
+        "correct": 6,
+        "invalid_queries": 0
+      }
+    }
+  ],
+  "best_description": "lixiang-product-grill / 李想产品复盘",
+  "best_description_reason": null,
+  "min_test_queries": 6,
+  "valid_probes": 63,
+  "invalid_probes": 8
+}

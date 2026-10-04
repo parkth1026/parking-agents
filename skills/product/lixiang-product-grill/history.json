@@ -19,7 +19,62 @@
       "vs_previous": null,
       "bank_epoch": 1,
       "current_best": true
+    },
+    {
+      "date": "2026-10-05T04:31:16+08:00",
+      "iteration_ref": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\evals\\lixiang-product-grill-workspace\\iteration-1",
+      "gates": {
+        "with_skill": {
+          "pass_rate": 1,
+          "mean_ms": 169827.6667,
+          "mean_tokens": null
+        },
+        "with_skill_no_refs": {
+          "pass_rate": 1,
+          "mean_ms": 138678.6667,
+          "mean_tokens": null
+        },
+        "without_skill": {
+          "pass_rate": 0.6944,
+          "mean_ms": 79853,
+          "mean_tokens": null
+        }
+      },
+      "vs_previous": {
+        "evals_total": 3,
+        "won": 0,
+        "lost": 0,
+        "tie": 0,
+        "detail": [
+          {
+            "eval": "eval-16讲-全量复盘-材料丰富",
+            "result": "new"
+          },
+          {
+            "eval": "eval-16讲-单维度复盘-定价",
+            "result": "new"
+          },
+          {
+            "eval": "eval-16讲-材料贫瘠-缺口发现",
+            "result": "new"
+          },
+          {
+            "eval": "eval-全量复盘-材料丰富",
+            "result": "dropped"
+          },
+          {
+            "eval": "eval-单文件网页prompt",
+            "result": "dropped"
+          },
+          {
+            "eval": "eval-材料贫瘠-缺口发现",
+            "result": "dropped"
+          }
+        ]
+      },
+      "bank_epoch": 2,
+      "current_best": true
     }
   ],
-  "current_best": "runs[0]"
+  "current_best": "runs[1]"
 }
