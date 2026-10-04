@@ -2,6 +2,8 @@
 
 ## 意图与触发场景
 
+- 触发模式：名字触发——用户点名技能名或明确要求该能力才触发；情境相近但未点名、未明确要求的请求不触发（2026-10-03 批量定案，与 description 同步收窄）。
+
 用户有一个与当前仓库同 remote 的独立 clone（典型动机：两份完整 `.git` 对象库浪费磁盘、fetch 双份、分支管理割裂），想把它**原地**转换成当前仓库的 linked worktree：路径不变、分支不变、ignored 本地产物（`.env`、`target/`、`node_modules/`、`vcpkg_installed/`、submodule 检出等）原样保留。
 
 触发语例如：「把 D:\X\repo-dev 这个 clone 转成当前仓库的 worktree」「这两个 clone 是同一个仓的，合成 worktree 吧」「repo-dev 是单独 clone 的，有点浪费」。输入就是一个目标 git 路径；产出是转换报告（JSON）+ 可用的 worktree。

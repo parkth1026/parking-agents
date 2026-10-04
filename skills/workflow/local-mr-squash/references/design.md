@@ -2,6 +2,8 @@
 
 ## 意图与触发场景
 
+- 触发模式：仅显式点名（名字触发的严格变体：明确要求该能力但未点名也不触发）——2026-09-11 定案维持，2026-10-03 批量收窄时复核确认不放宽（description 逐字锁定，触发评测定稿资产）。
+
 把「本地 squash 合并」从会话临场发挥固化为可重复流程：七步 prose（内嵌 resolving-merge-conflicts 五步语义合并思想 + squash 规则）+ 零配置硬门禁脚本 `scripts/verify-squash-merge.mjs`。语义裁决交给 LLM 纪律，机械收口交给脚本（树净/单笔/全包含/已收口四项），门禁非绿不许宣称合并完成。
 
 触发模式：**仅显式点名**。2026-09-11 用户定夺（goal 追加约束）：本技能不得被 AI 自动触发，必须准确引用（用户原话出现 local-mr-squash / $local-mr-squash）才加载；未点名的合并分支、squash、解决冲突请求不适用（冲突解决走 resolving-merge-conflicts）。该定夺推翻 grilling prototype v2 的自动触发式 description——prototype 仍是历史规格源，产品按新口径。

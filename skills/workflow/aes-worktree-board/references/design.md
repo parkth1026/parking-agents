@@ -2,6 +2,8 @@
 
 ## 意图与触发场景
 
+- 触发模式：名字触发——用户点名技能名或明确要求该能力才触发；情境相近但未点名、未明确要求的请求不触发（2026-10-03 批量定案，与 description 同步收窄）。
+
 把主仓 Orchestrator、Codex Desktop Task、既有 Git worktree、GitHub Issue 图和需求星图接到同一套可恢复控制面。脚本只负责事实采集、身份与租约、事件入箱、状态门禁、审计和渲染；任务选择、Desktop `create_thread`、独立 review、合并及 post-merge verification 仍由宿主主 agent 执行。
 
 ## 设计取舍
