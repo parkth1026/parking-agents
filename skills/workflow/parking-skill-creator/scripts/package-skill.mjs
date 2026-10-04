@@ -14,11 +14,15 @@ const EXCLUDE_DIRS = new Set(["__pycache__", "node_modules"]);
 const EXCLUDE_GLOBS = [/\.pyc$/];
 const EXCLUDE_FILES = new Set([".DS_Store"]);
 const ROOT_EXCLUDE_DIRS = new Set(["evals", "eval-fixtures"]); // 仅技能根下排除；外部 evidence payload 留在仓库不进包
+// 精确路径排除（相对技能根，posix 连接）：付费课程全文存档只在仓库内保留，不进分发包。
+// 刻意不用目录名全局匹配（如在 EXCLUDE_DIRS 加 "archive"），避免波及其他技能的同名目录。
+const EXCLUDE_PATHS = new Set(["references/archive"]);
 
 function shouldExclude(relParts, name) {
   if (relParts.some((p) => EXCLUDE_DIRS.has(p))) return true;
   // relParts[0] = 技能目录名；relParts[1]（若有）= 技能根下第一层子目录
   if (relParts.length > 1 && ROOT_EXCLUDE_DIRS.has(relParts[1])) return true;
+  if (relParts.length > 1 && EXCLUDE_PATHS.has(relParts.slice(1).join("/"))) return true;
   if (EXCLUDE_FILES.has(name)) return true;
   return EXCLUDE_GLOBS.some((re) => re.test(name));
 }

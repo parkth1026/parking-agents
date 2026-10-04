@@ -1,0 +1,7 @@
+interface:
+  display_name: "lixiang-product-grill"
+  short_description: "以《李想·产品实战16讲》14 维度为尺子，一次一题复盘产品方法论符合度"
+  default_prompt: "Use $lixiang-product-grill to review the current product against Li Xiang's 16-lecture product methodology (14 dimensions across 3 modules)."
+
+policy:
+  allow_implicit_invocation: true
