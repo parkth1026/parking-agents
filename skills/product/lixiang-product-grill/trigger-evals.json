@@ -1,0 +1,33 @@
+{
+  "skill": "lixiang-product-grill",
+  "schema_version": 2,
+  "canonical_names": ["lixiang-product-grill", "李想产品复盘"],
+  "scoring": {
+    "method": "exact_string",
+    "protocol": "first_line",
+    "minimum_correct_queries": 14,
+    "minimum_correct_neighbor_queries": 4
+  },
+  "queries": [
+    { "id": "q01", "text": "用 lixiang-product-grill 盘一下「园区 3D 编辑器」", "should_trigger": true, "expected_skill": "lixiang-product-grill" },
+    { "id": "q02", "text": "/lixiang-product-grill 帮我复盘一下产品定价这个维度", "should_trigger": true, "expected_skill": "lixiang-product-grill" },
+    { "id": "q03", "text": "用李想产品复盘把我们的 SaaS 产品过一遍", "should_trigger": true, "expected_skill": "lixiang-product-grill" },
+    { "id": "q04", "text": "李想产品复盘，只盘体验和定价两个维度", "should_trigger": true, "expected_skill": "lixiang-product-grill" },
+    { "id": "q05", "text": "$lixiang-product-grill 全量 14 维度走一轮，材料在输入文件里", "should_trigger": true, "expected_skill": "lixiang-product-grill" },
+    { "id": "q06", "text": "请用「李想产品复盘」这把尺子照一下我们的智能硬件项目", "should_trigger": true, "expected_skill": "lixiang-product-grill" },
+    { "id": "q07", "text": "lixiang-product-grill 复盘「门店扩张节奏」", "should_trigger": true, "expected_skill": "lixiang-product-grill" },
+    { "id": "q08", "text": "用李想方法论盘一下 园区 3D 编辑器", "should_trigger": false, "expected_skill": "none" },
+    { "id": "q09", "text": "lixiang-ceo-grill 盘一下当前产品", "should_trigger": false, "expected_skill": "none" },
+    { "id": "q10", "text": "用 lixiang-ceo-grill 的三层九模块拷问一下产品方向", "should_trigger": false, "expected_skill": "none" },
+    { "id": "q11", "text": "我们的商业逻辑能不能跑通？帮我从商业角度全面诊断这个产品方向，问题出在哪、下一步做什么", "should_trigger": false, "expected_skill": "ceo-copilot" },
+    { "id": "q12", "text": "用 ceo-copilot 定位一下我们增长问题的上游根因，别只给表面建议", "should_trigger": false, "expected_skill": "ceo-copilot" },
+    { "id": "q13", "text": "帮我们对这个 B 端采购方案做一次失败预演，投前挑刺，重点看会死在哪", "should_trigger": false, "expected_skill": "none" },
+    { "id": "q14", "text": "b2b-product-review 评审一下我们的企业服务方案有没有隐藏风险", "should_trigger": false, "expected_skill": "none" },
+    { "id": "q15", "text": "把李想产品实战 16 讲的内容总结成一份思维导图给我", "should_trigger": false, "expected_skill": "none" },
+    { "id": "q16", "text": "哪里能看到李想的演讲完整版视频？帮我找一下链接", "should_trigger": false, "expected_skill": "none" },
+    { "id": "q17", "text": "帮我写一份产品体验报告，对比市面上几款 3D 建模软件的上手难度", "should_trigger": false, "expected_skill": "none" },
+    { "id": "q18", "text": "我们团队要搞 OKR 对齐，帮我们搭一套复盘流程模板", "should_trigger": false, "expected_skill": "none" },
+    { "id": "q19", "text": "用第一性原理分析一下新能源汽车行业的定价策略，写一篇分析稿", "should_trigger": false, "expected_skill": "none" },
+    { "id": "q20", "text": "给我们的新「门店」写一份选址分析报告，要带人流数据", "should_trigger": false, "expected_skill": "none" }
+  ]
+}
