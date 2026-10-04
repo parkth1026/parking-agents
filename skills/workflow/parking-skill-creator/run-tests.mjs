@@ -67,7 +67,7 @@ check("SKILL.md 声明短 Prompt/长文档的转换上限", creatorDoc.includes(
 check("writing guide 固化不凑数和 semantic nucleus", ["转换预算", "硬上限，不是最低配额", "没有值得转换的词就使用 0 个", "semantic nucleus", "双向钢人分析（steelman）", "分歧核心（crux）"].every((s) => writingGuide.includes(s)));
 check("SKILL.md 第 1 步固化触发模式三选一", ["手动专用", "名字触发", "语境触发"].every((s) => creatorDoc.includes(s))
   && creatorDoc.includes("定案记进 design.md"));
-check("writing guide 固化模式表与宿主开关", ["触发模式先定调", "allow_implicit_invocation", "disable-model-invocation", "没点名不触发是设计"].every((s) => writingGuide.includes(s)));
+check("writing guide 固化三档模式表与双开关", ["双开关硬关", "allow_implicit_invocation", "disable-model-invocation", "中英双语", "wait-what"].every((s) => writingGuide.includes(s)));
 check("UI default prompt 保持中文且保留 skill name contract", creatorInterface.includes("使用 $parking-skill-creator") && creatorInterface.includes("创建、评测、迭代或打包"));
 check("parking-skill-creator 自身 description 保持中文优先", creatorDescription.length < 450
   && ["with_skill/without_skill", "description", "subagent", ".skill", "Node"].every((s) => creatorDescription.includes(s))
@@ -384,11 +384,40 @@ try {
   check("openai.yaml 含三项 interface 元数据", ["display_name:", "short_description:", "default_prompt:", "$demo-gen"].every((s) => interfaceYaml.includes(s)));
   check("openai.yaml display_name 与技能名一致", interfaceYaml.includes('display_name: "demo-gen"'));
   check("init 默认 allow_implicit_invocation: true", interfaceYaml.includes("allow_implicit_invocation: true"));
+  check("init 默认 frontmatter 无 disable-model-invocation", !readFileSync(join(genDir, "SKILL.md"), "utf8").includes("disable-model-invocation"));
   const manualGen = runFile("init-skill.mjs", ["Manual Skill", "--invocation", "manual", "--path", join(root3, "manual")]);
   const manualYaml = readFileSync(join(root3, "manual", "manual-skill", "agents", "openai.yaml"), "utf8");
-  check("init --invocation manual 置 allow_implicit_invocation: false", manualGen.code === 0 && manualYaml.includes("allow_implicit_invocation: false"));
+  check("init --invocation manual 生成双开关", manualGen.code === 0 && manualYaml.includes("allow_implicit_invocation: false")
+    && readFileSync(join(root3, "manual", "manual-skill", "SKILL.md"), "utf8").includes("disable-model-invocation: true"));
   const badInvocation = runFile("init-skill.mjs", ["Bad Invocation", "--invocation", "lazy", "--path", join(root3, "badinv")]);
   check("init 拒绝非法 invocation 值", badInvocation.code === 2 && out(badInvocation).includes("只接受 auto 或 manual"));
+
+  // 触发模式检测（三档口径，判据见 gate-rules.md「触发模式检测」）
+  const modeRoot = join(root3, "modes");
+  mkdirSync(modeRoot, { recursive: true });
+  const mkModeSkill = (mname, fm, yaml, design) => {
+    const dir = join(modeRoot, mname);
+    mkdirSync(join(dir, "agents"), { recursive: true });
+    mkdirSync(join(dir, "references"), { recursive: true });
+    writeFileSync(join(dir, "SKILL.md"), `---\nname: ${mname}\n${fm}\n---\n# ${mname}\n`);
+    if (yaml !== null) writeFileSync(join(dir, "agents", "openai.yaml"), yaml);
+    if (design !== null) writeFileSync(join(dir, "references", "design.md"), design);
+    return dir;
+  };
+  const DECL_NAMED = "# d\n\n## 意图与触发场景\n- 触发模式：名字触发\n";
+  const rManual = runFile("quick-validate.mjs", [mkModeSkill("mode-manual", "description: d\ndisable-model-invocation: true", "policy:\n  allow_implicit_invocation: false\n", null)]);
+  check("检测: 双开关判手动专用且键不警告", rManual.code === 0 && out(rManual).includes("触发模式: 手动专用（双开关齐全）")
+    && !out(rManual).includes("未知键 'disable-model-invocation'"));
+  const rNamed = runFile("quick-validate.mjs", [mkModeSkill("mode-named", "description: mode-named / 演示技能", null, DECL_NAMED)]);
+  check("检测: 名字式中英双语判名字触发且声明一致", rNamed.code === 0
+    && out(rNamed).includes("触发模式: 名字触发（名字式 description（规范形态））") && out(rNamed).includes("声明一致"));
+  const rClause = runFile("quick-validate.mjs", [mkModeSkill("mode-clause", "description: 仅当用户点名 mode-clause 时使用", null, DECL_NAMED)]);
+  check("检测: 点名条款判名字触发条款式", rClause.code === 0 && out(rClause).includes("条款式"));
+  const rCtx = runFile("quick-validate.mjs", [mkModeSkill("mode-ctx", "description: 帮用户完成 X 任务的技能，用户提到 X 就用", null, null)]);
+  check("检测: 全描述判语境触发", rCtx.code === 0 && out(rCtx).includes("触发模式: 语境触发（全描述）"));
+  const rConflict = runFile("quick-validate.mjs", [mkModeSkill("mode-conflict", "description: 仅当用户点名 mode-conflict 时使用", "policy:\n  allow_implicit_invocation: false\n", DECL_NAMED)]);
+  check("检测: 声明与开关冲突出警告但不挡 PASS", rConflict.code === 0
+    && out(rConflict).includes("声明冲突") && out(rConflict).includes("检测为手动专用"));
   const aliasAttempt = runFile("init-skill.mjs", ["Alias Demo", "--interface", "display_name=别名", "--path", join(root3, "locked")]);
   check("init 拒绝 display_name 别名", aliasAttempt.code === 2 && out(aliasAttempt).includes("display_name 固定为技能目录名"));
   check("init stdout 报 design/openai 产物行", gen.stdout.includes("references/design.md") && gen.stdout.includes("agents/openai.yaml") && gen.stdout.includes("AC-N"));

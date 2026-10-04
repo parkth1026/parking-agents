@@ -40,18 +40,16 @@
 ## frontmatter 与 description
 
 - `name`：kebab-case，小写字母/数字/连字符，≤64 字符，动词开头的短语优先，目录名与 name 一致。
-- `description`：触发的主要机制，同时写清「做什么」与「何时用」；所有「何时使用」的信息都在这里，不放正文（正文触发后才加载）。校验红线：≤1024 字符、不含尖括号。
-- **触发模式先定调**——创建第 1 步与用户三选一，定案记进 design.md「意图与触发场景」；「何时用」按模式收放：
+- `description` 是触发机制的载体，形态由**触发模式**决定——创建第 1 步与用户三选一，定案记进 design.md「意图与触发场景」：
 
-| 模式 | 语义 | description 写法 / 代价 |
+| 模式 | 语义 | 执行 |
 | --- | --- | --- |
-| 手动专用 | 模型不自行触发，仅用户显式调用（command 型） | 只写做什么，并注明「仅当用户显式调用本技能时使用」。代价：对话随口点名不触发；触发评测考不了 |
-| 名字触发（本仓默认） | 用户点名技能名或明确要求该能力才触发 | 「做什么」写全；「何时用」只收显式点名/明确要求——没点名不触发是设计，不是漏触发 |
-| 语境触发 | 期望模型从上下文自动抽取 | 主动招揽：用户会提的关键词、场景、相邻说法全覆盖，没点名也触发；误触发面变大，靠触发评测 near-miss 收口 |
+| 手动专用 | 仅用户显式调用，模型不自行触发（command 型） | 双开关硬关：frontmatter `disable-model-invocation: true` + openai.yaml `allow_implicit_invocation: false`（init `--invocation manual` 一键生成）；description 只写名字。范例：wait-what |
+| 名字触发（本仓默认） | 用户点名技能（英文名或中文名）才触发 | description 只写名字、中英双语（如 `local-mr-squash / 本地 MR squash 合并`）——省常驻上下文，靠名字命中；不写做什么与场景 |
+| 语境触发 | 期望模型从上下文自动抽取 | 常规写法：做什么+何时用写全并主动招揽（「…whenever the user mentions dashboards…, even if they don't explicitly ask for a 'dashboard'.」）；误触发面大，靠触发评测 near-miss 收口 |
 
-- 语境触发才用宽招揽句式（官方示例：「…whenever the user mentions dashboards, data visualization…, even if they don't explicitly ask for a 'dashboard'.」）；名字触发禁用此式。
-- 手动专用优先用宿主开关硬关，description 只作兜底：init 传 `--invocation manual` 置 `agents/openai.yaml` 的 `allow_implicit_invocation: false`；宿主另有 frontmatter 调用开关（如 Claude 的 `disable-model-invocation: true`）时写入宿主键，quick-validate 对宿主新增键只警告不挡。
-- 除 name/description 外只允许 license/allowed-tools/metadata/compatibility；宿主调用策略键按上条例外。
+- 所有「何时使用」信息只在 description，不放正文（正文触发后才加载）；校验红线：≤1024 字符、不含尖括号。
+- 除 name/description 外只允许 license/allowed-tools/metadata/compatibility 与手动专用键 `disable-model-invocation`（宿主已知键，校验器不警告）。
 
 ## 中文 Prompt 的术语克制
 

@@ -19,7 +19,7 @@ function usage() {
   console.log(`  --structure 结构模式（默认 task）: ${Object.keys(STRUCTURES).join(" | ")}`);
   console.log("  --path     输出目录（默认: 本技能目录的同级技能目录）");
   console.log("  --interface key=value  覆盖 agents/openai.yaml 的 short_description 或 default_prompt（可重复；display_name 固定为技能目录名）");
-  console.log("  --invocation auto|manual  触发模式（默认 auto）：manual 置 allow_implicit_invocation: false（仅用户显式调用）");
+  console.log("  --invocation auto|manual  触发模式（默认 auto）：manual 生成双开关——frontmatter disable-model-invocation: true + openai.yaml allow_implicit_invocation: false（仅用户显式调用）");
   console.log("示例: node init-skill.mjs log-classifier --structure task");
   process.exit(2);
 }
@@ -36,9 +36,9 @@ function titleCase(name) {
   return name.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
 }
 
-const SKILL_TEMPLATE = (name) => `---
-name: ${name}
-description: "[TODO: 写清楚这个技能做什么、何时触发——「何时」按 design.md 定的触发模式收放（名字触发只收点名/明确要求，语境触发才写具体场景、文件类型）。所有「何时使用」的信息都放这里，正文在触发后才加载。]"
+const SKILL_TEMPLATE = (name, invocation = "auto") => `---
+name: ${name}${invocation === "manual" ? "\ndisable-model-invocation: true" : ""}
+description: "[TODO: 按 design.md 定的触发模式写——语境触发=做什么+何时用写全；名字触发=只写名字、中英双语（name / 中文名）；手动专用=只写名字。所有「何时使用」的信息都放这里，正文在触发后才加载。]"
 ---
 
 # ${titleCase(name)}
@@ -275,7 +275,7 @@ try {
   console.log(`目录创建失败（${err.code ?? err.message}，退出码 1）: ${skillDir}`);
   process.exit(1);
 }
-writeFileSync(join(skillDir, "SKILL.md"), SKILL_TEMPLATE(skillName), "utf8");
+writeFileSync(join(skillDir, "SKILL.md"), SKILL_TEMPLATE(skillName, args.invocation), "utf8");
 console.log(`init ${skillName} → ${skillDir}`);
 console.log("  SKILL.md            (含待办占位、结构选择指南节与测试节)");
 writeFileSync(join(skillDir, "run-tests.mjs"), RUN_TESTS_TEMPLATE(skillName), "utf8");

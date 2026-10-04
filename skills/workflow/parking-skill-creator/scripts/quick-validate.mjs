@@ -60,6 +60,58 @@ function triageUnknownKey(key) {
 // 对它失败关闭只会无故拒掉正常技能（野外语料 3 处命中全在这类键上）。
 const VALIDATED_KEYS = ["name", "description", "compatibility"];
 
+/**
+ * 触发模式检测（2026-10-04 三档口径，判据与声明一致性规则见 gate-rules.md）：
+ * 1) 任一硬开关（frontmatter disable-model-invocation: true / openai.yaml
+ *    allow_implicit_invocation: false）→ 手动专用，报告开关是否齐全；
+ * 2) 无开关且 description 为名字式（含技能名，剔除名字与分隔符后剩余 ≤16 可见字符）→ 名字触发（规范形态）；
+ * 3) 无开关且 description 含点名条款（点名/显式调用/explicitly names…）→ 名字触发（条款式，过渡形态）；
+ * 4) 其余 → 语境触发（全描述）。
+ * design.md 声明（「触发模式：」行）存在时做一致性比对，不一致给警告（不挡退出码）。
+ */
+function detectTriggerMode(skillDir, name, desc, values) {
+  const frontSwitch = /^true$/i.test(String(values["disable-model-invocation"] ?? "").trim());
+  let yamlSwitch = false;
+  try {
+    const y = readFileSync(join(skillDir, "agents", "openai.yaml"), "utf8");
+    if (/allow_implicit_invocation:\s*false/.test(y)) yamlSwitch = true;
+  } catch {}
+  let declared = null;
+  try {
+    declared = readFileSync(join(skillDir, "references", "design.md"), "utf8")
+      .match(/触发模式[:：]\s*([^\n；。]+)/)?.[1]?.trim() ?? null;
+  } catch {}
+
+  let mode, form;
+  if (frontSwitch || yamlSwitch) {
+    mode = "手动专用";
+    const missing = [];
+    if (!frontSwitch) missing.push("frontmatter disable-model-invocation: true");
+    if (!yamlSwitch) missing.push("openai.yaml allow_implicit_invocation: false");
+    form = missing.length ? `开关不全（缺 ${missing.join("、")}）` : "双开关齐全";
+  } else if (/点名|显式调用|explicitly names|explicitly invokes/i.test(desc)) {
+    mode = "名字触发"; form = "条款式 description（规范形态=只写名字中英双语）";
+  } else if (name && desc.includes(name)
+    && [...desc.split(name).join("").replace(/[/·—：:()（）【】\s-]/g, "")].length <= 16) {
+    mode = "名字触发"; form = "名字式 description（规范形态）";
+  } else {
+    mode = "语境触发"; form = "全描述";
+  }
+
+  let warn = null;
+  if (declared) {
+    // 仅显式点名=名字触发的严格变体，允许落到更硬的手动专用开关上，不算冲突。
+    const expect = /手动专用/.test(declared) ? new Set(["手动专用"])
+      : /仅显式点名|仅点名/.test(declared) ? new Set(["名字触发", "手动专用"])
+      : /名字触发/.test(declared) ? new Set(["名字触发"])
+      : /语境触发/.test(declared) ? new Set(["语境触发"]) : null;
+    if (expect && !expect.has(mode)) {
+      warn = `design.md 声明触发模式「${declared}」，但 artifacts 检测为${mode}——请修正声明或补齐对应开关/description 形态`;
+    }
+  }
+  return { mode, form, declared, warn };
+}
+
 function usage() {
   console.log("用法: node quick-validate.mjs <技能目录>");
   console.log("示例: node quick-validate.mjs ../my-skill");
@@ -166,12 +218,19 @@ export function validateSkill(skillDir) {
     errors.push(`分发件含本机工程树绝对路径: ${hit}（占位/示例/降级句写法见 scripts/lib/path-gate.mjs 豁免口径）`);
   }
 
+  // 触发模式检测：信息性输出，不挡退出码（检测失败保持沉默，不让它变成新的假红）。
+  let triggerMode = null;
+  try {
+    triggerMode = detectTriggerMode(skillDir, name.trim(), description.trim(), values);
+    if (triggerMode.warn) warnings.push(triggerMode.warn);
+  } catch {}
+
   return {
     valid: errors.length === 0,
     undecidable: null,
     errors,
     warnings,
-    summary: { name: name.trim(), nameLen: name.trim().length, descLen: description.trim().length, keys },
+    summary: { name: name.trim(), nameLen: name.trim().length, descLen: description.trim().length, keys, triggerMode },
   };
 }
 
@@ -207,6 +266,10 @@ if (isMain) {
     console.log(`  name: ${summary.name || "(空)"} (${summary.nameLen}/64)`);
     console.log(`  description: ${summary.descLen}/1024, 无尖括号`);
     console.log(`  键: ${summary.keys.join(", ")} ✓`);
+    if (summary.triggerMode) {
+      const tm = summary.triggerMode;
+      console.log(`  触发模式: ${tm.mode}（${tm.form}）${tm.declared ? (tm.warn ? "；design.md 声明冲突" : "；design.md 声明一致") : "；design.md 未声明模式"}`);
+    }
     for (const w of warnings || []) console.log(`  警告: ${w}`);
     if (!existsSync(join(dir, "run-tests.mjs"))) {
       console.log("  警告: 无 run-tests.mjs——新技能必须固化测试(init 脚手架自带)；旧技能升级时补上");

@@ -14,3 +14,16 @@ SKILL.md 第 5 步只写「跑什么、四个退出码各是什么意思」。�
 ## 全仓复扫防腐化
 
 键集腐化只有在真实语料上才暴露（单技能 fixture 看不见），所以 `run-tests.mjs` 有一条**全仓复扫**：进程内直接调 `validateSkill()` 遍历本仓全部技能，任一失败即测试失败（实测 58 个技能 20ms；换成 spawn CLI 要 48 秒——这条回归能常设，前提是走进程内调用）。非本仓布局的宿主自动跳过。
+
+## 触发模式检测（2026-10-04 三档口径）
+
+PASS 输出末尾给一行**触发模式**检测（信息性，不挡退出码；检测自身异常保持沉默，不制造新假红）。三档语义见 writing-guide「frontmatter 与 description」。判定按优先级短路：
+
+1. **手动专用**：frontmatter `disable-model-invocation: true` 或 openai.yaml `allow_implicit_invocation: false` 任一命中即判；并报告开关是否齐全（双开关=frontmatter 键 + yaml false，范例 wait-what）。
+2. **名字触发·条款式**（过渡形态）：无开关，description 含点名条款关键词（`点名`/`显式调用`/`explicitly names`/`explicitly invokes`）。条款判定优先于名字式——含点名条款的 description 即便很短也不是纯名字。历史技能的大段「仅当用户点名…」description 都落这里；迁移到规范形态=改写成名字中英双语。
+3. **名字触发·名字式**（规范形态）：无开关无条款，description 含技能 name，且把 name 全部出现与分隔符（`/ · — ： : ( ) （ ） 【 】 空格 连字符`）剔除后剩余可见字符 ≤16——即 description 只剩名字的中英双语表达。
+4. **语境触发**：其余（全描述）。
+
+**声明一致性**：design.md「意图与触发场景」节的「触发模式：…」行存在时做比对——`手动专用`→期望手动专用；`名字触发`→期望名字触发；`仅显式点名/仅点名`（严格变体）→名字触发与手动专用都算自洽；`语境触发`→期望语境触发。不一致出警告（仍 PASS），修法二选一：改声明，或补齐对应开关/description 形态。无声明时报「未声明模式」，不构成任何信号。
+
+阈值 16 的依据：规范名字式=英文名+中文名+分隔符，实测 `local-mr-squash / 本地 MR squash 合并` 剔除后余 12 字符；任何带「做什么」动词短语的 description 都远超此值。改阈值须同步改本节与 run-tests 的检测用例。

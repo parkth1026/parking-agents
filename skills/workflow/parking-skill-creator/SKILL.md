@@ -47,7 +47,7 @@ description: 本机技能生产流水线——创建、校验、评测、迭代�
 当前会话里可能已经有想捕获的工作流（用户说「把刚才这套做成技能」）——先从会话历史提取：工具、步骤顺序、用户纠正、输入输出格式，然后再问缺口，逐条确认：
 
 1. 这个技能让 agent 能做什么？
-2. 触发模式三选一——手动专用（仅用户显式调用，command 型）/名字触发（点名或明确要求才触发，本仓默认）/语境触发（从上下文自动抽取），各模式写法见 writing-guide；用户会说什么话按模式取材，定案记进 design.md「意图与触发场景」。
+2. 触发模式三选一——手动专用（双开关硬关，仅用户显式调用，command 型）/名字触发（description 只写名字、中英双语，本仓默认）/语境触发（常规全描述自动触发），执行细则与检测判据见 writing-guide；定案记进 design.md「意图与触发场景」。
 3. 期望的输出形态？
 4. 测试用例：产出客观可验的技能（文件转换、数据抽取、固定流程）**必须**把测试固化进技能（第 4 步写进 `run-tests.mjs`，升级校验全靠它）；产出主观的技能（文风、设计）通常不需要，向用户说明后跳过。
 
@@ -83,7 +83,7 @@ node scripts/init-skill.mjs <技能名> --structure <workflow|task|reference|cap
 
 - 名字自动归一化 kebab-case（`Log Classifier` → `log-classifier`），超 64 字符退出码 2。
 - 默认输出到本技能同级的技能目录；目标已存在且非空时拒绝（退出码 1，不覆盖）。
-- 产出：含待办占位与「结构选择指南」节的 SKILL.md + 技能目录根部 `run-tests.mjs` 回归测试骨架 + `references/design.md` 设计文档骨架（四节：意图与触发场景/设计取舍/验收条件 AC-N/迭代记录）+ `agents/openai.yaml`（`display_name` 用技能名，default prompt 引用 `$<技能名>`；手动专用加 `--invocation manual`）+ 按结构生成的 scripts/references/assets 占位 README。模板是**通用**的，不带本仓库假设——本仓库惯例见文末「本仓库使用提示」。
+- 产出：含待办占位与「结构选择指南」节的 SKILL.md + 技能目录根部 `run-tests.mjs` 回归测试骨架 + `references/design.md` 设计文档骨架（四节：意图与触发场景/设计取舍/验收条件 AC-N/迭代记录）+ `agents/openai.yaml`（`display_name` 用技能名，default prompt 引用 `$<技能名>`；手动专用加 `--invocation manual` 双开关）+ 按结构生成的 scripts/references/assets 占位 README。模板是**通用**的，不带本仓库假设——本仓库惯例见文末「本仓库使用提示」。
 
 ## 第 4 步：写资源再写 SKILL.md
 
@@ -94,10 +94,10 @@ node scripts/init-skill.mjs <技能名> --structure <workflow|task|reference|cap
 写 SKILL.md 的完整方法论见 `references/writing-guide.md`，核心：
 
 - **渐进披露**：description 常驻上下文；正文 <500 行；细节进 references 并在正文留「何时读哪个文件」的指针。
-- **description 是主触发机制**：做什么+何时用都写进去，「何时用」按第 1 步定的触发模式收放——语境触发才主动招揽（agent 天生漏触发），名字触发只收显式点名/明确要求；所有「何时使用」信息在 description，不写正文节。
+- **description 形态由第 1 步的触发模式决定**：语境触发=做什么+何时用写全并主动招揽（agent 天生漏触发）；名字触发=只写名字、中英双语；手动专用=只写名字+双开关；「何时使用」信息只在 description，不写正文节。
 - **风格**：祈使句；解释为什么而不是堆 MUST；从反馈泛化而不是过拟合测试例子；写完初稿用新眼光重读一遍。
 
-frontmatter 只允许 name/description（必需）+ license/allowed-tools/metadata/compatibility（可选）。
+frontmatter 只允许 name/description（必需）+ license/allowed-tools/metadata/compatibility（可选）+ 手动专用键 `disable-model-invocation`。
 
 ### 中文 Prompt 的语言与术语边界
 
@@ -115,7 +115,7 @@ node scripts/quick-validate.mjs <技能目录>
 
 四个退出码：`0` PASS / `1` 违规（逐条列规则名）/ `2` 用法错 / `3` `UNDECIDABLE`——frontmatter 用了解析器支持子集外的构造，
 **既不判 PASS 也不判 FAIL**，因为读不到宿主会读到的值，猜一个比没有门禁更危险。
-规则集是 name kebab-case ≤64、description ≤1024 且无尖括号、compatibility ≤500，加上未知键的拼写分诊。
+规则集是 name kebab-case ≤64、description ≤1024 且无尖括号、compatibility ≤500，加上未知键的拼写分诊；并输出**触发模式检测**（开关/名字式 description/design.md 声明一致性，判据见 gate-rules）。
 
 支持子集的边界、键分诊的阈值与全仓复扫回归见 `references/gate-rules.md`——改校验器或想知道某个写法为什么被拦时读它。
 
