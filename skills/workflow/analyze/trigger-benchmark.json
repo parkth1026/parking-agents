@@ -30,9 +30,11 @@
   },
   "rounds": [
     {
-      "description": null,
+      "description": "Run read-only deep repository analysis and return a ranked synthesis with explicit confidence, concrete file references, and clear evidence-vs-inference boundaries. Use only when the user explicitly names this skill (analyze) or explicitly requests this kind of evidence-ranked deep repository analysis (影响面分析、跨文件链路梳理、冲突证据裁决并给置信度). Casual mentions like 'analyze X', 'investigate', 'why does', 帮我分析/排查 without naming the skill or explicitly requesting this protocol do not trigger it. Not for simple one-file fact lookups or requests that want code edits instead of an explanation.",
+      "valid_probes": 52,
       "train": {
         "queries": 12,
+        "evaluated": 12,
         "trigger_rate_on_should": 1,
         "false_trigger_rate_on_should_not": 0,
         "correct": 12,
@@ -40,23 +42,7 @@
       },
       "test": {
         "queries": 8,
-        "trigger_rate_on_should": 1,
-        "false_trigger_rate_on_should_not": 0,
-        "correct": 8,
-        "invalid_queries": 0
-      }
-    },
-    {
-      "description": "v2-修订版: Run read-only deep repository analysis and return a ranked synthesis with explicit confidence... 帮我分析/梳理/排查... Not for simple one-file fact lookups or code edits.",
-      "train": {
-        "queries": 12,
-        "trigger_rate_on_should": 1,
-        "false_trigger_rate_on_should_not": 0,
-        "correct": 12,
-        "invalid_queries": 0
-      },
-      "test": {
-        "queries": 8,
+        "evaluated": 8,
         "trigger_rate_on_should": 1,
         "false_trigger_rate_on_should_not": 0,
         "correct": 8,
@@ -64,6 +50,9 @@
       }
     }
   ],
-  "best_description": null,
-  "invalid_probes": 14
+  "best_description": "Run read-only deep repository analysis and return a ranked synthesis with explicit confidence, concrete file references, and clear evidence-vs-inference boundaries. Use only when the user explicitly names this skill (analyze) or explicitly requests this kind of evidence-ranked deep repository analysis (影响面分析、跨文件链路梳理、冲突证据裁决并给置信度). Casual mentions like 'analyze X', 'investigate', 'why does', 帮我分析/排查 without naming the skill or explicitly requesting this protocol do not trigger it. Not for simple one-file fact lookups or requests that want code edits instead of an explanation.",
+  "best_description_reason": null,
+  "min_test_queries": 6,
+  "valid_probes": 52,
+  "invalid_probes": 8
 }

@@ -1,25 +1,105 @@
 {
   "skill": "analyze",
   "queries": [
-    { "id": "q1", "text": "为什么我跑 npm run check:repo 会报 Cannot find module？帮我分析下原因，先别改", "should_trigger": true },
-    { "id": "q2", "text": "investigate 一下 ue-error-solver 的配置是怎么解析的，SKILL_ENV 环境变量和配置文件到底谁优先", "should_trigger": true },
-    { "id": "q3", "text": "帮我梳理 session-start hook 的注入链路，从 hooks.json 到最终注入上下文要经过哪些文件", "should_trigger": true },
-    { "id": "q4", "text": "仓库里 skills/ 和 .claude/skills/ 都有 ue-error-solver，到底哪个才是实际生效的版本？分析一下", "should_trigger": true },
-    { "id": "q5", "text": "npm test 现在 fail 得很奇怪，帮我查查是什么引起的，我要基于代码证据的解释", "should_trigger": true },
-    { "id": "q6", "text": "why does hooks/session-start 的注释说只支持 Claude Code，文档却说四个平台？哪个是真的", "should_trigger": true },
-    { "id": "q7", "text": "如果把 hooks.json 里的 session-start 去掉，哪些平台会受影响？先做影响面分析再说", "should_trigger": true },
-    { "id": "q8", "text": "在动手改配置之前，我想先弄明白 UeErrorSolver.mjs 现在的行为：配置从哪几层合并、NAS 检查什么时候触发", "should_trigger": true },
-    { "id": "q9", "text": "这两处文档对支持平台的说法对不上，帮我判断哪个是事实，排个序说明理由", "should_trigger": true },
-    { "id": "q10", "text": "我们想把构建脚本迁到 PS1 之前，先分析下现在 hooks/run-hook.cmd 这个 polyglot 是怎么同时当 bat 和 sh 用的", "should_trigger": true },
-    { "id": "q11", "text": "帮我把 D:/builds/ 下这几个 UE 编译失败日志按错误模式归类分析一下", "should_trigger": false },
-    { "id": "q12", "text": "用 jenkins-pair-analyze 把最近两次 jenkins 失败构建配对分析一下", "should_trigger": false },
-    { "id": "q13", "text": "分析一下 jenkins 日志里这个链接错误是哪次提交引入的，构建号 2333", "should_trigger": false },
-    { "id": "q14", "text": "这段 react 组件重复逻辑太多了，帮我 simplify 一下", "should_trigger": false },
-    { "id": "q15", "text": "帮我调研一下 Tailwind 4 的配置最佳实践", "should_trigger": false },
-    { "id": "q16", "text": "我想新建一个技能叫 log-classifier，帮我搭好脚手架并跑校验", "should_trigger": false },
-    { "id": "q17", "text": "读一下 package.json，告诉我版本号是多少", "should_trigger": false },
-    { "id": "q18", "text": "帮我把 GEMINI.md 翻译成英文", "should_trigger": false },
-    { "id": "q19", "text": "把 package.json 里 check:repo 的路径改成 skills/dev/ 下面的正确位置", "should_trigger": false },
-    { "id": "q20", "text": "安排一次完整的需求访谈，帮我把新技能的需求问清楚", "should_trigger": false }
+    {
+      "id": "q1",
+      "text": "用 analyze 深挖一下为什么 npm run check:repo 会报 Cannot find module，先别改代码",
+      "should_trigger": true
+    },
+    {
+      "id": "q2",
+      "text": "/analyze 这个仓库的 session-start hook 注入链路，从 hooks.json 到最终注入要经过哪些文件",
+      "should_trigger": true
+    },
+    {
+      "id": "q3",
+      "text": "run analyze on this repo: skills/ 和 .claude/skills/ 都有 ue-error-solver，到底哪个才是实际生效的版本",
+      "should_trigger": true
+    },
+    {
+      "id": "q4",
+      "text": "用 analyze 把这两处文档对支持平台的矛盾说法裁决一下，哪个是事实，按证据强度排序",
+      "should_trigger": true
+    },
+    {
+      "id": "q5",
+      "text": "帮我对 hooks.json 去掉 session-start 这个改动做一次影响面分析——要带置信度、给文件级证据的那种，别直接下结论",
+      "should_trigger": true
+    },
+    {
+      "id": "q6",
+      "text": "这堆互相矛盾的报错证据帮我做个 ranked synthesis：每条结论标清楚是证据还是推断、置信度多少，然后再谈怎么修",
+      "should_trigger": true
+    },
+    {
+      "id": "q7",
+      "text": "动配置前先用 analyze 把 UeErrorSolver.mjs 的行为摸清楚：配置从哪几层合并、NAS 检查什么时候触发",
+      "should_trigger": true
+    },
+    {
+      "id": "q8",
+      "text": "我想跨文件看下这条功能是怎么接线的，用 analyze 那种带 evidence-vs-inference 边界的方式给我梳理，别猜",
+      "should_trigger": true
+    },
+    {
+      "id": "q9",
+      "text": "为什么测试老是在 CI 上 flaky？我不要拍脑袋的答案，给我一份证据分了级、冲突证据有裁决的分析报告",
+      "should_trigger": true
+    },
+    {
+      "id": "q10",
+      "text": "$analyze 一下：把构建脚本迁到 PS1 之前，先看看 hooks/run-hook.cmd 这个 polyglot 是怎么同时当 bat 和 sh 用的",
+      "should_trigger": true
+    },
+    {
+      "id": "q11",
+      "text": "帮我分析下这段代码为什么报错，两句话说明白就行",
+      "should_trigger": false
+    },
+    {
+      "id": "q12",
+      "text": "analyze this function real quick, is it O(n)?",
+      "should_trigger": false
+    },
+    {
+      "id": "q13",
+      "text": "investigate 一下 Jenkins 构建为什么挂了，找到原因直接修掉",
+      "should_trigger": false
+    },
+    {
+      "id": "q14",
+      "text": "why does this test always fail on CI? 顺手把它修了",
+      "should_trigger": false
+    },
+    {
+      "id": "q15",
+      "text": "帮我查查失败原因，改完配置就完事了",
+      "should_trigger": false
+    },
+    {
+      "id": "q16",
+      "text": "帮我梳理一下这个模块的结构，写个 README 就行",
+      "should_trigger": false
+    },
+    {
+      "id": "q17",
+      "text": "读一下 package.json，告诉我版本号是多少",
+      "should_trigger": false
+    },
+    {
+      "id": "q18",
+      "text": "帮我把 D:/builds/ 下这几个 UE 编译失败日志按错误模式归类分析一下",
+      "should_trigger": false
+    },
+    {
+      "id": "q19",
+      "text": "这段 react 组件重复逻辑太多，帮我 simplify 一下",
+      "should_trigger": false
+    },
+    {
+      "id": "q20",
+      "text": "帮我调研一下 Tailwind 4 的配置最佳实践",
+      "should_trigger": false
+    }
   ]
 }
