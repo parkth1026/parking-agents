@@ -1,6 +1,6 @@
 ---
 name: best-practice-research
-description: "[OMX] Bounded best-practice research grounded in official and upstream evidence. Use when the user asks to research a technology, API, design decision, implementation practice, or standards question; stop at evidence-backed guidance and do not implement changes."
+description: "[OMX] Bounded best-practice research grounded in official and upstream evidence. Use only when the user explicitly names best-practice-research or explicitly requests a bounded, evidence-grounded best-practice study (明确要求基于官方/上游证据的最佳实践调研，只出结论不实施改动); generic 查资料/research 请求未点名也未明确要求时不触发。Stop at evidence-backed guidance and do not implement changes."
 argument-hint: "<technology|decision|practice question>"
 ---
 

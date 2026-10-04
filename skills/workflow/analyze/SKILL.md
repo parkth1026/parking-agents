@@ -1,6 +1,6 @@
 ---
 name: analyze
-description: Run read-only deep repository analysis and return a ranked synthesis with explicit confidence, concrete file references, and clear evidence-vs-inference boundaries. Use when the user says 'analyze', 'investigate', 'why does', 'what's causing', 帮我分析/梳理/排查, 怎么坏了/查查失败原因, asks how a feature is wired across files, wants an impact (影响面) analysis before a change, or needs conflicting repository evidence judged and ranked before any changes are proposed. Not for simple one-file fact lookups or requests that want code edits instead of an explanation.
+description: Run read-only deep repository analysis and return a ranked synthesis with explicit confidence, concrete file references, and clear evidence-vs-inference boundaries. Use only when the user explicitly names this skill (analyze) or explicitly requests this kind of evidence-ranked deep repository analysis (影响面分析、跨文件链路梳理、冲突证据裁决并给置信度). Casual mentions like 'analyze X', 'investigate', 'why does', 帮我分析/排查 without naming the skill or explicitly requesting this protocol do not trigger it. Not for simple one-file fact lookups or requests that want code edits instead of an explanation.
 ---
 
 # Analyze — Read-Only Deep Analysis

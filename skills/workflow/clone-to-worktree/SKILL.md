@@ -1,6 +1,6 @@
 ---
 name: clone-to-worktree
-description: 把与当前仓库同 remote 的独立 git clone 原地转换成 linked worktree：路径、分支、ignored 构建产物、submodule 全部保留，回收冗余对象库。用户说「把某个目录的 clone 转成 worktree」「这两个目录是同一个仓库的、太浪费」「合并重复 clone」或想省掉双份 fetch/双份磁盘时使用；输入只需目标 clone 路径。
+description: 把与当前仓库同 remote 的独立 git clone 原地转换成 linked worktree：路径、分支、ignored 构建产物、submodule 全部保留，回收冗余对象库。仅当用户点名 clone-to-worktree 或明确要求把某个 clone 转成/合并成 worktree 时使用；「两个目录太浪费」「想省双份磁盘」这类未点名也未明确要求转换的说法不自动选它。输入只需目标 clone 路径。
 ---
 
 # Clone 转 Worktree
