@@ -3,7 +3,7 @@
   "skill": "ceo-copilot",
   "canonical_names": [
     "ceo-copilot",
-    "lixiang-ceo-grill",
+    "lixiang-product-grill",
     "b2b-product-review",
     "none"
   ],
@@ -140,12 +140,12 @@
       "id": "q11",
       "text": "我们做医院设备管理产品。我已经写过用户需求、产品和商业模式的思考，想按李想创业公开课的专业 CEO 三层九模块逐项复盘：引用我已有原话对照原文标准，只有缺口再问，最后给逐模块裁定。",
       "should_trigger": false,
-      "expected_skill": "lixiang-ceo-grill",
+      "expected_skill": "lixiang-product-grill",
       "group": "neighbor",
       "source": {
         "kind": "new_near_miss_from_published_capability",
-        "file": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\skills\\pub\\lixiang-ceo-grill\\SKILL.md",
-        "source_sha256": "06c2c01c6c6219f972ae26849fda27f24752ecb447253a903262eec66fea87b4",
+        "file": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\skills\\product\\lixiang-product-grill\\SKILL.md",
+        "source_sha256": "be9fe454a6173eb68917016b34294cf8a4099cf8becd48ab3eeeaa27bb5da8dd",
         "rationale": "固定课程标准、用户原话对照、逐模块复盘"
       }
     },
@@ -153,12 +153,12 @@
       "id": "q12",
       "text": "这个园区 SaaS 方向我讲了几轮，先别换一套商业诊断框架。请用李想的专业 CEO 方法论核对我已表达的思考，检查三层之间是否断裂；问题只补我没想清楚的模块。",
       "should_trigger": false,
-      "expected_skill": "lixiang-ceo-grill",
+      "expected_skill": "lixiang-product-grill",
       "group": "neighbor",
       "source": {
         "kind": "new_near_miss_from_published_capability",
-        "file": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\skills\\pub\\lixiang-ceo-grill\\SKILL.md",
-        "source_sha256": "06c2c01c6c6219f972ae26849fda27f24752ecb447253a903262eec66fea87b4",
+        "file": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\skills\\product\\lixiang-product-grill\\SKILL.md",
+        "source_sha256": "be9fe454a6173eb68917016b34294cf8a4099cf8becd48ab3eeeaa27bb5da8dd",
         "rationale": "固定课程标准、用户原话对照、逐模块复盘"
       }
     },
@@ -166,12 +166,12 @@
       "id": "q13",
       "text": "我准备继续投这个产品。请按专业 CEO 的三层九模块做一次方向复盘，把我在文档和对话里的原话摆在李想的课程标准旁，给各模块符合度与层间断裂点。",
       "should_trigger": false,
-      "expected_skill": "lixiang-ceo-grill",
+      "expected_skill": "lixiang-product-grill",
       "group": "neighbor",
       "source": {
         "kind": "new_near_miss_from_published_capability",
-        "file": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\skills\\pub\\lixiang-ceo-grill\\SKILL.md",
-        "source_sha256": "06c2c01c6c6219f972ae26849fda27f24752ecb447253a903262eec66fea87b4",
+        "file": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\skills\\product\\lixiang-product-grill\\SKILL.md",
+        "source_sha256": "be9fe454a6173eb68917016b34294cf8a4099cf8becd48ab3eeeaa27bb5da8dd",
         "rationale": "固定课程标准、用户原话对照、逐模块复盘"
       }
     },

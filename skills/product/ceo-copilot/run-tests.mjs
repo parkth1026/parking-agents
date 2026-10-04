@@ -32,13 +32,13 @@ const negativeQueries = triggerEval.queries.filter((q) => q.should_trigger === f
 const businessMarkers = /(商业|产品|新业务|定价|业务|客户|付费|市场|投资|获客|创业|采购|销售)/;
 // 2026-10-02 AC-006 迁移：相邻商业近似题是有效负例。保留题数、平衡和无关反例的防误触发检查。
 // 完整迁移记录随 issue31-closure/trigger/frozen/assertion-migration.json 保存。
-const canonicalTriggerNames = new Set(["ceo-copilot", "lixiang-ceo-grill", "b2b-product-review", "none"]);
+const canonicalTriggerNames = new Set(["ceo-copilot", "lixiang-product-grill", "b2b-product-review", "none"]);
 const neighborQueries = triggerEval.queries.filter((q) => q.group === "neighbor");
 const unrelatedQueries = triggerEval.queries.filter((q) => q.group === "unrelated");
 check("trigger-evals 20 条且正负各 10 条", triggerEval.skill === "ceo-copilot" && triggerEval.queries.length === 20 && positiveQueries.length === 10 && negativeQueries.length === 10);
 check("trigger-evals id、文本唯一且使用规范分流名", new Set(triggerEval.queries.map((q) => q.id)).size === 20 && new Set(triggerEval.queries.map((q) => q.text)).size === 20 && triggerEval.queries.every((q) => typeof q.id === "string" && typeof q.text === "string" && q.text.trim().length > 0 && canonicalTriggerNames.has(q.expected_skill)));
 check("trigger-evals should_trigger 与精确分流名一致", triggerEval.queries.every((q) => q.should_trigger === (q.expected_skill === "ceo-copilot")));
-check("trigger-evals 相邻近似各至少 3 条且不是本技能正例", neighborQueries.length >= 6 && ["lixiang-ceo-grill", "b2b-product-review"].every((name) => neighborQueries.filter((q) => q.expected_skill === name).length >= 3) && neighborQueries.every((q) => q.should_trigger === false));
+check("trigger-evals 相邻近似各至少 3 条且不是本技能正例", neighborQueries.length >= 6 && ["lixiang-product-grill", "b2b-product-review"].every((name) => neighborQueries.filter((q) => q.expected_skill === name).length >= 3) && neighborQueries.every((q) => q.should_trigger === false));
 check("trigger-evals 无关反例仍不涉及商业诊断", unrelatedQueries.length >= 4 && unrelatedQueries.every((q) => q.should_trigger === false && q.expected_skill === "none" && !businessMarkers.test(q.text)));
 check("trigger-evals 保留精确评分及禁止别名归一", triggerEval.scoring?.expected_name_comparison === "exact_string" && triggerEval.scoring?.aliases === "count_as_incorrect_without_normalization");
 check("SKILL.md 无待办占位", !/\[TODO|结构选择指南/.test(skill));
