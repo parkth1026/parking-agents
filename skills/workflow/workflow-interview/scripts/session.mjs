@@ -736,6 +736,11 @@ function caliberAsked(dir) {
   return false;
 }
 
+/** 人验软闸用：Verify 段是否疑似以人的确认为通过条件——人称词与认可词邻近共现，
+ *  或「等/待……确认」句式。「用户确认版」是合法语境（确认版对照物），先剔除再判。
+ *  词级检测必带误伤，只点名不拒绝；真正的防线在 shape 文档的起草规则。 */
+const HUMAN_GATE_RE = /(用户|员工|人工|客户|真人|评审人?|主管|领导|老板)[^；;\n]{0,12}(确认|签字|审批|同意|点头)|(等|待)[^；;\n]{0,8}(确认|签字|审批|回复)/;
+
 function cmdFinalize(argv) {
   const dir = resolveIssueDir(argv[0]);
   const cpath = contractPath(dir);
@@ -804,9 +809,20 @@ function cmdFinalize(argv) {
     for (const v of manual) console.log(`  ${v.ac} [${v.tier}]${v.embedded ? '·内嵌' : ''} ${v.raw.slice(0, 64)}`);
     console.log('  这不是错。但它们不会在 /goal 每轮的完成审计里被反驳，交接时要当面说清哪几条得人来看。');
   }
+  // 人验软闸：Verify 段以人的确认为通过条件（用户/员工确认、签字、审批）。/goal 的
+  // 完成审计永远无法判定它——烧 turn 到三连闸 blocked，或执行 Agent 假自陈完成。
+  // 词级检测必带误伤（「用户确认版对照物」是合法语境），所以只点名不拒绝。
+  const humanGated = verifies.filter((v) => !/确认版/.test(v.raw) && HUMAN_GATE_RE.test(v.raw));
+  if (humanGated.length > 0) {
+    console.log(`WARNING: 以下 ${humanGated.length} 段疑似以人的确认为通过条件：`);
+    for (const v of humanGated) console.log(`  ${v.ac} [${v.tier}]${v.embedded ? '·内嵌' : ''} ${v.raw.slice(0, 64)}`);
+    console.log('  /goal 的完成审计无法判定人的确认：烧 turn 到三连闸 blocked，或假自陈完成。');
+    console.log('  真人才能判的验收移「交付后人工复核」节；会话式交接可保留，转 /goal 前必须移走。');
+  }
   if (verifies.length > 0 && acsWithA.size === 0) {
     console.log('WARNING: 一条 [A] 档都没有。完成判定全部依赖自陈，长时程执行等于没有终止条件。');
-    console.log('         回去看有没有哪条能升到 [A]；确实一条都升不了，就跟用户说清这次靠人验收。');
+    console.log('         回去看有没有哪条能升到 [A]；真人才能判的部分移「交付后人工复核」节，Verify 留执行 Agent 可自证的形态；');
+    console.log('         确实整份验收都靠人，跟用户说清，把人验条目整节落进「交付后人工复核」。');
   }
 
   // 口径闸门：界面对照物在场的契约，复刻精度必须问过。「结构非像素」曾是 aes-prototype
@@ -861,6 +877,18 @@ function cmdFinalize(argv) {
     console.error(`\n交接指令 ${handoff.length} 字符，超过 codex create_goal 的 ${GOAL_OBJECTIVE_LIMIT} 上限。`);
     console.error('压缩契约「目标」节那一句话，别指望 codex 截断——它会直接拒收。');
     failed = true;
+  }
+
+  // 交付后人工复核 → 用户待办清单。它不属于执行 Agent 的完成判定（objective 只绑
+  // 「验收条件」和「强约束」），塞进 objective 只会让完成审计多一个永不可判项。
+  const postReview = extractSection(md, '交付后人工复核');
+  if (postReview) {
+    const items = postReview.split(/\r?\n/).filter((line) => /^-\s+/.test(line));
+    if (items.length > 0) {
+      console.log('\n─── 交付后人工复核（用户待办，不属于执行 Agent 完成判定）───');
+      for (const line of items) console.log(line.replace(/^-\s+/, '').trim());
+      console.log('  交接时把这份清单交给用户本人：条目在 /goal 完成审计范围之外，由人交付后复核。');
+    }
   }
 
   m.validation.verify_tiers = tiers;

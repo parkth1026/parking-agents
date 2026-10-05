@@ -558,6 +558,65 @@ const CALIBER_ASK = JSON.stringify({
     `${res.status}\n${`${res.stdout || ''}${res.stderr || ''}`.slice(0, 400)}`);
 }
 
+// ─────────────────────── 人验软闸与交付后人工复核 ───────────────────────
+
+{
+  // 人验 Verify：WARNING 点名但不拒绝——词级检测必带误伤，防线在起草规则，这里只给可见性。
+  const dir = mkIssue();
+  writeFileSync(join(dir, '3-contract', 'contract.md'), [
+    '# Goal Contract: 测试占位',
+    '',
+    '## 目标',
+    '',
+    '占位目标一句话可观察。',
+    '',
+    '## 验收条件',
+    '',
+    '- AC-001: 可观察的占位结果成立',
+    '  - Verify: [A] `node -e "process.exit(1)"` → 退出码 1（此刻应为红）',
+    '- AC-002: 员工试用下单核心流程后确认整体验收通过',
+    '  - Verify: [C] 员工确认验收通过',
+    '',
+  ].join('\n'), 'utf8');
+  const res = run('finalize', dir);
+  const out = `${res.stdout || ''}\n${res.stderr || ''}`;
+  check('humangate/人验 Verify 段 WARNING 点名但不拦',
+    res.status === 0 && out.includes('疑似以人的确认为通过条件') && out.includes('AC-002'),
+    `${res.status}\n${out.trim().slice(0, 400)}`);
+}
+{
+  // 「用户确认版」是合法语境（确认版对照物），不点名——误伤即空转信号。
+  const dir = mkIssue();
+  writeFileSync(join(dir, '3-contract', 'contract.md'), [
+    '# Goal Contract: 测试占位',
+    '',
+    '## 目标',
+    '',
+    '占位目标一句话可观察。',
+    '',
+    '## 验收条件',
+    '',
+    '- AC-001: 报文与对照物一致',
+    '  - Verify: [C] 对照用户确认版 api-mock 报文逐字段核对；[A] `node -e "process.exit(1)"` → 退出码 1',
+    '',
+  ].join('\n'), 'utf8');
+  const res = run('finalize', dir);
+  const out = `${res.stdout || ''}\n${res.stderr || ''}`;
+  check('humangate/确认版对照物不误伤', res.status === 0 && !out.includes('疑似以人的确认为通过条件'),
+    `${res.status}\n${out.trim().slice(0, 400)}`);
+}
+{
+  // 交付后人工复核节 → 用户待办清单随交接打出；Verify 里没有它，不进完成判定。
+  const dir = mkIssue();
+  writeFileSync(join(dir, '3-contract', 'contract.md'), `${VALID_CONTRACT
+    .replace('# Goal Contract: 测试占位', '# Goal Contract: 测试占位\n\n- Status: Ready')}## 交付后人工复核\n\n- 员工试走下单流程 — 证据：D-01 试走录屏\n`, 'utf8');
+  const res = run('finalize', dir);
+  const out = `${res.stdout || ''}\n${res.stderr || ''}`;
+  check('postreview/人工复核节转用户待办清单',
+    res.status === 0 && out.includes('交付后人工复核（用户待办') && out.includes('员工试走下单流程'),
+    `${res.status}\n${out.trim().slice(0, 400)}`);
+}
+
 console.log(`\n${total - failed}/${total} 通过`);
 rmSync(ROOT, { recursive: true, force: true });
 process.exit(failed > 0 ? 1 : 0);
