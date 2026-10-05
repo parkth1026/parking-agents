@@ -1,0 +1,30 @@
+# verify @ 2026-10-04T17:01:49Z
+# cwd: G:\GIT\AI_WorkFlow\parking-agents-manual
+
+[FAIL] AC-001  exit=1  $ node skills/product/lixiang-product-grill/run-tests.mjs
+         }
+         Node.js v24.19.0
+[FAIL] AC-002  exit=1  $ node skills/ue/karpathy-llm-wiki/scripts/validate-wiki.mjs --wiki skills/product/lixiang-product-grill/references/wiki
+         Wiki path does not exist: skills/product/lixiang-product-grill/references/wiki
+[FAIL] AC-002 [A·内嵌]  exit=1  $ node skills/product/lixiang-product-grill/run-tests.mjs
+         }
+         Node.js v24.19.0
+[FAIL] AC-003 [A·内嵌]  exit=1  $ node skills/product/lixiang-product-grill/run-tests.mjs
+         }
+         Node.js v24.19.0
+[FAIL] AC-004  exit=1  $ node skills/product/lixiang-product-grill/run-tests.mjs
+         }
+         Node.js v24.19.0
+[FAIL] AC-005 [A·内嵌]  exit=1  $ node skills/product/lixiang-product-grill/run-tests.mjs
+         }
+         Node.js v24.19.0
+[PASS] AC-006  exit=0  $ node skills/product/ceo-copilot/run-tests.mjs
+           ok  references/design.md 在位且含 wiki 与独立触发验收条件
+         95 passed, 0 failed
+[PASS] AC-006 [A·内嵌]  exit=0  $ node tests/skills/test-skill-discovery.mjs && node tests/skills/test-install-skills.mjs
+         ERROR: 未知技能: missing-skill
+         warning: name clash — shared: C:\Users\parking\AppData\Local\Temp\install-skills-test-uS5d0O\src-c\cat-b\shared skipped, walk order wins
+         warning: name clash — shared: C:\Users\parking\AppData\Local\Temp\install-skills-test-uS5d0O\src-c\cat-b\shared skipped, walk order wins
+
+绿 2 / 红 6 / 跑不起来 0
+另有 5 段非 [A] 档没跑：AC-001 [C]·内嵌、AC-003 [C]、AC-004 [C]·内嵌、AC-005 [C]、AC-006 [C]·内嵌

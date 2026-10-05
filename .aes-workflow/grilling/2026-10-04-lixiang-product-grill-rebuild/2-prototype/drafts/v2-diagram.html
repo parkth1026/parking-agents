@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>lixiang-product-grill 改后架构 — draft v2</title>
+<style>
+  :root { --ink:#1f2937; --grey-b:#f3f4f6; --grey-l:#9ca3af; --acc-b:#fff7ed; --acc-l:#ea5809; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif; color:var(--ink);
+         background:#fff; padding:24px; max-width:1080px; margin:0 auto; }
+  h1 { font-size:18px; margin-bottom:4px; }
+  h2 { font-size:15px; margin:20px 0 8px; }
+  .sub { color:#6b7280; font-size:12px; margin-bottom:12px; }
+  .legend { font-size:12px; line-height:1.7; border:1px solid #e5e7eb; border-radius:4px;
+            padding:8px 12px; margin-bottom:16px; background:#fafafa; }
+  .sw { display:inline-block; width:12px; height:12px; border-radius:2px; vertical-align:-1px; margin-right:4px; }
+  .sw.acc { background:var(--acc-b); border:1.5px solid var(--acc-l); }
+  .sw.gre { background:var(--grey-b); border:1.5px solid var(--grey-l); }
+  svg { display:block; }
+  svg text { font-family:inherit; }
+  .node rect { rx:6; }
+  .n-grey rect { fill:var(--grey-b); stroke:var(--grey-l); stroke-width:1.5; }
+  .n-acc  rect { fill:var(--acc-b); stroke:var(--acc-l); stroke-width:2; }
+  .n-title { font-size:13px; font-weight:600; fill:var(--ink); }
+  .n-sub   { font-size:10.5px; fill:#6b7280; }
+  .e-grey  { stroke:var(--grey-l); stroke-width:1.5; fill:none; }
+  .e-acc   { stroke:var(--acc-l); stroke-width:2; fill:none; }
+  .e-dash  { stroke-dasharray:5 4; }
+  .e-label { font-size:10.5px; fill:#6b7280; }
+  .e-label.acc { fill:var(--acc-l); }
+  footer { margin-top:20px; font-size:12px; line-height:1.7; }
+  footer .box { border:1px solid #e5e7eb; border-radius:4px; padding:10px 14px; background:#fafafa; }
+  footer b { font-weight:600; }
+  footer ul { margin-left:18px; }
+</style>
+</head>
+<body>
+
+<h1>lixiang-product-grill — 改后架构（confirmed，已转确认版 diagram.html）</h1>
+<p class="sub">单文件 · 零 JS · 断网可开 · 拓扑事实源：架构视图（两张）；流程视图不加画（behavior.md 变化行已线性）</p>
+
+<div class="legend">
+  图例（两视图同）：<span class="sw acc"></span>本次新增/变更　<span class="sw gre"></span>既有（不动）<br>
+  视图一「复盘运行时加载链」＝技能内部结构与双事实源边界；视图二「门禁与联动」＝外部依赖与分发闸
+</div>
+
+<h2>视图一：复盘运行时加载链（overview）</h2>
+<svg width="960" height="300" viewBox="0 0 960 300" xmlns="http://www.w3.org/2000/svg">
+  <g class="node n-grey" transform="translate(24,116)">
+    <rect width="128" height="48" rx="6"/>
+    <text class="n-title" x="12" y="21">用户</text>
+    <text class="n-sub" x="12" y="37">显式点名触发</text>
+  </g>
+  <g class="node n-grey" transform="translate(224,100)">
+    <rect width="176" height="80" rx="6"/>
+    <text class="n-title" x="12" y="22">SKILL.md</text>
+    <text class="n-sub" x="12" y="40">lixiang-product-grill</text>
+    <text class="n-sub" x="12" y="56">协议骨架（内容重构）</text>
+    <text class="n-sub" x="12" y="70">裁定唯一依据=题库</text>
+  </g>
+  <g class="node n-grey" transform="translate(488,24)">
+    <rect width="200" height="64" rx="6"/>
+    <text class="n-title" x="12" y="24">question-bank.md</text>
+    <text class="n-sub" x="12" y="42">14 维度×六要素＋五断点</text>
+    <text class="n-sub" x="12" y="56">每维度块带 S-页指针＋文件头目录</text>
+  </g>
+  <g class="node n-acc" transform="translate(488,120)">
+    <rect width="200" height="72" rx="6"/>
+    <text class="n-title" x="12" y="24">references/wiki/（新）</text>
+    <text class="n-sub" x="12" y="42">sources×19 / concepts / cases</text>
+    <text class="n-sub" x="12" y="58">仅弹药与溯源，不承载裁定</text>
+  </g>
+  <g class="node n-acc" transform="translate(772,128)">
+    <rect width="164" height="56" rx="6"/>
+    <text class="n-title" x="12" y="24">archive/（新）</text>
+    <text class="n-sub" x="12" y="42">16 讲 19 篇全文＋溯源头</text>
+  </g>
+  <g class="node n-grey" transform="translate(488,224)">
+    <rect width="200" height="52" rx="6"/>
+    <text class="n-title" x="12" y="22">lixiang-ceo-article.md</text>
+    <text class="n-sub" x="12" y="40">附注（已退出运行时加载清单）</text>
+  </g>
+
+  <path class="e-grey" d="M 152 140 H 224"/>
+  <text class="e-label" x="164" y="132">点名</text>
+  <path class="e-grey" d="M 400 128 L 444 128 L 444 56 L 488 56"/>
+  <text class="e-label" x="416" y="48">访谈前必读</text>
+  <path class="e-acc"  d="M 400 156 H 488"/>
+  <text class="e-label acc" x="404" y="148">每维度读对应页（弹药）</text>
+  <path class="e-acc"  d="M 688 156 H 772"/>
+  <text class="e-label acc" x="700" y="148">溯源</text>
+  <text class="e-label" x="492" y="216">（虚线已去除：附注不进运行链）</text>
+</svg>
+
+<h2>视图二：门禁与联动（detail）</h2>
+<svg width="960" height="340" viewBox="0 0 960 340" xmlns="http://www.w3.org/2000/svg">
+  <g class="node n-grey" transform="translate(24,36)">
+    <rect width="184" height="64" rx="6"/>
+    <text class="n-title" x="12" y="24">run-tests.mjs</text>
+    <text class="n-sub" x="12" y="42">断言组重写（wiki/附注护栏/</text>
+    <text class="n-sub" x="12" y="56">三层一致/出厂门禁）</text>
+  </g>
+  <g class="node n-grey" transform="translate(24,152)">
+    <rect width="184" height="56" rx="6"/>
+    <text class="n-title" x="12" y="24">validate-wiki v7.2</text>
+    <text class="n-sub" x="12" y="42">karpathy-llm-wiki（只调用）</text>
+  </g>
+  <g class="node n-grey" transform="translate(328,116)">
+    <rect width="176" height="56" rx="6"/>
+    <text class="n-title" x="12" y="24">references/wiki/</text>
+    <text class="n-sub" x="12" y="42">＋archive/ 原文存档</text>
+  </g>
+  <g class="node n-grey" transform="translate(328,232)">
+    <rect width="176" height="56" rx="6"/>
+    <text class="n-title" x="12" y="24">ceo-copilot 题库</text>
+    <text class="n-sub" x="12" y="42">规范名＋负例＋让渡句措辞</text>
+  </g>
+  <g class="node n-grey" transform="translate(632,36)">
+    <rect width="200" height="64" rx="6"/>
+    <text class="n-title" x="12" y="24">技能本体</text>
+    <text class="n-sub" x="12" y="42">SKILL.md＋题库＋五件套</text>
+    <text class="n-sub" x="12" y="56">（git mv 改名）</text>
+  </g>
+  <g class="node n-grey" transform="translate(632,152)">
+    <rect width="200" height="56" rx="6"/>
+    <text class="n-title" x="12" y="24">~/.agents/skills 挂载</text>
+    <text class="n-sub" x="12" y="42">symlink 重建指新路径</text>
+  </g>
+  <g class="node n-grey" transform="translate(632,268)">
+    <rect width="200" height="56" rx="6"/>
+    <text class="n-title" x="12" y="24">package-skill 打包出口</text>
+    <text class="n-sub" x="12" y="42">排除清单＋references/archive/</text>
+  </g>
+
+  <path class="e-grey" d="M 208 68 L 268 68 L 268 116 L 328 116 L 328 144"/>
+  <text class="e-label" x="232" y="60">断言</text>
+  <path class="e-acc"  d="M 208 180 L 268 180 L 268 158 L 328 158"/>
+  <text class="e-label acc" x="224" y="172">校验（新增调用）</text>
+  <path class="e-acc"  d="M 504 260 L 560 260 L 560 100 L 632 100"/>
+  <text class="e-label acc" x="512" y="252">规范名同步＋全量重跑</text>
+  <path class="e-grey" d="M 732 152 L 732 100"/>
+  <text class="e-label" x="740" y="132">挂载</text>
+  <path class="e-acc e-dash" d="M 504 144 L 568 144 L 568 68 L 632 68"/>
+  <text class="e-label acc" x="520" y="60">断言目标扩展</text>
+  <path class="e-acc e-dash" d="M 732 268 L 732 208"/>
+  <text class="e-label acc" x="740" y="244">打包（排除 archive）</text>
+</svg>
+
+<footer>
+  <div class="box">
+    <b>Fidelity ledger</b>
+    <ul>
+      <li><b>Detail</b>：每维度 wiki 读取链与「仅弹药、不承载裁定」边界；validator 校验关系；ceo-copilot 规范名联动＋全量重跑；symlink 挂载；package-skill 分发闸（排除 archive）。</li>
+      <li><b>Merged</b>：视图一 SKILL/题库按「内容重构、角色不变」处理为灰（变更写副标）；视图二 wiki 与 archive 合为一节点；「技能本体」合并 SKILL＋题库＋五件套。</li>
+      <li><b>Collapsed</b>：validator 8 维计分细节；评测三臂（with/without/no_refs）与探针管道（example-run 场景 3 展开）；wiki 三目录内部结构。</li>
+      <li><b>Dropped</b>：流程视图（behavior.md 变化行线性）；evals/ 历史工作区；SKILL→旧文章的运行时边（v2 起附注退出加载清单，无此边）。</li>
+      <li><b>Kept</b>：旧文章附注节点（保留但不在运行链）；agents/openai.yaml（内容同步，无拓扑变化，未画）。</li>
+    </ul>
+    <b>删除清单</b>：旧九模块题库内容（git 历史留底）；旧名 symlink；旧名 default_prompt；打包中的 archive（repo 内保留）。
+    <br><b>accent 预算说明</b>：视图一 accent 节点＝wiki、archive；视图二无新增节点，以橙边标注新增依赖；节点 6-7/9、边 5-6/12。
+  </div>
+</footer>
+
+</body>
+</html>
