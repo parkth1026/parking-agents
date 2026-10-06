@@ -1,0 +1,7 @@
+interface:
+  display_name: "concept-understanding-test"
+  short_description: "Create and use the Concept Understanding Test skill"
+  default_prompt: "Use $concept-understanding-test to handle a Concept Understanding Test task."
+
+policy:
+  allow_implicit_invocation: true
