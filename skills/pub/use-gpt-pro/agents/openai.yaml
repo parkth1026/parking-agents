@@ -1,0 +1,5 @@
+interface:
+  display_name: "use-gpt-pro"
+  default_prompt: "Use $use-gpt-pro"
+policy:
+  allow_implicit_invocation: false
