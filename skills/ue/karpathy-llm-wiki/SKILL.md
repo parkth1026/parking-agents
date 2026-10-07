@@ -199,8 +199,10 @@ wiki 可能被共享——NAS 后端的 `wikiDir` 会被其他会话和技能
 
 1. **读 index.md** — 找与问题相关的页面。
 
-2. **搜索 wiki 页面** — index.md 没有明显命中时，用问题里的关键词
-   搜索 wiki 目录。
+2. **搜索 wiki 页面** — index.md 没有明显命中时，这不等于库内没有。先按
+   SCHEMA.md 词表 grep frontmatter `tags:`（受控词表检索，精度高于自由文本），
+   再 grep 正文，词形至少 2 种（中文/英文/缩写各试一遍）。两级都空才允许进入
+   第 5 步的「未覆盖」结论。
 
 3. **读相关页面** — 基于 wiki 内容综合出答案。引用页面时用
    `[[Page Name]]` 链接，方便用户追查。
@@ -218,6 +220,10 @@ wiki 可能被共享——NAS 后端的 `wikiDir` 会被其他会话和技能
 6. **更新 log.md** — 追加简短条目，记录查询内容与参考过的页面。
 
 ### 操作 3：Lint（检查）
+
+采用精简入口与外部完整清单的部署，可传 `--catalog <完整清单.md>`。
+校验器合并入口和清单的 wikilink，检查断链与索引完整性；清单放在 wikiDir 外。
+未传此参数时保持只检查 index.md 的默认行为。查询无需加载完整清单。
 
 校验 wiki 的一致性与质量。
 
@@ -264,6 +270,9 @@ wiki 可能被共享——NAS 后端的 `wikiDir` 会被其他会话和技能
    - **缺失 frontmatter**：补齐必填 YAML 字段
    - **超大页面**：拆成聚焦的子页面并交叉引用。index.md 超限则拆分层 MOC
      （按分类的子目录页），index 只留分类入口
+   - **MOC 内容纪律**：分层目录页（MOC）的描述行必须带一句 WHY（该页为何
+     属于此簇）；禁止纯自动生成的裸链接列表；同主题 ≥10 页或导航明显吃力才建
+     新 MOC；自动清单只能作为待整理 backlog 追加在人工精选之后
    - **出链不足的页面**：向相关概念补 `[[wikilink]]`
 
 4. **重跑校验** — 循环直到分数 >= 9.0、断链 = 0、且 staleness 节清零
@@ -467,6 +476,8 @@ LLMs, deep learning, AI research, ML systems, and related topics.
 # Wiki Index
 
 > Auto-maintained catalog. One line per page: `- Page Name — one-line description`
+> This file is the catalog, not the corpus — a miss here is not a miss of the wiki.
+> Query protocol: (1) scan this catalog; (2) on miss, grep frontmatter by the SCHEMA.md tag taxonomy, then grep page bodies with >=2 term forms (CJK / English / abbreviation); (3) still nothing -> state "not covered by this wiki" explicitly. Never fill gaps from model memory.
 
 ## Entities
 
