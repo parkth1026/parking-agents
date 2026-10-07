@@ -112,6 +112,39 @@
       },
       "bank_epoch": 3,
       "current_best": false
+    },
+    {
+      "date": "2026-10-07T23:59:00+08:00",
+      "iteration_ref": "G:GITAI_WorkFlowparking-agents-manualevalslixiang-product-grill-workspaceiteration-2-互鉴",
+      "gates": {
+        "with_skill": {
+          "pass_rate": 0.913,
+          "mean_ms": null,
+          "mean_tokens": null
+        }
+      },
+      "vs_previous": {
+        "baseline": "iteration-2-互鉴 run-1（21/23）",
+        "evals_total": 2,
+        "won": 0,
+        "lost": 0,
+        "tie": 2,
+        "note": "方差复跑（带轨迹捕获，channel=headless-trace）：定价 run-2 7/7（AC-4 失败确认单轮方差）；材料贫瘠 run-2 5/7（AC-5 两连败定性非方差弱点：层间断裂命中但「整体方向悬空」结论未点名；AC-6 单败为评分 judgment-call）。AC-10 读取合规轨迹审计 2/2 PASS：SKILL+题库+报告模板均首写前成功读取；定价读 S10、材料贫瘠读全 14 个 S 页。合计维持 21/23。",
+        "detail": [
+          {
+            "eval": "eval-16讲-单维度复盘-定价",
+            "result": "tie",
+            "note": "run-1 6/7 → run-2 7/7"
+          },
+          {
+            "eval": "eval-16讲-材料贫瘠-缺口发现",
+            "result": "tie",
+            "note": "run-1 6/7 → run-2 5/7"
+          }
+        ]
+      },
+      "bank_epoch": 3,
+      "current_best": false
     }
   ],
   "current_best": "runs[1]"
