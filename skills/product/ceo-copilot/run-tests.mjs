@@ -167,5 +167,13 @@ check("references 无模板占位 README", !existsSync(join(REF, "README.md")));
 const design = read("references/design.md");
 check("references/design.md 在位且含 wiki 与独立触发验收条件", /AC-18/.test(design) && /AC-19/.test(design) && design.includes("技能触发与运行保持自包含"));
 
+// --- [互鉴移植] 断点清单与可追溯（2026-10-07） ---
+check("断点清单五条在简明诊断页（做得出/付费/换对象/继续投入/前置选择）",
+  ["做得出", "有人付钱", "换个对象", "值得继续投入", "前置选择"].every((k) => slim.includes(k)));
+check("断点只报命中不计数", slim.includes("命中的写进答案") && slim.includes("不提、不计数"));
+check("关键判断附材料短原话或位置，内部页码仍禁",
+  slim.includes("短原话") && slim.includes("节名或行号") && slim.includes("参考页页码、读取回执和书名背书不进答案"));
+check("design 含互鉴移植 AC-24/AC-25", design.includes("AC-24") && design.includes("AC-25"));
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

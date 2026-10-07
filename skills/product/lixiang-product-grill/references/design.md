@@ -51,6 +51,10 @@ ceo-copilot 的 wiki 是维护层（运行时不读）；本技能的 wiki 是**
 | AC-8 | 触发面：trigger-evals 题面锁（正例 ≥6、负例 ≥13 含旧短语与旧名点名、邻域题、exact_string）＋真跑 trigger_rate_on_should=1.0 且误触发 0 | script＋eval |
 | AC-9 | 五件套：trigger-evals.json、output-evals.json、run-tests.mjs、trigger-benchmark.json、history.json 齐全；output 三臂真实链跑通（bank_epoch 2） | script＋eval |
 
+| AC-10 | SKILL.md 含读取完成契约（截断/报错/只见文件名不算读过、维度输出前完成 S 页全文、失败如实报告缺失、读取记录不进对话）；运行时读取合规本轮 NOT_RUN | script＋manual（NOT_RUN） |
+| AC-11 | 数字纪律在场且双载体同步（SKILL.md 与 web-prompt.md）：算术只用用户/材料数字、课程案例数字标注讲次、答不上记缺口不代估 | script＋eval（断言 NOT_RUN） |
+| AC-12 | 中途直问先答在场且双载体同步：先答一两句再回流程，不改写成复盘问题 | script |
+
 ## 黑名单降级记录（carve-out 执行）
 
 强约束黑名单＝旧九模块名 9 词（行业趋势/行业问题/进攻方向/用户定位/时间节奏/目标要求/业务架构/在线系统/运营系统）＋签名句 5 串（认知决定战略，战略决定业务/量变带来质变/独一无二的资质/高保真映射/闭环），作用于 question-bank.md、SKILL.md、web-prompt.md 三文件，逐词逐串断言。
@@ -70,3 +74,4 @@ carve-out（2026-10-05 实测，grep 19 篇 archive）：
 | --- | --- | --- | --- |
 | 2026-10-05 | 整尺重构（前身 lixiang-ceo-grill 2026-09-21/23 两轮，git 历史留底）：改名 lixiang-product-grill；尺子换为 16 讲 14 维度（标准句 70 组引文-讲次对逐字验证）；新增 archive 19 篇（字节同源）与 wiki 弹药层（sources 19/concepts/cases）；SKILL 协议加开场倒序菜单、smart-skip 激进、每维度读 S 页、裁定唯一依据＝题库；报告矩阵改 14 维度×三模块；五断点全部锚到课程逐字原句（无一自构）；触发模式改名字触发 | 未跑评测轮（重构） | 无 |
 | 2026-10-05 | 评测轮：触发评测 72 探针（60＋4 负例重跑 12）→ test 1.00 / false 0.20；output 三臂（claude/sonnet 真实 run-headless 链）with_skill 100%、with_skill_no_refs 100%、without_skill 69%（技能依赖断言每场景翻 2 条，反证成立）；题库换纪元 bank_epoch 2；ceo-copilot 邻库元数据同步并全量重跑 test 1.00/0.00。用户裁决 A：AC-003 误触发 0.20 接受现状（benchmark 如实记录，残留风险在案——详见上方「触发评测结论」） | 触发 test 1.00/0.20；三臂 100/100/69；ceo 重跑不低于旧值 | 无 |
+| 2026-10-07 | 互鉴移植：读取完成契约、数字纪律、中途直问先答三协议入场（web-prompt 同步后两条）；output-evals 加数字纪律断言（NOT_RUN） | 结构断言全过；读取合规与数字纪律行为未执行（NOT_RUN） | 无 |

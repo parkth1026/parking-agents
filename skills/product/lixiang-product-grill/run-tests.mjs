@@ -332,5 +332,15 @@ check("[触发面] id 唯一且 text 唯一", new Set(ids).size === ids.length &
 check("[触发面] expected_skill 全部属于四值集合", qs.every((q) => VALID_EXPECTED.has(q.expected_skill)));
 check("[触发面] scoring 用 exact_string", JSON.stringify(te.scoring ?? {}).includes("exact_string"));
 
+// ---------- [互鉴移植] 2026-10-07 ----------
+check("[协议] 读取完成契约（截断不算读过、维度输出前完成 S 页、失败如实报告）",
+  skill.includes("读取完成契约") && skill.includes("截断、读取报错") && skill.includes("如实报告缺失") && skill.includes("读取记录不写进复盘对话"));
+check("[协议] 数字纪律（只用用户/材料数字、课程案例标注、不代估）",
+  skill.includes("数字纪律") && skill.includes("只用用户给出或材料里的数字") && skill.includes("不代入自己估的数"));
+check("[协议] 中途直问先答", skill.includes("中途直问先答") && skill.includes("再回到当前维度流程"));
+check("[web-prompt] 数字纪律同步", web.includes("数字纪律") && web.includes("只用我给出或材料里的数字"));
+check("[web-prompt] 直问先答同步", web.includes("直问先答"));
+check("[design] AC-10..AC-12 在场", ["AC-10", "AC-11", "AC-12"].every((x) => design.includes(x)));
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
