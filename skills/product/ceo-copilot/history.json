@@ -232,7 +232,55 @@
         ]
       },
       "bank_epoch": 1
+    },
+    {
+      "date": "2026-10-07T23:05:00+08:00",
+      "iteration_ref": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\evals\\ceo-copilot-workspace\\iteration-9-互鉴",
+      "gates": {
+        "with_skill": {
+          "pass_rate": 0.9535,
+          "mean_ms": 93869.2,
+          "mean_tokens": null
+        }
+      },
+      "vs_previous": {
+        "baseline": "iteration-8",
+        "evals_total": 5,
+        "won": 1,
+        "lost": 0,
+        "tie": 4,
+        "note": "基线断言集不含 AC-24/25（新断言 5/5、5/5 全过）。同名断言关键变化：A 复制 AC-2 由 iteration-8 FAIL 转 PASS。首轮 AC-14 在 4/5 题泄漏「（命中'××'）」核对用语，经措辞修复（禁核对用语）后重跑消除 3 处；残留失败 2＝全面诊断 AC-2（评分从严：双根因并列无传导）＋农险 AC-14（材料自带编号未解释）。宿主未报 token。",
+        "detail": [
+          {
+            "eval": "eval-A复制下游提问",
+            "result": "won",
+            "note": "8/8（基线 6/8，AC-2 FAIL→PASS）"
+          },
+          {
+            "eval": "eval-A全面诊断",
+            "result": "tie",
+            "note": "9/10（AC-14 修复，AC-2 评分从严判 FAIL）"
+          },
+          {
+            "eval": "eval-A定价下游提问",
+            "result": "tie",
+            "note": "9/9（AC-14 修复）"
+          },
+          {
+            "eval": "eval-C留出卡下游提问",
+            "result": "tie",
+            "note": "8/8（run-1，未受泄漏影响）"
+          },
+          {
+            "eval": "eval-农险复盘",
+            "result": "tie",
+            "note": "7/8（AC-24/25 过；AC-14＝材料自带编号未解释）"
+          }
+        ]
+      },
+      "bank_epoch": 3,
+      "current_best": true
     }
   ],
-  "current_best": "runs[3]"
+  "current_best": "runs[5]"
 }
