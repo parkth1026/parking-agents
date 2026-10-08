@@ -1,0 +1,176 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Capability Radar v1",
+  "type": "object",
+  "required": [
+    "capabilities"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "title": {
+      "type": "string",
+      "maxLength": 44
+    },
+    "centerLabel": {
+      "type": "string",
+      "maxLength": 10
+    },
+    "date": {
+      "type": "string",
+      "format": "date"
+    },
+    "domains": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 16
+      }
+    },
+    "subtitle": {
+      "type": "string",
+      "maxLength": 240
+    },
+    "note": {
+      "type": "string",
+      "maxLength": 240
+    },
+    "source": {
+      "type": "string",
+      "maxLength": 240
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "sha256"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      }
+    },
+    "capabilities": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 24,
+      "items": {
+        "$ref": "#/$defs/capability"
+      }
+    }
+  },
+  "$defs": {
+    "capability": {
+      "type": "object",
+      "required": [
+        "id",
+        "group",
+        "name",
+        "status"
+      ],
+      "properties": {
+        "id": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "number"
+            }
+          ]
+        },
+        "group": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "shortLabel": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20
+        },
+        "status": {
+          "enum": [
+            "已具备",
+            "确定能做到",
+            "可能做到"
+          ]
+        },
+        "summary": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "input": {
+          "type": "string"
+        },
+        "output": {
+          "type": "string"
+        },
+        "proof": {
+          "type": "string"
+        },
+        "limits": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "string"
+        },
+        "scenarios": {
+          "type": "string"
+        },
+        "sourceRefs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "source",
+              "locator"
+            ],
+            "properties": {
+              "source": {
+                "type": "string",
+                "minLength": 1
+              },
+              "locator": {
+                "type": "string",
+                "minLength": 1
+              },
+              "quote": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4000
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$comment": "额外校验唯一能力 ID、group 与 domains 对应、来源引用、有效日历日期和短说明回退长度。统一执行 scripts/contract.mjs。"
+}

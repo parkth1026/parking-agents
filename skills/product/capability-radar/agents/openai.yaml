@@ -1,0 +1,6 @@
+interface:
+  display_name: "能力雷达"
+  short_description: "将文档或表格转换为标准 JSON 与离线能力雷达"
+  default_prompt: "使用 $capability-radar 将我提供的材料转换为标准能力 JSON，保留证据与限制，生成可双击查看的 HTML。"
+policy:
+  allow_implicit_invocation: true

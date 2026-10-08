@@ -1,0 +1,57 @@
+{
+  "skill": "capability-radar",
+  "runs": [
+    {
+      "date": "2026-10-08",
+      "version": "initial-portable",
+      "regressions": {
+        "status": "PASS",
+        "checks": 29
+      },
+      "real_inputs": [
+        "WDP6 v2 Markdown 转换与实际页面",
+        "WDP6 v1 XLSX 读取，不混合旧版本"
+      ],
+      "independent_narrative": {
+        "status": "PASS_AFTER_REVIEW_REPAIR",
+        "included": 3,
+        "pending": 1,
+        "excluded": 1,
+        "findings": [
+          "主图摘要漏掉关键限定",
+          "来源行号偏移",
+          "否定谓词加强"
+        ],
+        "repairs": [
+          "限制摘要检查",
+          "原文片段定位核对",
+          "人工复核后修正谓词"
+        ]
+      },
+      "baseline": "两臂均正确处理三档状态。未量化质量优越性。",
+      "trigger_benchmark": "NOT_RUN"
+    },
+    {
+      "date": "2026-10-08",
+      "version": "node-zero-dependency-migration",
+      "regressions": {
+        "status": "PASS",
+        "checks": 44
+      },
+      "real_inputs": {
+        "xlsx": {
+          "sheets": 5,
+          "rows": 88,
+          "warnings": 1
+        },
+        "markdown": {
+          "tables": 3,
+          "rows": 34,
+          "lines": 51
+        }
+      },
+      "trigger_benchmark": "NOT_RUN",
+      "repository_checks": "skill gate and installer verified; full npm test blocked by existing nuwa skill layout"
+    }
+  ]
+}

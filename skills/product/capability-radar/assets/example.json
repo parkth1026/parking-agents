@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "title": "团队能力雷达 · 示例",
+  "centerLabel": "示例",
+  "domains": [
+    "资料处理",
+    "任务应用"
+  ],
+  "subtitle": "示例数据，不代表任何团队实际能力",
+  "note": "导入团队 JSON 后显示真实盘点。三档分类不等于产品化成熟度或交付承诺。",
+  "capabilities": [
+    {
+      "id": "DEMO-1",
+      "group": "资料处理",
+      "name": "导入基础资料",
+      "shortLabel": "导入基础资料",
+      "status": "已具备",
+      "summary": "示例，请替换为真实证据"
+    },
+    {
+      "id": "DEMO-2",
+      "group": "任务应用",
+      "name": "生成标准成果",
+      "shortLabel": "生成标准成果",
+      "status": "确定能做到",
+      "summary": "示例，请填写成立条件"
+    },
+    {
+      "id": "DEMO-3",
+      "group": "任务应用",
+      "name": "探索新任务",
+      "shortLabel": "探索新任务",
+      "status": "可能做到",
+      "summary": "示例，请填写待验证项"
+    }
+  ]
+}

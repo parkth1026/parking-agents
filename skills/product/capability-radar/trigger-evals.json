@@ -1,0 +1,11 @@
+{
+  "skill": "capability-radar",
+  "queries": [
+    {"query": "把这份 Markdown 能力盘点做成三档能力雷达", "should_trigger": true},
+    {"query": "将 Excel 中的能力清单转为标准 JSON 和离线 HTML", "should_trigger": true},
+    {"query": "按新资料更新已具备、确定能做到、可能做到的能力图谱", "should_trigger": true},
+    {"query": "把这份技术报告做普通摘要", "should_trigger": false},
+    {"query": "绘制定量性能评分雷达图", "should_trigger": false},
+    {"query": "画一个服务部署架构图", "should_trigger": false}
+  ]
+}

@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>能力雷达模板</title>
+<style>
+:root{--paper:#f5f5f5;--ink:#2d3142;--muted:#4f5d75;--rule:#bfc0c0;--green:#7c8f6f;--blue:#5e7a9b;--gold:#b8915a}
+*{box-sizing:border-box}body{margin:0;color:var(--ink);background:var(--paper);font-family:"Microsoft YaHei","PingFang SC",Arial,sans-serif}
+.toolbar{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:16px 28px;border-bottom:1px solid var(--rule)}
+.brand{font-weight:600}.actions{display:flex;gap:8px;flex-wrap:wrap}button{font:inherit;color:var(--ink);background:transparent;border:1px solid var(--rule);border-radius:6px;padding:9px 14px;cursor:pointer}button:hover{background:#ececec}button.primary{background:var(--ink);color:var(--paper);border-color:var(--ink)}button:focus-visible,textarea:focus-visible{outline:3px solid var(--blue);outline-offset:3px}
+main{max-width:2200px;margin:auto;padding:12px 12px 32px}.canvas-wrap{overflow:auto}#chart svg{display:block;width:100%;height:auto}#notice{margin:12px 28px;padding:12px 16px;border-left:4px solid var(--gold);background:#f4ecdf;line-height:1.6}#notice[hidden]{display:none}
+.usage{margin:0 28px 20px;color:var(--muted);font-size:14px;line-height:1.7}.usage details{border-top:1px solid var(--rule);padding-top:12px}.usage summary{cursor:pointer}.usage code{overflow-wrap:anywhere}.usage table{width:100%;border-collapse:collapse}.usage th,.usage td{text-align:left;padding:8px;border-bottom:1px solid var(--rule)}
+dialog{max-width:900px;width:calc(100% - 32px);max-height:90vh;border:1px solid var(--rule);border-radius:8px;background:var(--paper);color:var(--ink);padding:24px}dialog::backdrop{background:rgba(45,49,66,.40)}dialog h2{margin:0 0 12px}dialog p{color:var(--muted);line-height:1.6}textarea{width:100%;height:48vh;resize:vertical;padding:14px;border:1px solid var(--rule);border-radius:4px;background:#fff;font:14px/1.6 Consolas,monospace;color:var(--ink)}.dialog-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}.error{color:#9c502f;white-space:pre-wrap;line-height:1.5}.presentation .toolbar,.presentation .usage{display:none}.presentation main{padding:0;max-width:none}.exit-presentation{display:none;position:fixed;right:16px;top:16px;background:var(--paper);z-index:3}.presentation .exit-presentation{display:block}#detail-content{line-height:1.8}#detail-content dt{color:var(--muted);font-size:14px;margin-top:12px}#detail-content dd{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
+@media(max-width:600px){.toolbar{padding:12px;gap:10px}.brand{width:100%}.actions button{font-size:14px;padding:8px 10px}.usage{margin:0 8px}main{padding:8px}.canvas-wrap{overflow-x:auto}#chart svg{min-width:760px}dialog{padding:16px}}
+@media print{.toolbar,.usage,.exit-presentation,#notice{display:none!important}main{padding:0;max-width:none}#chart svg{min-width:0;width:100%}body{background:var(--paper)}@page{size:A3 portrait;margin:8mm}}
+</style>
+</head>
+<body>
+<header class="toolbar">
+  <span class="brand">能力雷达 · 数据驱动</span>
+  <div class="actions">
+    <button id="import-json">导入 JSON</button><button id="edit-json">编辑数据</button><button id="save-json">导出 JSON</button>
+    <button id="save-html">保存 HTML</button><button id="save-svg">导出 SVG</button><button id="save-png">导出 PNG</button><button id="present" class="primary">汇报模式</button>
+  </div>
+</header>
+<input id="json-file" type="file" accept=".json,application/json" hidden>
+<div id="notice" role="alert" hidden></div>
+<main>
+  <div class="canvas-wrap"><div id="chart" aria-live="polite"></div></div>
+  <section class="usage">
+    <details><summary>数据格式与使用说明</summary>
+      <p>导入 JSON，或在“编辑数据”中修改后应用。能力名称直接显示在雷达上；点击能力可查看完整证据。导入只更新当前页面，不会修改原始文件。请导出 JSON 保存数据；“保存 HTML”会将当前数据嵌入新页面，重新打开或发送给老板时直接显示这一版。</p>
+      <table><thead><tr><th>字段</th><th>作用</th></tr></thead><tbody>
+        <tr><td><code>title / date / centerLabel</code></td><td>图标题、数据日期和导出文件名前缀（不画在图上）</td></tr>
+        <tr><td><code>domains</code></td><td>能力域数组；顺序决定扇区排列。省略时按首次出现的 group 排列</td></tr>
+        <tr><td><code>capabilities[].id / group / name</code></td><td>稳定编号、能力域、完整能力名称</td></tr>
+        <tr><td><code>shortLabel</code></td><td>图上最短说明。最多 20 个字符；省略时使用 name</td></tr>
+        <tr><td><code>status</code></td><td>只能为“已具备”“确定能做到”“可能做到”；决定圈层</td></tr>
+        <tr><td><code>summary</code></td><td>图上限制摘要，最多 32 个字符。省略时不自动摘要</td></tr>
+        <tr><td><code>proof / limits / input / output</code></td><td>完整证据与限制，点击能力后查看</td></tr>
+        <tr><td><code>subtitle / note / source</code></td><td>图内说明、证据边界和来源名称</td></tr>
+      </tbody></table>
+      <p>支持 1–8 个能力域、1–24 项能力。文字保持水平。每张卡片整体落在自己的圈层和能力域内，圈层按需自动放大；边框颜色表示三档状态。程序检查标签碰撞；无法清晰排布时拒绝更新，保留上一版，不隐藏能力。</p>
+    </details>
+  </section>
+</main>
+<button class="exit-presentation" id="exit-present">退出汇报模式 · Esc</button>
+<dialog id="editor"><h2>编辑能力数据</h2><p>名称写明“能做什么”；summary 保留关键限制。状态只由数据决定。</p><textarea id="json-editor" aria-label="能力 JSON 数据" spellcheck="false"></textarea><div class="error" id="editor-error" role="alert"></div><div class="dialog-actions"><button id="cancel-edit">取消</button><button id="apply-json" class="primary">应用并绘图</button></div></dialog>
+<dialog id="detail"><h2 id="detail-title"></h2><dl id="detail-content"></dl><div class="dialog-actions"><button id="close-detail">关闭</button></div></dialog>
+<script type="application/json" id="initial-data">{
+  "schemaVersion": 1,
+  "title": "团队能力雷达 · 示例",
+  "centerLabel": "示例",
+  "domains": [
+    "资料处理",
+    "任务应用"
+  ],
+  "subtitle": "示例数据，不代表任何团队实际能力",
+  "note": "导入团队 JSON 后显示真实盘点。三档分类不等于产品化成熟度或交付承诺。",
+  "capabilities": [
+    {
+      "id": "DEMO-1",
+      "group": "资料处理",
+      "name": "导入基础资料",
+      "shortLabel": "导入基础资料",
+      "status": "已具备",
+      "summary": "示例，请替换为真实证据"
+    },
+    {
+      "id": "DEMO-2",
+      "group": "任务应用",
+      "name": "生成标准成果",
+      "shortLabel": "生成标准成果",
+      "status": "确定能做到",
+      "summary": "示例，请填写成立条件"
+    },
+    {
+      "id": "DEMO-3",
+      "group": "任务应用",
+      "name": "探索新任务",
+      "shortLabel": "探索新任务",
+      "status": "可能做到",
+      "summary": "示例，请填写待验证项"
+    }
+  ]
+}</script>
+<script>
+'use strict';
+(() => {
+const NS='http://www.w3.org/2000/svg';
+const STAGES=[{name:'已具备',color:'#7c8f6f',tint:'#e6ebe2',shape:'circle'},{name:'确定能做到',color:'#5e7a9b',tint:'#e5ebf2',shape:'diamond'},{name:'可能做到',color:'#b8915a',tint:'#f3ecdf',shape:'outline'}];
+const INK='#2d3142', MUTED='#4f5d75', PAPER='#f5f5f5', RULE='#bfc0c0';
+const $=id=>document.getElementById(id);
+let currentData, currentLayout, currentSVG;
+function element(tag,attrs={},value){const e=document.createElementNS(NS,tag);for(const [k,v] of Object.entries(attrs))e.setAttribute(k,String(v));if(value!==undefined)e.textContent=value;return e;}
+function txt(parent,x,y,value,size=26,color=INK,weight=400,anchor='start',attrs={}){const e=element('text',{x,y,'font-size':size,fill:color,'font-weight':weight,'text-anchor':anchor,...attrs},value);parent.append(e);return e;}
+function nonempty(v){return typeof v==='string'&&v.trim().length>0;}
+/*__RADAR_CONTRACT_BEGIN__*/
+function validateRadarData(raw) {
+  const statuses=['已具备','确定能做到','可能做到'];
+  const str=v=>typeof v==='string'&&v.trim().length>0;
+  const len=v=>Array.from(v).length;
+  if(!raw||typeof raw!=='object'||Array.isArray(raw))throw Error('JSON 顶层必须是对象。');
+  const data=JSON.parse(JSON.stringify(raw));
+  if(data.schemaVersion!==undefined&&data.schemaVersion!==1)throw Error('仅支持 schemaVersion=1。');
+  data.schemaVersion=1;
+  if(!Array.isArray(data.capabilities)||data.capabilities.length<1||data.capabilities.length>24)throw Error('capabilities 必须包含 1–24 项能力；更多条目应拆为多张雷达。');
+  for(const key of ['title','subtitle','note','source','centerLabel'])if(data[key]!==undefined&&(typeof data[key]!=='string'||len(data[key])>240))throw Error(`${key} 必须是字符串，最多 240 个字符。`);
+  if(data.date!==undefined&&(typeof data.date!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(data.date)||Number.isNaN(Date.parse(data.date+'T00:00:00Z'))||new Date(data.date+'T00:00:00Z').toISOString().slice(0,10)!==data.date))throw Error('date 必须是有效的 YYYY-MM-DD 日期。');
+  const ids=new Set();
+  data.capabilities.forEach((c,i)=>{
+    if(!c||typeof c!=='object'||Array.isArray(c))throw Error(`第 ${i+1} 项能力必须是对象。`);
+    if(!['string','number'].includes(typeof c.id)||!String(c.id).trim()||(typeof c.id==='number'&&!Number.isFinite(c.id)))throw Error(`第 ${i+1} 项缺少有效 id。`);
+    const id=String(c.id).trim();if(ids.has(id))throw Error(`能力 id 重复：${id}`);ids.add(id);
+    if(!str(c.group)||len(c.group.trim())>16)throw Error(`能力 ${id} 的 group 必须为 1–16 个字符。`);
+    if(!str(c.name)||len(c.name)>120)throw Error(`能力 ${id} 缺少有效 name。`);
+    c.group=c.group.trim();
+    if(!statuses.includes(c.status))throw Error(`能力 ${id} 的 status 无效。只允许：${statuses.join(' / ')}。`);
+    if(c.shortLabel!==undefined&&!str(c.shortLabel))throw Error(`能力 ${id} 的 shortLabel 不能为空。`);
+    c.shortLabel=(c.shortLabel||c.name).trim();
+    if(len(c.shortLabel)>20)throw Error(`能力 ${id} 的图上说明超过 20 个字符，请设置更短的 shortLabel。`);
+    if(c.summary!==undefined&&(typeof c.summary!=='string'||len(c.summary)>32))throw Error(`能力 ${id} 的 summary 最多 32 个字符。`);
+    for(const k of ['proof','limits','input','output','evidence','scenarios'])if(c[k]!==undefined&&typeof c[k]!=='string')throw Error(`能力 ${id} 的 ${k} 必须为字符串。`);
+    if(c.sourceRefs!==undefined&&(!Array.isArray(c.sourceRefs)||c.sourceRefs.length===0||c.sourceRefs.some(r=>!r||!str(r.source)||!str(r.locator))))throw Error(`能力 ${id} 的 sourceRefs 必须含 source 与 locator。`);
+    if(c.sourceRefs?.some(r=>r.quote!==undefined&&(!str(r.quote)||len(r.quote)>4000)))throw Error(`能力 ${id} 的来源 quote 必须为 1–4000 个字符。`);
+  });
+  if(data.domains!==undefined&&(!Array.isArray(data.domains)||data.domains.some(v=>!str(v)||len(v.trim())>16)))throw Error('domains 必须是能力域名称数组，每项最多 16 个字符。');
+  data.domains=(data.domains||[...new Set(data.capabilities.map(c=>c.group))]).map(v=>v.trim());
+  if(data.domains.length<1||data.domains.length>8||new Set(data.domains).size!==data.domains.length)throw Error('能力域须为 1–8 个，且名称不能重复。');
+  if(data.capabilities.some(c=>!data.domains.includes(c.group)))throw Error('有能力的 group 不在 domains 中。');
+  data.title=data.title||'技术能力雷达';data.centerLabel=data.centerLabel||'能力范围';
+  if(len(data.title)>44)throw Error('title 最多 44 个字符。');
+  if(len(data.centerLabel)>10)throw Error('centerLabel 最多 10 个字符。');
+  if(data.sources!==undefined){
+    if(!Array.isArray(data.sources)||data.sources.some(s=>!s||!str(s.id)||!str(s.name)||!/^[a-f0-9]{64}$/.test(s.sha256)))throw Error('sources 每项必须含 id、name 和 sha256。');
+    const sourceIds=new Set(data.sources.map(s=>s.id));if(sourceIds.size!==data.sources.length)throw Error('sources.id 重复。');
+    for(const c of data.capabilities)if(!c.sourceRefs?.length||c.sourceRefs.some(r=>!sourceIds.has(r.source)))throw Error(`能力 ${c.id} 缺少有效来源引用。`);
+  }
+  return data;
+}
+
+const validate=validateRadarData;
+/*__RADAR_CONTRACT_END__*/
+const measureCanvas=document.createElement('canvas'), ctx=measureCanvas.getContext('2d');
+function width(value,size,weight=400){ctx.font=`${weight} ${size}px "Microsoft YaHei","PingFang SC",Arial,sans-serif`;return ctx.measureText(value).width;}
+function wrap(value,maxWidth,size,weight=400){
+  const result=[];let line='';
+  for(const ch of Array.from(value||'')){if(ch==='\n'){result.push(line);line='';continue;}if(line&&width(line+ch,size,weight)>maxWidth){result.push(line);line=ch;}else line+=ch;}
+  if(line)result.push(line);return result;
+}
+function overlaps(a,b,gap=12){return a.x<b.x+b.w+gap&&a.x+a.w+gap>b.x&&a.y<b.y+b.h+gap&&a.y+a.h+gap>b.y;}
+function normalized(degrees){return (degrees%360+360)%360;}
+function inside(rect,lo,hi,start,span,outer){
+  const cx=rect.x+rect.w/2,cy=rect.y+rect.h/2;
+  const nx=Math.max(rect.x,Math.min(0,rect.x+rect.w)),ny=Math.max(rect.y,Math.min(0,rect.y+rect.h));if(Math.hypot(nx,ny)<lo+10)return false;
+  const centerAngle=normalized(Math.atan2(cy,cx)*180/Math.PI-start);
+  if(span<359&&(centerAngle<6||centerAngle>span-6))return false;
+  for(const x of [rect.x,rect.x+rect.w])for(const y of [rect.y,rect.y+rect.h]){
+    if(Math.hypot(x,y)>hi-10)return false;if(span<359){const ca=normalized(Math.atan2(y,x)*180/Math.PI-start);if(ca<1.5||ca>span-1.5)return false;}
+  }
+  return true;
+}
+function layout(data){
+  const span=360/data.domains.length;
+  const nodes=data.capabilities.map(c=>{
+    const titleLines=wrap(c.shortLabel,440,38,600), summaryLines=wrap(c.summary||'',440,27);const fitW=Math.ceil((Math.max(...titleLines.map(l=>width(l,38,600)),...summaryLines.map(l=>width(l,27)))+36)/4)*4;
+    if(titleLines.length>2||summaryLines.length>3)throw Error(`能力 ${c.id} 的短说明过长，请精简 shortLabel 或 summary。`);
+    return {c,titleLines,summaryLines,w:fitW,h:26+titleLines.length*48+(summaryLines.length?8+summaryLines.length*36:0)};
+  });
+  // Label centers encode domain and ring; explicit status text removes ambiguity at edges.
+  const grow=[0,0,0];for(let attempt=0;attempt<90;attempt++){
+    const inner=360+grow[0]*20, band=280+grow[1]*20, band2=220+grow[2]*20, middle=inner+band, outer=middle+band2;
+    const bounds=[{lo:88,hi:inner},{lo:inner,hi:middle},{lo:middle,hi:outer}];
+    const placed=[], reserved=[];
+    bounds.forEach((b,i)=>reserved.push({x:-110,y:-(b.lo+b.hi)/2-20,w:220,h:40}));
+    let failed=false;
+    for(let domain=0;domain<data.domains.length&&!failed;domain++)for(let stage=0;stage<3&&!failed;stage++){
+      const group=nodes.filter(n=>n.c.group===data.domains[domain]&&n.c.status===STAGES[stage].name).sort((a,b)=>b.h-a.h||String(a.c.id).localeCompare(String(b.c.id),'zh-CN',{numeric:true}));
+      const b=bounds[stage],start=-90+domain*span;
+      const optionsFor=(node,gi,taken)=>{
+        const options=[];
+        for(let r=b.lo+20;r<=b.hi-20;r+=10)for(let a=start+2;a<start+span-1;a+=1.5){
+          const angle=a*Math.PI/180,x=Math.round(r*Math.cos(angle)/4)*4,y=Math.round(r*Math.sin(angle)/4)*4;
+          const rect={x:x-node.w/2,y:y-node.h/2,w:node.w,h:node.h};
+          if(!inside(rect,b.lo,b.hi,start,span,outer)||reserved.some(q=>overlaps(rect,q,8))||taken.some(q=>overlaps(rect,q,24)))continue;
+          options.push({...rect,cx:x,cy:y,c:node.c,titleLines:node.titleLines,summaryLines:node.summaryLines,stage,domain,cost:Math.abs(r-(b.lo+b.hi)/2)+Math.abs(a-(start+span*(gi+.5)/group.length))*4});
+        }
+        return options.sort((p,q)=>p.cost-q.cost||p.y-q.y||p.x-q.x);
+      };
+      const solve=(gi,taken,budget)=>{
+        if(gi===group.length)return [];
+        const options=optionsFor(group[gi],gi,taken);
+        for(let k=0;k<options.length&&budget.n>0;k+=Math.max(1,Math.floor(options.length/(group.length>2?60:400)))){
+          budget.n--;
+          const rest=solve(gi+1,[...taken,options[k]],budget);
+          if(rest)return [options[k],...rest];
+        }
+        return null;
+      };
+      const solved=solve(0,placed,{n:30000});
+      if(!solved){failed=true;grow[stage]++;break;}
+      placed.push(...solved);
+    }
+    if(!failed){
+      const W=2*(outer+260),CY=outer+340,H=CY+outer+350;
+      return {W,H,CX:W/2,CY,inner,middle,outer,bounds,span,nodes:placed};
+    }
+  }
+  throw Error('当前能力分布过密，无法在保持文字清晰的条件下排布。请减少同一扇区同一圈层的条目，或合并为上级能力。上一版图保留。');
+}
+function multiline(parent,x,y,lines,size,color,weight=400,lineHeight=30,anchor='middle',attrs={}){
+  const t=element('text',{x,y,'font-size':size,fill:color,'font-weight':weight,'text-anchor':anchor,...attrs});
+  lines.forEach((line,i)=>t.append(element('tspan',{x,dy:i?lineHeight:0},line)));parent.append(t);return t;
+}
+function glyph(parent,x,y,stage,size=9){
+  const s=STAGES[stage];
+  if(s.shape==='diamond')parent.append(element('path',{d:`M${x} ${y-size}L${x+size} ${y}L${x} ${y+size}L${x-size} ${y}Z`,fill:s.color}));
+  else parent.append(element('circle',{cx:x,cy:y,r:size,fill:s.shape==='outline'?PAPER:s.color,stroke:s.color,'stroke-width':2}));
+}
+function buildSVG(data,L){
+  const svg=element('svg',{xmlns:NS,width:L.W,height:L.H,viewBox:`0 0 ${L.W} ${L.H}`,role:'img','aria-labelledby':'capability-radar-title capability-radar-desc'});
+  svg.append(element('title',{id:'capability-radar-title'},data.title));
+  svg.append(element('desc',{id:'capability-radar-desc'},`${data.domains.length} 个能力域，${data.capabilities.length} 项能力。每项能力直接显示名称和摘要。内圈已具备，中圈确定能做到，外圈可能做到。`));
+  svg.append(element('style',{},'text{font-family:"Microsoft YaHei","PingFang SC",Arial,sans-serif}.capability{cursor:pointer}.capability:focus .label-bg{stroke:#2d3142;stroke-width:3}.capability:hover .label-bg{stroke:#2d3142;stroke-width:2}'));
+  svg.append(element('rect',{width:L.W,height:L.H,fill:PAPER}));
+  txt(svg,64,68,data.title,52,INK,600);
+  txt(svg,L.W-64,66,data.date?`数据日期 · ${data.date}`:'',24,MUTED,400,'end');
+  txt(svg,64,112,data.subtitle||'能力名称直接入图 · 圈层表示三档分类',26,MUTED);
+  const legendY=160;
+  STAGES.forEach((s,i)=>{const x=80+i*330;glyph(svg,x,legendY-8,i,10);txt(svg,x+24,legendY,s.name,26,s.color,600);});
+  txt(svg,L.W-64,160,`${data.domains.length} 个能力域 · ${data.capabilities.length} 项能力`,24,MUTED,400,'end');
+  const plot=element('g',{transform:`translate(${L.CX},${L.CY})`});svg.append(plot);
+  [L.outer,L.middle,L.inner].forEach((r,i)=>plot.append(element('circle',{cx:0,cy:0,r,fill:STAGES[2-i].tint,stroke:STAGES[2-i].color,'stroke-width':1,'stroke-opacity':.35})));
+  if(data.domains.length>1)for(let i=0;i<data.domains.length;i++){
+    const a=(-90+i*L.span)*Math.PI/180;
+    plot.append(element('line',{x1:0,y1:0,x2:L.outer*Math.cos(a),y2:L.outer*Math.sin(a),stroke:INK,'stroke-width':5,'stroke-opacity':.55}));
+  }
+  
+  
+  data.domains.forEach((domain,i)=>{
+    const a=(-90+(i+.5)*L.span)*Math.PI/180, r=L.outer+110;
+    multiline(plot,r*Math.cos(a),r*Math.sin(a)+18,wrap(domain,420,56,700),56,INK,700,66,'middle',{'data-domain':domain});
+  });
+  STAGES.forEach((s,i)=>{
+    const y=-(L.bounds[i].lo+L.bounds[i].hi)/2;
+    plot.append(element('rect',{x:-104,y:y-24,width:208,height:46,fill:s.tint,rx:4}));
+    txt(plot,0,y+12,s.name,34,s.color,700,'middle',{'data-ring':s.name});
+  });
+  L.nodes.forEach(n=>{
+    const s=STAGES[n.stage], g=element('g',{class:'capability','data-id':n.c.id,'data-status':n.c.status,'data-group':n.c.group,role:'button',tabindex:0,'aria-label':`${n.c.shortLabel}，${n.c.status}。${n.c.summary||''}。查看完整证据。`});
+    g.append(element('title',{},`${n.c.name} · ${n.c.status}\n${n.c.limits||n.c.summary||''}`));
+    g.append(element('rect',{class:'label-bg',x:n.x,y:n.y,width:n.w,height:n.h,rx:8,fill:PAPER,stroke:s.color,'stroke-width':3,'stroke-opacity':.95}));
+    
+    
+    const titleY=n.y+50;
+    multiline(g,n.cx,titleY,n.titleLines,38,INK,600,48,'middle',{'data-short-label':n.c.id});
+    if(n.summaryLines.length)multiline(g,n.cx,titleY+n.titleLines.length*48,n.summaryLines,27,MUTED,400,36,'middle',{'data-summary':n.c.id});
+    g.addEventListener('click',()=>showDetail(n.c));g.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();showDetail(n.c);}});
+    plot.append(g);
+  });
+  const footerY=L.CY+L.outer+240;
+  svg.append(element('line',{x1:64,y1:footerY-36,x2:L.W-64,y2:footerY-36,stroke:RULE,'stroke-width':1}));
+  multiline(svg,64,footerY,wrap(data.note||'三档分类不等于产品化成熟度或交付承诺；空白区域只表示未录入能力。',L.W-128,22),22,MUTED,400,30,'start');
+  if(data.source)txt(svg,64,L.H-28,`来源：${data.source}`,18,MUTED);
+  return svg;
+}
+function apply(raw){
+  const data=validate(raw), L=layout(data), svg=buildSVG(data,L);
+  $('chart').replaceChildren(svg);currentData=data;currentLayout=L;currentSVG=svg;document.title=data.title;$('notice').hidden=true;
+  return data;
+}
+function notice(message){$('notice').textContent=message;$('notice').hidden=false;}
+function showDetail(c){
+  $('detail-title').textContent=c.name;$('detail-content').replaceChildren();
+  for(const [k,label] of [['status','三档分类'],['group','能力域'],['evidence','原文证据档'],['input','输入'],['output','产出'],['proof','证据'],['limits','限制'],['scenarios','应用场景']])if(c[k]){
+    const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=label;dd.textContent=c[k];$('detail-content').append(dt,dd);
+  }
+  if(c.sourceRefs?.length){
+    const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent='来源定位';
+    dd.textContent=c.sourceRefs.map(ref=>{const source=currentData.sources?.find(s=>s.id===ref.source);return (source?.name||ref.source)+' · '+ref.locator;}).join('\n');
+    $('detail-content').append(dt,dd);
+  }
+  $('detail').showModal();
+}
+function download(blob,name){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);}
+function filename(ext){return `${currentData.centerLabel||'能力'}-能力雷达-${currentData.date||'当前'}.${ext}`.replace(/[\\/:*?"<>|]/g,'-');}
+function serialize(){const clone=currentSVG.cloneNode(true);clone.querySelectorAll('[tabindex]').forEach(e=>e.removeAttribute('tabindex'));return new XMLSerializer().serializeToString(clone);}
+$('import-json').addEventListener('click',()=>$('json-file').click());
+$('json-file').addEventListener('change',async e=>{
+  const file=e.target.files[0];if(!file)return;
+  try{if(file.size>1024*1024)throw Error('JSON 文件不能超过 1 MB。');const raw=JSON.parse((await file.text()).replace(/^\uFEFF/,''));apply(raw);}
+  catch(error){notice(`导入失败，上一版图保留。${error.message}`);}finally{e.target.value='';}
+});
+$('edit-json').addEventListener('click',()=>{$('json-editor').value=JSON.stringify(currentData,null,2);$('editor-error').textContent='';$('editor').showModal();});
+$('cancel-edit').addEventListener('click',()=>$('editor').close());
+$('apply-json').addEventListener('click',()=>{try{const value=$('json-editor').value;if(value.length>1024*1024)throw Error('JSON 不能超过 1 MB。');apply(JSON.parse(value));$('editor').close();}catch(error){$('editor-error').textContent=`更新失败，上一版图保留。${error.message}`;}});
+$('close-detail').addEventListener('click',()=>$('detail').close());
+$('save-json').addEventListener('click',()=>download(new Blob([JSON.stringify(currentData,null,2)],{type:'application/json;charset=utf-8'}),filename('json')));
+$('save-svg').addEventListener('click',()=>download(new Blob([serialize()],{type:'image/svg+xml;charset=utf-8'}),filename('svg')));
+$('save-html').addEventListener('click',()=>{
+  const clone=document.documentElement.cloneNode(true);
+  clone.querySelector('#initial-data').textContent=JSON.stringify(currentData,null,2).replace(/</g,'\\u003c');
+  clone.querySelector('body').classList.remove('presentation');
+  clone.querySelectorAll('dialog').forEach(e=>e.removeAttribute('open'));
+  clone.querySelector('#notice').hidden=true;clone.querySelector('#notice').textContent='';
+  clone.querySelector('#json-editor').textContent='';clone.querySelector('#editor-error').textContent='';
+  clone.querySelector('#detail-content').replaceChildren();clone.querySelector('#detail-title').textContent='';
+  clone.querySelector('#save-png').removeAttribute('disabled');
+  download(new Blob(['<!doctype html>\n'+clone.outerHTML],{type:'text/html;charset=utf-8'}),filename('html'));
+});
+$('save-png').addEventListener('click',async()=>{
+  const button=$('save-png');button.disabled=true;
+  try{
+    await document.fonts.ready;
+    const dataUrl='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(serialize());
+    const img=new Image();await new Promise((ok,no)=>{img.onload=ok;img.onerror=()=>no(Error('SVG 图片解码失败'));img.src=dataUrl;});
+    const canvas=document.createElement('canvas'), scale=Math.min(1.5,4096/Math.max(currentLayout.W,currentLayout.H));
+    canvas.width=Math.round(currentLayout.W*scale);canvas.height=Math.round(currentLayout.H*scale);canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+    const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));if(!blob)throw Error('未能生成图片。');download(blob,filename('png'));
+  }catch(error){notice(`PNG 导出失败：${error.message}`);}finally{button.disabled=false;}
+});
+$('present').addEventListener('click',()=>document.body.classList.add('presentation'));
+$('exit-present').addEventListener('click',()=>document.body.classList.remove('presentation'));
+document.addEventListener('keydown',e=>{if(e.key==='Escape')document.body.classList.remove('presentation');});
+document.fonts.ready.then(()=>{try{apply(JSON.parse($('initial-data').textContent));}catch(error){notice(`初始化失败：${error.message}`);}});
+})();
+</script>
+</body>
+</html>
