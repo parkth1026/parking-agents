@@ -1,0 +1,6 @@
+{
+  "_README": "真实路径放在 SKILL_ENV 或 ~/.config/parking-agents/skill-env.json 的 bizResearchWiki.rootDir；保留此键兼容已有配置，不复用 UE5 knowledgeBase。本技能只写 raw/、runs/；wiki/ 路径仅供只读查重与后续显式交接。",
+  "bizResearchWiki": {
+    "rootDir": null
+  }
+}
