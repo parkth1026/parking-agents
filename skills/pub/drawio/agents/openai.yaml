@@ -1,0 +1,7 @@
+interface:
+  display_name: "drawio"
+  short_description: "生成原生 .drawio 图表：Mermaid/XML 双路，PNG/SVG/PDF 导出与浏览器 URL"
+  default_prompt: "Use $drawio to create this diagram as a native .drawio file."
+
+policy:
+  allow_implicit_invocation: true
