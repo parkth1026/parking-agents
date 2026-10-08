@@ -57,6 +57,7 @@
 - 可靠路径：登录态下在页面内同源 `fetch('/api/v0/share/content?share_id=<id>', {credentials:'include'})`，返回完整 JSON（`data.biz_data.messages[]`，含 USER/ASSISTANT、fragments 分 THINK/RESPONSE/TOOL_*），本地解析即可全文转录；接口 URL 可从 `performance.getEntriesByType('resource')` 证据式找到，无需猜路径。
 - 分享页 `screenshot()` 可能表面准备超时（与既有劣化坑同款），但不影响数据接口路径。
 - `share/content` 接口实测无需登录（WebFetch 直接抓接口 URL 即返回 JSON），可先用 WebFetch 打接口做快速预览；但大对话（约 200KB）经 WebFetch 小模型转述疑似被截断（12 条只数出 8 条），精确全量转录仍以浏览器同源 fetch 落盘解析为准。
+- 2026-10-08 补充：命令行 curl 直抓该接口会被 WAF 拦截（返回 "Error - Request Blocked" HTML）；带浏览器 `User-Agent` 头（如 Chrome UA）+ `Accept: application/json` 后即可免登录拿全量 JSON，比开浏览器更快。回答内联引用标记格式为 `[reference:N]`，N 对应 RESPONSE fragment 的 `references[N]`（指向 TOOL_OPEN/TOOL_SEARCH fragment id）；TOOL_OPEN 的 URL/标题在其 `result.url`/`result.title`，部分打开失败片段 `result` 为 null。
 
 ### 2026-09-28 用户裁定：开关由用户手动管理
 
