@@ -95,11 +95,15 @@ const C = {
 
 // ---- CLI 参数 ----
 function parseArgs(argv) {
-  const args = { wiki: null, config: null, raw: null };
+  const args = { wiki: null, config: null, raw: null, catalog: null };
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--wiki") args.wiki = argv[++i];
     else if (argv[i] === "--config") args.config = argv[++i];
     else if (argv[i] === "--raw") args.raw = argv[++i];
+    else if (argv[i] === "--catalog") {
+      args.catalog = argv[++i];
+      if (!args.catalog || args.catalog.startsWith('--')) { console.error('缺少 --catalog 路径'); process.exit(2); }
+    }
     else { console.error(`未知参数: ${argv[i]}`); process.exit(2); }
   }
   if (!args.wiki) { console.error("缺少必填参数 --wiki <path/to/wiki>"); process.exit(2); }
@@ -186,7 +190,12 @@ const headingExists = (rawContent, anchor) => {
 };
 
 // ---- 入口 ----
-const { wiki: wikiPath, config: configPath, raw: rawArg } = parseArgs(process.argv.slice(2));
+const { wiki: wikiPath, config: configPath, raw: rawArg, catalog: catalogPath } = parseArgs(process.argv.slice(2));
+
+if (catalogPath && !existsSync(catalogPath)) {
+  console.error(`Catalog path does not exist: ${catalogPath}`);
+  process.exit(2);
+}
 
 console.log(C.cyan("=== Wiki Validation Script v7.2 ==="));
 if (!existsSync(wikiPath)) {
@@ -272,8 +281,9 @@ if (existsSync(schemaPath)) {
 // index.md 提取已索引页面
 const indexedPages = [];
 const indexPath = join(wikiPath, "index.md");
-if (existsSync(indexPath)) {
-  for (const m of read(indexPath).matchAll(/\[\[([^\]]+)\]\]/g)) indexedPages.push(m[1]);
+const indexFiles = [indexPath, ...(catalogPath ? [catalogPath] : [])].filter(existsSync);
+for (const file of indexFiles) {
+  for (const m of read(file).matchAll(/\[\[([^\]]+)\]\]/g)) indexedPages.push(m[1]);
 }
 
 // === 维度 1: 断链 ===
@@ -381,16 +391,18 @@ for (const file of allFiles) {
 
 // index.md 的目录链接：纳入断链检查（消除校验盲区）；按配置计入入链
 // （index 是 catalog of all pages，目录行视为官方入链；关闭开关可回退旧行为）
-if (existsSync(indexPath)) {
-  const indexRaw = read(indexPath);
-  for (const target of indexedPages) {
+for (const indexFile of indexFiles) {
+  const indexRaw = read(indexFile);
+  const indexLabel = indexFile === indexPath ? "index.md" : indexFile;
+  for (const match of indexRaw.matchAll(/\[\[([^\]]+)\]\]/g)) {
+    const target = match[1];
     // v7.1：index 目录链接同样剥锚点解析页面名；v7.2：[[#heading]] 页内跳转
     // 解析为 index.md 自身（不计断链，锚点对 index.md 校验）
     const { page: pagePart, anchor } = splitAnchor(target);
     if (pagePart === "") {
       totalLinkSum++;
       if (anchor && !headingExists(indexRaw, anchor)) {
-        anchorIssues.push({ File: "index.md", Link: target, Target: "index.md (self)" });
+        anchorIssues.push({ File: indexLabel, Link: target, Target: `${indexLabel} (self)` });
       }
       continue;
     }
@@ -404,9 +416,9 @@ if (existsSync(indexPath)) {
       if (indexCountsAsInbound && canonical) {
         inboundCount.set(canonical, inboundCount.get(canonical) + 1);
       }
-      if (anchor && canonical) checkAnchor("index.md", target, canonical, anchor);
+      if (anchor && canonical) checkAnchor(indexLabel, target, canonical, anchor);
     } else {
-      brokenLinks.push({ File: "index.md", Link: target });
+      brokenLinks.push({ File: indexLabel, Link: target });
     }
   }
 }

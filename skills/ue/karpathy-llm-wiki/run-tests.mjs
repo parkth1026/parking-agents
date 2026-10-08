@@ -599,5 +599,24 @@ function run(args) {
   check("断链 0 → PASS", r.code === 0, `code=${r.code}`);
 }
 
+// 精简入口与完整清单同时校验；普通 wiki 保持原有默认行为。
+{
+  const wiki = join(ROOT, "good-wiki");
+  const catalog = join(ROOT, "page-catalog.md");
+  writeFileSync(join(wiki, "index.md"), "# Index\n- [[Transformer]]\n");
+  writeFileSync(catalog, "# Catalog\n- [[Transformer]]\n- [[OpenAI]]\n- [[Attention]]\n");
+  const r = run(["--wiki", wiki, "--catalog", catalog]);
+  check("slim index + catalog covers all pages", r.code === 0 && !r.stdout.includes("Missing from Index ("));
+  writeFileSync(catalog, "# Catalog\n- [[Transformer]]\n- [[Ghost]]\n");
+  const brokenCatalog = run(["--wiki", wiki, "--catalog", catalog]);
+  check("catalog broken link is rejected", brokenCatalog.code === 1 && brokenCatalog.stdout.includes("[[Ghost]]"));
+  writeFileSync(catalog, "# Catalog\n- [[Transformer]]\n- [[OpenAI]]\n- [[Attention]]\n");
+  writeFileSync(join(wiki, "index.md"), "# Index\n- [[Ghost Entry]]\n");
+  const brokenEntry = run(["--wiki", wiki, "--catalog", catalog]);
+  check("entry links still checked with catalog", brokenEntry.code === 1 && brokenEntry.stdout.includes("[[Ghost Entry]]"));
+  check("missing catalog is configuration error", run(["--wiki", wiki, "--catalog", join(ROOT, "missing-catalog.md")]).code === 2);
+  check("missing catalog argument rejected", run(["--wiki", wiki, "--catalog"]).code === 2);
+}
+
 console.log(`\n=== ${pass} passed, ${fail} failed ===`);
 process.exit(fail === 0 ? 0 : 1);
