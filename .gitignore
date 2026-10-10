@@ -24,3 +24,5 @@ node_modules/
 /.aes-gate/
 *.DS_Store
 /.gpt-pro
+**/.obsidian
+.zcodeignore
