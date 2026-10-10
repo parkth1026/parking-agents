@@ -1,0 +1,90 @@
+{
+  "book_id": "B08",
+  "title": "Testing Business Ideas",
+  "author": "David J. Bland, Alexander Osterwalder",
+  "published": "2020",
+  "identifier": "urn:uuid:7f2b8a1e-derived-testing-business-ideas",
+  "edition_note": "EBSCOhost PDF→MOBI 转换版本（源为 mobi）。预处理链：python-mobi 拆包（mobi7）→ 自写脚本切除书末 EBSCO 垃圾段并按书结构重组为派生 EPUB（_tools/testing-business-ideas.derived.epub）→ epub-native-to-raw 抽取。阅读顺序在多栏/图形页有交错，本电子版无页码。",
+  "locator": "synthetic-page",
+  "page_units": 300,
+  "extraction": "派生链：源 mobi → python-mobi 拆包（mobi7/book.html 单文件流）→ 自写脚本按书结构切成 63 个 XHTML （叙事章按 SECTION N — X / N.M — 标题段与章前引言页定界；44 张实验卡按“竖排标签碎段+实验名+印刷页码+定义+EXPERIMENTS/COST 簇”逐卡定界；书末 EBSCO 转换器垃圾段 12 段/733 纯文本字符整段切除）→ 打包为 derived EPUB（spine 按书序，NCX 目录 63 条）→ epub-native-to-raw 抽取。重组级守恒：切分前 14212 段/350779 字符 = 保留 14200 段/350046 字符 + 切除垃圾 12 段/733 字符；重组后重解析 14200 段/350046 字符，相等。抽取级守恒：切分后 58130 单位 + 跳过 0 = 源（derived EPUB）58130 单位。正文不改字；图片变成 [图：文件名] 占位行；无印刷页分页标记，按每页约 300 个单位切合成页，每节另起一页。",
+  "known_limits": [
+    "定位方式为合成页（synthetic-page）：原电子书无页码。正文里出现的印刷页码（Front Matter 目录的 p.N、每张实验卡头部的三位页码、Index 条目的页码）是纸书页码，与 raw 页号不对应，不能用于引用定位。",
+    "Front Matter 节（原书 ~p.XI–XIV 目录页）多栏交错：目录条目与配图文字互相穿插、部分条目被打散成碎字（如 Stakeholder Interviews → \"der e Stub ws ehol\"），该节目录条目顺序不可信；真实章节结构以各节文件为准。",
+    "3.2 Discovery Intro（原书 p.104–105）与 3.3 Validation Intro（原书 p.234–235）是实验矩阵图的文字层：实验名、p.N、D · F · V 标记多栏交错，矩阵的行列结构（COST/AVG.TIME/EVIDENCE STRENGTH 轴）从 raw 无法恢复。",
+    "全书页缘竖排标签被转换器打散为碎字段：DISCOVERY→\"ERvoc\"、VALIDATION→\"NoTIaId\"/\"alv\"、EXPERIMENTS→\"Ts en M eri XP e\"、EXPLORATION→\"ERvoc\" 等；这些碎字按原样保留在 raw 中，未做拼接修复。",
+    "44 张实验卡的图形读不到：证据强度图标、COST/SETUP TIME/RUN TIME 滑杆位置、THEME 色块、D · F · V 三点标记均只余文字与 [图：…] 占位行；从 raw 无法得知任何一张卡的强度/成本/耗时档位。",
+    "卡内 CASE STUDY 与 VARIATION 侧栏归入所在卡的节；部分卡末尾的 \"VARIATION\" 标记段（如 Feature Stub 卡尾的 VARIATION/404、Customer Interview 卡尾的 VARIATION）概念上引出下一个实验，位置归前一张卡。",
+    "Afterword（原书 p.328–329）在此转换版中没有正文：文字层无正文段、无图，仅剩运行页眉（\"Afterword\"、\"328\"、\"EXPERIMENTS\"、\"Afterword 329\"），已按小节并入 Glossary 节；如需 Afterword 内容须另找版本。",
+    "Index 节末尾附 Wiley EULA 通告 3 行（原书排版如此）。",
+    "书末 EBSCO 转换器垃圾段（\"Document Outline\"、\"Table of Contents\"、BlandDavidJOste_2020_* 资源文件名拼接、\"Página em branco\"，共 12 段 / 733 个纯文本字符）已在 EPUB 重组时整段切除，不进入 raw。",
+    "被拆开的连字（如 profi t 型）与行尾断词（如 \"exper-iment\"、\"inter-view\"）是转换版原文的一部分，未修复，按原样保留。"
+  ],
+  "origin_manifest_sha256": "17b4c0a784cd1e19ec9e4618e1c9ae26958548be466049f57db95844d655ee54",
+  "scope": "Only already-cited raw page blocks are bundled. No whole-book or extraction-completeness certification.",
+  "sections": [
+    {
+      "file": "s1.json",
+      "title": "2.1 Hypothesize",
+      "sha256": "d0327f727d72656f2333586804725cd7f9ebb65fc14c4aa53f6deb69a99b0da2",
+      "pages": [
+        17,
+        18,
+        20,
+        21
+      ],
+      "origin_file": "03-21-Hypothesize.md",
+      "origin_file_sha256": "ea5bc49b2879b86f4707d84412967990e4091c7495515fba92143f27b1b9e6bb"
+    },
+    {
+      "file": "s2.json",
+      "title": "3.1 Select an Experiment",
+      "sha256": "2b5dba913b70e17036c49307cf8e827ec898554fe09daa47268b15108945c051",
+      "pages": [
+        43,
+        44
+      ],
+      "origin_file": "08-31-Select-an-Experiment.md",
+      "origin_file_sha256": "ba1e6b3248ecba59d384d2c8a6eda1a4c3dc4ced1690d8de956dbf9a721eaa86"
+    },
+    {
+      "file": "s3.json",
+      "title": "2.2 Experiment",
+      "sha256": "7b51de4e68b2c80a35a79a98b207e97c3e4207662320ff385ec2f067a8bd11da",
+      "pages": [
+        22,
+        23,
+        24
+      ],
+      "origin_file": "04-22-Experiment.md",
+      "origin_file_sha256": "c67e95d2ae2a643d2e39064e65ee3f2d7924344fa4ed1efc4b8c23e877d594ac"
+    },
+    {
+      "file": "s4.json",
+      "title": "2.3 Learn",
+      "sha256": "0f71538a650ef6a8638e888ea50953cd3256565ff0556c9bfd88e4d078a83d1e",
+      "pages": [
+        25,
+        26,
+        27,
+        28,
+        29
+      ],
+      "origin_file": "05-23-Learn.md",
+      "origin_file_sha256": "ce6d5a4d50ea14b100cf704146a79fbb91a70f600e753c1e21a5b8690d72a82f"
+    },
+    {
+      "file": "s5.json",
+      "title": "Experiment: Concierge",
+      "sha256": "8e61bec10e680301672f1d3d086dd50ddb475b1ad158c6104efffd968d424ec2",
+      "pages": [
+        151,
+        152,
+        154,
+        155
+      ],
+      "origin_file": "43-Experiment-Concierge.md",
+      "origin_file_sha256": "bc72cef5ce2be835754d943fd1c2c1cbb54e0b8337463562baab24da718d4f1e"
+    }
+  ]
+}

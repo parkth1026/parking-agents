@@ -1,0 +1,20 @@
+{
+  "book_id": "B24",
+  "source_id": "s2",
+  "title": "CHAPTER 42: Concierge Test Technique",
+  "original_file": "109-CHAPTER-42-Concierge-Test-Technique.md",
+  "origin_file_sha256": "7e23aef8500e72667b9c185dfd388faa50b31a50061855d8869c705147d9436b",
+  "selection": "Already-cited raw pages only; preserve page text verbatim.",
+  "pages": [
+    {
+      "page": 226,
+      "text": "\n\n# CHAPTER 42 Concierge Test Technique\n\nA concierge test is one of my favorite techniques for quickly generating high‐quality product ideas and, at the same time, working on developing the customer understanding and empathy that's so important for motivating the team and delivering strong solutions.\n\nA concierge test is a relatively new name to describe an old but effective technique. The idea is that we do the customer's job for them—manually and personally. Just as if you went to a hotel concierge and asked if he could find you some theater tickets to a popular show. You don't really know the details of what that concierge is doing for you to get those tickets, but you do know that he is doing something.\n\nWith this technique, you become the concierge. You do what the user or customer needs done for them. You may have to ask them to train you first, but you are in their shoes doing the tasks they would do.\n\nA concierge test requires going out to the actual users and customers and asking them to show you how they work so that you can learn how to do their job, and so that you can work on providing them a much better solution.\n\nThis is similar, but not the same, as spending some time with your customer service or customer success staff. That is also valuable, and often a good source of product ideas as well, but that is helping customers once they call with a problem.\n\nA concierge test requires going out to the actual users and customers and asking them to show you how they work so that\n\n",
+      "sha256": "d874654f0e29710920dfc937ee2d8cee61a44d17613a5e5aecec519279d87548"
+    },
+    {
+      "page": 227,
+      "text": "\n\nyou can learn how to do their job, and so that you can work on providing them a much better solution.\n\nIf you are building a customer‐enabling product, the users may be employees of your company, but the technique is the same—you go to these colleagues and ask them to teach you how they do their job.\n\nLike the principle of shared learning, it is most valuable if the product manager, the product designer, and one of the engineers does the concierge test.\n",
+      "sha256": "2fddb969aad6e8dcea3d3d47e6d58387105823fd3c8df5986626a3e61d678982"
+    }
+  ]
+}

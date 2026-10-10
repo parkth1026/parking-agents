@@ -1,0 +1,42 @@
+{
+  "book_id": "B00",
+  "title": "The Second Curve",
+  "author": "Charles Handy",
+  "published": "2015-03-12",
+  "identifier": "9781473506138",
+  "edition_note": "Random House 2015 年电子版，原生流式 EPUB，ISBN 9781473506138。文件来自电子书分发站。",
+  "locator": "synthetic-page",
+  "page_units": 300,
+  "extraction": "unzip 后按 spine 顺序读 XHTML；块级元素各成一段；标题加 #，列表加 -，图片变成 [图：文件名｜alt] 占位行，上标变成 [^n]；没有印刷页标记，按每页约 300 个单位切合成页，每节另起一页；正文不改字",
+  "known_limits": [
+    "EPUB 没有印刷页标记。页码是合成页：每页约 300 个词，每节另起一页，和纸书页码无关。",
+    "全书 7 张图片只留了占位行。其中 2 张是第 1 章的 S 形曲线和第二曲线示意图，图里的内容读不到。"
+  ],
+  "origin_manifest_sha256": "c0e95d02f79662e6f57305757512e13ac735c7d3c3d9477297a4148487acad0a",
+  "scope": "Only already-cited raw page blocks are bundled. No whole-book or extraction-completeness certification.",
+  "sections": [
+    {
+      "file": "s1.json",
+      "title": "1. The Second Curve",
+      "sha256": "b633fc89b3ecfea48c95351d0afe65dc3f5b6f44b49bef1a8a50f6376306f3ce",
+      "pages": [
+        14,
+        15,
+        16,
+        17
+      ],
+      "origin_file": "05-1-The-Second-Curve.md",
+      "origin_file_sha256": "5251eb135439e219f4f10ed5d3c8c5d2647d739cd3573d214439ad13b8e98055"
+    },
+    {
+      "file": "s2.json",
+      "title": "6. The Dilemmas of Growth",
+      "sha256": "fa40f588022a2d3857e32326a839417c4728f5c6ed04fd5e80ded8ee4cc637b5",
+      "pages": [
+        64
+      ],
+      "origin_file": "10-6-The-Dilemmas-of-Growth.md",
+      "origin_file_sha256": "ac0d1217a1be1b7d1dc37c236a03f72a3968135ee9d12ad526881c462fb4cb08"
+    }
+  ]
+}

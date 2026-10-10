@@ -1,0 +1,79 @@
+{
+  "book_id": "B11",
+  "title": "The Wide Lens: A New Strategy for Innovation",
+  "author": "Ron Adner",
+  "published": "2012-03",
+  "identifier": "f00932e6-ec5b-480c-b0d9-ae685971d681",
+  "edition_note": "Portfolio/Penguin 2012 年第一版电子版（版权页 First published in 2012 by Portfolio/Penguin；EPUB 元数据 date 2012-03-01）。EPUB 为 calibre 重打包（jacket.xhtml、calibre_pb 分页 div 痕迹），正文按章分文件，结构完好。",
+  "locator": "synthetic-page",
+  "page_units": 300,
+  "extraction": "unzip 后按 spine 顺序读 XHTML；块级元素各成一段；标题加 #，列表加 -，图片变成 [图：文件名｜alt] 占位行，上标变成 [^n]；没有印刷页标记，按每页约 300 个单位切合成页，每节另起一页；正文不改字",
+  "known_limits": [
+    "74 个图片只有占位行 [图：文件名]，alt 全为空。其中 00006.gif 是装饰分隔符，重复出现 15 次；其余约 59 张 jpeg 为书中图表（生态系统图、蓝图框架等），图内曲线、标签与结构不可从 raw 读出。占位行常出现在页首（章首图、装饰图），会触发 verify 的疑似页眉提醒，属图片占位，不是页眉残留。",
+    "verify 的\"被拆开的连字\"启发式命中 3 处，逐条核对均为误报：\"sci-fi megahit\" ×2（James Cameron 的 Avatar 语境）、\"Nalebuff introduce\" ×1（人名 Barry Nalebuff，Notes 节）。全书无 fi/fl 连字拆开损伤。",
+    "源 EPUB 含 274 个 id=\"pageN\" 形态的印刷页锚点（pagei–pageviii 罗马数字前言页 + page1–page278），挂在正文段落内的 <a> 元素上，不是标准 epub:type=\"pagebreak\"，本抽取未采用（the-innovators-dilemma / discovery-driven-growth 先例）。页码全部为合成页，p.N 只在本 raw 目录内有效，不能换算为纸书页码。",
+    "尾注无正文内上标标记：注释本体在 Notes 节，按章分小节（方括号标题如 [ INTRODUCTION ]），每条以印刷页码开头（如 \"4 partners who must work together: …\"）。正文与注释的对应只能按 章+页码+锚定短语 人工完成。",
+    "4 处悬垂连字符是源书排印风格，不是断词损伤：chapter 1 \"the fourth- and ninth-largest tire markets\"、chapter 3 \"a five- to ten-year lease-to-own\"、chapter 4 \"a five- to eight-year window\"、chapter 4 \"a two-and-a-half- to three-year lead time\"。保留原样。",
+    "skip 清单去掉的 5 个文件均无正文：jacket.xhtml 是 calibre 工具生成的书衣元数据页（233 单位，含营销文案与文件元数据，非原书内容）、titlepage.xhtml（0 单位封面）、part0000.html（环衬短标题页）、part0001.html（扉页）、part0004.html（目录页，导航用，无正文）。"
+  ],
+  "origin_manifest_sha256": "987a34a2135bff4d105392aacfed83370dfcbe5eda63f6d2b7b2e1282fbf442d",
+  "scope": "Only already-cited raw page blocks are bundled. No whole-book or extraction-completeness certification.",
+  "sections": [
+    {
+      "file": "s1.json",
+      "title": "Chapter 1: Why Things Go Wrong When You Do Everything Right",
+      "sha256": "345f2745ae078f0f1ca01f5c2cc826c1131eab1bbe026e732a0dcfad48355c9d",
+      "pages": [
+        19,
+        20
+      ],
+      "origin_file": "02-Chapter-1-Why-Things-Go-Wrong-When-You-Do-Everything-Right.md",
+      "origin_file_sha256": "fbe0b4e13ff5a360ba411c4c9a48c79f45f4081e20b5dce47f32abd084409509"
+    },
+    {
+      "file": "s2.json",
+      "title": "Chapter 3: Adoption Chain Risk: Seeing All the Customers Before Your End Customer",
+      "sha256": "2fa2507db416fabe19614893abdc981b3a66a86e6e88d17cfe604afc81069638",
+      "pages": [
+        51,
+        52
+      ],
+      "origin_file": "04-Chapter-3-Adoption-Chain-Risk-Seeing-All-the-Customers-Befor.md",
+      "origin_file_sha256": "1e647fae291426d6c2f90f7f2e69d1d4c4452de0278bb990d61147854bcb17b8"
+    },
+    {
+      "file": "s3.json",
+      "title": "Chapter 5: Roles and Relationships: To Lead or Follow in the Innovation Ecosystem?",
+      "sha256": "55379b7ba8cc406e18aedc104f09a2184054c8e6398b762ed9d986e2f8cf1d72",
+      "pages": [
+        100
+      ],
+      "origin_file": "07-Chapter-5-Roles-and-Relationships-To-Lead-or-Follow-in-the-I.md",
+      "origin_file_sha256": "7a443435c62cc642b2429c9fd21ee2e024033539046c096586fb8c7e0ff1f8dd"
+    },
+    {
+      "file": "s4.json",
+      "title": "Chapter 7: Changing the Game: Reconfiguring the Ecosystem to Work for You",
+      "sha256": "2cc060b4dc76059e5c2ebb9a326c4d319ee56fd67bd3c291e878c53a32f351de",
+      "pages": [
+        118,
+        130
+      ],
+      "origin_file": "10-Chapter-7-Changing-the-Game-Reconfiguring-the-Ecosystem-to-W.md",
+      "origin_file_sha256": "eb6970990eff6814b86d58125129c9b7fc6f5def6c2f39c56459a40bb71aac2f"
+    },
+    {
+      "file": "s5.json",
+      "title": "Chapter 8: Sequencing Success: Winning the Connected Game",
+      "sha256": "bc236dbaecfe26576f51637aeeeb7b8a1fe40673bf1b8b1235b32c0cece8bf84",
+      "pages": [
+        143,
+        144,
+        145,
+        146
+      ],
+      "origin_file": "11-Chapter-8-Sequencing-Success-Winning-the-Connected-Game.md",
+      "origin_file_sha256": "c69d57dd83d0b4dbb7bacece6cfc1f2a13f0c255cbb7b7c5cc00253bf3d91b70"
+    }
+  ]
+}

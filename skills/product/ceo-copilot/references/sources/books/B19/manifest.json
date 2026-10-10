@@ -1,0 +1,59 @@
+{
+  "book_id": "B19",
+  "title": "The Mom Test: how to talk to customers and learn if your business is a good idea when everybody is lying to you",
+  "author": "Rob Fitzpatrick",
+  "published": "2013-08",
+  "identifier": "urn:uuid:5BEB296D-E55F-4041-9E8C-BF56109D45D2",
+  "edition_note": "自出版电子书 v1.04（扉页标 v1.04、@robfitz、August 2013），a foundercentric.com book。原生流式 EPUB，Cocoa HTML Writer 导出。文件来自电子书分发站（z-library 副本）。",
+  "locator": "synthetic-page",
+  "page_units": 300,
+  "extraction": "unzip 后按 spine 顺序读 XHTML；块级元素各成一段；标题加 #，列表加 -，图片变成 [图：文件名｜alt] 占位行，上标变成 [^n]；没有印刷页标记，按每页约 300 个单位切合成页，每节另起一页；正文不改字",
+  "known_limits": [
+    "EPUB 没有任何印刷页标记（无 epub:type=pagebreak，也无 id=pageN 类锚点）。页码全部是合成页：每页约 300 个词，每节另起一页，与纸书（约 130 页印刷本）页码无关，p.N 只在本 raw 目录内有效。",
+    "contents.xhtml 目录页的页码列全是未解析的「?」，无正文，已整页跳过，不计入守恒的输出侧。",
+    "扉页（Title Page，含 v1.04 / August, 2013 / foundercentric.com 版本信息）正文量小于最小节阈值，按脚本规则并入第一节开头，文字未删。",
+    "正文 URL 链接按源文件只保留锚文本（如 momtestbook.com、@robfitz），无链接目标元数据。",
+    "verify 的唯一 WARN（「pre- and post-meeting」，25-Running-the-process p.91）是源文件 body26.xhtml 原样的悬挂连字符写法，不是抽取产生的断词，按原样保留。"
+  ],
+  "origin_manifest_sha256": "9c2d6d1fe478f261d4a142f4bfb948d0965fc9b49daee42f52b3d2c230debdad",
+  "scope": "Only already-cited raw page blocks are bundled. No whole-book or extraction-completeness certification.",
+  "sections": [
+    {
+      "file": "s1.json",
+      "title": "Failing the mom test",
+      "sha256": "a77c1ec76f4f7452b700d84b4d58c36759ce71d96906a6ac02e7cb04a39417e9",
+      "pages": [
+        7,
+        8,
+        9,
+        10,
+        11
+      ],
+      "origin_file": "04-Failing-the-mom-test.md",
+      "origin_file_sha256": "d380c5eefaa91eda663b007345d257475916a280302c2ff0f1e2677c0e004c74"
+    },
+    {
+      "file": "s2.json",
+      "title": "Commitment and advancement",
+      "sha256": "e04bdb70b6ddebb33df4aba5f0c599f790891428dac622bfcdac17d7c692bd40",
+      "pages": [
+        58,
+        59,
+        60,
+        61
+      ],
+      "origin_file": "14-Commitment-and-advancement.md",
+      "origin_file_sha256": "1ca6c5a7f07943acca14c47b0774f3d49a2efc35e3669621ff3f7eb1f706910b"
+    },
+    {
+      "file": "s3.json",
+      "title": "\"I would definitely buy that.\"",
+      "sha256": "1877a479fc49aaae86add4b1dbeee4b104743e5fd9f9742690c11e61960cb23c",
+      "pages": [
+        64
+      ],
+      "origin_file": "17-I-would-definitely-buy-that.md",
+      "origin_file_sha256": "f320fe582ecca4d67d90ba6b6edc116ca3833d3e7d8520e1e03a0ad3e6e3d4e4"
+    }
+  ]
+}

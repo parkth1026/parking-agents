@@ -1,0 +1,15 @@
+{
+  "book_id": "B25",
+  "source_id": "s2",
+  "title": "Chapter Five: Continuous Interviewing",
+  "original_file": "10-Chapter-Five-Continuous-Interviewing.md",
+  "origin_file_sha256": "d4dac912cd6135c027d2c122d7de30fc9cdd644f5b10d74c8681ea4fba809f41",
+  "selection": "Already-cited raw pages only; preserve page text verbatim.",
+  "pages": [
+    {
+      "page": 72,
+      "text": "\n\nInterview Together, Act Together\n\nProduct trios should interview together. Some teams prefer to let one role, usually the product manager or the designer, be the “voice of the customer.” However, our goal as a product trio is to collaborate in a way that leverages everyone’s expertise. If one person is the “voice of the customer,” that role will trump every other role.\n\nImagine that a product manager and a designer disagree on how to proceed. The designer has done all the interviewing. It’s easy for the designer to argue, “This is what the customer wants.” Whether or not that is true, the product manager has no response to that. Designating one person as the “voice of the customer” gives that person too much power in a team decision-making model. The goal is for all team members to be the voice of the customer.\n\nAdditionally, the more diverse your interviewing team, the more value you will get from each interview. What we hear in an interview will be influenced by our prior knowledge and experience.[^26] A product manager will hear things that an engineer might not pick up on, and vice versa.\n\nWhat does this look like in practice? Imagine you are interviewing a Netflix customer, and they tell you the following story:\n\nLast night my wife and I, as we were finishing up dinner, decided we wanted to watch a movie. We wanted to watch on our big TV in the living room—it has better sound than the den—but our son was playing video games, so we had to wait for him to get to a good save point before he could switch to the den. As we waited, we scrolled through Netflix’s movie selection on our iPad to figure out what we wanted to watch. Most of our recommendations were for kids’ movies because it’s mostly our kids who use the account. We tried “Most popular,” but it was all TV shows. My wife remembered hearing about a good movie, but we couldn’t figure out how to search for a specific movie title. It was very frustrating.\n\n",
+      "sha256": "fcd3459ae2b4a394e809a4ebaa82c6ba9afabe6a431ec7883f76c0c2220bef09"
+    }
+  ]
+}

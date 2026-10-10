@@ -11,3 +11,9 @@
 | 2026-10-01 | validate | 修订后 validator v7.0：76 页，0 断链、0 有机孤儿，总分 10.00/10，PASS；raw staleness 按无本地副本策略跳过。 |
 | 2026-10-01 | validate | Final validator v7.0 run used an explicit empty raw directory (0 files; no shared NAS evidence scope): 76 pages, zero broken links/orphans, all 8 dimensions 10/10, total 10.00/10 PASS. |
 | 2026-10-03 | validate | validator v7.1（锚点语法支持后首次全量复验，显式空 raw 口径同建库时）：126 页，0 断链（v7.0 判 1012 条 `[[Page#heading]]` 锚点链接现按页面名解析、advisory 复核 0 坏锚点）、0 自引用（本页 `[[coverage]]` 自链改纯文本「本页」）、8 维全 10/10，总分 10.00/10 PASS。有机孤儿 7（coverage-inventory 分册，report-only）。v7.1 升级与本次修复详情见 karpathy-llm-wiki 技能 design.md 迭代记录。 |
+
+| 2026-10-10 | report-directed enrichment | 锁定 Markdown 报告观点，新增 26 个 E 补充页与 decision-index，113 条理论逐项映射，104 条报告应用动作保留，37 个代表案例注明迁移限制；来源清单记录报告、manifest、101 个 raw 文件及 329 个页锚点的哈希。按需调用规则取代日常禁用 Wiki；结构与实际行为分开验证。来源定位见 enrichment/source-map.json；开发验证记录属于设计归档，不是运行依赖。历史 coverage-manifest 与评测保留。 |
+
+| 2026-10-10 | portable package | 运行来源改为包内相对路径；锁定报告与已引用的 101 份原文选段、329 个页锚点随技能分发。保留原始来源哈希，不收录整本书。历史评测路径改为归档标识，不改变其结果。搬迁与反例校验单独记录，不据此声称决策能力更强。 |
+
+| 2026-10-10 | bounded decision support | 收窄按需读取，索引补充准确相对路径；校准证据主体、财务计算、方法迁移与反证动作。保留 26 本、113 条观点和 37 个案例入口。B16 新增 raw p.142 定义限定，保留原文版本哈希。行为增益须另行对照评测。 |

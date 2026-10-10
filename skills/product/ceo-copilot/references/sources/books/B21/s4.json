@@ -1,0 +1,15 @@
+{
+  "book_id": "B21",
+  "source_id": "s4",
+  "title": "Three Conditions of a Minimum Viable Business Product",
+  "original_file": "133-Three-Conditions-of-a-Minimum-Viable-Business-Product.md",
+  "origin_file_sha256": "1b7080132322f6214d283be0dd872326b461d89a2c96502fa871c16f866f0fe6",
+  "selection": "Already-cited raw pages only; preserve page text verbatim.",
+  "pages": [
+    {
+      "page": 245,
+      "text": "\n\n# THREE CONDITIONS OF A MINIMUM VIABLE BUSINESS PRODUCT\n\nThere are three core elements necessary to have a Minimum Viable Business Product. All three must be present for this step to be successfully completed. They are:\n\n1. The customer gets value out of use of the product.\n\n2. The customer pays for the product.\n\n3. The product is sufficient to start the customer feedback loop, where the customer can help you iterate toward an increasingly better product.\n\nAs mentioned in Step 1 Market Segmentation, some business models rely on engagement from a primary customer who uses a product at below cost or no charge. A secondary customer pays for the product, typically by access to the customer or the customer’s information. In such a case, you would design your MVBP so that the first and third conditions of a minimum viable product are met for your primary customer, and all three conditions are met for your secondary customer. One example of an MVBP for a primary/secondary customer business model is presented later in this step.\n\nYour MVBP should balance simplicity with sufficiency. As Einstein said, “Everything should be made as simple as possible, but not simpler.” Your odds of success are higher if you limit the number of variables in your initial product, getting something that works into the customer’s hands quickly, even if it does not have all the functionality you would like to include.\n\nThe goal is straightforward—make a list of all of your key assumptions, narrow your assumptions to the most important, put it/them into a product the customer can use, and see if they will buy it.\n",
+      "sha256": "915ec8ab5c7fc32543ab4a71bb1c66879b8c34ba0696de858bab06e56d5657a1"
+    }
+  ]
+}

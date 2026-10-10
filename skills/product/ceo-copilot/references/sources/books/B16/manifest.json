@@ -1,0 +1,102 @@
+{
+  "book_id": "B16",
+  "title": "Blue Ocean Strategy, Expanded Edition",
+  "author": "W. Chan Kim, Renée Mauborgne",
+  "published": "2015",
+  "edition_note": "英文扩展版：前言两篇、十一章、附录 A–C、Notes、Bibliography、Index、About the Authors。与 Beyond Disruption 同装一个合集 EPUB（PDF 转制，pdftohtml 0.36 + calibre 5.23.0）。本目录是 2026-10-08 版的重抽：旧版守恒不可证明，正文残留 142 处 InDesign 文件名行、4 处时间戳、15 处 running head。页锚点沿用合集 PDF 页序，未重编。",
+  "locator": "pdf-page",
+  "extraction": "unzip 后按 spine 顺序读 HTML（跳过 [\"index_split_007.html\"]）；每个 <p> 一段，<img> 转成 [图：文件名] 占位行并计入单位数；页锚点 <a id=\"pN\"> 原值转成 <!-- p.N | printed X -->，页码不重编；删转制残留：InDesign 文件名行（页码含罗马、行尾可粘时间戳）、打印时间戳、字间加空格的大写页眉、页首页眉（节起始页除外）、页首页码行、正文段尾粘连的 slug 片段（只剥片段）、正文段尾同数印刷页码（下一段须为同页码 slug 行）；正文不改字",
+  "known_limits": [
+    "图（战略画布、四步动作格、价值曲线等）是矢量图转出的碎文字：图内标签和坐标数字在，但曲线形状、点的位置、标签与轴的对应关系读不到，不能凭 raw 复述图。",
+    "连字被拆开：fi / fl / ff / ffi 后多一个空格（profi t、diff erences、off ering、fi rms）。",
+    "连字符后多一个空格（Texas- based、one- off）；跨行断词被拆开并各成一段（Ches- ter、offi / ce），原样保留。",
+    "图和引文附近的正文被拆成多个短段；Notes 区的注释编号（1. 2. 3.）是普通行，正文里指向 Notes 的上标注号被转成普通数字粘在词后。",
+    "字间加空格的大写行已按版式残留删除：verso 页眉（B L U E O C E A N S T R A T E G Y 等 105 行）与 P A R T O N E / A P P E N D I X A 装饰标题；这些标题的信息由节标题（目录）携带，p.6 / p.319 的 H A R V A R D B U S I N E S S R E V I E W P R E S S 由 p.2 与版权页的正常文本携带。",
+    "EPUB 页锚点是合集 PDF 页序（本书 1–318），不是印刷页码；印刷页码在页标记 printed 字段（正文区阿拉伯数字，前言区罗马数字）。整页空白（如 p.5、p.23、p.33）没有页标记。",
+    "章首装饰点转成“( ) ( ) ( ) ( )”行；合集封面图（p.1）、本卷扉页图（p.3）转成 [图：…] 占位行；合集封面 cover.jpeg 在 titlepage.xhtml、无页锚点，未归入本书 images/。",
+    "目录（p.10–11）与索引（p.302–315）的条目页码是独立数字行，作为内容保留。"
+  ],
+  "origin_manifest_sha256": "a1c5c55f8589ea87567909207f490d2ba0bab74090313dfd6042eeaf70bd4787",
+  "scope": "Report-directed cited raw page blocks only, with a targeted definition clarification at p.142. No whole-book completeness certification.",
+  "sections": [
+    {
+      "file": "s1.json",
+      "title": "Ch 1: Creating Blue Oceans",
+      "sha256": "7bf8ae273a9c6fb4f9dad8c543dfa63ade282500a9d82cc21c3c84cb72ae5b15",
+      "pages": [
+        44,
+        45,
+        46,
+        47,
+        48,
+        49
+      ],
+      "origin_file": "07-Ch-1-Creating-Blue-Oceans.md",
+      "origin_file_sha256": "703cb8bd58228fa7a526bc2e8dd80d2bd8b7a7bbbcc039323e3d22836166fc21"
+    },
+    {
+      "file": "s2.json",
+      "title": "Ch 2: Analytical Tools and Frameworks",
+      "sha256": "c01e667c975cc96c5438315d62130547b206b6864acff9da9d75ca36e84cd35a",
+      "pages": [
+        61,
+        62,
+        63
+      ],
+      "origin_file": "08-Ch-2-Analytical-Tools-and-Frameworks.md",
+      "origin_file_sha256": "c159f9f4ff5386567ed5e348fab1821bdfba853605a26e58ac5f0aac2a8ad5d4"
+    },
+    {
+      "file": "s3.json",
+      "title": "Ch 6: Get the Strategic Sequence Right",
+      "sha256": "326a41a278cfea25aa23dffa720533c6cf961dd660b8d3e8a514c6ed8668ae34",
+      "pages": [
+        148,
+        149,
+        150,
+        151,
+        161,
+        162
+      ],
+      "origin_file": "13-Ch-6-Get-the-Strategic-Sequence-Right.md",
+      "origin_file_sha256": "78808a8db097ec48b395df0e5dcfe6820a68861efa215e6f3cc73023cca5f0e3"
+    },
+    {
+      "file": "s4.json",
+      "title": "Ch 8: Build Execution into Strategy",
+      "sha256": "c37a4a6df90f57e7722193b9d467d4aa94c5d85db648834c959b53b64dc30151",
+      "pages": [
+        205,
+        206,
+        207
+      ],
+      "origin_file": "16-Ch-8-Build-Execution-into-Strategy.md",
+      "origin_file_sha256": "254d04e982b963e1b67e4113552f2e005f39020f8a07b4a80be29e07f89c788d"
+    },
+    {
+      "file": "s5.json",
+      "title": "Ch 3: Reconstruct Market Boundaries",
+      "sha256": "0266e5adc0570e3573214b0602898024fbc83de3a8ff2452940582767482a99f",
+      "pages": [
+        80,
+        81,
+        82,
+        113
+      ],
+      "origin_file": "10-Ch-3-Reconstruct-Market-Boundaries.md",
+      "origin_file_sha256": "35380e1be269417b32bd4f0e7914d60efee5347e417e86792d9c14eabe7bb05d"
+    },
+    {
+      "file": "s6.json",
+      "title": "Ch 5: Reach Beyond Existing Demand",
+      "sha256": "d104d545596707587aa5aa760e62f4d4de3a6963320ff2c99e53e96153c73849",
+      "pages": [
+        136,
+        137,
+        142
+      ],
+      "origin_file": "12-Ch-5-Reach-Beyond-Existing-Demand.md",
+      "origin_file_sha256": "ae171e69c9a16ae76b2d31c3c50c5391e46c93adb91d24107c23dc33339960e8"
+    }
+  ]
+}

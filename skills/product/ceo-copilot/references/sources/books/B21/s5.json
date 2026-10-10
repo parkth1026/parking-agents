@@ -1,0 +1,20 @@
+{
+  "book_id": "B21",
+  "source_id": "s5",
+  "title": "How to Complete This Step",
+  "original_file": "58-How-to-Complete-This-Step.md",
+  "origin_file_sha256": "25e51825d9e1cab3f058decc550efd2b04ede9881ae620be1f096c15ed8651c5",
+  "selection": "Already-cited raw pages only; preserve page text verbatim.",
+  "pages": [
+    {
+      "page": 120,
+      "text": "\n\n# HOW TO COMPLETE THIS STEP\n\n1. List more than 10 potential customers (aside from your Persona), and include any pertinent information you have about them from your existing research. There is no set number of customers you should list, because sometimes you can complete this step with a list of 12 customers, while other times you need to list 20–30 or more customers in order to get 10 customers who match your criteria and who are interested in your product. Each of these customers should be similar to each other and the Persona; if not, revisit the list, and potentially revisit your selection of Persona. It is important to have homogeneity in your list. They should all be powerful purchasing references for each other.\n\n2. Contact each of the potential customers on your list and present your Full Life Cycle Use Case, High-Level Product Specification, and Quantified Value Proposition (Steps 6–8). Be sure while having these conversations that you are operating in “inquiry” mode, not “advocacy/sales” mode, as the latter will diminish the quality of your interactions. Determine whether the customer’s needs and ideas are in line with what you’ve established thus far from your Persona, Full Life Cycle Use Case, Quantified Value Proposition, TAM assumptions, and so on. Especially validate with these customers the hypothesis you have regarding the Persona’s top purchasing priorities.\n\n3. If a customer validates your hypotheses from the previous steps, now is a good time to ask the customer if they would consider providing a letter of intent to buy your solution, once it is available. You are still in “inquiry” mode, so you are asking, “If a company were to offer this product, would you be interested in purchasing it?” rather than “Will you buy this product?” If they are extremely enthusiastic, you can even ask them to prepay for the product, which is a fantastic level of commitment. Before you take their money, however, make sure you can deliver what they want and also make sure there are no special conditions in their purchase order that you cannot or do not want to be expected to meet.\n\n",
+      "sha256": "e3acb10365b64a34c3efd32353c7e6cb259b7473286cddbe995ee23e3e2d2dbf"
+    },
+    {
+      "page": 121,
+      "text": "\n\n4. If a customer’s feedback is not aligned exactly with your assumptions, take good notes and think how this affects your analysis. Do not overreact to each new interview, even if there is a major disconnect, unless you see a pattern. You will know intuitively if there is a major disconnect after a few interviews.\n\n5. Now that you have contacted each customer, you may have new data. At this point, you can go back and modify your earlier assumptions and determine whether to contact additional customers. Your end goal is a homogenous list of 10 customers who are truly interested and aligned with your Persona and other assumptions.\n\n6. If you find that you cannot create a list of 10 customers who are excited about your High-Level Product Specification, then you may need to reconsider your beachhead market.\n\n7. While this step is conceptually simple, contacting customers and getting information from them will require a good amount of work, but will be invaluable as you move forward. Do not share this list of customers or the information you gather with others outside your company.\n",
+      "sha256": "ac4f58e2eda2c62d906fe88c4a949c931154958f07aaafb61b36376d073f638c"
+    }
+  ]
+}

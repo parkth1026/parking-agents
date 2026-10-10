@@ -1,0 +1,25 @@
+{
+  "book_id": "B09",
+  "source_id": "s2",
+  "title": "Chapter 6: When Designing Products, Configuration and Bundling is More Science Than Art",
+  "original_file": "08-ch06-configuration-bundling.md",
+  "origin_file_sha256": "e5abec23897557c7375844c6b6a4587904ad13c956629b9c8f0192ea7d2bee4b",
+  "selection": "Already-cited raw pages only; preserve page text verbatim.",
+  "pages": [
+    {
+      "page": 86,
+      "text": "\n\n(Continued )\n\nThe answers we discussed are summarized in Figure 6.4 for ease of comparison.\n\nFigure 6.4 Bundling of Pizza and Breadsticks\n\nNow let’s examine an actual example in practice to illustrate the beneﬁts of bundling: Microsoft’s iconic Ofﬁce software.\n\nMicrosoft Ofﬁce: A Bundling Blockbuster\n\nMicrosoft is a compelling example of a company that soared thanks to bundling. When it released its Ofﬁce suite of software in the 1990s, its customer base was used to paying for word processing, e-mail, spread sheet, and presentation software applications separately. Microsoft pitched a discounted price for the bundle (as opposed to individual application prices), and it touted how convenient it was to have all the applications in the suite have a similar look and feel. The bundle helped the company cement customer loyalty and grow market share in the face of pressure from plucky, perfectly competent competitors that focused only on parts of the solution (such as Lotus 1-2-3 for spreadsheets and WordPerfect for word processing).\n\nOver time, Microsoft developed different versions of its Ofﬁce suite that varied in functionality. That let different customer segments—business,\n\n",
+      "sha256": "c8589c5fa7489e50c55c89068db6f457a5efa0bb5e3ff1fedb485912a67052f1"
+    },
+    {
+      "page": 87,
+      "text": "\n\nhome, and education customers—ﬁnd options that suited their different needs. By 2013, the Ofﬁce business division was Microsoft’s biggest, accounting for about a third of the company’s total revenue and more than 40 percent of operating proﬁt.1\n\nThat’s the beneﬁt of bundling.\n\nTwo Key Principles of Product Conﬁguration and Bundling\n\nWhen you conﬁgure and bundle your new product, you may get over whelmed with deciding which features to include in each segment offer. In a different way, it is easy for customers to become overwhelmed trying to decide which offer is right for them. Designing your product with leader, ﬁller, and killer features in mind will help you with that ﬁrst challenge. Creating good, better, and best options will address the second.\n\nPrinciple #1: Leaders, Fillers, and Killers\n\nYou should approach your product conﬁguration decision strategically— that is, through monetization techniques—to avoid leaving money on the table. To determine what features you should bake into which product conﬁguration, you should start by separating the must-have features from the nice-to-haves. On their own, nice-to-haves won’t convince customers to buy a product.\n\nIt’s equally important to think about which features might turn off customers. Critical features—what we call leaders—are what drive customers to buy a product. Customers have high WTP for such leader features. Fillers are features of moderate importance or nice-to haves. In contrast, killers are features that will blow the deal if the customer is forced to pay for them.\n\nThe leader/ﬁller/killer classiﬁcation is the most important aspect of conﬁguring your new product. We described methods for doing this in Figure 4.3 in Chapter 4. You can see the kinds of output that come from such classiﬁcations in Figure 6.5. Here, Feature 1 is a leader since the majority of customers ﬁnd value in it. In contrast, Feature 11 is a killer because a signiﬁcant portion of people see no value in it, and only a few\n\n",
+      "sha256": "113048058d1a43c2aeea05dea4dae8778c4822e2e2ee583ceb8cf7943419471d"
+    },
+    {
+      "page": 88,
+      "text": "\n\nFigure 6.5 How Customers Viewed a Product’s Features as Leaders/ Fillers/Killers\n\nﬁnd it valuable. A killer feature should be eliminated from the offering, but it could be sold à la carte to the few who want it.\n\nHere’s an easy way to identify killer features: Look for those that are valued by less than 20 percent of your customers and are not valued at all by more than 20 percent.\n\nSometimes, a product’s features may fall into one category for a certain customer segment and another category for a different group. For example, for drivers in the frigid north, heated car seats are a leader. But in very warm or tropical climates, they are a ﬁller (or even a killer if they add to the price of the car).\n\nCustomer segmentation is your tool for identifying these distinc tions—that is, which features each segment considers to be leaders, ﬁllers, and killers.\n\nPrinciple #2: Creating Good, Better, and Best Options\n\nThe classic approach to product conﬁguration and bundling is to create a three-tier model, sometimes referred to as good, better, best or G/B/B.\n\n",
+      "sha256": "6e9eee919625a52d44c11149d8368ce8f1206e3e8ef44517eec66ea0dd56f2c4"
+    }
+  ]
+}

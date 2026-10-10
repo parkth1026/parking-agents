@@ -1,0 +1,96 @@
+{
+  "book_id": "B17",
+  "title": "Business Model Generation: A Handbook for Visionaries, Game Changers, and Challengers",
+  "author": "Alexander Osterwalder, Yves Pigneur",
+  "published": "2010",
+  "identifier": "urn:uuid:273fd756-62f2-4858-8d67-99e08f24bba9",
+  "edition_note": "Wiley 原版（版权页 Copyright © 2010 by Alexander Osterwalder and Yves Pigneur）。本 EPUB 为 2013 年重发的 Mobi 式转制本：spine 仅 3 个大 XHTML（text00000-00002.html），锚点为 filepos 字节偏移，NCX docTitle 为 'UnKnown'。内容对应 2010 年印刷版。",
+  "locator": "synthetic-page",
+  "page_units": 300,
+  "extraction": "unzip 后按 spine 顺序读 XHTML；块级元素各成一段；标题加 #，列表加 -，图片变成 [图：文件名｜alt] 占位行，上标变成 [^n]；没有印刷页标记，按每页约 300 个单位切合成页，每节另起一页；正文不改字",
+  "known_limits": [
+    "本书是视觉系 handbook，245 张图片全部只留 [图：Image00XXX.jpg] 占位行，本 EPUB 图片全部无 alt 文字。画布图、示意图、视觉案例页、图表内文字均不可从 raw 读出，包括 Business Model Canvas 整图与各章整页视觉案例；涉及视觉案例的论证只能读其周边正文。",
+    "页码为合成页（每页约 300 单位，每节另起一页）。源 EPUB 无印刷页分页标记，p.N 只在本 raw 目录内有效，不能换算为纸书页码。",
+    "原书版式用色块/字级/分栏区分正文、侧栏（sidebar）、实践者访谈（Practitioner Quotes/Outlook 专栏）、画布讲解框；raw 中版式信息丢失，全部退化为线性段落，侧栏与正文边界不可辨。",
+    "书内目录页（Table of Contents）内容保留；同一目录在书末（References 之后）又完整出现一次，为转制残留（约 73 单位），并入 References 节末尾，按「只删版式残留」原则未删。",
+    "About the Authors 作者简介在 References 之后，并入 References 节。",
+    "正文中的超链接退化为纯文字；带链接的推荐阅读/网站列表只能读到链接文字本身。",
+    "原书封面、章分隔页为整页图片，只余占位行；彩色标题（如 Def_ 、Section 1 等设计性标题）保留原文字，颜色字号信息丢失。",
+    "NCX 目录未给作者导言单独条目，导言（Today countless innovative business models are emerging… 一段，raw p.5-9）并入 02-Table-of-Contents 节；该节实际内容为书内目录页 + 导言 + 导言中的实践者引言。'Canvas'、'Process' 两个分部标题页（各仅一幅图与标题，<50 单位）分别并入 03-Definition-of-a-Business-Model 与 24-Business-Model-Design-Process 节开头。",
+    "转制残留按原样保留未修：6 处行尾断词/断语（traffic- generation、American- style、by- the(-minute)、strategy- consulting、commodi- ties、free- of-charge）；1 处人名连字转码缺陷（Johan fflñrneblad，源文件即如此，推断应为 Johan Förneblad，判断）。verify 报的 1 处连字拆开为误报（'Hoff constantly'，Hoff 为引言者姓氏）。"
+  ],
+  "origin_manifest_sha256": "a01d212c19ccca9509afbc24d522ae25ee0936917c93a054297a33496a564914",
+  "scope": "Only already-cited raw page blocks are bundled. No whole-book or extraction-completeness certification.",
+  "sections": [
+    {
+      "file": "s1.json",
+      "title": "The 9 Building Blocks",
+      "sha256": "b02554161c9c43e93bf35783ede692adecb397237a2b49cfc856795d77bc9773",
+      "pages": [
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25
+      ],
+      "origin_file": "04-The-9-Building-Blocks.md",
+      "origin_file_sha256": "94ff88ffc7a00e4e361da2ce09b11527ecf0e2a0ea62aefa1fb61bf427dd4ac2"
+    },
+    {
+      "file": "s2.json",
+      "title": "Unbundling Business Models",
+      "sha256": "cffef70231a358960ca5c15570e854c4029abb39cd400def3ca40176c7b74092",
+      "pages": [
+        32,
+        33,
+        34
+      ],
+      "origin_file": "07-Unbundling-Business-Models.md",
+      "origin_file_sha256": "7e9fc5f1186a82b8c1ed15135a306828b418d360e4f11e2d77509df53a3ad4ff"
+    },
+    {
+      "file": "s3.json",
+      "title": "Prototyping",
+      "sha256": "6a21300eba177f5eebdfccc8648d9e05036f4dbf916fec3d2a61aa40acb6ad8e",
+      "pages": [
+        84,
+        85,
+        86
+      ],
+      "origin_file": "16-Prototyping.md",
+      "origin_file_sha256": "6eaeddebbd8b666953cd0fa3202e8ad1c29729136cbc5816453c2bfc36838581"
+    },
+    {
+      "file": "s4.json",
+      "title": "Business Model Design Process",
+      "sha256": "3034bd1973449b3d9793e0423e3bbd6fe916eecfc0203dae860d00f0fa1369fd",
+      "pages": [
+        138,
+        139,
+        140
+      ],
+      "origin_file": "24-Business-Model-Design-Process.md",
+      "origin_file_sha256": "d7f66da689956b38ea871f10c4e3d2d5b91a76c720d7c46a9c5f8d439c744d9f"
+    },
+    {
+      "file": "s5.json",
+      "title": "Patterns",
+      "sha256": "95215a360c8bf9f3bea74d7304fdc2217e115eb2bf84c095e6b96cdf653b117a",
+      "pages": [
+        31
+      ],
+      "origin_file": "06-Patterns.md",
+      "origin_file_sha256": "7a382829de0ad99f7c23ee8f78f876142fb42bc9c11295991ac73e2d5724106b"
+    }
+  ]
+}

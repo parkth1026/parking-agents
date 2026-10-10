@@ -1,0 +1,109 @@
+{
+  "book_id": "B21",
+  "title": "Disciplined Entrepreneurship",
+  "author": "Bill Aulet, Marius Ursache",
+  "published": "2013-06-28",
+  "identifier": "URN:9781118720813",
+  "edition_note": "Wiley 2013 英文原版电子书（版权页 Copyright 2013 by Bill Aulet；ebk ISBN 978-1-118-72081-3，cloth ISBN 978-1-118-69228-8）。EPUB 元数据把 Marius Ursache 列为第二作者；版权页署名其为 Cover image，致谢页说明其为全书插画作者，实际作者只有 Bill Aulet。单版本收录，无译本。",
+  "locator": "synthetic-page",
+  "page_units": 300,
+  "extraction": "unzip 后按 spine 顺序读 XHTML；块级元素各成一段；标题加 #，列表加 -，图片变成 [图：文件名｜alt] 占位行，上标变成 [^n]；没有印刷页标记，按每页约 300 个单位切合成页，每节另起一页；正文不改字",
+  "known_limits": [
+    "页码：源 EPUB 无任何印刷页分页标记（epub:type pagebreak 与 id=\"pageN\" 类锚点均无），全部为合成页，每页约 300 单位，每节另起一页。p.N 只在本 raw 目录内有效，不能换算为纸书页码。",
+    "图多书：119 张图只保留 [图：文件名｜alt] 占位行，alt 全为 'image'，无信息量。图注文字（figurecaption）在正文里保留。图内内容读不到：市场细分矩阵、TAM 桶状图、竞争定位二维图、24 步工作表等图表的图形与数据不可从 raw 读出。",
+    "表格：HTML 表格转成以 | 分隔的行文本，列对齐与合并单元格结构丢失（涉及 Introduction、Step 0、1、3、4、5、19 等节）。",
+    "索引：电子版索引条目不带页码（源文件即无），只能当概念清单用，不能按页回查。",
+    "脚注：源用 span.superscript 锚点而非 <sup> 标签，正文脚注号以内联数字紧贴前词出现（如 \"Ed Roberts6:\"、\"price difference.1\"），不是 [^n] 形态；注释本体在所在章最后一节尾部、以编号开头的段落里（源 class endnoteentry，涉及 Introduction 与 Step 0、4、10、15、17、18、19、23 共 9 个文件）。标记与本体无程序链接，按编号人工对应。",
+    "Praise 推荐语页（fm01.html）不在源 EPUB 目录（NCX）里，抽取自动归入 00-front-matter 节；Cover、Contents 目录页、Title 扉页（纯图片）按无正文跳过，跳过单位数记录在 manifest.skipped。",
+    "节粒度：源 NCX 目录含章内小节锚点（#secN），脚本按目录条目切分，得到 146 个小节级文件（Example、Summary 各节重复出现，靠文件序号区分）。库内先例：inspired（163 节）、the-innovators-solution（128 节）同粒度。24 个 Step 的完整边界用 manifest.sections 的 pages 区间拼合。",
+    "verify-raw 两条提醒的核对结论：其一，「疑似页眉页脚 [图：f#-#.jpg｜image] 出现在 13 个页首末行」为图片占位行落在合成页边界，图多书的预期形态，不是页眉页脚；其二，「被拆开的连字约 1 处」经核对是致谢页人名 Leo Weitzenhoff 后接单词 all 的误报，全书无真实拆字。"
+  ],
+  "origin_manifest_sha256": "56b443f82150e534e1eb4b4ea259b58a1cae6f2959b6f78a3f2197e826875868",
+  "scope": "Only already-cited raw page blocks are bundled. No whole-book or extraction-completeness certification.",
+  "sections": [
+    {
+      "file": "s1.json",
+      "title": "Six Themes of the 24 Steps",
+      "sha256": "a92c74cbec52c92a51b2846a1d7fc8c87243fb3053bcd70a380a86c156644bc3",
+      "pages": [
+        21
+      ],
+      "origin_file": "06-Six-Themes-of-the-24-Steps.md",
+      "origin_file_sha256": "8309301319899ee5c638bff29db0cf8b35fe735e10cf750e6d22a2014c1dc6f3"
+    },
+    {
+      "file": "s2.json",
+      "title": "Primary Roles in the Decision-Making Unit",
+      "sha256": "66c252daf863b23af12b1561f480b21da4607ca1d33cb6bef1e1eaab24f34c50",
+      "pages": [
+        148
+      ],
+      "origin_file": "78-Primary-Roles-in-the-Decision-Making-Unit.md",
+      "origin_file_sha256": "5975551007e6b867c29597153b2f73d9180e2b0a254a991ecee47d62351737b8"
+    },
+    {
+      "file": "s3.json",
+      "title": "Examples",
+      "sha256": "e61cc09813a81971451b3dbd8a1d0bb388f66e3f17d99061f733832e11e3a1ec",
+      "pages": [
+        152,
+        153
+      ],
+      "origin_file": "81-Examples.md",
+      "origin_file_sha256": "79ddfc784a09395834410bedcbee37437177c393a3d4d40393a8b4c91bb7a9e9"
+    },
+    {
+      "file": "s4.json",
+      "title": "Three Conditions of a Minimum Viable Business Product",
+      "sha256": "23b9ebd440aca36dde8337e188573ea03d9e0db3c7371faefae1f79a6ffb3e8e",
+      "pages": [
+        245
+      ],
+      "origin_file": "133-Three-Conditions-of-a-Minimum-Viable-Business-Product.md",
+      "origin_file_sha256": "1b7080132322f6214d283be0dd872326b461d89a2c96502fa871c16f866f0fe6"
+    },
+    {
+      "file": "s5.json",
+      "title": "How to Complete This Step",
+      "sha256": "22e45aec0af6ce095d54f6d902cdafb2ccc8e61ba6d9a0ca4ec57376533148ca",
+      "pages": [
+        120,
+        121
+      ],
+      "origin_file": "58-How-to-Complete-This-Step.md",
+      "origin_file_sha256": "25e51825d9e1cab3f058decc550efd2b04ede9881ae620be1f096c15ed8651c5"
+    },
+    {
+      "file": "s6.json",
+      "title": "What to Include in a Full Life Cycle Use Case",
+      "sha256": "d604b795f7905bc11dda4f9ac7f8dcde50570766d1f16b6db09aa25c21979bcf",
+      "pages": [
+        96
+      ],
+      "origin_file": "44-What-to-Include-in-a-Full-Life-Cycle-Use-Case.md",
+      "origin_file_sha256": "f853e2ca81c9f58a6ce9a66ce0a516804b54af8fb3dbf124532baedf83bd9b59"
+    },
+    {
+      "file": "s7.json",
+      "title": "Key Inputs to Calculate the LTV",
+      "sha256": "d1dea7f43ce1cebb6d29900cae5ae4b430863f33ddbc644c0a010f86d1ec7284",
+      "pages": [
+        198,
+        199
+      ],
+      "origin_file": "105-Key-Inputs-to-Calculate-the-LTV.md",
+      "origin_file_sha256": "8b00bab1bd3a81d442da35bf3ff487fd69ad176f2040bf336251d7c349e42aca"
+    },
+    {
+      "file": "s8.json",
+      "title": "The Right Way to Calculate Coca: A top-down Perspective",
+      "sha256": "082a3a547e68761ffd0ab74b46ab1bc04abc1585dd84e2286f0d32912c7b3224",
+      "pages": [
+        223,
+        224
+      ],
+      "origin_file": "120-The-Right-Way-to-Calculate-Coca-A-top-down-Perspective.md",
+      "origin_file_sha256": "ef2266e6b31cca2262a8379730153f400ed2f46356bd2abe6a53be4eacafcc78"
+    }
+  ]
+}

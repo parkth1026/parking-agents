@@ -1,0 +1,20 @@
+{
+  "book_id": "B24",
+  "source_id": "s1",
+  "title": "CHAPTER 33: Principles of Product Discovery",
+  "original_file": "82-CHAPTER-33-Principles-of-Product-Discovery.md",
+  "origin_file_sha256": "b874e910ffdc7fc0e585805b40f671a2dd2b448d4c89ccc70e92045aef415f02",
+  "selection": "Already-cited raw pages only; preserve page text verbatim.",
+  "pages": [
+    {
+      "page": 176,
+      "text": "\n\n# CHAPTER 33 Principles of Product Discovery\n\nThe purpose of product discovery is to address these critical risks:\n\n- Will the customer buy this, or choose to use it? (Value risk)\n\n- Can the user figure out how to use it? (Usability risk)\n\n- Can we build it? (Feasibility risk)\n\n- Does this solution work for our business? (Business viability risk)\n\nAnd it's not enough that it's just the product manager's opinion on these questions. We need to collect evidence.\n\nWhen it comes to how we do product discovery, there are a set of core principles that drive how we work. If you understand these, you will understand not only how to work well today but also how to easily incorporate new techniques as they emerge in the future.\n\n- We know we can't count on our customers (or our executives or stakeholders) to tell us what to build.\n\nCustomers don't know what's possible, and with technology products, none of us know what we really want until we actually see it. It's not that customers or our executives are necessarily wrong; it's just that it's our job to make sure the solution we deliver solves the underlying problem. This is probably the most fundamental principle in all of modern product. Historically, in the vast majority of innovations in our industry, the customers had no idea that what they now love was even a possibility. This is only becoming truer with time.\n\nCustomers don't know what's possible, and with technology products, none of us know what we really want until we actually see it.\n\n- The most important thing\n\n",
+      "sha256": "adf4ab868ace2397fc10f5f45383a17680bec0eff1e52238b69ed338d92bb7ea"
+    },
+    {
+      "page": 177,
+      "text": "\n\nis to establish compelling value.\n\nIt's all hard, but the hardest part of all is creating the necessary value so that customers ultimately choose to buy or to use. We can survive for a while with usability issues or performance issues, but without the core value, we really have nothing. As a result, this is generally where we'll need to spend most of our discovery time.\n\n- As hard and important as the engineering is, coming up with a good user experience is usually even harder, and more critical to success.\n\nWhile every product team has engineers, not every team has the necessary product design skills, and even when they do, are they being used the way we need to use them?\n\n- Functionality, design, and technology are inherently intertwined.\n\nIn the old waterfall model, the market drove the functionality (aka the requirements), which drove the design, which drove the implementation.\n\nToday, we know that the technology drives (and enables) the functionality as much as the other way around. We know that technology drives (and enables) design. We know that design drives (and enables) functionality. You don't have to look further than your own phone to see numerous examples of both. The point is that all three of these are completely intertwined. This is the single biggest reason we push so hard for the product manager, product designer, and tech lead to sit physically adjacent to each other.\n\n- We expect that many of our ideas won't work out, and the ones that do will require several iterations.\n\n“The most important thing is to know what you can't know.”\n\nTo quote Marc Andreessen, “The most important thing is to know what you can't know,” and we can't know in advance which of our ideas will work with customers and which won't. So, we approach discovery\n\n",
+      "sha256": "e4fb9ed65df587ea4106b5134c199cca5e627d4ed9b302a8731f4f8b307fc04f"
+    }
+  ]
+}

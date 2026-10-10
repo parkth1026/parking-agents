@@ -1,0 +1,62 @@
+{
+  "book_id": "B05",
+  "title": "Playing to Win: How Strategy Really Works",
+  "author": "Lafley, A.G., Martin, Roger L.",
+  "published": "2013",
+  "identifier": "99fa915a-10c6-4587-8894-14d1aaddf5a7",
+  "edition_note": "Harvard Business Review Press 2013 英文原版电子书（版权页 Copyright 2013，ISBN 978-1-4221-8739-5）。calibre 转制的流式 EPUB；EPUB 元数据 published 字段是无效值 0101-01-01，已按版权页改写为 2013。电子版无印刷页码，raw 页码为合成页。",
+  "locator": "synthetic-page",
+  "page_units": 300,
+  "extraction": "unzip 后按 spine 顺序读 XHTML；块级元素各成一段；标题加 #，列表加 -，图片变成 [图：文件名｜alt] 占位行，上标变成 [^n]；没有印刷页标记，按每页约 300 个单位切合成页，每节另起一页；正文不改字",
+  "known_limits": [
+    "EPUB 没有印刷页标记（无 epub:type=pagebreak，全库 grep 亦无 id=\"pageN\" 形态锚点）。页码是合成页：每页约 300 个单位，每节另起一页，与纸书页码无关，p.N 只在本 raw 目录内有效。",
+    "23 个编号图（FIGURE 1-1～1-4、4-1～4-2、5-1～5-2、7-1～7-2、8-1～8-4、B-1～B-8、C-1）只有占位行 [图：文件名｜images]，alt 全为 'images'。图内内容读不到：choice cascade（1-1/1-2）、Olay 与 P&G 的 choices（1-3/1-4）、两条 value equation（4-1/4-2）、P&G activity system 与 reinforcing rods（5-1/5-2）、strategy logic flow 与 Porter five forces（7-1/7-2）、Ch8 的四个决策流程图、Appendix B 的供需/成本曲线。raw 只保留图号与图题文字。",
+    "00006.jpeg 是重复出现 52 次的装饰分隔线（728 字节），占位行 [图：00006.jpeg｜images] 无内容意义。",
+    "8 处 HTML 表格转为逐单元格竖排，列对齐丢失：Ch2（part0004_split_001）、Ch4（part0006_split_003）、Ch6 两处（part0008_split_001/002）、Ch7（part0009_split_003）、Ch8 两处（part0010_split_005/006）、Appendix A 的 TABLE A-1/A-2（2000 与 2009 年 P&G where-to-play / how-to-win 结果对照）。表格首行多为表头，按行号顺序人工对应列。",
+    "脚注在正文为 [^n] 上标；注释本体在 Notes 节，共 43 条，按章分组（c001-note-001 形态锚点）。两者无程序链接，按编号人工对应。",
+    "题献页（Inspired by Peter Drucker）在 spine 上紧跟版权页，落在 Copyright 节末尾；封底推荐语（Praise for Playing to Win）保留为 Front matter 节；扉页（Title Page）与目录页（Contents）无正文，已 skip。本书无 Index。",
+    "verify-raw 的两类转制残留 WARN 均为误报，正文无损：2 处「被拆开的连字」实为完整词 antidandruff shampoo（Ch1 口腔护理、Ch7）；5 处「行尾断词残留」实为原书合法的悬挂连字符（mid- and long-term、sector- and company-level、thirty-five- to forty-nine-year-old、consumer- and customer-driven、fifteen- to twenty-pound）。"
+  ],
+  "origin_manifest_sha256": "065334ef6d09d7d75b263ebaf400a30a7ed24d1b0d010dea6839376599c34268",
+  "scope": "Only already-cited raw page blocks are bundled. No whole-book or extraction-completeness certification.",
+  "sections": [
+    {
+      "file": "s1.json",
+      "title": "Introduction: How Strategy Really Works",
+      "sha256": "2a2c3027fa46d0623d8a0a8d9dcf4f6adffbd84dcf2d0431a0f1305917059222",
+      "pages": [
+        7
+      ],
+      "origin_file": "02-Introduction-How-Strategy-Really-Works.md",
+      "origin_file_sha256": "6dff9bdd5fa0494297edf27a4c627d72d71e87be3f28a349f8f0e844e899a5b1"
+    },
+    {
+      "file": "s2.json",
+      "title": "One: Strategy Is Choice",
+      "sha256": "f5753ad56eadcaf9150711eaf860ac6bb2714fe95500b4198b6f205eb54e9895",
+      "pages": [
+        10,
+        11,
+        12
+      ],
+      "origin_file": "03-One-Strategy-Is-Choice.md",
+      "origin_file_sha256": "47ef25d9c512b2f0dc6f4e31eb8d76594cc9cc091467b431ff79bd308557eca2"
+    },
+    {
+      "file": "s3.json",
+      "title": "Eight: Shorten Your Odds",
+      "sha256": "87ef272a109ad772ea634fa32b511e1e4f5823f7c361c7cef169388ad2a2d0d2",
+      "pages": [
+        147,
+        148,
+        149,
+        150,
+        151,
+        152,
+        153
+      ],
+      "origin_file": "10-Eight-Shorten-Your-Odds.md",
+      "origin_file_sha256": "05a2dc300a78f0e905315fab3fc03ea71d362a56ff35e0fa98047e8b3852ecc2"
+    }
+  ]
+}

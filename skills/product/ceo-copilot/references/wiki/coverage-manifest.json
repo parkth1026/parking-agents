@@ -1,11 +1,12 @@
 {
   "schema_version": 1,
   "source": {
-    "path": "G:/GIT/AI_WorkFlow/product-research/docs/research/第二增长曲线_新产品立项参考报告_覆盖核查修订版.html",
+    "path": "references/sources/report.html",
     "sha256": "a84fd5e124a80d7dd98a73c7def5a203e1ea0c0db2438ce520b4450072a6a948",
-    "text_path": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\skills\\pub\\ceo-copilot\\references\\来源-第二增长曲线报告.txt",
+    "text_path": "references/来源-第二增长曲线报告.txt",
     "text_sha256": "6164eeaf075fd99c2916181f8fe491e5b9330cdc1530f4014379dcb077daa23c",
-    "text_role": "现存来源文本仅作行号辅助；实际分母直接来自锁定HTML正文，不使用searchData或defaultNotes缓存。"
+    "text_role": "现存来源文本仅作行号辅助；实际分母直接来自锁定HTML正文，不使用searchData或defaultNotes缓存。",
+    "path_base": "skill_root"
   },
   "frozen_at": "2026-10-02",
   "author": "wiki_completion",
@@ -25314,5 +25315,6 @@
   "review": {
     "status": "pending-independent",
     "required": "独立原报告分母与逐项语义复核，不以本清单为唯一分母"
-  }
+  },
+  "packaging_note": "Only source locators changed for portability. Frozen items, dates and source hashes retain their historical meaning."
 }

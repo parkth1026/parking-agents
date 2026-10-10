@@ -1,0 +1,93 @@
+{
+  "book_id": "B20",
+  "title": "The Lean Startup: How Today's Entrepreneurs Use Continuous Innovation to Create Radically Successful Businesses",
+  "author": "Ries, Eric",
+  "published": "2011-09-13T07:00:00+00:00",
+  "identifier": "9780307887917",
+  "edition_note": "Crown Business 2011 年美国首版（版权页 eISBN 978-0-307-88791-7，版本标记 v3.1）。EPUB 为 calibre 转制（spine 文件名带 CR! 前缀与 mbppagebreak div，源为 Kindle 零售版转制），正文完整性与切分守恒由本抽取的 manifest 数字验证。",
+  "locator": "synthetic-page",
+  "page_units": 300,
+  "extraction": "unzip 后按 spine 顺序读 XHTML；块级元素各成一段；标题加 #，列表加 -，图片变成 [图：文件名｜alt] 占位行，上标变成 [^n]；没有印刷页标记，按每页约 300 个单位切合成页，每节另起一页；正文不改字",
+  "known_limits": [
+    "50 张图片只有占位行 [图：文件名]，alt 全为空。其中 00004.jpg（25 处）是章/分部标题分隔条，00005.jpg（10 处）是场景分隔符，均为纯装饰；封面 00002.jpg 与扉页 00003.jpg 为整页图。内容插图 13 张（00006–00018，如 Build-Measure-Learn 循环、增长引擎示意图），图内文字、曲线与结构不能从 raw 读出，只能靠图题与上下文文字。",
+    "源 EPUB 无任何印刷页分页标记（epub:type pagebreak 与 id=\"pageN\" 形态锚点均为 0），页码全部为合成页（每页约 300 单位、每节另起一页）。p.N 只在本 raw 目录内有效，不能换算为纸书页码。",
+    "脚注：正文上标转成 [^n]；注释本体集中在 Endnotes 节，按章分组（#### Chapter N. Title），每章编号从 1 重新开始。注释条目行首保留回链编号（形如 \"1 .\"），正文 [^n] 与注释按\"所在章 + 编号\"人工对应，无程序链接。",
+    "9 个数据表（Votizen 漏斗指标前后对比 5 个、SGW 项目时间线 1 个、复利增长率对比 1 个、Disclosures 公司名单 2 个）转成逐行 \"单元格 | 单元格\" 形式，行序保留，列结构靠 | 分隔可读。",
+    "封面、扉页、Contents 目录页（split_005，42 单位）按版式残留跳过，不进 raw；扉页文字在图片 00003.jpg 内，不可读。",
+    "Front matter 节（00 号文件）是 \"Acclaim for THE LEAN STARTUP\" 名家推荐语两页，非正文论证。",
+    "Copyright 页保留为独立节（约 90 单位）；Dedication（\"For Tara\"，2 单位）与各分部标题页（Part One/Two/Three）小于最小节阈值，已并入相邻节，文字未丢，见 manifest 的 merged_small_sections。",
+    "verify-raw 三条提醒均已核对为非缺陷：a) 连字估数 4 处（Rachleff as/then、unstuff all、restuff them）是真实词的误报，无 profi t 型真连字残留；b) 断词样式 3 处（hunch- or intuition-guided、two- to four-week、higher- and higher-quality）是原书悬垂连字符（suspended hyphen）合法写法，保留原样；c) \"[图：#.jpg] 在 8 个页首/页尾\" 是 verify 把数字归一后对 [图：00004.jpg] 章题装饰条占位行的命中，不是页眉页脚。",
+    "章首段首字母是 dropcap 排版，抽取时已并回单词（如源文件内 \"I\" + \"n\" 两段在 raw 中为 In），无半字残留。"
+  ],
+  "origin_manifest_sha256": "789f831cd7d44eeaaf1aca330167c8feb21aa75c021a6e32a55da912778a149a",
+  "scope": "Only already-cited raw page blocks are bundled. No whole-book or extraction-completeness certification.",
+  "sections": [
+    {
+      "file": "s1.json",
+      "title": "7. Measure",
+      "sha256": "b1e734e6e6d5a92771b0abc2bb34ca2d570ed56d4094e91804d9e0be0e62663a",
+      "pages": [
+        95,
+        96,
+        97
+      ],
+      "origin_file": "10-7-Measure.md",
+      "origin_file_sha256": "3b97b48dde403a161b7dbb8bcb95532304260a349dd670bef8209f6d137f7655"
+    },
+    {
+      "file": "s2.json",
+      "title": "10. Grow",
+      "sha256": "4cbb9a17ba7a85b7ad57c499b3372f09cb677c735a867f306ebf9f85a30b5b59",
+      "pages": [
+        167,
+        168,
+        169,
+        170,
+        171,
+        172,
+        173,
+        174,
+        175,
+        176
+      ],
+      "origin_file": "14-10-Grow.md",
+      "origin_file_sha256": "e50e9c9b9b3346df134966a6c496595a3c51e93810f94c737f9a952653ecb9c4"
+    },
+    {
+      "file": "s3.json",
+      "title": "3. Learn",
+      "sha256": "2e94a68f06fcba9f85292dbf8055e90503a111f67e4c0b5ec9d3479ef0912175",
+      "pages": [
+        34,
+        35,
+        36
+      ],
+      "origin_file": "05-3-Learn.md",
+      "origin_file_sha256": "9cfd9d24d5c3f74eb2490c08c1f2cfcdff461e8f416ccc35a3eb7bd5569adf7e"
+    },
+    {
+      "file": "s4.json",
+      "title": "8. Pivot (or Persevere)",
+      "sha256": "ca1096026b07e5351f34c60dcc2c84cd8da25e2c9df27759504beeec9f51d20e",
+      "pages": [
+        122,
+        123,
+        124
+      ],
+      "origin_file": "11-8-Pivot-or-Persevere.md",
+      "origin_file_sha256": "9fa2268e7c687e17e339f0802b6f12e5d69375452176f62b517773d9ce006a1e"
+    },
+    {
+      "file": "s5.json",
+      "title": "9. Batch",
+      "sha256": "22c0b893b613631941dfdcda42f643c53ce10e0ccca1a5f892f03d6fbde3a327",
+      "pages": [
+        149,
+        150,
+        151
+      ],
+      "origin_file": "13-9-Batch.md",
+      "origin_file_sha256": "2062b84c2db38458e68844ef05ae0aa6a3d9e5b4c33ebcf06348e04fa23b500a"
+    }
+  ]
+}

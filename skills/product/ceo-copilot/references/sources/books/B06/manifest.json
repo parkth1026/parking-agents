@@ -1,0 +1,52 @@
+{
+  "book_id": "B06",
+  "title": "Where to play",
+  "author": "Gruber, Marc, Tal, Sharon",
+  "published": "2017-10-02",
+  "identifier": "3229224348",
+  "edition_note": "Pearson Education 电子版（EPUB 元数据 published 2017-10-02，版权页 First edition published 2017，© Pearson Education Limited 2017，ePub ISBN 978-1-292-17894-3）。内容为 2017 年原版。",
+  "locator": "synthetic-page",
+  "page_units": 300,
+  "extraction": "unzip 后按 spine 顺序读 XHTML；块级元素各成一段；标题加 #，列表加 -，图片变成 [图：文件名｜alt] 占位行，上标变成 [^n]；没有印刷页标记，按每页约 300 个单位切合成页，每节另起一页；正文不改字",
+  "known_limits": [
+    "214 张图片（raw 内 213 张，跳过的扉页图不计）只有占位行 [图：文件名｜alt]，alt 多为 'Illustration'/'Worksheet'。图内内容读不到：Market Opportunity Navigator 三张核心图（Market Opportunity Set、Attractiveness Map、Agile Focus Dartboard）的图上文字与刻度、各案例配图、Worksheets 节的 4 张整页工作表模板，均不可从 raw 读出。",
+    "源 EPUB 含 240 个 id=\"pageN\" 形态的印刷页锚点（阿拉伯数字 1–230 共 230 个，罗马数字 i–x 共 10 个），不是标准 epub:type=\"pagebreak\"，本抽取未采用（沿用 the-innovators-dilemma/solution 先例）。页码全部为合成页，p.N 只在本 raw 目录内有效，不能换算为纸书页码。锚点保留在源文件中，可供未来重抽。",
+    "24 张表格（前言 3 张、ch1 2 张、ch2 18 张、ch4 1 张）转为逐单元格竖排，列对齐丢失。",
+    "75 条编号脚注（ch2 57、ch3 9、ch4 9）：正文为 [^n] 上标，注释本体在各节末脚注标题下按编号排列；两者无程序链接，按编号人工对应。",
+    "7 处悬垂连字符（under- and over-analysis、up- or downsides 两处、Short- vs. long-term、short- or a long-term、him- or herself、Index 内 short- vs. long-term）为原书原文，保留未动，不是转制断词。",
+    "01-Acknowledgements 节实含三部分（源 spine 顺序）：图片版权致谢（part0003）、前置推荐语含 Steve Jobs/Jeff Bezos 语录（part0004）、本书工具简介 Discover/Evaluate/Focus 列表（part0005）。后两段不在目录中，按 spine 顺序并入该节，未跳过。"
+  ],
+  "origin_manifest_sha256": "048b012812735155e60a59568bd1f5c83d225fecfeb9fcb4d5b247d601befd87",
+  "scope": "Only already-cited raw page blocks are bundled. No whole-book or extraction-completeness certification.",
+  "sections": [
+    {
+      "file": "s1.json",
+      "title": "1 Overview",
+      "sha256": "81716a24d39b43ec2378610804af6b9e315235efdce20fe5b2a7fb9edb2b207c",
+      "pages": [
+        5,
+        6,
+        10
+      ],
+      "origin_file": "02-1-Overview.md",
+      "origin_file_sha256": "9b1a7f412a02df4d62d38d067ee73673af90d2af6bf10045e2dd17025b3772bb"
+    },
+    {
+      "file": "s2.json",
+      "title": "2 The Market Opportunity Navigator: Three steps for discovering your most valuable market opportunities",
+      "sha256": "ef308c9015f4c14aee9ba9517f654271ec2f5277317894139f39cd631b0a7162",
+      "pages": [
+        15,
+        20,
+        26,
+        27,
+        28,
+        37,
+        46,
+        47
+      ],
+      "origin_file": "03-2-The-Market-Opportunity-Navigator-Three-steps-for-discoveri.md",
+      "origin_file_sha256": "25f06dd2ad216a9240e07216992d8e5a72972bebddded1adaf4b2d99cdd6c3fe"
+    }
+  ]
+}

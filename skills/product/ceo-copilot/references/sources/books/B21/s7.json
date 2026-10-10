@@ -1,0 +1,20 @@
+{
+  "book_id": "B21",
+  "source_id": "s7",
+  "title": "Key Inputs to Calculate the LTV",
+  "original_file": "105-Key-Inputs-to-Calculate-the-LTV.md",
+  "origin_file_sha256": "8b00bab1bd3a81d442da35bf3ff487fd69ad176f2040bf336251d7c349e42aca",
+  "selection": "Already-cited raw pages only; preserve page text verbatim.",
+  "pages": [
+    {
+      "page": 198,
+      "text": "\n\n# KEY INPUTS TO CALCULATE THE LTV\n\nNow I will take you through precisely how to calculate the LTV of a customer. While the final number will likely be a range and not necessarily correct the first time you do it, it is very important to understand what drives the value of LTV. In other words, you need to know much more than just a number; you need to understand the underlying factors so you can understand your risks and how you can increase LTV over time. It will also help you when you get real paying customers and you need to analyze what their LTV is and how it is trending. This is how and when you will make adjustments to continually monitor whether your unit economics are on track to a viable, sustainable, and attractive future. Here are the key inputs that you will need to understand to estimate the LTV:\n\n1. One-time Revenue Stream, If Any. Typically, if there is an up-front charge for your product, it is a one-time source of revenue.\n\n2. Recurring Revenue Streams, If Any. Subscription and maintenance fees, as well as repeated purchases of consumables, are all recurring revenues.\n\n3. Additional Revenue Opportunities. If there are opportunities to “upsell” the customer, where the customer purchases additional products with minimal additional effort from your sales team, include these as revenue streams. Remember to consider the DMU and the sales cycle you calculated earlier. Underestimating either of these could lead you to a distorted view.\n\n4. Gross Margin for Each Of Your Revenue Streams. The gross margin is the price of your product minus the production cost of making an individual product. Cost does not include sales and marketing costs (which is factored into the COCA) or overhead costs like R&D or administrative expenses.\n\n5. Retention Rate. For each recurring revenue stream, this rate is the percentage of customers who continue to pay the recurring fee for the product. This usually expressed as a monthly rate or a yearly rate. (The opposite of retention rate is “churn rate,” which is the percentage of customers you lose.) Assume, for simplicity, that once the customer has stopped paying a recurring fee, the customer will no longer be receptive to upselling. Do not assume that on a multiyear or multimonth contract customers will make all of their payments. Early termination of a contract by the customer should be incorporated into the retention rate.\n\n",
+      "sha256": "458c10865e5c1b3f2917cc2cda9de35442c401b38a65b4ff6b477e74241993d2"
+    },
+    {
+      "page": 199,
+      "text": "\n\n6. Life of Product. For each one-time revenue stream, this is the length of time you expect the product to last before the customer will need to either purchase a replacement or discontinue use of the product.\n\n7. Next Product Purchase Rate. For each one-time revenue stream, this rate is the percentage of customers who will buy a replacement product from you when the current product has reached the end of its life.\n\n8. Cost of Capital Rate For Your Business. Expressed as a yearly rate, this is how much it costs you, in debt or equity, to get money from investors for your business. For a new entrepreneur who lacks a track record and is just getting started, the appropriate number is most likely between 35 and 75 percent per year.1 This number is so high because an investor gives you money he cannot get back for years at a time (an illiquid investment). The investor is also taking a great risk because you are a brand-new business. These two factors mean that investors will charge you quite a premium for capital.\n",
+      "sha256": "26aa7ee14233787f2fd21df930c263e7cd157f7e6dd2dc0f0b7254626a3521d4"
+    }
+  ]
+}

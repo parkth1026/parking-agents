@@ -1,0 +1,67 @@
+{
+  "book_id": "B23",
+  "title": "7 Powers: The Foundations of Business Strategy",
+  "author": "Hamilton Helmer",
+  "published": "2016",
+  "identifier": "9780998116327",
+  "edition_note": "Deep Strategy LLC 自版（版权页 © 2016；印刷版 ISBN 978-0-9981163-0-3，本 EPUB 电子 ISBN 978-0-9981163-2-7）。版本史：v1（books/2026-10-09-7-powers，保留作基线）从 z-library 来源 PDF 抽取，PDF 文字层 Th/fi/fl/ff/ft 连字系统性脱落（Net ix=Netflix 等）；会话中途源 PDF 被替换为同书 EPUB，本目录 v2 从 EPUB 重抽，文字层连字完整（Netflix 117 处、first/profit 各 116 处、缺字形态 0 处）。先前「EPUB 缺 PDF 后期印次推荐语页（Daniel Ek 等）」的判断经逐条比对不成立：两版推荐语页均为 13 条且名单与文字一致（Daniel Ek、Reed Hastings、Jonathan Levin、Peter Thiel、Bruce Chizen、Pete Docter、Mike Moritz、Patrick Collison、Blake Grossman、Daphne Koller、Sean O'Sullivan、Mark Baumgartner、Greg Hinckley）。",
+  "locator": "synthetic-page",
+  "page_units": 300,
+  "extraction": "unzip 后按 spine 顺序读 XHTML；块级元素各成一段；标题加 #，列表加 -，图片变成 [图：文件名｜alt] 占位行，上标变成 [^n]；没有印刷页标记，按每页约 300 个单位切合成页，每节另起一页；正文不改字",
+  "known_limits": [
+    "定位方式：EPUB 无印刷页分页标记（probe print_pagebreaks=0），页标记 <!-- p.N | synthetic -->：每页约 300 单位、每节另起一页。与 v1 的 PDF 页体系（p.1-233）不可换算；两版引用不可互相替换页码。",
+    "文字层完整：v1 PDF 版的 Th/fi/fl/ff/ft 连字脱落（Net ix、pro t、rst 等形态）在本 EPUB 不存在。v1 raw 中的连字脱落形态在本目录中均为完整词（Netflix 117 处、first 116 处、profit 116 处，EPUB grep 缺字形态 0 处）。",
+    "结构差异（与 v1 逐项）：1) PDF 版 TABLE OF CONTENTS 页对应 toc.html，是导航文件无正文，按技能规范 skip 未入 raw（v1 里它在 Front Matter 节内）；2) Dedication、PART I、PART II 分隔页按脚本 minSectionUnits=50 规则自动并入后一节开头（Dedication 在 Introduction 节首、PART I 在 Chapter 1 节首、PART II 在 Chapter 8 节首），v1 是并入前一节尾；3) 扉页（title.html）并入 Copyright 节；4) Back Cover（back.html）skip。",
+    "书内图以 [图：文件名｜alt] 占位行进 raw。全书 img 引用共 86 处、对应 85 个原始图片文件（line.png 在同一文件里被引用 2 次，其余各 1 次）；其中 84 处在正文章节（进 raw），cover.html 的封面图与 back.html 的封底图各 1 处（随 skip 不进 raw）。85 个图片文件已全部按原始字节（不重编码不转格式）导出到本目录 images/，索引见 images/index.tsv。曲线形状、坐标轴刻度、数据点、柱状对比仍以图片文件为准，raw 文本读不到。",
+    "书内尾注（Chapter Notes 节）与正文中的 [^n] 上标标记是注释编号，不是页码。v1 PDF raw 里尾注编号是行内裸数字（如「…microprocessors.9」），本版统一为 [^9] 形态。",
+    "有序列表与字母列表在 EPUB 源里是 <ol>/<ul> 结构（编号不在文字层），raw 统一渲染为「- 」列表项：条目顺序保留、编号数字不出现（v1 PDF raw 里是「1./a./b.」）。Chapter 9 术语表（Power/Strategy/strategy/value/Strategy Dynamics）的表格单元格在 raw 里用「|」分隔。",
+    "公式为线性化文本：上下标与分式结构读不出（如 NPV = M0 g s m、Profit ≡ π = [P – c] Q），附录推导的分式展开以图片呈现（见 images/）。",
+    "本 EPUB 无页眉页脚；各 html 文件 <head><title> 里的「7 Powers」不进入正文。",
+    "verify-raw 三条 WARN 的处置：1) 「被拆开的连字 约 1 处」= Chapter Notes 的「Bob Wulff of Adobe」，Wulff 是人名，源 xhtml 同样写作 Wulff，误报；2) 「[图：N.png｜images] 在 7 个页首/页末」= 整页图或随文图的占位行，非页眉；3) 「C H A P T E R # 在 7 个页首」= 7 个章首页的章标题（P A R T 分隔行随小节合并在章标题前），非页眉。"
+  ],
+  "origin_manifest_sha256": "428b6432f3458ff71b4602185f692692620b9681d98f7ba81ab8e532bdd6aab3",
+  "scope": "Only already-cited raw page blocks are bundled. No whole-book or extraction-completeness certification.",
+  "sections": [
+    {
+      "file": "s1.json",
+      "title": "Introduction",
+      "sha256": "c55ce626330614d735d8b11ae88bf097ec47a5ada45f021d54f8f1c5ecbe1054",
+      "pages": [
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17
+      ],
+      "origin_file": "03-Introduction.md",
+      "origin_file_sha256": "e2e99f27ab9fc3685f1b411003b362a7a3c763155aba84300c44f155eb1e0565"
+    },
+    {
+      "file": "s2.json",
+      "title": "Chapter 3: Counter-Positioning",
+      "sha256": "48b5d56149bd3fd8cdb8c5ac524f3de78792ea189c37c5ce498705e5fd83a53e",
+      "pages": [
+        36,
+        37,
+        38,
+        39,
+        40
+      ],
+      "origin_file": "06-Chapter-3-Counter-Positioning.md",
+      "origin_file_sha256": "2f4c503c38cff0333f580bf279a2f8e8561d9663c0cfdb6d26d28a7b303f0ee0"
+    },
+    {
+      "file": "s3.json",
+      "title": "Chapter 9: The Power Progression",
+      "sha256": "3c0edccbe2ab9e4e04b5f8b87a04ad93ce8a746427ff30b26ff1e0c220d1b9d4",
+      "pages": [
+        106,
+        107
+      ],
+      "origin_file": "12-Chapter-9-The-Power-Progression.md",
+      "origin_file_sha256": "4d1dd93173802112130730e754870af26d79a276a7821a66172df4cded98fc43"
+    }
+  ]
+}

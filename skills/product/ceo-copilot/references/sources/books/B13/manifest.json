@@ -1,0 +1,48 @@
+{
+  "book_id": "B13",
+  "title": "The Innovator's Dilemma: When New Technologies Cause Great Firms to Fail (Management of Innovation and Change)",
+  "author": "Clayton M. Christensen",
+  "published": "2013-10-21T22:00:00+00:00",
+  "identifier": "44655c21-173a-4e75-8a0a-d51a01d8a215",
+  "edition_note": "Harvard Business Review Press 电子版（EPUB 元数据 published 2013-10-21，版权页 Copyright 1997, 2000）。含 2011 版新增的前言性内容与 Book Group Guide、About the Author。核心正文为 1997 年原版内容。",
+  "locator": "synthetic-page",
+  "page_units": 300,
+  "extraction": "unzip 后按 spine 顺序读 XHTML；块级元素各成一段；标题加 #，列表加 -，图片变成 [图：文件名｜alt] 占位行，上标变成 [^n]；没有印刷页标记，按每页约 300 个单位切合成页，每节另起一页；正文不改字",
+  "known_limits": [
+    "56 张图片只有占位行 [图：文件名｜art]，alt 全为 'art'。图内内容读不到：磁盘驱动器容量/速度轨迹曲线、value network 结构图、机械挖掘机技术演进曲线等关键图表只有图号与图题文字，曲线与数据点不可从 raw 读出。",
+    "Introduction 合成页 p.21 的两列表格（Established vs. Disruptive Technology）转为逐单元格竖排，列对齐丢失：首行为表头 'Established Technology | Disruptive Technology'，其后按奇数行=左列、偶数行=右列交替对应。",
+    "源 EPUB 含 255 个 id=\"pageNN\" 形态的印刷页锚点（含 pagexv 等罗马数字前言页），不是标准 epub:type=\"pagebreak\"，本抽取未采用。页码全部为合成页，p.N 只在本 raw 目录内有效，不能换算为纸书页码。",
+    "脚注在正文为 [^n] 上标，注释本体在节尾 NOTES 标题下按编号排列；两者无程序链接，按编号人工对应。",
+    "Front matter p.1 丛书列表中装饰图 00001.jpeg 位于书名 'Crisis Renewal' 两词之间，为源 EPUB 原始排布，未调整。"
+  ],
+  "origin_manifest_sha256": "623179902207189de007c5f29e69e1d62586650cf757339e13cac47a96a7f843",
+  "scope": "Only already-cited raw page blocks are bundled. No whole-book or extraction-completeness certification.",
+  "sections": [
+    {
+      "file": "s1.json",
+      "title": "CHAPTER ELEVEN: The Dilemmas of Innovation: A Summary",
+      "sha256": "a7666d4fedba417de07fb1797a2c8359587bae50715d1c48cf9b2f710845dbd7",
+      "pages": [
+        220,
+        221,
+        222,
+        223,
+        224
+      ],
+      "origin_file": "15-CHAPTER-ELEVEN-The-Dilemmas-of-Innovation-A-Summary.md",
+      "origin_file_sha256": "45ae61f0ac75bac09fa3bb82b3a41bfae835d915885796a4b09617a871fa5ab0"
+    },
+    {
+      "file": "s2.json",
+      "title": "CHAPTER FOUR: What Goes Up, Can’t Go Down",
+      "sha256": "78cab2cf618a8be17a0076321f8b85e308c7c776e4c8b6d4e151606f2c9b5d42",
+      "pages": [
+        86,
+        87,
+        88
+      ],
+      "origin_file": "07-CHAPTER-FOUR-What-Goes-Up-Cant-Go-Down.md",
+      "origin_file_sha256": "c50275cec79352b82f4e0036521a21bafc7c25a2aa2258be7025fc33e95d255f"
+    }
+  ]
+}

@@ -24,8 +24,8 @@
       "group": "target",
       "source": {
         "kind": "retained_baseline",
-        "file": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\evals\\ceo-copilot-workspace\\issue31-closure\\baseline\\skill\\trigger-evals.json",
-        "question_id": "q01"
+        "question_id": "q01",
+        "artifact_id": "historical:issue31-closure/baseline/trigger-evals"
       }
     },
     {
@@ -36,8 +36,8 @@
       "group": "target",
       "source": {
         "kind": "retained_baseline",
-        "file": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\evals\\ceo-copilot-workspace\\issue31-closure\\baseline\\skill\\trigger-evals.json",
-        "question_id": "q02"
+        "question_id": "q02",
+        "artifact_id": "historical:issue31-closure/baseline/trigger-evals"
       }
     },
     {
@@ -48,8 +48,8 @@
       "group": "target",
       "source": {
         "kind": "retained_baseline",
-        "file": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\evals\\ceo-copilot-workspace\\issue31-closure\\baseline\\skill\\trigger-evals.json",
-        "question_id": "q03"
+        "question_id": "q03",
+        "artifact_id": "historical:issue31-closure/baseline/trigger-evals"
       }
     },
     {
@@ -60,8 +60,8 @@
       "group": "target",
       "source": {
         "kind": "retained_baseline",
-        "file": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\evals\\ceo-copilot-workspace\\issue31-closure\\baseline\\skill\\trigger-evals.json",
-        "question_id": "q04"
+        "question_id": "q04",
+        "artifact_id": "historical:issue31-closure/baseline/trigger-evals"
       }
     },
     {
@@ -72,8 +72,8 @@
       "group": "target",
       "source": {
         "kind": "retained_baseline",
-        "file": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\evals\\ceo-copilot-workspace\\issue31-closure\\baseline\\skill\\trigger-evals.json",
-        "question_id": "q05"
+        "question_id": "q05",
+        "artifact_id": "historical:issue31-closure/baseline/trigger-evals"
       }
     },
     {
@@ -84,8 +84,8 @@
       "group": "target",
       "source": {
         "kind": "retained_baseline",
-        "file": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\evals\\ceo-copilot-workspace\\issue31-closure\\baseline\\skill\\trigger-evals.json",
-        "question_id": "q06"
+        "question_id": "q06",
+        "artifact_id": "historical:issue31-closure/baseline/trigger-evals"
       }
     },
     {
@@ -96,8 +96,8 @@
       "group": "target",
       "source": {
         "kind": "retained_baseline",
-        "file": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\evals\\ceo-copilot-workspace\\issue31-closure\\baseline\\skill\\trigger-evals.json",
-        "question_id": "q07"
+        "question_id": "q07",
+        "artifact_id": "historical:issue31-closure/baseline/trigger-evals"
       }
     },
     {
@@ -108,8 +108,8 @@
       "group": "target",
       "source": {
         "kind": "retained_baseline",
-        "file": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\evals\\ceo-copilot-workspace\\issue31-closure\\baseline\\skill\\trigger-evals.json",
-        "question_id": "q08"
+        "question_id": "q08",
+        "artifact_id": "historical:issue31-closure/baseline/trigger-evals"
       }
     },
     {
@@ -120,8 +120,8 @@
       "group": "target",
       "source": {
         "kind": "retained_baseline",
-        "file": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\evals\\ceo-copilot-workspace\\issue31-closure\\baseline\\skill\\trigger-evals.json",
-        "question_id": "q09"
+        "question_id": "q09",
+        "artifact_id": "historical:issue31-closure/baseline/trigger-evals"
       }
     },
     {
@@ -132,8 +132,8 @@
       "group": "target",
       "source": {
         "kind": "retained_baseline",
-        "file": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\evals\\ceo-copilot-workspace\\issue31-closure\\baseline\\skill\\trigger-evals.json",
-        "question_id": "q10"
+        "question_id": "q10",
+        "artifact_id": "historical:issue31-closure/baseline/trigger-evals"
       }
     },
     {
@@ -144,9 +144,9 @@
       "group": "neighbor",
       "source": {
         "kind": "new_near_miss_from_published_capability",
-        "file": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\skills\\product\\lixiang-product-grill\\SKILL.md",
         "source_sha256": "be9fe454a6173eb68917016b34294cf8a4099cf8becd48ab3eeeaa27bb5da8dd",
-        "rationale": "固定课程标准、用户原话对照、逐模块复盘"
+        "rationale": "固定课程标准、用户原话对照、逐模块复盘",
+        "artifact_id": "historical:lixiang-product-grill/SKILL"
       }
     },
     {
@@ -157,9 +157,9 @@
       "group": "neighbor",
       "source": {
         "kind": "new_near_miss_from_published_capability",
-        "file": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\skills\\product\\lixiang-product-grill\\SKILL.md",
         "source_sha256": "be9fe454a6173eb68917016b34294cf8a4099cf8becd48ab3eeeaa27bb5da8dd",
-        "rationale": "固定课程标准、用户原话对照、逐模块复盘"
+        "rationale": "固定课程标准、用户原话对照、逐模块复盘",
+        "artifact_id": "historical:lixiang-product-grill/SKILL"
       }
     },
     {
@@ -170,9 +170,9 @@
       "group": "neighbor",
       "source": {
         "kind": "new_near_miss_from_published_capability",
-        "file": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\skills\\product\\lixiang-product-grill\\SKILL.md",
         "source_sha256": "be9fe454a6173eb68917016b34294cf8a4099cf8becd48ab3eeeaa27bb5da8dd",
-        "rationale": "固定课程标准、用户原话对照、逐模块复盘"
+        "rationale": "固定课程标准、用户原话对照、逐模块复盘",
+        "artifact_id": "historical:lixiang-product-grill/SKILL"
       }
     },
     {
@@ -183,9 +183,9 @@
       "group": "neighbor",
       "source": {
         "kind": "new_near_miss_from_published_capability",
-        "file": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\skills\\pub\\b2b-product-review\\SKILL.md",
         "source_sha256": "ad4dda6af442d6588e313bfc36a83a9a2e899405772dbd37a44434c67b81df80",
-        "rationale": "已有 B 端方案、失败预演、机制与阶段证据审查"
+        "rationale": "已有 B 端方案、失败预演、机制与阶段证据审查",
+        "artifact_id": "historical:b2b-product-review/SKILL"
       }
     },
     {
@@ -196,9 +196,9 @@
       "group": "neighbor",
       "source": {
         "kind": "new_near_miss_from_published_capability",
-        "file": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\skills\\pub\\b2b-product-review\\SKILL.md",
         "source_sha256": "ad4dda6af442d6588e313bfc36a83a9a2e899405772dbd37a44434c67b81df80",
-        "rationale": "已有 B 端方案、失败预演、机制与阶段证据审查"
+        "rationale": "已有 B 端方案、失败预演、机制与阶段证据审查",
+        "artifact_id": "historical:b2b-product-review/SKILL"
       }
     },
     {
@@ -209,9 +209,9 @@
       "group": "neighbor",
       "source": {
         "kind": "new_near_miss_from_published_capability",
-        "file": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\skills\\pub\\b2b-product-review\\SKILL.md",
         "source_sha256": "ad4dda6af442d6588e313bfc36a83a9a2e899405772dbd37a44434c67b81df80",
-        "rationale": "已有 B 端方案、失败预演、机制与阶段证据审查"
+        "rationale": "已有 B 端方案、失败预演、机制与阶段证据审查",
+        "artifact_id": "historical:b2b-product-review/SKILL"
       }
     },
     {
@@ -222,8 +222,8 @@
       "group": "unrelated",
       "source": {
         "kind": "retained_baseline",
-        "file": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\evals\\ceo-copilot-workspace\\issue31-closure\\baseline\\skill\\trigger-evals.json",
-        "question_id": "q17"
+        "question_id": "q17",
+        "artifact_id": "historical:issue31-closure/baseline/trigger-evals"
       }
     },
     {
@@ -234,8 +234,8 @@
       "group": "unrelated",
       "source": {
         "kind": "retained_baseline",
-        "file": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\evals\\ceo-copilot-workspace\\issue31-closure\\baseline\\skill\\trigger-evals.json",
-        "question_id": "q18"
+        "question_id": "q18",
+        "artifact_id": "historical:issue31-closure/baseline/trigger-evals"
       }
     },
     {
@@ -246,8 +246,8 @@
       "group": "unrelated",
       "source": {
         "kind": "retained_baseline",
-        "file": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\evals\\ceo-copilot-workspace\\issue31-closure\\baseline\\skill\\trigger-evals.json",
-        "question_id": "q19"
+        "question_id": "q19",
+        "artifact_id": "historical:issue31-closure/baseline/trigger-evals"
       }
     },
     {
@@ -258,9 +258,10 @@
       "group": "unrelated",
       "source": {
         "kind": "retained_baseline",
-        "file": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\evals\\ceo-copilot-workspace\\issue31-closure\\baseline\\skill\\trigger-evals.json",
-        "question_id": "q20"
+        "question_id": "q20",
+        "artifact_id": "historical:issue31-closure/baseline/trigger-evals"
       }
     }
-  ]
+  ],
+  "locator_note": "Question bodies are embedded. Source artifact identifiers record historical provenance; no neighboring skill files are required."
 }

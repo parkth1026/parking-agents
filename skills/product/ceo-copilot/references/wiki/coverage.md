@@ -10,18 +10,20 @@ report_accessed: "2026-10-02"
 external_links_revalidated: false
 sources:
   - title: "第二增长曲线新产品立项参考报告，覆盖核查修订版"
-    url: "product-research/docs/research/第二增长曲线_新产品立项参考报告_覆盖核查修订版.html"
+    url: "../sources/report.html"
     nature: "锁定报告正文，SHA-256 a84fd5e124a80d7dd98a73c7def5a203e1ea0c0db2438ce520b4450072a6a948"
     depth: "本页为原创摘要；未新增读取原书或公共网页"
 ---
 
 # 报告知识覆盖与冻结入口
 
+> 本页为 2026-10-02 的报告覆盖快照。2026-10-10 原书定向补充从 [[decision-index]] 进入；本页历史缺口与未读原书口径不冒充当前补充状态。
+
 ## 报告版本与冻结范围
 
-源报告路径：`product-research/docs/research/第二增长曲线_新产品立项参考报告_覆盖核查修订版.html`。SHA-256：`a84fd5e124a80d7dd98a73c7def5a203e1ea0c0db2438ce520b4450072a6a948`。报告v1.1整理日2026-09-29；本轮读取日2026-10-02。报告事实源保持不变，Wiki只存原创摘要、来源链接、深度和边界。技能内来源文本作为行号定位辅助，不算Wiki知识页，也不能替代本页逐项内容。
+源报告路径：`../sources/report.html`。SHA-256：`a84fd5e124a80d7dd98a73c7def5a203e1ea0c0db2438ce520b4450072a6a948`。报告v1.1整理日2026-09-29；本轮读取日2026-10-02。报告事实源保持不变，Wiki只存原创摘要、来源链接、深度和边界。技能内来源文本作为行号定位辅助，不算Wiki知识页，也不能替代本页逐项内容。
 
-冻结清单见 [[coverage-inventory-01]] 起的分册及 `coverage-manifest.json`。每项保留报告HTML锚点/行、技能来源文本行（可定位时）、目标页/标题、深度与误用范围。机器结构通过只证明映射存在；独立清单与具名语义复核保存在验收目录 `issue31-closure/coverage-review/`，本页不自签独立PASS。
+冻结清单见 [[coverage-inventory-01]] 起的分册及 `coverage-manifest.json`。每项保留报告HTML锚点/行、技能来源文本行（可定位时）、目标页/标题、深度与误用范围。机器结构通过只证明映射存在；历史独立清单与具名语义复核属于设计归档，不是包内运行依赖；本页不据此自签独立PASS。
 
 ## 两种完整性分开
 

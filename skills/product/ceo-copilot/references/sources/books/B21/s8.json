@@ -1,0 +1,20 @@
+{
+  "book_id": "B21",
+  "source_id": "s8",
+  "title": "The Right Way to Calculate Coca: A top-down Perspective",
+  "original_file": "120-The-Right-Way-to-Calculate-Coca-A-top-down-Perspective.md",
+  "origin_file_sha256": "ef2266e6b31cca2262a8379730153f400ed2f46356bd2abe6a53be4eacafcc78",
+  "selection": "Already-cited raw pages only; preserve page text verbatim.",
+  "pages": [
+    {
+      "page": 223,
+      "text": "\n\n# THE RIGHT WAY TO CALCULATE COCA: A TOP-DOWN PERSPECTIVE\n\nA more effective way to calculate an accurate COCA is to tabulate your aggregate sales and marketing expenses over a period of time; then divide that by the total number of new customers you acquire within that time period. Since your COCA(t) will vary over time as your sales process changes and your organization is in the learning curve and you develop strong positive word of mouth within your target customer group, you should calculate it over time. I recommend three time periods in order to show how the COCA is trending.\n\nAppropriate time periods depend on the life cycle of your product, which is directly related to the amount of time it takes for your customer to realize the value proposition from your product. A typical way to define the first three time periods for a COCA calculation is by taking your first year of sales, your second and third year or sales, and your fourth and fifth year of sales. Depending on your new venture, these time periods could be different. If in doubt, use year 1, years 2 and 3, and years 4 and 5 as your three time periods.\n\nWhen aggregating your sales and marketing expenditures, be sure to include costs for all the key items in your sales and marketing plan: sales reps, auto, travel and entertainment, phone, Internet, demo units, technical sales support, website development, consultants, trade shows, real estate, administrative support, computers, and so on. Also calculate the cost in time that the executives on the team spend on sales as these are very real and expensive costs.\n\nThis calculation requires that you understand your sales process well. Do not worry if your calculation is not exactly right; but be sure to enlist an experienced person to help develop budget projections, and be sure to understand how adjusting costs affects the profitability of your business.\n\n",
+      "sha256": "8dbf94f8de7a8a685c25e742436019338f0df3b8df40614361efba77d7e244d2"
+    },
+    {
+      "page": 224,
+      "text": "\n\nDividing the cost of your sales and marketing expenses by the defined time period will yield the Total Marketing and Sales Expenses over Time or TMSE(t) where t is the first, second, or third time period. If a sizeable portion of your TMSE(t) is the cost of retention of existing customers, rather than acquiring new customers, subtract this from the TMSE(t). We will refer to the cost of retention as the Install Base Support Expense over Time or IBSE(t). Then, determine the number of new customers you will close during that time period (which means delivering the product and collecting their money), referred to as New Customers over Time or NC(t).\n\nGiven these definitions, we can explicitly define the COCA calculation for any given time period to be as follows:\n\n[图：f209-01.jpg｜image]\n\nOnce you have numbers for each of your first three time periods, plot them on a graph where the x-axis is time and the y-axis is COCA for that period. You can also draw a best-fit curve.\n\nThe graph in Figure 19.3 illustrates a good COCA, where it decreases over time. The horizontal line at X represents the COCA’s steady state, once sales volume ramps up and the product, company, and market mature, typically achieved during the longer-term stage of your sales process.\n\nFigure 19.3 Graph of COCA over time.\n\n[图：f209-02.jpg｜image]\n",
+      "sha256": "6770d4caa49e86e84ba774c528b3f394c43f0a4d8bc63046bf4ce5866b6f4c67"
+    }
+  ]
+}

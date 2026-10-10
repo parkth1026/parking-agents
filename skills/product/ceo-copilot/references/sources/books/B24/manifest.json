@@ -1,0 +1,88 @@
+{
+  "book_id": "B24",
+  "title": "INSPIRED: How to Create Tech Products Customers Love (2nd ed.)",
+  "author": "Marty Cagan",
+  "published": "2018",
+  "identifier": "urn:isbn:9781119387565",
+  "edition_note": "Wiley 第 2 版（版权页 2018），ISBN 9781119387565（EPUB）。文件来自电子书分发站（z-library 副本）。EPUB dc:creator 只标 Marty Cagan；第 2 版 Christian Idiodi、Lea Hickman 等 SVPG 同事参与撰写部分章节，raw 不区分署名。EPUB 元数据 dc:date（2019-01-22）是文件导出时间，不是出版日期，故配置里显式写 published=2018。",
+  "locator": "print-page",
+  "extraction": "unzip 后按 spine 顺序读 XHTML；块级元素各成一段；标题加 #，列表加 -，图片变成 [图：文件名｜alt] 占位行，上标变成 [^n]；印刷页分页标记转成 <!-- p.N | printed X -->；正文不改字",
+  "known_limits": [
+    "印刷页标记（epub:type=pagebreak，title 属性）覆盖：前置罗马页 i–vi、ix–xi、xvii–xviii；正文阿拉伯页 1–349 连续无缺号。无标记的印刷页：vii–viii、xii、xiv–xvi、350，均为原书空白页或无页码页。raw 页码与印刷页的对应看每页标记的 printed 值；全书换算稳定：阿拉伯段 raw p.N = printed N-11（p.12=printed 1，p.360=printed 349），罗马段 p.1–p.6=printed i–vi、p.7–p.9=printed ix–xi、p.10–p.11=printed xvii–xviii。",
+    "封面 cover.xhtml（图 alt 文字 4 单位）、目录页 toc.xhtml（printed xiii）、End User License Agreement eula.xhtml（printed 351，Wiley 电子书格式条款，非正文）整文件跳过，不计入守恒的输出侧。",
+    "源文把复合词连字符排成 U+2010（‐，如 growth‐stage、co‐founder），不是普通连字符 U+002D。这是原书排版字符，按原样保留；全文检索连字词时两种连字符都要试。",
+    "正文图只有 2 张（c06、c08 各 1），raw 里是 [图：文件名｜alt] 占位行，图内文字与结构读不到；f02 书名页的出版者标志图同样只有占位行。",
+    "目录（NCX）里的小节锚点（如 c08.xhtml#head-2-1）会按脚本规则把长章切成多个小节文件，小于 50 单位的开头并入后一节（见 manifest 的 merged_small_sections），文字不丢，但文件名是小节名而非章名。",
+    "Index（printed 333–349）是纸书索引，条目后的页码指印刷页码；raw 只保留文字与印刷页标记，索引条目与页码的排版对齐不保留。"
+  ],
+  "origin_manifest_sha256": "25d8dbb0b098fa7001b0ebc7a91f491a82b21c2c0bd33182d37ceadc0d6173da",
+  "scope": "Only already-cited raw page blocks are bundled. No whole-book or extraction-completeness certification.",
+  "sections": [
+    {
+      "file": "s1.json",
+      "title": "CHAPTER 33: Principles of Product Discovery",
+      "sha256": "7670c9e6c19a5c4f6eb1b70dfa4670f210b6cd8056e86e70b05e9d7766e016ec",
+      "pages": [
+        176,
+        177
+      ],
+      "origin_file": "82-CHAPTER-33-Principles-of-Product-Discovery.md",
+      "origin_file_sha256": "b874e910ffdc7fc0e585805b40f671a2dd2b448d4c89ccc70e92045aef415f02"
+    },
+    {
+      "file": "s2.json",
+      "title": "CHAPTER 42: Concierge Test Technique",
+      "sha256": "b2d666c51b7a8c6ad179d06acc320dc63491c94340eb8d4932ddb8801dab9d1c",
+      "pages": [
+        226,
+        227
+      ],
+      "origin_file": "109-CHAPTER-42-Concierge-Test-Technique.md",
+      "origin_file_sha256": "7e23aef8500e72667b9c185dfd388faa50b31a50061855d8869c705147d9436b"
+    },
+    {
+      "file": "s3.json",
+      "title": "CHAPTER 57: Profile: Kate Arnold of Netflix",
+      "sha256": "543862bd16c441e1e9a99b85ec8b2f8b1b6507c622d455ef4740f91de0032c8d",
+      "pages": [
+        294,
+        295
+      ],
+      "origin_file": "144-CHAPTER-57-Profile-Kate-Arnold-of-Netflix.md",
+      "origin_file_sha256": "08d05533031ca8f5940723355284c4e3a2af3259d295ded72265c5d71599ff4c"
+    },
+    {
+      "file": "s4.json",
+      "title": "CHAPTER 59: Pilot Team Technique",
+      "sha256": "1485eda86c6889faefd3092c250bc4a7f7c8c5dd5bb1f918b43dc5841f68f659",
+      "pages": [
+        302,
+        303
+      ],
+      "origin_file": "146-CHAPTER-59-Pilot-Team-Technique.md",
+      "origin_file_sha256": "eda7d6350892f90378cc2f71994addec4db24284b84b7ebfefd9550dfebe2d16"
+    },
+    {
+      "file": "s5.json",
+      "title": "CHAPTER 38: Story Map Technique",
+      "sha256": "6d34d905182be5ca6758329c454399e53869e9ccf8d8f2b844bdfff0d11ced90",
+      "pages": [
+        204,
+        205
+      ],
+      "origin_file": "97-CHAPTER-38-Story-Map-Technique.md",
+      "origin_file_sha256": "b6065e520403590d16d9ca7b595dca2b50caa52c4255f354043cafebb62aa714"
+    },
+    {
+      "file": "s6.json",
+      "title": "CHAPTER 23: The Alternative to Roadmaps",
+      "sha256": "66c0a4db4daeb0ccec8d85b4a1adb353acdf0a9c01eee91310d9ee066f6ce5e5",
+      "pages": [
+        126,
+        127
+      ],
+      "origin_file": "70-CHAPTER-23-The-Alternative-to-Roadmaps.md",
+      "origin_file_sha256": "e0e4349693894680385e2b7e2cf225f492b11b9ffdbcfd0637b381dc1c240037"
+    }
+  ]
+}

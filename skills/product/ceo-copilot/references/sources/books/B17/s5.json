@@ -1,0 +1,15 @@
+{
+  "book_id": "B17",
+  "source_id": "s5",
+  "title": "Patterns",
+  "original_file": "06-Patterns.md",
+  "origin_file_sha256": "7a382829de0ad99f7c23ee8f78f876142fb42bc9c11295991ac73e2d5724106b",
+  "selection": "Already-cited raw pages only; preserve page text verbatim.",
+  "pages": [
+    {
+      "page": 31,
+      "text": "\n\nSection 2\n\nPatterns\n\n“Pattern in architecture is the idea of capturing architectural design ideas as archetypal and reusable descriptions.”\n\nChristopher Alexander, Architect\n\nChapter Contents\n\nUnbundling Business Models\n\nThe Long Tail\n\nMulti-Sided Platforms\n\nFREE as a Business Model\n\nOpen Business Models\n\nThis section describes business models with similar characteristics, similar arrangements of business model Building Blocks, or similar behaviors. We call these similarities business model patterns. The patterns described in the following pages should help you understand business model dynamics and serve as a source of inspiration for your own work with business models.\n\nWe’ve sketched out five business model patterns built on important concepts in the business literature. We’ve “translated” these into the language of the Business Model Canvas to make the concepts comparable, easy to understand, and applicable. A single business model can incorporate several of these patterns.\n\nConcepts upon which our patterns are based include Unbundling, the Long Tail, Multi-Sided Platforms, FREE, and Open Business Models. New patterns based on other business concepts will certainly emerge over time.\n\nOur goal in defining and describing these business model patterns is to recast well-known business concepts in a standardized format—the Business Model Canvas—so that they are immediately useful in your own work around business model design or invention.\n",
+      "sha256": "34c035b4805772c7a5981960165eaf3ecf3af495259504904c8a43e6baa4ac99"
+    }
+  ]
+}

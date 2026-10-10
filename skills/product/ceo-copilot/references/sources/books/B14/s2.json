@@ -1,0 +1,20 @@
+{
+  "book_id": "B14",
+  "source_id": "s2",
+  "title": "Product Architecture and Interfaces",
+  "original_file": "50-Product-Architecture-and-Interfaces.md",
+  "origin_file_sha256": "864e6f0f1937e5b211794b5b90b52005356a6aa7d94a1dceb2c3f6ad976a4b64",
+  "selection": "Already-cited raw pages only; preserve page text verbatim.",
+  "pages": [
+    {
+      "page": 149,
+      "text": "\n\n# Product Architecture and Interfaces\n\nA product’s architecture determines its constituent components and subsystems and defines how they must interact—fit and work together—in order to achieve the targeted functionality. The place where any two components fit together is called an interface. Interfaces exist within a product, as well as between stages in the value-added chain. For example, there is an interface between design and manufacturing, and another between manufacturing and distribution.\n\nAn architecture is interdependent at an interface if one part cannot be created independently of the other part—if the way one is designed and made depends on the way the other is being designed and made. When there is an interface across which there are unpredictable interdependencies, then the same organization must simultaneously develop both of the components if it hopes to develop either component.\n\nInterdependent architectures optimize performance, in terms of functionality and reliability. By definition, these architectures are proprietary because each company will develop its own interdependent design to optimize performance in a different way. When we use the term interdependent architecture in this chapter, readers can substitute as synonyms optimized and proprietary architecture.\n\nIn contrast, a modular interface is a clean one, in which there are no unpredictable interdependencies across components or stages of the value chain. Modular components fit and work together in well-understood and highly defined ways. A modular architecture specifies the fit and function of all elements so completely that it doesn’t matter who makes the components or subsystems, as long as they meet the specifications. Modular components can be developed in independent work groups or by different companies working at arm’s length.\n\nModular architectures optimize flexibility, but because they require tight specification, they give engineers fewer degrees of freedom in design. As a result, modular flexibility comes at the sacrifice of performance.[^3]\n\n",
+      "sha256": "ab3cf8b504102e9f04cc9aadf3c3d464ce8952ef17703d69ee5cec93ee35755c"
+    },
+    {
+      "page": 150,
+      "text": "\n\nPure modularity and interdependence are the ends of a spectrum: Most products fall somewhere between these extremes. As we shall see, companies are more likely to succeed when they match product architecture to their competitive circumstances.\n",
+      "sha256": "9e53fa61d17a3fee52f957e84e9116d3c90e2b79b3cd0b93681dbfb7f44969df"
+    }
+  ]
+}

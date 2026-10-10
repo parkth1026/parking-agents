@@ -1,0 +1,38 @@
+{
+  "book_id": "B03",
+  "title": "The Corporate Startup",
+  "author": "Tendayi Viki, Dan Toma, Esther Gons",
+  "published": "2017",
+  "identifier": "urn:uuid:504EAC42-657A-4EE0-A1A6-EC2E45345D00",
+  "edition_note": "Vakmedianet（荷兰出版社）2017 年第一版的官方电子版，英文原版流式 EPUB，ISBN 978 94 627 6195 7；colophon 写明 'Deze digitale editie is gemaakt naar de eerste druk, 2017'。EPUB 元数据里的 published=2018-11-16 是打包时间，不是出版年，故此处写 2017。",
+  "locator": "synthetic-page",
+  "page_units": 300,
+  "extraction": "unzip 后按 spine 顺序读 XHTML；块级元素各成一段；标题加 #，列表加 -，图片变成 [图：文件名｜alt] 占位行，上标变成 [^n]；没有印刷页标记，按每页约 300 个单位切合成页，每节另起一页；正文不改字",
+  "known_limits": [
+    "EPUB 没有印刷页分页标记，raw 页码是合成页：每页约 300 个单位，每节另起一页，与 2017 纸书页码不对应，无法按纸书页码回查。",
+    "全书脚注引用是锚链接文字（正文中的裸数字，如句末的 20、21），不是 <sup> 上标，raw 里保留为裸数字；各章尾注（Endnotes）作为普通段落留在该章文件末尾，同在一个 raw 节里。",
+    "全书 336 张图片中 333 张进了 raw（另 3 张在 skip 文件里），全部只留 [图：文件名] 占位行：332 张 alt 为空，4 张 alt 是文件名式描述（Investment plan.jpg、Investment analysis.jpg、NEXT canvas.jpg、Tristans Ecosystem.jpg）。本书是框架图/canvas 重度型书籍，图内的结构、曲线、连线与文字全部读不到，凭 raw 无法还原图的内容。",
+    "9 个章文件含 <table>，raw 里表格被压成竖排的 |-分隔行，列对齐与表头结构丢失；verify 报的「疑似页眉页脚 | ×10 页」即这些表格行，不是页眉页脚。",
+    "Chapter Ten 的创新生态系统框架表里，标签在源 XHTML 里带显式断词换行（如 Inno-<br/>vation、Resour-<br/>ces、Exter-<br/>nal），raw 保留为「Inno- vation」式断词，共约 24 处；它们是框架图的分区名（Innovation Portfolio、Tools and Resources、External Partners 等），不是正文句子。",
+    "verify 的「被拆开的连字」提醒（约 4 处）经逐处核对全部是误报：Ansoff（人名，Ansoff matrix 提出者 Igor Ansoff）与 Tuff（人名）后接动词，是真实单词，不是 fi/fl 连字被拆。",
+    "skip 掉 3 个文件共 119 单位：封面文件（封面图 + 封底营销 bullet 文案，109 单位）、Part 1 / Part 2 分部隔页（只有分部标题与装饰照片 p18-19.png、p120-121.png，各 5 单位，标题文字与目录、manifest 重复）。分部装饰照片未进 raw。",
+    "扉页区有一行制作标记 'Titelpagina'（荷兰语「题页」，Xtra 生产标签）和 'Inhoud'（荷兰语「目录」）作为普通文字保留在 raw，未删。"
+  ],
+  "origin_manifest_sha256": "2530dfefcbac46a3036c39bd1ff06c1d78194ea0d6c9a47ab31692b3ba9b834e",
+  "scope": "Only already-cited raw page blocks are bundled. No whole-book or extraction-completeness certification.",
+  "sections": [
+    {
+      "file": "s1.json",
+      "title": "CHAPTER ONE Innovation Ecosystem",
+      "sha256": "7d668697184954c8c916443f047790b4a9106a079d0221f714b3ce22bd5ac2b7",
+      "pages": [
+        22,
+        23,
+        24,
+        25
+      ],
+      "origin_file": "05-CHAPTER-ONE-Innovation-Ecosystem.md",
+      "origin_file_sha256": "79b9d803b7faa28f1795dd10d8135b9653801e5496ee214cf52d460f4715b7e9"
+    }
+  ]
+}

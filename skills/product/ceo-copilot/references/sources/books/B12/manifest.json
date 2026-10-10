@@ -1,0 +1,59 @@
+{
+  "book_id": "B12",
+  "title": "Crossing the Chasm, 3rd Edition: Marketing and Selling Disruptive Products to Mainstream Customers",
+  "author": "Geoffrey A. Moore",
+  "published": "2014",
+  "edition_note": "HarperBusiness 第三版（2014；版权页 1991/1999/2002/2014，Author's Note 署 2013-06）。文字层带页眉页码：偶数页「NN C rossing the C hasm」，奇数页「章标题 NN」。",
+  "locator": "pdf-page",
+  "extraction": "pdftotext version 4.00 -enc UTF-8 -layout；段内断行还原；每页开头插入 <!-- p.N | printed X --> 标记；删掉页首页尾的页眉和页码行、软连字符；正文不改字",
+  "known_limits": [
+    "定位方式：页标记 <!-- p.N | printed X -->，N = PDF 页（全书 1-288），X = 页眉里的印刷页码。正文区恒有 PDF 页 = 印刷页 + 13（如印刷 11 = PDF 24、印刷 255 = PDF 268）。前置页（PDF 1-15）与各章/节首页无页眉页码，printed 无值。wiki 引用一律用 p.N（PDF 页）。",
+    "两处页眉页码文字层取错：PDF p.20 页眉实为印刷页 7，文字层读作 1，raw 标记记为 printed 1；PDF p.90 页眉实为 77，文字层读作 11，标记记为 printed 11（该 PDF 的 7 字形在个别页眉字体里映射成 1）。除这两页外，页眉页码与印刷页一致。",
+    "章/节首页的大标题在文字层与装饰字重叠成乱码：PDF p.16「If MaBrekaZBuiclklieornbaeirge Can」（Introduction: If Mark Zuckerberg Can Be a Billionaire）、p.46「HigEh-nTliegchhteMnamreknenteitng」（High-Tech Marketing Enlightenment）、p.256「TDheevHeilgohp-mTeencth MMoadreklet」（The High-Tech Market Development Model）、p.262「DTihgeitaFloCuor nGseuamrserMAoddoepl tfioorn」（The Four Gears Model for Digital Consumer Adoption）。标题全文以各节 manifest/frontmatter 为准。",
+    "文字层常见字母空格拆分（W hen / I f / O r / C rossing the C hasm）、被拆开的连字（profi t 类）、行尾断词（Face- book 类）按原样保留，不改。",
+    "Index（PDF 268-286）是双栏版式，-layout 抽成单栏后左右栏逐行交错，条目文字有交叉错乱（如「Mm aa8icn8isn-tt8roe9sahmcrmosasriknegtitnhge」= mainstream marketing 88-89 与相邻条目交错）。索引的字母序可读，栏对齐关系读不出。索引里引用的页码是印刷页码，回查时用 PDF 页 = 印刷页 + 13 换算。",
+    "Index 各页页眉（Index NNN / NNN Index，PDF 269-286 每页 1 行共 18 行，其中的 NNN 是印刷页码）保留未删：目录页（PDF 12）末行「Index 255」与页眉同文且带页码，headers 规则会把目录行误删。按先例（BOS 2005）保目录行、留页眉，Index 不进 headers。",
+    "3 行无页码页眉残留在 raw：PDF p.65「C rossing the C hasm」、p.158 与 p.162「Assemble the Invasion Force」（这三页页眉的页码在文字层缺失，不带页码的页眉行不删，免得误删 Appendix 1/2 节标题）。另 PDF p.131 页眉行「118 C ■1 the C hasm」（■ = U+25A0，rossing 字形损坏）已按 headers 删除，其折行残片「rossing」留在 p.131 开头。",
+    "无文字层的空白页/分隔页背面（raw 无页标记，页码缺口由此而来）：PDF 1、11、13、15、23、45、87、117、209、255、267、287 共 12 页。PART ONE（PDF 14）、PART TWO（PDF 86）分隔页有短文字，分别落在 00-frontmatter 与 03-chapter-2 节尾；半书名页 PDF 6「CROSSING THE CHASM」、题词页 PDF 10「To Marie」在 00-frontmatter 内。",
+    "书内图（技术采用生命周期曲线、整体产品圆盘、市场开发模型、四齿轮模型等）只有文字标签进入 raw（如 Appendix 1 的 TORNADO / CHASM / BOWLING ALLEY / MAIN STREET 碎行）；图形结构、曲线、坐标轴、表格对齐读不到。",
+    "提取用 noFolios=true：页缘纯数字行不当页码删。本书页缘纯数字行是章号 1-7（章首页第一行）；印刷页码都在页眉行里随页眉一起删。不设 noFolios 会把章号当页码误删，并在章首页记错 printed。"
+  ],
+  "origin_manifest_sha256": "f10fb950766ff1080a4a58c2a3cbca1d5953f48ea7c03b73603d207ae3779a1c",
+  "scope": "Only already-cited raw page blocks are bundled. No whole-book or extraction-completeness certification.",
+  "sections": [
+    {
+      "file": "s1.json",
+      "title": "3 The D-Day Analogy",
+      "sha256": "27863e8eebe9b0436e28ab73d4b85c63e1f1c17cec1498a31f504da57b9aa37d",
+      "pages": [
+        104,
+        105,
+        106
+      ],
+      "origin_file": "04-ch03-the-d-day-analogy.md",
+      "origin_file_sha256": "7dd09851dbba05c8a22e4ee9a9f08bcf71184dd38196768c15285fb96872f5f6"
+    },
+    {
+      "file": "s2.json",
+      "title": "4 Target the Point of Attack",
+      "sha256": "2310d31781354f16cbe5bc8d82c2476f6d83f5fe1995ae44761cb37ce553088d",
+      "pages": [
+        122,
+        123
+      ],
+      "origin_file": "05-ch04-target-the-point-of-attack.md",
+      "origin_file_sha256": "74f6cad1b9ad4546b56788ff20c2a2ee17141601e6fc77986de9b61d8dc39f1c"
+    },
+    {
+      "file": "s3.json",
+      "title": "5 Assemble the Invasion Force",
+      "sha256": "bdc8630783e2c1df9934ee63d18a5b9269073b5ac795dfe31bf4e8f147377b58",
+      "pages": [
+        143,
+        144
+      ],
+      "origin_file": "06-ch05-assemble-the-invasion-force.md",
+      "origin_file_sha256": "2fdda83c5eeefa71bd1e69031494bd081bae4bdfc6acc1c14a6815b1cb9e334c"
+    }
+  ]
+}

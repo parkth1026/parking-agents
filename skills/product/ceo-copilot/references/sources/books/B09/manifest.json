@@ -1,0 +1,100 @@
+{
+  "book_id": "B09",
+  "title": "Monetizing Innovation: How Smart Companies Design the Product Around the Price",
+  "author": "Madhavan Ramanujam, Georg Tacke",
+  "published": "2016",
+  "edition_note": "Wiley 2016 原版（版权页 © 2016，ISBN 9781119240860 hardback / 9781119240884 ebk）。z-library 来源 PDF，259 页，文字层完整（连字 ﬁ/ﬂ 以 Unicode 连字字形保留，无字母脱落），17 页文字稀疏或无文字（整页图/空白页）。印刷页码与 PDF 页的固定偏移：PDF = printed + 16（正文阿拉伯页码部分）。",
+  "locator": "pdf-page",
+  "extraction": "pdftotext version 4.00 -enc UTF-8 -layout；段内断行还原；每页开头插入 <!-- p.N | printed X --> 标记；删掉页首页尾的页眉和页码行、软连字符；正文不改字",
+  "known_limits": [
+    "定位方式：页标记 <!-- p.N | printed X -->，N = PDF 页（全书 1-259），X = 纸面印刷页码。正文印刷页码与 PDF 页固定偏移 PDF = printed + 16（printed 3 = PDF 19）。前置部分（PDF 11-16）印刷页码是罗马数字（ix-xiv），抽取脚本只识别阿拉伯页码，这几页不记 printed，页面上孤立的罗马页码行（ix / xi / xiii）作为正文段落残留在 00/01/02 节内，未删。",
+    "14 个整页图/空白页无文字层，raw 里没有对应页标记（verify 的页码缺口即这些页）：PDF 1、2（封面）、9（空）、18、30、54、68、136、150、164、176、178（章末/部首背面的空白或整页图页）、242（Notes 末空白页）、258（Index 末空白页）。PDF 8 是献词页（For Hema and Ulrike），有文字，在 00 节内。",
+    "PART One（PDF 17）/ PART Two（PDF 53）/ PART Three（PDF 177）分隔页按库内先例（CtC、7 Powers）并入前一节尾部：Part One 落在 02-acknowledgments 尾，Part Two 落在 05-ch03 尾，Part Three 落在 14-ch12 尾。",
+    "文字层连字以 Unicode 连字单字形保留（U+FB01 ﬁ 937 处、U+FB02 ﬂ 104 处），不是脱落（对照：7 Powers 是整体脱落，本书无此缺陷）。影响检索：在 raw 里查 configuration/company/first/profit/fl ow 类词必须用连字字形（Conﬁguration、ﬁrst、proﬁt）或避开该音节的部分词检索。",
+    "章首首字母是 drop cap 排版，文字层形态为「大写字母 + 空格 + 余下小写」（如 L et's、O f、I nnovation、J ust），出现在各章第一节段与 FOREWORD/ACKNOWLEDGMENTS 首段，按原样保留。",
+    "全书 244 个软连字符（U+00AD）是排版符号，已删；其中行尾的软连字断词点删后由断行还原补空格，形成「organiza tions」「organiza- tions」型中缝空格（行尾断词属原文排版，按原样保留，未修复）。Notes 里 URL 跨行断开处同理（如 2013-01- 31/how-chryslers…，原书是 2013-01-31），引用 URL 需先去掉中缝空格。",
+    "书内图（Figure 2.2、4.1-4.3、5.1-5.2、7.1、8.1-8.6、10.1-10.4、11.1、13.x 等）与跨页表只有图题行和表内文字进入 raw；曲线形状、坐标轴、柱状对比、表格两栏对齐读不到；跨页表的续表标记「(continued )」按原样保留在正文位置。",
+    "Index 节末尾（PDF 259）附 Wiley END USER LICENSE AGREEMENT 通告 3 行（原书排版如此，先例见 Testing Business Ideas）。",
+    "Index 的页眉（「228 Index」「Index 229」等，PDF 244-257 约 14 行）未删，保留在 Index 各页页首：目录页 PDF p.12 末行「Index 227」与该页眉同文同形（都带阿拉伯页码），若把 Index 放进 headers，脚本会删掉这行目录条目、并把 p.12 的页标记误记成 printed 227（试跑实测）。按 BOS 先例保目录行：Index 不进 headers，页眉行留在正文页首，Index 内各页（244-257）页标记无 printed 值，wiki 引用 Index 一律用 p.N（PDF 页）。Notes 页眉（220 Notes / Notes 221）无此冲突，正常删除。",
+    "headersWithoutFolio=true 仅为删除前辅文罗马页码页眉（x Contents、xii Foreword、xiv Acknowledgments，共 3 行，不带阿拉伯页码）。各节标题首页用全大写形态（CHAPTER N、NOTES、INDEX、FOREWORD、ACKNOWLEDGMENTS），与页眉字符串大小写不同，未被误删（试跑已核对：NOTES、INDEX 均在各自文件首段）。",
+    "章首页首行「CHAPTER N」（14 处）与跨页图表续表标记「(continued )」/「(Continued )」（16 处）是正文/图注，不是页眉，verify 的页眉启发式提醒已逐条核实，保留。",
+    "行尾连字符断词 42 处（如 Hunt- er、well- known），断行还原后在连字符后补了空格，是原文排版，按原样保留，未修复。",
+    "版权页「Copyright  2016」的 © 符号不在文字层，原样保留双空格。"
+  ],
+  "origin_manifest_sha256": "aea80947b1ba0cbc4b9982841e0ff59e7b566d41eaf2a47dcbd7d7f7981b1d6f",
+  "scope": "Only already-cited raw page blocks are bundled. No whole-book or extraction-completeness certification.",
+  "sections": [
+    {
+      "file": "s1.json",
+      "title": "Chapter 1: How Innovators Leave Billions on the Table—A Tale of Two Cars",
+      "sha256": "07fe26abe396c49368961948e9b7115e33788507b1e5a18e1a6a404895bbb940",
+      "pages": [
+        20,
+        21,
+        22,
+        23,
+        28,
+        29
+      ],
+      "origin_file": "03-ch01-two-cars.md",
+      "origin_file_sha256": "335d4359f1059d37e2e12cf9617bb13a0d18f0d7f5696f2ca2489c625dc8ad7a"
+    },
+    {
+      "file": "s2.json",
+      "title": "Chapter 6: When Designing Products, Configuration and Bundling is More Science Than Art",
+      "sha256": "9792ee8e511c8b3dc276b3fa0e80640f2952e8e2783123788b354162be5a6b3d",
+      "pages": [
+        86,
+        87,
+        88
+      ],
+      "origin_file": "08-ch06-configuration-bundling.md",
+      "origin_file_sha256": "e5abec23897557c7375844c6b6a4587904ad13c956629b9c8f0192ea7d2bee4b"
+    },
+    {
+      "file": "s3.json",
+      "title": "Chapter 12: Maintain Your Price Integrity—Avoid Knee-Jerk Repricing",
+      "sha256": "94ed352a701aca9f9af358d62cc33326111e67fa9d1cb51b8f5c02a0e08c0073",
+      "pages": [
+        165,
+        166
+      ],
+      "origin_file": "14-ch12-price-integrity.md",
+      "origin_file_sha256": "bcdc83bafc839be122ae16fa452bbec38374a9c453da0385e6b0f1eb416acf19"
+    },
+    {
+      "file": "s4.json",
+      "title": "Chapter 14: Implementing the “Designing the Product around the Price” Innovation Process",
+      "sha256": "fd923e1806e2fafbd9a49f715768069bc17ce595c46c042b09d8cf0d7c2cc813",
+      "pages": [
+        232
+      ],
+      "origin_file": "16-ch14-implementation.md",
+      "origin_file_sha256": "04777213f3c7cd3fa55408456c82719d371e5bc654713f2aa94f8ad79bbb71ef"
+    },
+    {
+      "file": "s5.json",
+      "title": "Chapter 2: Feature Shocks, Minivations, Hidden Gems, and Undeads—The Four Flavors of Monetizing Innovation Failure",
+      "sha256": "20dc3784fca69d5cd0daecb53cd7830aa081016f9690f4f8e50e2b382d50f73e",
+      "pages": [
+        31,
+        32
+      ],
+      "origin_file": "04-ch02-four-failures.md",
+      "origin_file_sha256": "a40e9471ca2a977f55b0e03cee751fe511ac7c57fa9cdecefcc12d75c9a2fa00"
+    },
+    {
+      "file": "s6.json",
+      "title": "Chapter 4: Have the “Willingness-to-Pay” Talk Early—You Can’t Prioritize without It",
+      "sha256": "983b92ce1290c4ef103949dcf393b13d6f52e53f457306ed652cdcdeb6b4ac42",
+      "pages": [
+        55,
+        56,
+        57,
+        58
+      ],
+      "origin_file": "06-ch04-wtp-talk.md",
+      "origin_file_sha256": "ecc1720aaccd992f1e4d9c6b3b04403e7a5d2624de44058612015a7e16f21d75"
+    }
+  ]
+}

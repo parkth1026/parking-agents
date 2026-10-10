@@ -1,0 +1,20 @@
+{
+  "book_id": "B24",
+  "source_id": "s4",
+  "title": "CHAPTER 59: Pilot Team Technique",
+  "original_file": "146-CHAPTER-59-Pilot-Team-Technique.md",
+  "origin_file_sha256": "eda7d6350892f90378cc2f71994addec4db24284b84b7ebfefd9550dfebe2d16",
+  "selection": "Already-cited raw pages only; preserve page text verbatim.",
+  "pages": [
+    {
+      "page": 302,
+      "text": "\n\n# CHAPTER 59 Pilot Team Technique\n\nEarlier in this book, we discussed the technology adoption curve and how this theory describes how different people will accept change. It turns out this theory also applies to our own organization and especially to how we make changes to how that organization works.\n\nSome people in your organization love change, some want to see someone else use it successfully first, some need more time to digest changes, and a few hate change and will only change if they're forced to do it.\n\nIf you get too excited and roll out a significant change to everyone in the organization at once, then the laggards (those that hate change) may resist or even sabotage your efforts.\n\nRather than fight this reality, we can embrace it. One of the simplest techniques for facilitating moving to new ways of working is the use of pilot teams. Pilot teams allow the roll out of change to a limited part of the organization before implementing it more broadly. The idea is that you look for a product team to volunteer to try out some new techniques. You let them run for a while (usually a quarter or two) with this new way of working and see how this goes.\n\nSome people in your organization love change, some want to see someone else use it successfully first, some need more time to digest changes, and a few hate change and will only change if they're forced to do it.\n\nYour specific success measures will depend on your goals, but ultimately, you're looking to compare the team's effectiveness in delivering business outcomes; that is, how well do the pilot teams accomplish their objectives versus the others or compared to how they did in the past?\n\nGiven the nature of the experiment, your comparisons will be qualitative, but that doesn't make them any less compelling.\n\nIf things go well, you'll likely\n\n",
+      "sha256": "ce2a418ee1710857b1141ecf8623036110d361ba35b33adb1c116505334d6100"
+    },
+    {
+      "page": 303,
+      "text": "\n\nend up with several other teams eager to adopt. If things don't go well, you might decide this technique is not a fit for you, or you might decide to make adjustments.\n\nTo maximize the chance of the pilot teams having a good outcome, we carefully consider the people involved, their location, and their degree of autonomy. Ideally, we have people who are open to new ways of working, the key people on the team are co‐located, and the team is largely in control of how they work and not so dependent on other teams that still work in the old way.\n",
+      "sha256": "78a1e5ed538a0b160d4c2773ea459624e98d8b90914fed91d0ee5341fe93b722"
+    }
+  ]
+}

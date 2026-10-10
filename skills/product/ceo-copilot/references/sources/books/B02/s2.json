@@ -1,0 +1,25 @@
+{
+  "book_id": "B02",
+  "source_id": "s2",
+  "title": "The Pattern Library (Invent Patterns intro)",
+  "original_file": "09-pattern-library.md",
+  "origin_file_sha256": "e5ea383edd96a2edc2a9d01542c19a113d0ad2eda45fc4572d6c4d0f67aa3386",
+  "selection": "Already-cited raw pages only; preserve page text verbatim.",
+  "pages": [
+    {
+      "page": 147,
+      "text": "\n\nA repeatable configuration of different business model building blocks to strengthen an organization’s overall business model.\n\nHelp new ventures develop a competitive advantage beyond technology, product, service, or price.\n\nHelp established companies shift from an outdated to more competitive business model.\n\nA single business model can incorporate several patterns.\n\n",
+      "sha256": "cb7dfbf51759cf61e58e98111b2470a6e3f152470d69ef963b1c4c197e824111"
+    },
+    {
+      "page": 148,
+      "text": "\n\nIn the following pages we outline a pattern library that is split into two categories of patterns: invent patterns to enhance new ventures and shift patterns to substantially improve an established but deteriorating business model to make it more competitive.\n\nPattern Library\n\n",
+      "sha256": "3abb800d8a7515e8f5f1a180cdffab5588ec609363248b50b18a2c3f4ab96383"
+    },
+    {
+      "page": 149,
+      "text": "\n\nInvent Patterns\n\nCodify aspects of a superior business model. Each pattern helps you think through how to compete on a superior business model, beyond the traditional means of competition based on technology, product, service, or price. The best business models incorporate several patterns to outcompete others.\n\nShift Patterns\n\nCodify the shift from one type of business model to another. Each pattern helps you think through how you could substantially improve your current business model by shifting it from a less competitive one to a more competitive one.\n\nExplore\n\nExploit\n\n",
+      "sha256": "9554b0af47df3c766b5833cb1d76258dde67aafb18b9c78bc377160a09b19cdd"
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "book_id": "B24",
+  "source_id": "s5",
+  "title": "CHAPTER 38: Story Map Technique",
+  "original_file": "97-CHAPTER-38-Story-Map-Technique.md",
+  "origin_file_sha256": "b6065e520403590d16d9ca7b595dca2b50caa52c4255f354043cafebb62aa714",
+  "selection": "Already-cited raw pages only; preserve page text verbatim.",
+  "pages": [
+    {
+      "page": 204,
+      "text": "\n\n# CHAPTER 38 Story Map Technique\n\nStory maps are one of the most generally useful techniques I know. They are essentially a framing and planning technique, but they are just as useful for ideation. They are also used as a design technique when working on prototypes, and they are great for communicating with your team and stakeholders. They also play a very practical role in managing and organizing your work. Further, a story map is helpful throughout product discovery and delivery.\n\nI think you'll agree that's a lot of benefits. But the best part is how simple it is.\n\nThe origin of story maps came from frustration with the typical flat backlog of user stories. There's no context, just a prioritized list of stories. How can the team know how one story fits in with the big picture? What does it mean to even prioritize at that granularity with so little context? And what set of stories constitutes a meaningful milestone or a release?\n\nJeff Patton, one of the early Agile thinkers, was frustrated by this, so he leveraged some proven UX design techniques, and adapted them to Agile concepts and introduced user story maps.\n\nMany teams I know consider a high‐fidelity user prototype and a story map as their go‐to techniques.\n\nThese are two‐dimensional maps, in which major user activities are arrayed along the horizontal dimension, loosely ordered by time from left to right. So, if there are a dozen major user activities, they would be along the top from left to right, generally in the order you would do them—or at least, if you were describing the overall system to someone else, the order in which you'd describe them.\n\nAlong the vertical dimension, we have a progressive level of detail. As we flesh out each major activity into sets of user tasks, we add stories for each of those tasks. The critical tasks are higher vertically than the optional tasks.\n\nIf you lay out your system this way, you can, at a glance, get the holistic view and consider where to draw the line in terms of different releases and their associated objectives.\n\nNow each story has context. The entire team can see how it fits in with the other stories. And not just as a snapshot in time. The team can see how the system is expected to grow over time.\n\nWe can use this story map to\n\n",
+      "sha256": "12cdb49bc2398b69eb54cb21e4bcee08c40eb496707f7ab8d1aac117365bbe3b"
+    },
+    {
+      "page": 205,
+      "text": "\n\nframe our prototypes, and then as we get feedback on our prototypes and learn how people interact with our product ideas, we can easily update the story map to serve as a living reflection of the prototypes. As we finalize our discovery work and progress into delivery, the stories from the map move right into the product backlog.\n\nMany teams I know consider a high‐fidelity user prototype and a story map as their go‐to techniques.\n\nAnother must‐read book for product managers: User Story Mapping: Discover the Whole Story, Build the Right Product, by Jeff Patton (O'Reilly Media, 2014).\n",
+      "sha256": "8524e413a3df9716ba73f2178447d6b19e05077ed143efbaed0398fdb8178944"
+    }
+  ]
+}

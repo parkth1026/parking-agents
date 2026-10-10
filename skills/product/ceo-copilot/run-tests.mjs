@@ -6,6 +6,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { inspectPackage } from "./scripts/validate-portability.mjs";
 
 const SKILL_DIR = dirname(fileURLToPath(import.meta.url));
 const REF = join(SKILL_DIR, "references");
@@ -90,11 +91,13 @@ const scanStep = /^3\. \*\*全景扫描\*\*：([\s\S]*?)(?=\n4\.)/m.exec(skill)?
 // Static routing guards do not prove actual runtime reads or answer quality.
 const diagnosticRoute = skill.split("## 独立知识查询、覆盖验收与维护")[0];
 const knowledgeRoute = skill.split("## 独立知识查询、覆盖验收与维护")[1]?.split("## 测试")[0] ?? "";
-check("日常瘦身诊断 Wiki disabled 且无自动 Wiki 页读取路由", diagnosticRoute.includes("`wiki_policy=disabled`") && diagnosticRoute.includes("日常不读取 `references/wiki/`") && !/references\/wiki\/(?:index\.md|books\/|cases\/|concepts\/|methods\/)/.test(diagnosticRoute));
+// 2026-10-10 用户授权：报告观点经原书补全后，日常按需调用方法与案例。
+// 历史 slim/disabled 的冻结评测与收据保持不变，本断言只检查当前入口契约。
+check("日常保持简明诊断并按需读取相关方法与案例", diagnosticRoute.includes("`wiki_policy=on_demand`") && diagnosticRoute.includes("references/wiki/decision-index.md") && diagnosticRoute.includes("不遍历整库") && diagnosticRoute.includes("简单事实复述") && !diagnosticRoute.includes("`wiki_policy=disabled`"));
 check("瘦身必读全文在首次写答案前成功读取", diagnosticRoute.includes("工具输出截断、读取报错") && diagnosticRoute.includes("在第一次写用户答案前") && diagnosticRoute.includes("完成本文件、简明诊断页和所有输入全文读取"));
-check("显式知识查询与覆盖验收保留定位资料且不自动启动", knowledgeRoute.includes("只在用户明确要求") && knowledgeRoute.includes("不因候选层、案例、框架或诊断信息缺口自动启动") && knowledgeRoute.includes("不遍历整库") && ["index.md", "coverage.md", "coverage-manifest.json"].every((f) => knowledgeRoute.includes(f) && existsSync(join(REF, "wiki", f))));
+check("独立查询与全量验收保留显式入口，日常只做按需读取", knowledgeRoute.includes("只在用户明确要求") && knowledgeRoute.includes("不自动启动全量覆盖验收或维护") && knowledgeRoute.includes("不遍历整库") && ["index.md", "coverage.md", "coverage-manifest.json"].every((f) => knowledgeRoute.includes(f) && existsSync(join(REF, "wiki", f))));
 const slim = read("references/14-简明诊断.md");
-check("瘦身入口固定两份必读技能文件", diagnosticRoute.includes("`runtime_profile=slim`") && diagnosticRoute.includes("只有这两份技能文件是日常必读页") && diagnosticRoute.includes("`references/14-简明诊断.md`"));
+check("按需入口固定两份必读技能文件", diagnosticRoute.includes("`runtime_profile=slim_on_demand`") && diagnosticRoute.includes("只有这两份技能文件是日常必读页") && diagnosticRoute.includes("`references/14-简明诊断.md`"));
 check("瘦身保留事实范围与部分已知，未知不升级失败", slim.includes("角色、收益归属、成本责任和入口不能互相替代") && slim.includes("不能因为一个子项未答就抹去整项已有证据") && slim.includes("未知说成查实失败"));
 check("瘦身保留直答、时间分离与可证伪行动", slim.includes("第一句回答用户当前问题") && slim.includes("先分别说明当时决定是否有依据") && slim.includes("支持与不成立两种判据"));
 check("瘦身不强制八层状态与长模板", slim.includes("不生成八层状态表或固定长报告") && slim.includes("不强制固定标题"));
@@ -175,5 +178,7 @@ check("关键判断附材料短原话或位置，内部页码仍禁",
   slim.includes("短原话") && slim.includes("节名或行号") && slim.includes("参考页页码、读取回执和书名背书不进答案"));
 check("design 含互鉴移植 AC-24/AC-25", design.includes("AC-24") && design.includes("AC-25"));
 
+const portable = inspectPackage();
+check("技能自有运行资料自包含且包内链接完整", portable.failures.length === 0, portable.failures.join("；"));
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -1,0 +1,15 @@
+{
+  "book_id": "B14",
+  "source_id": "s3",
+  "title": "Resources, Processes, and Values",
+  "original_file": "69-Resources-Processes-and-Values.md",
+  "origin_file_sha256": "fc0d47701f61ea4155973d5410b794a937049f0fd9876fc616f5a3cf2bf45456",
+  "selection": "Already-cited raw pages only; preserve page text verbatim.",
+  "pages": [
+    {
+      "page": 204,
+      "text": "\n\n# Resources, Processes, and Values\n\nWhat does this awfully elastic term capability really mean? We’ve found it helpful to unpack the concept of capabilities into three classes or sets of factors that define what an organization can and cannot accomplish: its resources, its processes, and its values—a triptych we refer to as the RPV framework. Although each of these terms requires careful definition and analysis, taken together we’ve found that they provide a powerful way to assess an organization’s capabilities and disabilities in ways that can make disruptive innovation much more likely to succeed.[^2]\n",
+      "sha256": "3ce35b188417fddc950f60b592e206d69bbfcdfcc1d6116ffe138dce56543cd2"
+    }
+  ]
+}

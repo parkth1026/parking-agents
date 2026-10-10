@@ -1,0 +1,15 @@
+{
+  "book_id": "B19",
+  "source_id": "s3",
+  "title": "\"I would definitely buy that.\"",
+  "original_file": "17-I-would-definitely-buy-that.md",
+  "origin_file_sha256": "f320fe582ecca4d67d90ba6b6edc116ca3833d3e7d8520e1e03a0ad3e6e3d4e4",
+  "selection": "Already-cited raw pages only; preserve page text verbatim.",
+  "pages": [
+    {
+      "page": 64,
+      "text": "\n\n\"I would definitely buy that.\"\n\nBad meeting. Danger! There’s admittedly some signal here, but the false positive danger is off the charts. This is the mis-interpreted answer which sunk the first startup I worked at to the tune of ten million bucks.\n\nTo fix it, you need to shift from fuzzy future promises into concrete current commitments. For example, you could ask for a letter of intent, a pre-purchase or deposit, or intros to other decision makers and team members. Kickstarter is so wonderful because it forces customers who say they would buy it to actually pull out a credit card and commit.\n\n\"When can we start the trial?\"\n\nMaybe a good meeting. Unlike “when does it launch,\" which is usually a stall, “When can we start” is a step forward. Setting up new software and training staff to use it is a big deal for most businesses. Even a \"free\" trial can cost them serious money. However, in some cases, \"trying\" software costs nothing, especially for individuals. For example, I've “tried” countless CRM (contact management) apps. It takes ten seconds to log in, look around, and never think about it again.\n\nAs always, think in terms of currency. What are they giving up to try it out? If your trial is too \"cheap\" to try, you can try to increase the cost of it. For example, you could ask to write a case study about them after they've spent 2 weeks using it. Or you could get them to promise to try using it with their team for at least a week. If you've got a more developed product, you can take their credit card and just charge them nothing if they cancel within 30 days. The more they are giving up for you, the more seriously you can take their validation.\n",
+      "sha256": "ded2d7f72c996e19cfdda2e56d2110156b556b76b266827e3cc4f62e9cc84431"
+    }
+  ]
+}

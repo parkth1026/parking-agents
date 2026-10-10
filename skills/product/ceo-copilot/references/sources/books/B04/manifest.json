@@ -1,0 +1,113 @@
+{
+  "book_id": "B04",
+  "title": "Good Strategy / Bad Strategy: The Difference and Why It Matters",
+  "author": "Richard P. Rumelt",
+  "published": "2011",
+  "edition_note": "2011 Profile Books（英国版）纸书扫描的文字层，来源 PDF 带 OceanofPDF.com 水印。文字层无印刷页码、无页眉页脚。",
+  "locator": "pdf-page",
+  "extraction": "pdftotext version 4.00 -enc UTF-8 -layout；段内断行还原；每页开头插入 <!-- p.N | printed X --> 标记；删掉页首页尾的页眉和页码行、软连字符；正文不改字",
+  "known_limits": [
+    "定位方式：本 PDF 文字层没有印刷页码（无 folio、无页眉页脚），页标记只有 <!-- p.N -->（N = PDF 页，全书 1-360）。wiki 引用一律用 PDF 页。",
+    "Index（PDF 317-359）与 Notes 里引用的页码是纸书印刷页码，与 PDF 页不存在恒定偏移，无法换算：书前部约 PDF = 印刷 + 15~16（如索引「Trafalgar, Battle of, 1」= PDF 17、「Schwarzkopf, Norman, 16–20」= PDF 31–35），后部对不上（如「Global Crossing, 277–84」实际在 PDF 278–290、「TiVo, 261–67」在 ch17 PDF 260-276 内）。判断：该索引页码出自另一版式，按索引页码回查会错页。",
+    "48 行 OceanofPDF.com 电子书发布组水印（全在页缘：45 页末行 + 3 页首行）已按 headers 删除（headersWithoutFolio=true，因全书文字层无阿拉伯页码，folio 规则不适用）。PDF p.1（封面）、p.7、p.107、p.244（Part 分隔页后的空白页）文字层无正文，raw 中无页标记，页码缺口 6→8、106→108、243→245 属此因。",
+    "页中部的节小标题会被 -layout 抽取拼进相邻正文行，文字没丢但嵌错位置，如 PDF p.27「how much it was “BusinBusiness 101 is surprisingess 101” and yet...」（原文是正文 “Business 101” + 小标题 “Business 101 is surprising” 交错）。读 raw 遇到词中嵌大写短语时按此解释。",
+    "书内图（hump chart、performance frontier、组织图、链式系统图等）只有图题与图注文字进入 raw；图内曲线、坐标轴、数据点读不到。",
+    "Index 与 Notes 是双栏/悬挂缩进版式，-layout 抽取后左右栏逐行交错，对齐关系丢失；索引子条目的层级只能靠原文缩进推断，raw 中行首缩进已去掉。PDF p.359（Index 末页）只有一条脚注「* That is, gold or currency fully backed by gold reserves.」。",
+    "行尾连字符断词按原样保留，段内接排后断词处带连字符加空格（如「thirty- three」「chain- link」），verify 估约 88 处；弯引号 “ ” ‘ ’ 与 em dash — 按文字层原样保留。",
+    "提取用 noFolios=true：页缘纯数字行不当页码删。原因：全书文字层无印刷页码，PDF p.55 图题折行「IH CORPORATE SALES, ASSETS & PROFIT BEFORE TAX 1977–」+「1984」的尾行「1984」会被纯数字启发式误当 folio 删掉。该图本身是复制的 Harvester 战略计划书影印件，图内曲线与数字读不到。"
+  ],
+  "origin_manifest_sha256": "fccf5bafc31b0461c2bb534c06f5139559799dfd85eb5f1a1993c189075d00bd",
+  "scope": "Only already-cited raw page blocks are bundled. No whole-book or extraction-completeness certification.",
+  "sections": [
+    {
+      "file": "s1.json",
+      "title": "Chapter 5: The Kernel of Good Strategy",
+      "sha256": "88756be5af198990ea544b956f2788f0cab6cfceda3c59af1bb33597591d7743",
+      "pages": [
+        89,
+        90,
+        91
+      ],
+      "origin_file": "07-ch05-the-kernel-of-good-strategy.md",
+      "origin_file_sha256": "fac738b7c6da991972dfe7683a641e338f1d9a6240de0a000208de641dbb3497"
+    },
+    {
+      "file": "s2.json",
+      "title": "Chapter 7: Proximate Objectives",
+      "sha256": "b9b1e7874b8221317728c36ad3637f67d60369964c2513d8bdc9d8565e535141",
+      "pages": [
+        116,
+        117,
+        118
+      ],
+      "origin_file": "10-ch07-proximate-objectives.md",
+      "origin_file_sha256": "16908a743f870b7717e0044a9b67af56b2151829d4d917513be3bd1985011efc"
+    },
+    {
+      "file": "s3.json",
+      "title": "Chapter 8: Chain-Link Systems",
+      "sha256": "5cec32e14e086021f0acf959819e3e3fcd116e8f1a732ad6ea79362659cec970",
+      "pages": [
+        126,
+        127
+      ],
+      "origin_file": "11-ch08-chain-link-systems.md",
+      "origin_file_sha256": "9851ee2a698b416a339eaf99776e71ae3dad6f8ad729c3fa8c523c19eccd519e"
+    },
+    {
+      "file": "s4.json",
+      "title": "Chapter 11: Growth",
+      "sha256": "aa277f83a93519fe1d50c147581009fc5750c7309db97266f6fe0adcf41baf46",
+      "pages": [
+        160,
+        161
+      ],
+      "origin_file": "14-ch11-growth.md",
+      "origin_file_sha256": "b0c76996faa0ee2b2e0ee34956f51c271a8f1fa74a66409880924a232926d341"
+    },
+    {
+      "file": "s5.json",
+      "title": "Chapter 14: Inertia and Entropy",
+      "sha256": "e4c48b257be69ed09efac10f7578b290a311e73fe5efbf593c3999c646e92c63",
+      "pages": [
+        209,
+        210
+      ],
+      "origin_file": "17-ch14-inertia-and-entropy.md",
+      "origin_file_sha256": "cd7d8a3b7c5ab4667071920e7202dfacd51306f1960cc9e909f8fdfac2a869ba"
+    },
+    {
+      "file": "s6.json",
+      "title": "Chapter 3: Bad Strategy",
+      "sha256": "d33e862645e1e3a2d39401059f8a3fa6254b34c67042585198dc400c4c160c95",
+      "pages": [
+        46
+      ],
+      "origin_file": "05-ch03-bad-strategy.md",
+      "origin_file_sha256": "4176a3bb91ff32687e0970ca24de0bcd951edd7eb30e251f69f759f2c8754832"
+    },
+    {
+      "file": "s7.json",
+      "title": "Chapter 9: Using Design",
+      "sha256": "da86f1cd519eb81aeb9e3c1b4687667f058e0b20cbd495cc71a1686b14e1906c",
+      "pages": [
+        137,
+        138,
+        139
+      ],
+      "origin_file": "12-ch09-using-design.md",
+      "origin_file_sha256": "f2abbac0a1ded8f968634a42d0b74bf63e012e2a8f3944ce8e9584e9a879c8cf"
+    },
+    {
+      "file": "s8.json",
+      "title": "Chapter 13: Using Dynamics",
+      "sha256": "363244b8b3e895a0fb5886ad865e62313742948f7fc5c9bdaef2b91acd24ca54",
+      "pages": [
+        186,
+        187
+      ],
+      "origin_file": "16-ch13-using-dynamics.md",
+      "origin_file_sha256": "66d2c7e5330dc668e5b2a315cfb0778671e3d250fd566a59bddd87d6c954e67b"
+    }
+  ]
+}

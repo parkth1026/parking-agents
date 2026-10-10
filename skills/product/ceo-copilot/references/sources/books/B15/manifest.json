@@ -1,0 +1,48 @@
+{
+  "book_id": "B15",
+  "title": "Lead and Disrupt: How to Solve the Innovator’s Dilemma",
+  "author": "Charles A. O’Reilly III and Michael L. Tushman",
+  "published": "2021",
+  "edition_note": "Second edition（Stanford Business Books，© 2021；foreword by Steve Blank）。z-library 来源 PDF，313 页，文字层完整（cjk 0）。印刷页码在页眉里：verso 页眉「<页码> CHAPTER <章号>」，recto 页眉「<章标题（letterspaced 大写）> <页码>」；前言区页眉用罗马数字。",
+  "locator": "pdf-page",
+  "extraction": "pdftotext version 4.00 -enc UTF-8 -layout；段内断行还原；每页开头插入 <!-- p.N | printed X --> 标记；删掉页首页尾的页眉和页码行、软连字符；正文不改字",
+  "known_limits": [
+    "定位方式 pdf-page：wiki 引用一律用 p.N（PDF 页）。正文印刷页码 = PDF 页 − 21（PDF 24 = printed 3，PDF 312 = printed 291）。printed 值取自页眉：verso 页眉「页码 CHAPTER 章号」取左侧数字，recto 页眉「章标题 页码」取右侧数字。",
+    "十个章首页的 printed 值是章号、不是页码（章首行「CHAPTER N」与 verso 页眉同文，被页眉规则连带误删）：p.24 printed=1（实为 3）、p.43 printed=2（实为 22）、p.69 printed=3（实为 48）、p.107 printed=4（实为 86）、p.128 printed=5（实为 107）、p.168 printed=6（实为 147）、p.193 printed=7（实为 172）、p.222 printed=8（实为 201）、p.239 printed=9（实为 218）、p.260 printed=10（实为 239）。章号见各节标题与文件名。",
+    "两页页眉与图表内容同排导致未删净/printed 缺失：p.33 页眉与图 1.1 图内标签同行，raw 里残留「12 CHAPTER 1 Quartz Watches」段，printed 实为 12；p.58 页眉被表题「NUMBER AND TYPE OF」顶掉，printed 实为 37。",
+    "无 printed 记录的页：前言区 p.10-19（印刷页为罗马数字 ix-xviii，页眉按罗马数字精确串删除）；Part 分隔页 p.22/126/220；Notes 首页 p.282；Index 首页 p.296（这些页文字层本身无页码）。",
+    "页码缺口 8 处全部是删除的空白页/衬页：6→8（p.7）、8→10（p.9）、12→14（p.13）、19→22（p.20 半题页+p.21）、22→24（p.23）、126→128（p.127）、218→220（p.219）、220→222（p.221）。「This page intentionally left blank」9 页（p.3/7/9/13/21/23/127/219/221）与半题页「LEAD AND DISRUPT」（p.2、p.20）按版式残留删除，相应页无页标记。封面 p.1、封底 p.313 无文字层。",
+    "断词与字距缺陷，一律保留不修：a) 行尾连字符断词在断行还原后成「innova- tion」形态，共 1051 处（高频：a- tion 34、i- ness 20、t- ing 17、e- ment 14、d- ing 14）；b) 复合词连字符后单字母插空：well-k nown（2 处）、one-o ff（1 处）等共 293 处；c) em-dash 后首词被拆成两半（behavior—w e、—a nd、—e very），约 74 处。在 raw 里全文检索须同时试「well known / well-known / well-k nown」等多种形态。",
+    "无系统性连字脱落（区别于 7 Powers）：fi/fl/ff/Th 连字完好。verify 报的 7 处「被拆开的连字」全是 Raff/Harhoff 人名后接 and 的误报。",
+    "脚注编号以普通数字排进正文（如「percent.1」），无随页脚注；出处按章集中在 13-notes.md（Notes 按章分节，注释号全书不连续，按各章内部编号）。Notes 里相邻条目若文字层无空行分隔，会并成同一段落（如 p.283 的 18-27 条），分条结构以行内「N. 」编号为准。",
+    "多栏/图表版式被 -layout 抽成串行文本，结构丢失但文字可检索：图 1.1 创新流矩阵（p.33）、Amazon 探索与利用时间线表（p.58 起，两页续表）、组织结构图、要素对照表等。图题行（Figure N.N …）保留。曲线形状、坐标刻度、表格对齐读不到。",
+    "Index（14-index.md）为两栏版式，抽取后左右栏与子词条交错换行，可全文检索但词条层级丢失；斜体页码提示（figures/tables）不体现。"
+  ],
+  "origin_manifest_sha256": "86489ea8b67a0307f5bbd45506586cb81e0b610759dd4d45c2a478231805a1e4",
+  "scope": "Only already-cited raw page blocks are bundled. No whole-book or extraction-completeness certification.",
+  "sections": [
+    {
+      "file": "s1.json",
+      "title": "Chapter 7. The Three Disciplines of Ambidexterity: Ideation, Incubation, and Scaling",
+      "sha256": "007050fe09f1ed17c14a2b688c03d7ec552d87c033b91d28f36b5ad50db3eba6",
+      "pages": [
+        193,
+        194,
+        195
+      ],
+      "origin_file": "09-ch07-the-three-disciplines-of-ambidexterity.md",
+      "origin_file_sha256": "dffe9b2c30250ac73537ce38d6f9253abdc1f8c663d5ccb335cc687b211504e8"
+    },
+    {
+      "file": "s2.json",
+      "title": "Chapter 6. Getting It Right Versus Almost Right",
+      "sha256": "34027c524138b85f51995364bdeb7d5207f58449c1f9a593048379480f718311",
+      "pages": [
+        170,
+        171
+      ],
+      "origin_file": "08-ch06-getting-it-right-versus-almost-right.md",
+      "origin_file_sha256": "4b27edd6d57c5b4a03669677d2c3d1041918db7b883838184c708de9852fdea1"
+    }
+  ]
+}

@@ -1,0 +1,92 @@
+{
+  "book_id": "B14",
+  "title": "The Innovator's Solution",
+  "author": "Clayton Christensen",
+  "published": "2004-01-01T05:00:00+00:00",
+  "identifier": "urn:uuid:a29adb08-7e8b-40a1-becb-a05f4e9b7466",
+  "edition_note": "Harvard Business School Press 电子版（EPUB 元数据 published 2004-01-01，版权页 Copyright 2003，ISBN 978-1-4221-9657-1-4）。内容为 2003 年原版。",
+  "locator": "synthetic-page",
+  "page_units": 300,
+  "extraction": "unzip 后按 spine 顺序读 XHTML；块级元素各成一段；标题加 #，列表加 -，图片变成 [图：文件名｜alt] 占位行，上标变成 [^n]；没有印刷页标记，按每页约 300 个单位切合成页，每节另起一页；正文不改字",
+  "known_limits": [
+    "16 张图片只有占位行 [图：文件名｜art]，alt 全为 'art'。图内内容读不到：文件名按纸书页命名（Art_P033–Art_P279），对应各章核心图表（如chap-2 的 Figure 2-4 竞争策略矩阵、chap-5 的架构演进图、chap-6 的价值链利润迁移图），曲线与数据点不可从 raw 读出。",
+    "源 EPUB 含 263 个 id=\"pageNN\" 形态的印刷页锚点（阿拉伯数字 1–304，另含 pagei/pagex 等罗马数字前言页锚点），不是标准 epub:type=\"pagebreak\"，本抽取未采用。页码全部为合成页，p.N 只在本 raw 目录内有效，不能换算为纸书页码。锚点保留在源文件中，可供未来重抽。",
+    "chap-1/2/3/8/10 内的表格转为逐单元格竖排，列对齐丢失。",
+    "脚注在正文为编号上标，注释本体在节尾 Notes 标题下按编号排列；源内有 href 双向链接，raw 中按编号人工对应。",
+    "源 EPUB 转制残留 9 处，按原则保留原样未修：8 处行尾断词（perform- ance、non- consumption、ink- and、world- wide、stock- brokers、middle- and、present- and、process- and）与 1 处拆开的连字（signifi cantly）。"
+  ],
+  "origin_manifest_sha256": "1e2bd7ef84d680738583d036a866736b92377184fdd2ed17baf0f885cd3e540a",
+  "scope": "Only already-cited raw page blocks are bundled. No whole-book or extraction-completeness certification.",
+  "sections": [
+    {
+      "file": "s1.json",
+      "title": "Shaping Ideas to Become Disruptive: Three Litmus Tests",
+      "sha256": "8de1b738a821406db999df85e9aa0d8896a37790a937c6c7d3a42028814f17e8",
+      "pages": [
+        58,
+        59,
+        60
+      ],
+      "origin_file": "18-Shaping-Ideas-to-Become-Disruptive-Three-Litmus-Tests.md",
+      "origin_file_sha256": "bf8704a161f82d2b5ca0012cd4a1b84cd8c29903c460535591ad668053b00846"
+    },
+    {
+      "file": "s2.json",
+      "title": "Product Architecture and Interfaces",
+      "sha256": "139c7cc77e1fa890d6ff40b336afff78a2b69b33f27c4b6ece6de845dd025345",
+      "pages": [
+        149,
+        150
+      ],
+      "origin_file": "50-Product-Architecture-and-Interfaces.md",
+      "origin_file_sha256": "864e6f0f1937e5b211794b5b90b52005356a6aa7d94a1dceb2c3f6ad976a4b64"
+    },
+    {
+      "file": "s3.json",
+      "title": "Resources, Processes, and Values",
+      "sha256": "513b339bc5cad607d5267e85c3ad0a24d1ad21d71a9ec44f6b84777ae14bd0e5",
+      "pages": [
+        204
+      ],
+      "origin_file": "69-Resources-Processes-and-Values.md",
+      "origin_file_sha256": "fc0d47701f61ea4155973d5410b794a937049f0fd9876fc616f5a3cf2bf45456"
+    },
+    {
+      "file": "s4.json",
+      "title": "THERE IS GOOD MONEY AND THERE IS BAD MONEY",
+      "sha256": "3b8caeba7babe57aa89299014b75d4adc4e1eff56648059262784b3ce031423d",
+      "pages": [
+        267,
+        268,
+        269
+      ],
+      "origin_file": "96-THERE-IS-GOOD-MONEY-AND-THERE-IS-BAD-MONEY.md",
+      "origin_file_sha256": "0a1159c66131bad7f3c118169488f2e36501a134b241aa4ab6313848138ea9f4"
+    },
+    {
+      "file": "s5.json",
+      "title": "Disruption at Work: How Minimills Upended Integrated Steel Companies",
+      "sha256": "c7752db0b28c1c6bd42a5d7f2afeef67cea5a0469855144c007dcd82988d4808",
+      "pages": [
+        43,
+        44
+      ],
+      "origin_file": "11-Disruption-at-Work-How-Minimills-Upended-Integrated-Steel-Co.md",
+      "origin_file_sha256": "a55e4226d21f9abe62be04e582f878aa3b86c7c3545bd3299327737ac940fb96"
+    },
+    {
+      "file": "s6.json",
+      "title": "Pomp and Circumstances in Segmenting Markets",
+      "sha256": "4aadfd00ec544d2798c1eb6e5a96d6a5837f6eaf7637911a56b0066a52e85596",
+      "pages": [
+        90,
+        91,
+        92,
+        93,
+        94
+      ],
+      "origin_file": "25-Pomp-and-Circumstances-in-Segmenting-Markets.md",
+      "origin_file_sha256": "d974502155c30e92d971413b1a6468a5e64bedccb9dab4bb356db407c3da97c9"
+    }
+  ]
+}

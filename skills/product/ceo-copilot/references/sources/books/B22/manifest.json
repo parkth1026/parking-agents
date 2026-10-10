@@ -1,0 +1,67 @@
+{
+  "book_id": "B22",
+  "title": "Obviously Awesome",
+  "author": "April Dunford",
+  "published": "2019-04-15",
+  "identifier": "urn:uuid:3130ff6c-f777-45f2-8f72-87576ab5eafe",
+  "edition_note": "自出版电子书（Ambient Press，Produced by Page Two），版权页 Copyright © 2019 April Dunford，ISBN 978-1-9990230-1-0 (ebook)。EPUB 元数据 published 2019-04-15。源文件是 Kobo 流出副本：每个 XHTML 带 kobo.js 注入脚本与 koboSpan 内联标记，抽取时按版式残留剔除，不改正文。文件来自电子书分发站（z-library 副本）。",
+  "locator": "synthetic-page",
+  "page_units": 300,
+  "extraction": "unzip 后按 spine 顺序读 XHTML；块级元素各成一段；标题加 #，列表加 -，图片变成 [图：文件名｜alt] 占位行，上标变成 [^n]；没有印刷页标记，按每页约 300 个单位切合成页，每节另起一页；正文不改字",
+  "known_limits": [
+    "EPUB 没有任何印刷页标记（无 epub:type=pagebreak，也无 id=pageN 类锚点，probe 确认 print_pagebreaks=0）。页码全部是合成页：每页约 300 个单位，每节另起一页，与纸书页码无关，p.N 只在本 raw 目录内有效。",
+    "正文 5 张插图（cake_1.jpg、lolipop_1.jpg、graph_1.jpg、graph_2.jpg、graph_3.jpg）alt 全为空，raw 里只有 [图：文件名] 占位行，图内内容读不到；graph_1-3 出现在 Step 8 的市场框架选择论证处，凭 raw 无法还原图示。另有 3 张分部题图（part1-3.jpg，alt 为分部标题）随分部隔页并入后续章节，1 张封面图在 skip 文件中。",
+    "skip 掉 4 个文件共约 199 单位：封面（cover.xhtml，封面图 + alt 文案）、半扉页与扉页（halftitlepage.xhtml、titlepage.xhtml，纯题图）、目录页（toc.xhtml，CONTENTS 条目与 manifest.sections 重复）。推荐语页（praise.xhtml）、版权页（copyright.xhtml）、开篇导语（opening-blurb.xhtml）、题词页（quote.xhtml）保留在 Front matter 节。",
+    "三个分部隔页（I. WHAT IS POSITIONING? 等，各 7-8 单位）小于最小节阈值，并入后一章开头：part1 并入 Positioning as Context，part2 并入 Step 1，part3 并入 After Positioning。",
+    "末节 Conclusion 文件还包含 About the Author（作者简介）与 backmatter（'Work with April Dunford' 宣传页）两块非目录内容，因二者不在目录里，按脚本规则落在最后一个目录节内，文字未删。",
+    "源文件存在 Kobo 重组留下的空格写法（如 praise 页 'B 2 B'、backmatter 'WOW !' 前后多余空格），是源 EPUB 原样，未修改。",
+    "verify 软连字符 WARN 4 处：源 XHTML 在复合词中间嵌了 U+00AD（chapter2 'data-­warehouse'、chapter6 'alter­native'、chapter10 'customer-­tracking'、about-the-author 'twenty-­five-year'）。抽取脚本不删 U+00AD，raw 原样保留，读作 data-warehouse、alternative、customer-tracking、twenty-five-year。",
+    "verify 行尾断词 WARN 1 处（15-Conclusion 'one- or two-day sessions'）是合法的悬挂连字符（suspended hyphen）写法，源 backmatter.xhtml 原样，不是断词残留。"
+  ],
+  "origin_manifest_sha256": "df57385105695c7a8120f2317ca5575131c377b7082133589ad61a57fcc1fe22",
+  "scope": "Only already-cited raw page blocks are bundled. No whole-book or extraction-completeness certification.",
+  "sections": [
+    {
+      "file": "s1.json",
+      "title": "The Five (plus One) Components of Effective Positioning",
+      "sha256": "a9c3c1fd6ac7152d01981960ac1299c2c2429ce3975ca74ed214e577599182e5",
+      "pages": [
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33
+      ],
+      "origin_file": "03-The-Five-plus-One-Components-of-Effective-Positioning.md",
+      "origin_file_sha256": "97a1df1b633c27329f07fc61987fe4e0fde3803f177fd151b0f88fc37d56b497"
+    },
+    {
+      "file": "s2.json",
+      "title": "Step 4. List Your True Competitive Alternatives",
+      "sha256": "1e9d92728e14edca34dcc472683572b317c5aeb37905bfe3528e3cf4991031e5",
+      "pages": [
+        51,
+        52
+      ],
+      "origin_file": "07-Step-4-List-Your-True-Competitive-Alternatives.md",
+      "origin_file_sha256": "4648cacc912e95e7df45c2f1fb1ddae1750658eff750cde71e0b140cd55f1197"
+    },
+    {
+      "file": "s3.json",
+      "title": "Step 8. Find a Market Frame of Reference That Puts Your Strengths at the Center and Determine How to Position in It",
+      "sha256": "7de9631e28bd3ad041b885b98dbbd45c267a7f6451b0e5f951f74006aac066cc",
+      "pages": [
+        64,
+        65,
+        66,
+        68,
+        69,
+        70
+      ],
+      "origin_file": "11-Step-8-Find-a-Market-Frame-of-Reference-That-Puts-Your-Stren.md",
+      "origin_file_sha256": "83a4fd8a7e0a2351988799e5cf796761bf21c79127f459afd1af5c54cb2b33da"
+    }
+  ]
+}

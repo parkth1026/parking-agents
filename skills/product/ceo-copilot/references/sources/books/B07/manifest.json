@@ -1,0 +1,48 @@
+{
+  "book_id": "B07",
+  "title": "Competing Against Luck",
+  "author": "Clayton M. Christensen",
+  "published": "2016-10-04",
+  "identifier": "9780062435637",
+  "edition_note": "2016 HarperCollins 英文原版电子书（ISBN 9780062435637）。电子版无印刷页码，raw 页码为合成页。",
+  "locator": "synthetic-page",
+  "page_units": 300,
+  "extraction": "unzip 后按 spine 顺序读 XHTML；块级元素各成一段；标题加 #，列表加 -，图片变成 [图：文件名｜alt] 占位行，上标变成 [^n]；没有印刷页标记，按每页约 300 个单位切合成页，每节另起一页；正文不改字",
+  "known_limits": [
+    "Index（索引）条目里的页码是印刷版页码（如 xiii, 61–63），与 raw 的合成页不对应；EPUB 自带的 disclaimer 也声明本电子版分页与印刷版不一致。按 Index 页码回查会错位，wiki 引用只能用合成页 p.N。",
+    "Chapter 6 的插图（9780062435613_Art_01.jpg，Uncovering the Job / Creating the Desired Experiences / Integrating around the Job 三层结构图）只有 [图：...] 占位行，图内的文字、连线与层级结构读不到。",
+    "全书 5 张图片里 4 张（封面、扉页图、Bookperk 广告、封底广告）在 skip 文件中，未进 raw；raw 只保留 Chapter 6 一张正文图。",
+    "各章的 Endnotes（尾注）作为该章文件的普通段落保留在章末；EPUB 里尾注引用是锚链接文字（正文中的裸数字 1、2、3），不是 <sup> 上标，因此不会转成 [^n] 标记。"
+  ],
+  "origin_manifest_sha256": "62032b4b1bb84460e76eed1ff7c4a3877643269c2e0d62301d417642ec9e2da7",
+  "scope": "Only already-cited raw page blocks are bundled. No whole-book or extraction-completeness certification.",
+  "sections": [
+    {
+      "file": "s1.json",
+      "title": "Chapter 1: The Milk Shake Dilemma",
+      "sha256": "259eba1f46d263b79fd7857b18baea590bc26ee5837df52e1f4e4bc3d3d89054",
+      "pages": [
+        13,
+        14,
+        15,
+        16,
+        17
+      ],
+      "origin_file": "01-Chapter-1-The-Milk-Shake-Dilemma.md",
+      "origin_file_sha256": "ca6c0f660e4f297cef97ae2ccdc95c48ca79958f6d31d7099db40220b3c03a34"
+    },
+    {
+      "file": "s2.json",
+      "title": "Chapter 5: How to Hear What Your Customers Don’t Say",
+      "sha256": "782d271c2d98e9b68dd63a9aa167d86806d561104d95d0cbe6e3141956699461",
+      "pages": [
+        87,
+        88,
+        89,
+        90
+      ],
+      "origin_file": "05-Chapter-5-How-to-Hear-What-Your-Customers-Dont-Say.md",
+      "origin_file_sha256": "4ece697a1b2a9a7937c675b3eeb7478604f2ac0b0209c2373ef2a9e1a7992baa"
+    }
+  ]
+}

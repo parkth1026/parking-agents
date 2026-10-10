@@ -1,0 +1,20 @@
+{
+  "book_id": "B24",
+  "source_id": "s6",
+  "title": "CHAPTER 23: The Alternative to Roadmaps",
+  "original_file": "70-CHAPTER-23-The-Alternative-to-Roadmaps.md",
+  "origin_file_sha256": "e0e4349693894680385e2b7e2cf225f492b11b9ffdbcfd0637b381dc1c240037",
+  "selection": "Already-cited raw pages only; preserve page text verbatim.",
+  "pages": [
+    {
+      "page": 126,
+      "text": "\n\n# CHAPTER 23 The Alternative to Roadmaps\n\nIn this chapter, I describe the alternative to product roadmaps. It's a big topic, and it touches on issues beyond product roadmaps, such as product culture, morale, empowerment, autonomy, and innovation. But my hope is to lay the foundation here and provide the details in the chapters that follow.\n\nBefore we jump into the alternative, however, we need to remind ourselves that roadmaps have existed for so long because they serve two purposes, and these needs don't go away:\n\n- The first purpose is because the management of the company wants to make sure that teams are working on the highest‐business‐value items first.\n\n- The second purpose is because—since they're trying to run a business—there are cases where they need to make date‐based commitments, and the roadmap is where they see and track those commitments (even though in most companies, they rarely trust the dates anymore).\n\nSo, to be accepted in most companies, any alternative approach to roadmaps must address these needs at least as well as they are addressed today.\n\nIn the empowered product team model this book is predicated on, the teams are themselves equipped to figure out the best ways to solve the particular business problems assigned to them. But for this to happen, it's not enough to have\n\n",
+      "sha256": "45644906af23ca1e97b3c0eba3806c52947edc26bd28166112817717c1008d37"
+    },
+    {
+      "page": 127,
+      "text": "\n\nstrong people equipped with modern tools and techniques. The product teams need to have the necessary business context. They need to have a solid understanding of where the company is heading, and they need to know how their particular team is supposed to contribute to the larger purpose.\n\nFor technology companies, there are two main components that provide this business context:\n\n- The product vision and strategy. This describes the big picture of what the organization as a whole is trying to accomplish and what the plan is for achieving that vision. Each of our product teams may have its own areas of focus (for example, buyer teams and seller teams), but it's all supposed to come together to achieve the product vision.\n\n- The business objectives. This describes the specific, prioritized business objectives for each product team.\n\nThe idea behind business objectives is simple enough: tell the team what you need them to accomplish and how the results will be measured, and let the team figure out the best way to solve the problems.\n\nConsider this example of a business objective and a measurable, key result. Suppose your product currently requires 30 days for a new customer to onboard. But in order to scale effectively, management believes this needs to be reduced to three hours or less.\n\nThat's a good example of a business objective for one or more product teams: “Dramatically reduce the time it takes for a new customer to go live.” And one of the measurable key results would be “Average new customer onboarding time less than three hours.”\n\nI'll describe much more about product vision and strategy—and business objectives—in the upcoming chapters. But for now I want to emphasize how important it is for each and every product team to know how their work contributes to the larger whole and what the company needs them to focus on right now.\n\nIt is management's responsibility to provide each product team with the specific business objectives they need to tackle.\n\nEarlier, I said we needed to acknowledge the two drivers for old‐style roadmaps, and\n\n",
+      "sha256": "dbcdec89bd08791b6cf5b7c856012a1f97ac923f6a54ebb3b6e6550c5dbf56c9"
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "book_id": "B01",
+  "title": "Dual Transformation: How to Reposition Today's Business While Creating the Future",
+  "author": "Scott D. Anthony, Clark G. Gilbert, Mark W. Johnson",
+  "published": "2017",
+  "edition_note": "Harvard Business Review Press 版的 PDF，有文字层，261 页。PDF 页码 = 印刷页码 + 7。文件来自电子书分发站。",
+  "locator": "pdf-page",
+  "extraction": "pdftotext version 4.00 -enc UTF-8 -layout；段内断行还原；每页开头插入 <!-- p.N | printed X --> 标记；删掉页首页尾的页眉和页码行、软连字符；正文不改字",
+  "known_limits": [
+    "图和表只剩文字标签，位置和连线读不到。",
+    "行尾断词没有还原，例如 “Para- doxically”。",
+    "PDF 第 1–3 页和各部分、各章之间的空白页没有文字，页码因此有缺口。"
+  ],
+  "origin_manifest_sha256": "6a412673cef70b1ec1b62433d36884bcbcf4e90d1c6cf96141deb969e8dbbe10",
+  "scope": "Only already-cited raw page blocks are bundled. No whole-book or extraction-completeness certification.",
+  "sections": [
+    {
+      "file": "s1.json",
+      "title": "Appendix: Dual Transformation Toolkit",
+      "sha256": "239d2a12a371d5582bcec25ee28b461c7a67556923b550ee65aaec2024e27434",
+      "pages": [
+        216,
+        217,
+        220,
+        221,
+        222,
+        223
+      ],
+      "origin_file": "13-Appendix-Dual-Transformation-Toolkit.md",
+      "origin_file_sha256": "a1b721946f239f0699a8eadddb14a7fbf7699c43d60d87bb390c641c230e1581"
+    },
+    {
+      "file": "s2.json",
+      "title": "4. The Capabilities Link between A and B",
+      "sha256": "0162c54023c0bf6901f31356cae9022a1f0b2b3bcd34b03c63e8c562125a5274",
+      "pages": [
+        90,
+        91
+      ],
+      "origin_file": "05-Ch-4-The-Capabilities-Link-between-A-and-B.md",
+      "origin_file_sha256": "4027e94950a4e679d78653c358e5e9d10f7bdc7fefce89e11b9109ad7a23a43f"
+    }
+  ]
+}

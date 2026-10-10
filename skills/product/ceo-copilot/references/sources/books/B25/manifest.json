@@ -1,0 +1,76 @@
+{
+  "book_id": "B25",
+  "title": "Continuous Discovery Habits: Discover Products that Create Customer Value and Business Value",
+  "author": "Teresa Torres",
+  "published": "2021-05-18T19:30:00+00:00",
+  "identifier": "B094PVB97X",
+  "edition_note": "Product Talk LLC 自出版电子版（EPUB 元数据 published 2021-05-18，版权页 Copyright © 2021 by Teresa Torres，LCCN 2021902811）。与 2021 年 5 月初版纸书同源内容。文件来自电子书分发站（z-library 副本）。",
+  "locator": "synthetic-page",
+  "page_units": 300,
+  "extraction": "unzip 后按 spine 顺序读 XHTML；块级元素各成一段；标题加 #，列表加 -，图片变成 [图：文件名｜alt] 占位行，上标变成 [^n]；没有印刷页标记，按每页约 300 个单位切合成页，每节另起一页；正文不改字",
+  "known_limits": [
+    "页码为合成页：源 EPUB 无印刷页分页标记，p.N 只在本 raw 目录内有效，不能换算为纸书页码。",
+    "正文 21 张插图只有占位行 [图：文件名｜images]，alt 全部无信息量（字面为 'images'）；OPF 另有 3 个图片文件（00009.gif、00031.jpeg、00032.jpeg）位于扉页与封底等已跳过的版式页，不进 raw。opportunity solution tree、story map、assumption mapping 等示意图的节点与分支结构不可从 raw 读出。",
+    "尾注（编号 1-30，源文件 text/part0028.html）在 EPUB 目录（NCX）中没有条目，抽取后并入 Acknowledgments 节尾部；源文件本身无标题，尾注从 '1' 编号条目开始。正文脚注为 [^n] 上标，与尾注本体按编号人工对应。",
+    "扉页（part0000.html）、目录页（part0002.html）、作者求书评插页（part0026.html）、封底营销文字（part0029.html）按无正文版式页跳过，跳过单位数记入 manifest.skipped。",
+    "verify 报「行尾断词残留 2 处」：Chapter Nine（合成页 p.110）的 'one- and two-bedroom units'、'One- or two-bedroom condos'，是原书合法的悬挂连词（suspended hyphen），不是转制断词，不改。",
+    "verify 报「被拆开的连字约 1 处」：查实为 Acknowledgments 节的 'Jeff has'，Jeff 是完整词，属 verify 启发式误报；全书正文无 fi/fl/ff 拆字。",
+    "verify 报「疑似页眉页脚 [图：#.gif｜images] 在 8 页首末行」：为插图占位行恰好落在合成页首/末行，不是页眉页脚；本书 XHTML 的书名只出现在 <title>（head），不进正文。"
+  ],
+  "origin_manifest_sha256": "218bc2f454b69208ae634856f94ffe6f826dbc90e5b78613fde12f6f8949800c",
+  "scope": "Only already-cited raw page blocks are bundled. No whole-book or extraction-completeness certification.",
+  "sections": [
+    {
+      "file": "s1.json",
+      "title": "Chapter Nine: Identifying Hidden Assumptions",
+      "sha256": "d46bbffe006666b8bec6e6c970ac48bf581e441a7ec70c81afc79b1552240605",
+      "pages": [
+        111,
+        112,
+        113,
+        114,
+        116,
+        119,
+        122
+      ],
+      "origin_file": "15-Chapter-Nine-Identifying-Hidden-Assumptions.md",
+      "origin_file_sha256": "da9372cf27f9a4a06b4d362576962ef8cbf54ab89f3402be24a9c14206ca00fb"
+    },
+    {
+      "file": "s2.json",
+      "title": "Chapter Five: Continuous Interviewing",
+      "sha256": "15b7204f671d8048348cc87aae878a24d0ec2540dae2a7cf7e411478034ecc6f",
+      "pages": [
+        72
+      ],
+      "origin_file": "10-Chapter-Five-Continuous-Interviewing.md",
+      "origin_file_sha256": "d4dac912cd6135c027d2c122d7de30fc9cdd644f5b10d74c8681ea4fba809f41"
+    },
+    {
+      "file": "s3.json",
+      "title": "Chapter One: The What and Why of Continuous Discovery",
+      "sha256": "aa5def432d56e1abe7676c8c782a20d4bcf7d3e3cb7490bd7c2f456d4609dd2b",
+      "pages": [
+        9,
+        10,
+        11,
+        12
+      ],
+      "origin_file": "04-Chapter-One-The-What-and-Why-of-Continuous-Discovery.md",
+      "origin_file_sha256": "5f88fa9bea2a32c2b19918113775f814317384f7be7dc2af311d73515821e063"
+    },
+    {
+      "file": "s4.json",
+      "title": "Chapter Two: A Common Framework for Continuous Discovery",
+      "sha256": "4c743e1e4c40b164e1daa01dfb628323ea9b5da6525a3b8416ea66495be183fa",
+      "pages": [
+        17,
+        18,
+        19,
+        20
+      ],
+      "origin_file": "05-Chapter-Two-A-Common-Framework-for-Continuous-Discovery.md",
+      "origin_file_sha256": "c9c3f56f4a310fdabcd46548805e1629d416f74580fd5b50fe70745544f5deff"
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "book_id": "B21",
+  "source_id": "s6",
+  "title": "What to Include in a Full Life Cycle Use Case",
+  "original_file": "44-What-to-Include-in-a-Full-Life-Cycle-Use-Case.md",
+  "origin_file_sha256": "f853e2ca81c9f58a6ce9a66ce0a516804b54af8fb3dbf124532baedf83bd9b59",
+  "selection": "Already-cited raw pages only; preserve page text verbatim.",
+  "pages": [
+    {
+      "page": 96,
+      "text": "\n\n# WHAT TO INCLUDE IN A FULL LIFE CYCLE USE CASE\n\nThe Full Life Cycle Use Case should first explain how the Persona determines that their existing needs are not being met by existing products, and how the Persona would find out about your product. Since you have been doing extensive primary market research, your Persona likely found out about the product through the course of your research, so you should instead detail how your Persona would have heard about the product if they had been a completely new prospect.\n\nIt is helpful to outline the customer’s current workflow, because by knowing the customer’s current process, it is easier to integrate your product into their operation. Customers who are generally satisfied with their workflow will rarely want to radically overhaul their process even if your product provides benefits over their current system.\n\nThe following factors are all essential parts of the Full Life Cycle Use Case:\n\n1. How end users will determine they have a need and/or opportunity to do something different.\n\n2. How they will find out about your product.\n\n3. How they will analyze your product.\n\n4. How they will acquire your product.\n\n5. How they will install your product.\n\n6. How they will use your product (in detail; see the Satisfier example further on).\n\n7. How they will determine the value gained from your product.\n\n8. How they will pay for your product.\n\n9. How they will receive support for your product.\n\n10. How they will buy more product and/or spread awareness (hopefully positive) about your product.\n\nThe Full Life Cycle Use Case should be visual, using diagrams, flowcharts, or other methods that show sequence.\n",
+      "sha256": "3bcfe4a35180b2c683143d439ea6ae69897fb5281afe4b956f305a3b7b85104e"
+    }
+  ]
+}

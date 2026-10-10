@@ -1,0 +1,61 @@
+{
+  "book_id": "B10",
+  "title": "Discovery-Driven Growth",
+  "author": "Rita Gunther McGrath, Ian C. MacMillan",
+  "published": "2009-03",
+  "identifier": "urn:uuid:2707f186-3f68-42ca-bc52-8bb58023a052",
+  "edition_note": "Harvard Business School Press 电子版（版权页 First eBook Edition: March 2009，Copyright 2009 Rita Gunther McGrath and Ian C. MacMillan）。EPUB 元数据 date 2019-11-18 是再打包时间，不是出版日期。内容为 2009 年原版。",
+  "locator": "synthetic-page",
+  "page_units": 300,
+  "extraction": "unzip 后按 spine 顺序读 XHTML；块级元素各成一段；标题加 #，列表加 -，图片变成 [图：文件名｜alt] 占位行，上标变成 [^n]；没有印刷页标记，按每页约 300 个单位切合成页，每节另起一页；正文不改字",
+  "known_limits": [
+    "60 张图片只有占位行 [图：文件名]，alt 全为 'image'/'cover'，图内内容读不到：各章 Art_P0NN 图与 table2.1–table8.8 系列（整表做成图片的 Exhibit 表）只有文件名，图中曲线、数据点与表格文字不可从 raw 读出。",
+    "12 处正文 HTML 表格转为逐单元格 ' | ' 竖排，列对齐与合并单元格丢失，引用前需对照原书确认行列对应。",
+    "源 EPUB 每个 spine 文件含 1 枚浏览器扩展注入的隐藏图标（save2-32.png，src 指向 chrome-extension://），raw 中保留为 [图：save2-32.png] 占位行，共 17 行，非原书内容。",
+    "源 EPUB 含 194 个 id=\"Page-__-N\" 形态的印刷页锚点（挂在 a/img/body 元素上，编号到 97 为止，与纸书页码不对应且不覆盖全书），不是标准 epub:type=\"pagebreak\"，本抽取未采用。页码全部为合成页，p.N 只在本 raw 目录内有效，不能换算为纸书页码。",
+    "脚注在正文为 [^n] 上标，注释本体在 Notes 节按章（Chapter 1–10 小节）排列；两者无程序链接，按编号人工对应。endnotes 无 Chapter 6 小节，源书第六章即无尾注。",
+    "3 处 '字母- 空格 小写' 形态是源书悬垂连字符（suspended hyphen），不是断词损伤：chapter 2 'half- to full-day'、chapter 6 'voice- and speech-recognition'、chapter 9 'twenty- to thirty-page'。保留原样。"
+  ],
+  "origin_manifest_sha256": "fbdadeb5b24d9791c8f38438abdf356cec5a16177323a63e49aa4ae870862155",
+  "scope": "Only already-cited raw page blocks are bundled. No whole-book or extraction-completeness certification.",
+  "sections": [
+    {
+      "file": "s1.json",
+      "title": "CHAPTER SIX Creating Reverse Financials and the Assumption Checklist",
+      "sha256": "e25e0613981cfdb7dae08293215a8bf9ae5f83fe50068b1466e29561237c5ba2",
+      "pages": [
+        95,
+        96,
+        97,
+        98
+      ],
+      "origin_file": "08-CHAPTER-SIX-Creating-Reverse-Financials-and-the-Assumption-C.md",
+      "origin_file_sha256": "c9d0ac4d51595b92728f78178a7e1daeefcd936b91ad511e085a9ffc399dc4de"
+    },
+    {
+      "file": "s2.json",
+      "title": "CHAPTER FIVE Designing the Business Model Architecture",
+      "sha256": "f7f1f841112a843a7a411c6b537dd194d756f4a934807d4c68b780f83b439c1d",
+      "pages": [
+        73,
+        74,
+        76,
+        78
+      ],
+      "origin_file": "07-CHAPTER-FIVE-Designing-the-Business-Model-Architecture.md",
+      "origin_file_sha256": "a0002a3b871c83e0628eb54bd2a546f86f9d89880da4f4c8348d1f8630ed0305"
+    },
+    {
+      "file": "s3.json",
+      "title": "CHAPTER SEVEN Actively Managing and Redirecting Projects",
+      "sha256": "e3888929186855e879b8a17bc721d88ce771c816a4cb93b5280ff40c558c34d3",
+      "pages": [
+        114,
+        115,
+        116
+      ],
+      "origin_file": "09-CHAPTER-SEVEN-Actively-Managing-and-Redirecting-Projects.md",
+      "origin_file_sha256": "71d8c39f428fcb0fc78ea3705636a62d3e32783d00e268e2d75c8f5f000d441b"
+    }
+  ]
+}

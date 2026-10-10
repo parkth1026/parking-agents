@@ -1,0 +1,64 @@
+{
+  "book_id": "B18",
+  "title": "Value Proposition Design: How to Create Products and Services Customers Want",
+  "author": "Alexander Osterwalder, Yves Pigneur, Greg Bernarda, Alan Smith; designed by Trish Papadakos",
+  "published": "2014",
+  "edition_note": "2014 Wiley 初版。本文件是 Internet Archive 2022 扫描件（Kahle/Austin Foundation 资助），实体书为 Wiley India 授权重印版，文字层是 OCR 而非出版社原生电子版。",
+  "locator": "pdf-page",
+  "extraction": "pdftotext version 4.00 -enc UTF-8 -layout；段内断行还原；每页开头插入 <!-- p.N | printed X --> 标记；删掉页首页尾的页眉和页码行、软连字符；正文不改字",
+  "known_limits": [
+    "定位方式：Internet Archive 扫描版 + OCR 文字层。页缘印刷页码被 OCR 以内联数字混入正文行（如 p.100「72 Don't hesitate…」、p.134「106 have will…」、p.240「212 Assigned to」）或孤立短行（p.306「278」、p.310「index 282」）的形式出现，覆盖率与位置都不稳定，无法做逐页 printed 标记，故 noFolios=true，页标记统一 <!-- p.N -->（N = PDF 页，全书 1-324）。印刷页码换算：正文 printed = PDF − 28（在 72/100、106/134、155/183、156/184、212/240、253/281、278/306、284/312 共 8 个可核点一致）；前件罗马页码 printed = PDF − 2（IX/11、XVIII/20、XXIV/26）。wiki 引用一律用 PDF 页。",
+    "文字层健康度：小写字母频率 a 7.49%、l 3.78%、y 1.85%（正常英语约 8%/4%/2%；对照 e 12.62%、t 8.89%、n 6.91% 均正常）——不存在同社《The Invincible Company》电子版的 a/l/y 系统性丢失缺陷。但本文件是 OCR 文字层，有零星错读：数字 1→7（目录页「704」=104、「742」=142、「788」=188 等）、重复字符伪影（p.110「Createe Possibiilliittiieess」=Create Possibilities、p.124「TTeecchhnnoolloocgyy」=Technology）、个别字母错读（p.9「moneu」=money、p.31「you clarity」=you clarify）。按原则不改，读 raw 时按上下文复原。",
+    "35 页在 -layout 抽取下无任何段落（probe 按阈值口径判 57 页近乎无文字）：p.29-30（ch1 扉页）、p.32-33、p.39、p.55、p.69、p.93-94、p.96-97（章末海报区）、p.103、p.115、p.133、p.147、p.149、p.171、p.187、p.200-202、p.217、p.243、p.282-284（ch4 开篇）、p.286-287、p.301-303、p.319、p.321、p.323——多为整页 canvas 图形页/章节分隔页/整页手绘页。verify 报的 23 处页码缺口全部来自这里。这些页的图形内容（canvas 画布、图例、插图）读不到。另有约 22 页只有孤立节标题或 thumb tab 乱码（如 p.38「Customer Profile」、p.54「Value Map」、p.56「2 @L/SVANVO」）。",
+    "旋转/镜像文本：页缘 thumb tab（「/C1.A0NVAS」=「1.CANVAS」、「@L/SVANVO」=「1.2 VALUE MAP」倒置、「/TSV3EPT.SD2RTATEGYZER」=「3.2 TEST STEP-BY-STEP STRATEGYZER」等）与章末海报、封底（PDF 320-324）被旋转 180° 扫描，OCR 输出乱序字符串（p.68、p.199、p.322「j49AO0 YOO 3y} dis…」、p.324）。这些串保留在 raw 里，读时按设计元素/封面文案处理，不是正文乱码。",
+    "版面：全书是多栏宽版面（Value Proposition Canvas、Business Model Canvas、表单、双栏正文）。-layout 保留水平位置，左右栏逐行交错拼在一起（如 p.18 正文与 canvas 区块标签交错），栏目对应关系丢失。图内曲线、坐标轴、图形元素读不到；只有标题、区块标签、轴名进入 raw（「Customer Jobs」「Pain Relievers」等标签在多个图里重复出现）。",
+    "切分注记：图形化开篇页落进前一节末尾——p.29-30（ch1 扉页，空）、p.68-69（1.3 Fit 图形开篇）、p.199-202（ch3 开篇区，199 为旋转海报乱码）、p.282-284（ch4 Evolve 开篇，空）、p.319（空）。2.3 Understanding Customers 的花体开篇页 p.132 OCR 为乱码（「Understanding ~ NULLS '4, Customers Wi\\\"l/1,11\\\\//{」），节从该页起切。目录页（p.6-7）页码数字有 OCR 损伤（1→7），不可用于导航；sections 切分依据逐页探测，非目录页。",
+    "行尾断词与被拆开的连字按原样保留（verify 全量计 137 处，如「propo- sitions」「Hunt- er」）；弯引号与 em/en dash 按文字层原样保留。",
+    "Index（PDF 310-318）为双栏悬挂缩进版式，左右栏逐行交错，子条目层级只能靠原书缩进推断；索引引用的页码是印刷页码，换算 PDF 页要 +28。"
+  ],
+  "origin_manifest_sha256": "b51c7b8e3d608134d75f225484ff8d80b9202fc311d066f7a1fe2fc832f3ace2",
+  "scope": "Only already-cited raw page blocks are bundled. No whole-book or extraction-completeness certification.",
+  "sections": [
+    {
+      "file": "s1.json",
+      "title": "1.3 Fit & Chapter Wrap-up",
+      "sha256": "cb5cb46bf7308cd4a6180b77f3b37fbbd4f9da4f0ed9a4784e13cd6971bf0554",
+      "pages": [
+        70,
+        76,
+        77,
+        78,
+        79
+      ],
+      "origin_file": "04-fit.md",
+      "origin_file_sha256": "a81f82724024ca2f567dd86baae504555aaa31a00bb83459fe693c816943b1ad"
+    },
+    {
+      "file": "s2.json",
+      "title": "1. Canvas — 1.1 Customer Profile",
+      "sha256": "76de05f23a55a3e2f8e6c357fdb621d6613324428c2c8cd4632aef2d20d1df03",
+      "pages": [
+        37,
+        40,
+        41,
+        42
+      ],
+      "origin_file": "02-canvas-customer-profile.md",
+      "origin_file_sha256": "46bfc5d0007304776b5797c350b625325b0cd37a02aa68b68fd449f51b64dcb9"
+    },
+    {
+      "file": "s3.json",
+      "title": "1.2 Value Map",
+      "sha256": "b5bd40f75a1bb1a45a57b6590d95a22429889a8f6b75b033db2409b70a82e755",
+      "pages": [
+        56,
+        58,
+        60,
+        62,
+        65
+      ],
+      "origin_file": "03-value-map.md",
+      "origin_file_sha256": "a7aaf420596454e3af91a967d9cdc44e801a080631fe4b619a64a5f973f23f27"
+    }
+  ]
+}

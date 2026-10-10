@@ -1,0 +1,59 @@
+{
+  "book_id": "B02",
+  "title": "The Invincible Company: How to Constantly Reinvent Your Organization with Inspiration from the World's Best Business Models",
+  "author": "Alexander Osterwalder, Yves Pigneur, Alan Smith, Fred Etiemble",
+  "published": "2020",
+  "edition_note": "2020 Wiley 初版电子 PDF（InDesign 直出）。v2 目录：用 PyMuPDF 重抽（v1 的 pdftotext 因字体 /Differences 后缀字形名不剥后缀而系统性丢字母 a/l/y 及个别数字 1，v1 目录保留不动作为缺字基线）。",
+  "locator": "pdf-page",
+  "extraction": "PyMuPDF 1.28.2（pymupdf, MuPDF 1.28.2）page.get_text(\"blocks\")，默认内容流顺序（未按坐标排序）；块内断行还原为空格；每页开头插入 <!-- p.N --> 标记；headers=[] 且 noFolios=true，零删除（不删页眉/页脚/页码行）；正文不改字。v2 根因：v1 用的 poppler pdftotext 对本书 123 个空壳 ToUnicode 字体的 /Differences 后缀字形名（如 a.alt1、l.alt1）不按 AGL 规则剥后缀，导致字母 a/l/y 与个别数字 1 系统性丢字；PyMuPDF 按 AGL 规则剥后缀，全书文字层完整（缺字模式 0）。本书禁止再用 pdftotext 做文字抽取。",
+  "known_limits": [
+    "定位方式：noFolios=true，页标记统一 <!-- p.N -->（N = PDF 页，全书 1-397），与 v1 一致。印刷页码换算：printed = PDF − 18。v2 文字层的页缘孤立页码行已可读（约 324 页有孤立数字行；v1 因数字 1 丢失多为残缺，如「08」「42」），因 noFolios=true 全部按正文短行保留（如 p.126「108」、p.160「142」）。wiki 引用一律用 PDF 页。",
+    "v2 与 v1 的关系：v1 目录（2026-10-09-the-invincible-company，pdftotext -layout 抽取）有系统性缺字（a/l/y/个别数字 1），保留不动，作为缺字基线；v2 用 PyMuPDF 重抽，同一 PDF、同一 30 节切分（页锚点与标题不变），文字层完整（缺字模式 0）。除缺字修复外还有行序差异：v1 的 -layout 按 x 坐标排水平位置，v2 按 PDF 内容流顺序（InDesign 写入顺序）。多栏/表格/canvas 页（约 288 页宽版面）两种行序都可能与纸面视觉顺序不同：v2 的标题与所属正文通常相邻成块，但栏与栏、正文与侧栏 callout 的先后以内容流为准；表格单元格文本按块串接，行列对应关系读不出。raw 以 v2 行序为准。",
+    "装饰字体的残余映射噪声（非缺字，按文字层原样保留）：封面/扉页标题块作「Invincib+e Company」（连字字形映射为 +）；p.24「6 Exp(ore ++」、p.25「7 Exp(oit ++」（展示字体 l 映射为 (）；p.64 分隔页孤立行「462」含多余数字。这些页的纸面是正常图形文字，读 raw 时按上下文复原。",
+    "图标字体错映射：ǃ（U+01C3，175 处）+ ɲ（U+0272，209 处）是清单/复选项的项目符号；□（U+25A1，30 处）是复选框；p.332/355 等页的「\"$&2&+ 8ɲ,!ɲ-5\"0ƿɲ」式乱码串是图标字体的字形映射错乱，不是文字。p.143 的图案总览图同理。",
+    "无文字页（7 页，verify 报的 7 处页码缺口全部来自这里）：p.2（封面折页）、p.33/44/54/63/154（空白页）、p.365（Afterword 手写体页）。这些页的图形内容读不到。",
+    "Afterword（PDF 364-365）：文字层只有标题「Afterword」，正文是手写体/图形，已并入 Glossary 节（24-afterword-glossary.md）。",
+    "图表与 canvas：全书约 288 页是多栏宽版面（Portfolio Map、Culture Map、案例地图、Pattern Library 卡片、scorecard 等）。图内曲线、坐标轴、图形元素读不到；只有图题、标签、轴名进入 raw。「Innovation Risk」「Expected Return」等轴名在多个图里重复出现。内嵌位图已原样导出到本目录 images/（JPEG 原字节 .jpg、Flate 无损转 .png、smask 单独存 .png），索引见 images/index.tsv；位图内的文字读不到。",
+    "页缘 thumb tab 与设计标签：每页外缘的章节指示标签以孤立短行出现，不带页码，不满足 headers 删除条件，保留在 raw 里。verify 报的「疑似页眉页脚」逐条处置：「#」(267 页)、「# #」(27 页) = 页缘孤立 printed 页码行（noFolios 保留）；「CULTURE」(16 页)、「Explore」(7 页)、「Exploit」(5 页) = 章节 thumb tab；「Outcomes」(13 页) = Culture Map 画布区块标签；「+# +# +# # −# −# −#」(12 页) = scorecard 刻度图例；「Expected Return」(5 页) = 图表轴名。全部不删。",
+    "行尾断词按原样保留：verify 检出「小写- 空格-小写」形态 961 处（如「conse- quences」「proposi- tions」，含设计图例里的连字符短语）；被拆开的 fi/fl/ff 连字为 0（verify 报的 1 处是公司名 Sanofi + are，误报）；弯引号 ’ “ ” 与 em/en dash 按文字层原样保留。",
+    "章节起点的孤立页码行：p.160「142」、p.180「162」、p.206「188」等是分隔页上的印刷页码，因 noFolios=true 保留为正文短行，落在前一节末尾；p.88「70」、p.127「109」、p.244 等同理落在各自节内。",
+    "目录页（p.17）是图形化目录，双栏交错成单块（「The Portfolio Map p. 10 Explore Portfolio p. 14 …」），raw 里该页不适合结构导航；sections 切分依据逐页探测结果，非目录页。",
+    "Index（PDF 382-392）与 Notes（369-379）里引用的页码是印刷页码，换算 PDF 页要 +18。Index/Notes/Glossary 是双栏悬挂缩进版式，左右栏逐行交错，子条目层级只能靠原书缩进推断。"
+  ],
+  "origin_manifest_sha256": "3bb6e19689da3559c5b43d0849518b6cc1f61e77e59dbd4dc90180d930eb47b2",
+  "scope": "Only already-cited raw page blocks are bundled. No whole-book or extraction-completeness certification.",
+  "sections": [
+    {
+      "file": "s1.json",
+      "title": "Explore Portfolio",
+      "sha256": "e79181883a27bda32316b9c9e4f881f8f1c57959b221d551df0db9118139a13f",
+      "pages": [
+        35
+      ],
+      "origin_file": "02-explore-portfolio.md",
+      "origin_file_sha256": "35250e3a55ba943e6e25b8e2493714d31f321ed04b9956feca276f13ea4abd5f"
+    },
+    {
+      "file": "s2.json",
+      "title": "The Pattern Library (Invent Patterns intro)",
+      "sha256": "51208e956e97375c4de17e9be901100aafbec98b1c4bdebaa71a22223c99423a",
+      "pages": [
+        147,
+        148,
+        149
+      ],
+      "origin_file": "09-pattern-library.md",
+      "origin_file_sha256": "e5ea383edd96a2edc2a9d01542c19a113d0ad2eda45fc4572d6c4d0f67aa3386"
+    },
+    {
+      "file": "s3.json",
+      "title": "Shift Patterns: Value Proposition Shifts",
+      "sha256": "17a95faaf5034ccbd929269fa6f92181a55f15d0049a385f066876210981c8b7",
+      "pages": [
+        250
+      ],
+      "origin_file": "14-value-proposition-shifts.md",
+      "origin_file_sha256": "346d6f64d16577faba4eb546baa78a0ce09dd2d630ef82471da6afa62cfb7365"
+    }
+  ]
+}
