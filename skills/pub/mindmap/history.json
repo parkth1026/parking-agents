@@ -1,0 +1,25 @@
+{
+  "skill": "mindmap",
+  "runs": [
+    {
+      "date": "2026-10-17T23:23:50+08:00",
+      "iteration_ref": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\evals\\mindmap-workspace\\iteration-1",
+      "gates": {
+        "with_skill": {
+          "pass_rate": 1,
+          "mean_ms": 249119,
+          "mean_tokens": 286914.5
+        },
+        "without_skill": {
+          "pass_rate": 0.8542,
+          "mean_ms": 155116.25,
+          "mean_tokens": 176963
+        }
+      },
+      "vs_previous": null,
+      "bank_epoch": 1,
+      "current_best": true
+    }
+  ],
+  "current_best": "runs[0]"
+}

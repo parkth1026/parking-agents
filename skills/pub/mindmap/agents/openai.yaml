@@ -1,0 +1,7 @@
+interface:
+  display_name: "mindmap"
+  short_description: "按规范创建与批量维护 markmap 思维导图"
+  default_prompt: "用 $mindmap 把这份文档整理成思维导图。"
+
+policy:
+  allow_implicit_invocation: true
