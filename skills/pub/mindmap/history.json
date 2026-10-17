@@ -19,6 +19,52 @@
       "vs_previous": null,
       "bank_epoch": 1,
       "current_best": true
+    },
+    {
+      "date": "2026-10-17T23:50:03+08:00",
+      "iteration_ref": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\evals\\mindmap-workspace\\iteration-2",
+      "gates": {
+        "old_skill": {
+          "pass_rate": 1,
+          "mean_ms": 188876.25,
+          "mean_tokens": 305350.75
+        },
+        "with_skill": {
+          "pass_rate": 1,
+          "mean_ms": 128238.5,
+          "mean_tokens": 266193.5
+        },
+        "without_skill": {
+          "pass_rate": 0.9375,
+          "mean_ms": 108201.25,
+          "mean_tokens": 173958.75
+        }
+      },
+      "vs_previous": {
+        "evals_total": 4,
+        "won": 0,
+        "lost": 0,
+        "tie": 4,
+        "detail": [
+          {
+            "eval": "eval-增量记录",
+            "result": "tie"
+          },
+          {
+            "eval": "eval-批量重构",
+            "result": "tie"
+          },
+          {
+            "eval": "eval-方案文档生成导图",
+            "result": "tie"
+          },
+          {
+            "eval": "eval-超限拆分裁定",
+            "result": "tie"
+          }
+        ]
+      },
+      "bank_epoch": 1
     }
   ],
   "current_best": "runs[0]"
