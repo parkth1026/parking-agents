@@ -37,13 +37,13 @@ const converter = path.join(here, 'xml-to-md.mjs');
 const ASSETS_REL = `${SLUG}-assets`; // 镜像内相对引用前缀（与镜像同目录平级）
 
 // ---------- lark-cli 封装 ----------
+const shq = (s) => /^[\w@%+=:,./-]+$/.test(s) ? s : `"${s}"`;
 function lark(cmd) {
   // 输出前可能有日志行，取第一个 '{' 起的 JSON；Windows 下 .cmd shim 需要 shell。
   // --output 只接受 cwd 内相对路径，统一传 repoRoot 相对 + 正斜杠。
   const rel = (p) => path.relative(repoRoot, p).replace(/\\/g, '/');
   const argv = cmd.map((s) => (path.isAbsolute(s) ? rel(s) : s));
-  const q = (s) => /^[\w@%+=:,./-]+$/.test(s) ? s : `"${s}"`;
-  const raw = execSync(`lark-cli ${argv.map(q).join(' ')}`, {
+  const raw = execSync(`lark-cli ${argv.map(shq).join(' ')}`, {
     encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, cwd: repoRoot,
   });
   const start = raw.indexOf('{');
@@ -51,6 +51,24 @@ function lark(cmd) {
   const j = JSON.parse(raw.slice(start));
   if (!j.ok) throw new Error(`lark-cli 失败: ${argv.join(' ')}\n${raw.slice(0, 500)}`);
   return j;
+}
+// 媒体下载：--output 路径白名单只认 CLI 自身 cwd / 账号临时目录 / 家目录 files，
+// evidence-root 在 repoRoot 外（相对路径含 ..）时直接传目标路径会被拒。
+// 统一在账号临时目录落盘（cwd=临时目录），再按 CLI 产出的 basename（白板会补扩展名）移入 assets。
+function mediaDownload(type, token, baseName) {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'lmr-media-'));
+  try {
+    const argv = ['docs', '+media-download', ...(type === 'whiteboard' ? ['--type', 'whiteboard'] : []),
+      '--token', token, '--output', baseName, '--as', 'user'];
+    execSync(`lark-cli ${argv.map(shq).join(' ')}`, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], cwd: tmp });
+    const produced = fs.readdirSync(tmp).map((f) => path.join(tmp, f));
+    if (!produced.length) throw new Error('下载后临时目录为空');
+    const dst = path.join(assetsDir, path.basename(produced[0]));
+    fs.copyFileSync(produced[0], dst);
+    return dst;
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
 }
 function docToken(v, kind) {
   if (!v) return undefined;
@@ -101,9 +119,9 @@ for (const [label, doc] of [['纪要', minutesDoc], ['逐字稿', transcriptDoc]
       const out = path.join(assetsDir, `${it.token}.png`);
       if (fs.existsSync(out)) { media.push({ ...it, ok: true, file: out, cached: true }); continue; }
       try {
-        lark(['docs', '+media-download', '--token', it.token, '--output', out, '--as', 'user']);
-        if (!fs.existsSync(out)) throw new Error('下载后文件不存在');
-        media.push({ ...it, ok: true, file: out });
+        let got = mediaDownload('img', it.token, `${it.token}.png`);
+        if (path.basename(got) !== `${it.token}.png`) { fs.renameSync(got, out); got = out; } // CLI 改名时归一到缓存键
+        media.push({ ...it, ok: true, file: got });
       } catch (e) {
         console.warn(`  ⚠️ ${label}图片 ${it.token} 下载失败，将剥离: ${String(e.message).slice(0, 120)}`);
         media.push({ ...it, ok: false });
@@ -111,14 +129,9 @@ for (const [label, doc] of [['纪要', minutesDoc], ['逐字稿', transcriptDoc]
     } else {
       // 白板缩略图：CLI 按内容补扩展名，先查既有文件再下载
       const existing = fs.readdirSync(assetsDir).find((f) => f.startsWith(`whiteboard-${it.token}.`));
-      const out = existing ? path.join(assetsDir, existing) : path.join(assetsDir, `whiteboard-${it.token}`);
-      if (existing) { media.push({ kind: it.kind, token: it.token, ok: true, file: out, cached: true }); continue; }
+      if (existing) { media.push({ kind: it.kind, token: it.token, ok: true, file: path.join(assetsDir, existing), cached: true }); continue; }
       try {
-        lark(['docs', '+media-download', '--type', 'whiteboard', '--token', it.token, '--output', out, '--as', 'user']);
-        const got = fs.existsSync(out)
-          ? out
-          : fs.readdirSync(assetsDir).map((f) => path.join(assetsDir, f)).find((p) => path.basename(p).startsWith(`whiteboard-${it.token}.`));
-        if (!got) throw new Error('下载后文件不存在');
+        const got = mediaDownload('whiteboard', it.token, `whiteboard-${it.token}`);
         media.push({ kind: it.kind, token: it.token, ok: true, file: got });
       } catch (e) {
         console.warn(`  ⚠️ ${label}白板 ${it.token} 缩略图下载失败，退回 token 标注: ${String(e.message).slice(0, 120)}`);

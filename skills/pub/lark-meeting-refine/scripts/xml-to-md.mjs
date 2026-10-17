@@ -162,9 +162,19 @@ function emitList(list, lines, depth, ordered) {
     lines.push(`${indent}${ordered ? `${idx++}. ` : '- '}${text}`);
     for (const c of li.children) {
       if (c.tag === 'ul' || c.tag === 'ol') emitList(c, lines, depth + 1, c.tag === 'ol');
-      else if (['grid', 'column'].includes(c.tag)) emitMediaBlocks(c.children, lines, depth + 1);
+      else if (['grid', 'column'].includes(c.tag)) emitGridBlocks(c.children, lines, depth + 1);
       else if (['img', 'whiteboard'].includes(c.tag)) emitMediaBlocks([c], lines, depth + 1);
     }
+  }
+}
+
+// li 内嵌 grid：column 可承载 ul/ol 文本列与 img/whiteboard 媒体列，须全部保内容
+// （2026-10-12 实战样本曾整列丢失文本）。p/table 维持原消解行为，不改变冻结期望输出。
+function emitGridBlocks(nodes, lines, depth) {
+  for (const n of nodes) {
+    if (n.tag === 'ul' || n.tag === 'ol') emitList(n, lines, depth, n.tag === 'ol');
+    else if (n.tag === 'grid' || n.tag === 'column') emitGridBlocks(n.children, lines, depth);
+    else emitMediaBlocks([n], lines, depth);
   }
 }
 

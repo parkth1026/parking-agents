@@ -69,6 +69,8 @@ node .agents/skills/lark-meeting-refine/scripts/verify-fixture.mjs
 
 冻结的 9-17 纪要 XML（`tests/fixtures/minutes-content.xml`）经被测转换器输出须与期望输出（`tests/fixtures/minutes-body.expected.md`，由冻结原型生成，核验记录见 `tests/fixtures/fixture-verification.md`）逐字节一致。改 `scripts/xml-to-md.mjs` 前必须先跑此门；期望侧由冻结生成器 `tests/fixtures/xml-to-md.frozen.mjs` 生成，**不得用被测转换器重新生成 D-02**。
 
+门同时校验第二对 fixture（2026-10-12 新增）：`li-grid-content.xml` → `li-grid-expected.md`，守卫 `li` 内嵌 grid 的 column 文本列（`<ul>`）不丢（期望侧手工撰写，防自指说明见 fixture-verification.md 附录）。任一对失败 exit 1。
+
 ## 不变清单（硬约束）
 
 - 飞书侧全程只读，零写入。

@@ -1,0 +1,1 @@
+<title>测试</title><ul><li><b>节</b><grid><column><ul><li>文本甲</li><li>文本乙</li></ul></column><column><img name="x" caption="图注" src="TOK1"/></column><column><p></p></column></grid></li><li><b>另一节</b><ul><li>普通项</li></ul><img name="y" caption="另一图" src="TOK2"/></li></ul>

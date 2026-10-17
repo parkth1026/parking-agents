@@ -62,3 +62,17 @@
 ## 重冻结条件
 
 behavior.md 转换规则变更时（契约「必须停下来问」项），D-01 不动、D-02 由冻结生成器重新生成并重核验本记录，sha256 同步更新。
+
+## 附录：G-01/G-02 li 内嵌 grid 回归对（2026-10-12 新增）
+
+背景：2026-10-12「阶段1对齐」实战样本发现 `li` 内嵌 grid 的 column 文本列（`<ul>`）整列丢失——旧实现把 grid 交给 `emitMediaBlocks`，该函数不解 column 内 ul。修复为 `emitGridBlocks`（`scripts/xml-to-md.mjs`）；column 内 `p`/`table` 维持原消解行为，D fixture 输出不受影响（门实测仍逐字节一致）。
+
+| 产物 | 路径（相对 skill 根） | sha256 |
+| --- | --- | --- |
+| G-01 合成 XML | `tests/fixtures/li-grid-content.xml` | `0cd283833c5ccea976f20e3c8c71d9ccbd7d653c7abdd0c59ea5b671e0fad3c2` |
+| G-02 期望输出 | `tests/fixtures/li-grid-expected.md` | `53e1b4f7879ae7bc66bb42636a0a4161b68f0747d3b435e626bc551b5c24f22e` |
+
+- G-01 为手工合成（非实战抓取）：覆盖 `li>grid>column(ul 文本列)+column(img)+column(空 p)` 与 `li>ul+img` 两种形态。
+- **G-02 为手工撰写**：新行为无法由冻结生成器产生——冻结生成器含旧缺陷，对 G-01 的输出 0 处「文本」命中（已实测），即本 fixture 对旧缺陷必然 FAIL，构成防自指（与 D-02 的冻结生成器互证互补）。
+- `verify-fixture.mjs` 已扩展为双 case 门（D + G），任一失败 exit 1。
+- 端到端复验：修复后转换器对 2026-10-12 真实纪要 XML（doc `J9RVdWn02oUZTuxzCLZcN8fTncc` rev 6）的输出，与当日手工补回的归档镜像正文逐字节一致（10,299 B）。
