@@ -83,3 +83,32 @@
 结论：技能的不可替代价值 = 纯 http 双协议坑 + agent PATH 兜底 + 噪音块事实；
 效率收益稳定（快 3~4×、省 2×+ tokens）。题面变更经用户 2026-08-30 授权，
 跨轮题面史由 git 记录；history 现共 4 条 run。
+
+## 2026-10-14 登录故障排查 + 升级 19.4.1 后全链路回归（glab 1.113.0 → 1.123.0）
+
+背景：服务端 git.51vr.local 已从 15.0.5 升级到 19.4.1-ee（`glab api version` 实测），
+DNS 解析 10.66.12.253。用户报告「glab 登录有问题」。根因不是登录，是 config 里
+残留的升级测试实例 10.100.20.59（19.3.2-ee，即 2026-09-14 A 组补测用的那台）整机
+不可达，把 `glab auth status` 拖成全局认证失败。
+
+| 命令 / 操作 | 输出摘要 | 裁决 |
+| --- | --- | --- |
+| `glab auth status`（裸跑） | 只显示 git.51vr.local，✓ keyring 登录，rc=0 | 噪音块「永远多一段红 401」描述过时，改正文 |
+| `glab auth status --hostname 10.100.20.59` | `API call failed: context deadline exceeded` + `X could not authenticate to one or more...` | 多 host 残留是真实故障模式，故障表加行 |
+| `ping 10.100.20.59` / `curl http、https` | 100% 丢包；80/443 双超时（exit 28） | 主机级不可达，非认证问题 |
+| `glab api user / version / metadata` | 用户 piaotonghu active；19.4.1-ee | 服务端版本事实更新入正文 |
+| `glab api "namespaces/neon"` | `"plan":"default"` | 免费档判断在 19.4.1 上复核成立 |
+| `glab repo view <路径/2449/GITLAB_HOST 强制>` | 三种方式均 `404 Not Found`（1.113 与 1.123 双测） | 怪癖节新增：用 `glab api projects/<id>` 替代 |
+| `glab ci status` | rc=1 但输出真实 pipeline #10248（verify failed，52m15s） | 怪癖节新增：退出码反映 pipeline 状态 |
+| `glab auth status -t` 提取令牌 → curl REST / GraphQL | REST `401 Unauthorized`；GraphQL `{"errors":[{"message":"Invalid token"}]}`（双版本复现） | `-t` 配方证伪，正文删除并改为警告 |
+| curl 直探 `/api/graphql`（无令牌 POST） | `{"data":{"currentUser":null}}` 合法结构 | GraphQL 端点本身健康 |
+| `git credential fill`（git:http:// 条目） | 密码 10 字符——是账号密码不是 PAT | git 凭据与 glab 令牌是两条独立链路，红线依据 |
+| cmdkey 第一轮批量删 46 条 | 46 次 "deleted successfully"，删后清单 46 条全在 | **假成功坑实证**：CRLF 名字 + 不存在目标也报成功，入正文 |
+| cmdkey `tr -d '\r'` 清洗后重删 | 删后清单仅剩 `glab:git.51vr.local:token:`，0 残留 | 验收只认删后计数 |
+| 清理后回归（auth/api user/issue/mr/pipeline/label/milestone/git fetch ×3 轮） | 20+ 项全过，延迟 310–350ms | 清理零副作用 |
+| `winget upgrade GLab.GLab`（1.113→1.123） | keyring 1 条、config hosts、登录状态全部无损；回归 7/7 | 升级保留凭据实测；版本参考更新 |
+| `glab auth status --output json`（1.123） | `{"hosts":[{...,"token_source":"keyring",...}]}` | 脚本化检查新范式入怪癖节 |
+| gitlab.com release notes v1.114–v1.123 逐版核对（REST API 取） | 无任何 GitLab 19.x 服务端兼容修复、无 repo view/404 修复 | 「无版本配套关系」结论的证据，入正文头部 |
+
+处置留痕：config.yml 备份 `config.yml.bak-20261014`；删除清单留档
+`deleted-credentials-20261014.txt`；SKILL.md 备份 `SKILL.md.bak-20261018`（本次修订）。
