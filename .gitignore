@@ -10,6 +10,9 @@ node_modules/
 /.zcode/plans
 /.claude/launch.json
 
+# WorkBuddy session workspace (memory logs, task state — machine-local)
+/.workbuddy/
+
 # Eval workspaces are scratch; durable records live in each skill dir
 /evals/
 /.agents/evals/
