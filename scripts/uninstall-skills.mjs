@@ -77,6 +77,7 @@ function parseArgs(argv) {
   return options;
 }
 
+/** `target` is the raw request (string | null), resolved exactly once here. */
 function runUninstall({ target, dryRun }) {
   const targets = resolveTargetKeys(target);
   let failed = false;
@@ -115,14 +116,15 @@ async function interactiveTui() {
     clack.cancel("已取消");
     return 0;
   }
-  const targetKeys = resolveTargetKeys(target === "default" ? null : target);
+  const targetRequest = target === "default" ? null : target;
+  const targetKeys = resolveTargetKeys(targetRequest);
   clack.note(`将删除 ${keysLabel(targetKeys)} 里所有指向本仓 skills/ 的链接（外来项不动）。`, "卸载计划");
   const confirmed = await clack.confirm({ message: "确认执行?", initialValue: true });
   if (clack.isCancel(confirmed) || !confirmed) {
     clack.cancel("已取消，未做任何改动。");
     return 0;
   }
-  const failed = runUninstall({ target: targetKeys, dryRun: false });
+  const failed = runUninstall({ target: targetRequest, dryRun: false });
   clack.outro(failed ? "卸载结束：有失败项，见上方日志" : "卸载完成 ✓");
   return failed ? 1 : 0;
 }
@@ -182,7 +184,7 @@ async function interactivePlain() {
     }
     rl.close();
     console.log();
-    return runUninstall({ target: targetKeys, dryRun: false }) ? 1 : 0;
+    return runUninstall({ target, dryRun: false }) ? 1 : 0;
   } finally {
     rl.close();
   }

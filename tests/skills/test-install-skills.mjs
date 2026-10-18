@@ -31,7 +31,7 @@ import {
   symlinkSync,
   writeFileSync,
 } from "node:fs";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -321,6 +321,39 @@ try {
   expect(
     existsSync(join(root, un.backups[0], "eng-pub", "SKILL.md")),
     "backup folder deleted or emptied by uninstall"
+  );
+
+  // --- stage G: interactive CLI hand-off regression -------------------------------
+  // ea57581 handed runInstall()/runUninstall() an already-resolved keys array,
+  // which resolveTargetKeys() wrapped again -> "TARGETS[key] is not a function"
+  // on every interactive run. Drive both plain menus (piped stdin = defaults)
+  // against a fake home and require a clean exit.
+  const fakeHome = join(root, "fake-home");
+  mkdirSync(fakeHome, { recursive: true });
+  const scriptsDir = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "scripts");
+  const childEnv = { ...process.env, USERPROFILE: fakeHome, HOME: fakeHome };
+  const installRun = spawnSync(process.execPath, [join(scriptsDir, "install-skills.mjs")], {
+    input: "\n\n\n", // plain menu: default targets / default set / confirm
+    encoding: "utf8",
+    env: childEnv,
+  });
+  expect(
+    installRun.status === 0,
+    `interactive install exited ${installRun.status}: ${(installRun.stderr || installRun.stdout || "").slice(-400)}`
+  );
+  const agentsFake = join(fakeHome, ".agents", "skills");
+  expect(
+    existsSync(agentsFake) && readdirSync(agentsFake).length > 0,
+    "interactive install created no links in the fake home"
+  );
+  const uninstallRun = spawnSync(process.execPath, [join(scriptsDir, "uninstall-skills.mjs")], {
+    input: "\n\n", // plain menu: default targets / confirm
+    encoding: "utf8",
+    env: childEnv,
+  });
+  expect(
+    uninstallRun.status === 0,
+    `interactive uninstall exited ${uninstallRun.status}: ${(uninstallRun.stderr || uninstallRun.stdout || "").slice(-400)}`
   );
 } finally {
   rmSync(root, { recursive: true, force: true });

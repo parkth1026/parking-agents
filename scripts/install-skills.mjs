@@ -136,6 +136,7 @@ function listMode(skills) {
   console.log(`\n共 ${skills.length} 个技能: default ${count("default")} / progress ${count("progress")} / all ${count("all")}`);
 }
 
+/** `target` is the raw request (string | null), resolved exactly once here. */
 function runInstall({ target, set, dryRun, only, skillNames }) {
   const targets = resolveTargetKeys(target);
   let failed = false;
@@ -185,9 +186,8 @@ async function interactiveTui() {
     ],
   });
   if (clack.isCancel(target)) return cancelled();
-  const targetKeys = resolveTargetKeys(
-    target === "default" ? null : target
-  );
+  const targetRequest = target === "default" ? null : target;
+  const targetKeys = resolveTargetKeys(targetRequest);
 
   const set = await clack.select({
     message: "套档",
@@ -204,7 +204,7 @@ async function interactiveTui() {
   const confirmed = await clack.confirm({ message: "确认执行?", initialValue: true });
   if (clack.isCancel(confirmed) || !confirmed) return cancelled("已取消，未做任何改动。");
 
-  const failed = runInstall({ target: targetKeys, set, dryRun: false, only: null, skillNames: null });
+  const failed = runInstall({ target: targetRequest, set, dryRun: false, only: null, skillNames: null });
   clack.outro(failed ? "安装结束：有失败项，见上方日志" : "安装完成 ✓");
   return failed ? 1 : 0;
 }
@@ -287,7 +287,7 @@ async function interactivePlain() {
       return 0;
     }
     console.log();
-    return runInstall({ target: targetKeys, set, dryRun: false, only: null, skillNames: null }) ? 1 : 0;
+    return runInstall({ target, set, dryRun: false, only: null, skillNames: null }) ? 1 : 0;
   } finally {
     rl.close();
   }
