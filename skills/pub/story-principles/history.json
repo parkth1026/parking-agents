@@ -1,0 +1,83 @@
+{
+  "skill": "story-principles",
+  "runs": [
+    {
+      "date": "2026-10-19T02:50:12+08:00",
+      "iteration_ref": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\evals\\story-principles-workspace\\iteration-1",
+      "gates": {
+        "with_skill": {
+          "pass_rate": 1,
+          "mean_ms": 135649.5,
+          "mean_tokens": 192237.75
+        },
+        "without_skill": {
+          "pass_rate": 1,
+          "mean_ms": 110903.75,
+          "mean_tokens": 189059.25
+        }
+      },
+      "vs_previous": null,
+      "bank_epoch": 1,
+      "current_best": true
+    },
+    {
+      "date": "2026-10-19T03:02:28+08:00",
+      "iteration_ref": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\evals\\story-principles-workspace\\iteration-2",
+      "gates": {
+        "with_skill": {
+          "pass_rate": 0.9375,
+          "mean_ms": 131975.75,
+          "mean_tokens": 197258
+        },
+        "without_skill": {
+          "pass_rate": 0.25,
+          "mean_ms": 84087,
+          "mean_tokens": 211635
+        }
+      },
+      "vs_previous": {
+        "evals_total": 4,
+        "won": 0,
+        "lost": 0,
+        "tie": 0,
+        "detail": [
+          {
+            "eval": "eval-对抗-排期越界",
+            "result": "new"
+          },
+          {
+            "eval": "eval-对抗-状态标记",
+            "result": "new"
+          },
+          {
+            "eval": "eval-对抗-诱导改写",
+            "result": "new"
+          },
+          {
+            "eval": "eval-对抗-诱导过拆",
+            "result": "new"
+          },
+          {
+            "eval": "eval-审查颗粒度",
+            "result": "dropped"
+          },
+          {
+            "eval": "eval-新epic拆解",
+            "result": "dropped"
+          },
+          {
+            "eval": "eval-新增story四行制",
+            "result": "dropped"
+          },
+          {
+            "eval": "eval-标注不改写",
+            "result": "dropped"
+          }
+        ]
+      },
+      "bank_epoch": 2,
+      "current_best": true
+    }
+  ],
+  "current_best": "runs[1]"
+}

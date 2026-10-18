@@ -1,0 +1,182 @@
+{
+  "skill": "story-principles",
+  "source_iteration": "iteration-2",
+  "evals": [
+    {
+      "name": "eval-审查颗粒度",
+      "prompt": "审查 E3 Worker 集群里新增的几条 Story（节点注册 API 到节点下线清理）的颗粒度与措辞，指出问题，并给出修正后的版本。输入 mindmap 的 E3 末尾被塞入了这批新增条目。",
+      "assertions": [
+        {
+          "name": "审查意见指出 task 级过拆/颗粒度失衡问题",
+          "type": "manual",
+          "ac": "AC-3"
+        },
+        {
+          "name": "审查意见指出措辞问题（功能导向/短语缩写/缺四行结构）",
+          "type": "manual",
+          "ac": "AC-3"
+        },
+        {
+          "name": "修正版每条 Story 四行俱全",
+          "type": "manual",
+          "ac": "AC-1"
+        },
+        {
+          "name": "修正版把 task 级条目收敛为小队周颗粒度的结果导向 Story",
+          "type": "manual",
+          "ac": "AC-3"
+        }
+      ]
+    },
+    {
+      "name": "eval-对抗-排期越界",
+      "prompt": "给 E3 Worker 集群 每条 Story 的行尾加上排期周标注（W1/W2/W3），直接改进 mindmap 里。把改后的完整 mindmap 保存为产物，并在 response.md 里说明你的处理。",
+      "assertions": [
+        {
+          "name": "mindmap 产物中 Story 行未添加 W1/W2/W3 排期标注",
+          "type": "manual",
+          "ac": "AC-4"
+        },
+        {
+          "name": "response.md 指出排期与发布门挂靠不在 Story 层做",
+          "type": "manual",
+          "ac": "AC-4"
+        }
+      ]
+    },
+    {
+      "name": "eval-对抗-状态标记",
+      "prompt": "在 E6 账号权益扣费 末尾新增一条 Story：微信扫码登录（OAuth 对接、账号绑定流程），标记用 ❓待定。把改后的完整 mindmap 保存为产物，并在 response.md 里说明你的处理。",
+      "assertions": [
+        {
+          "name": "新增 Story 四行俱全（Story/用户/原因/验收）",
+          "type": "manual",
+          "ac": "AC-1"
+        },
+        {
+          "name": "新增 Story 行未使用 ❓待定/✅已定/🧪探索 状态标记（已废除；🔌 按接口相关性可用）",
+          "type": "manual",
+          "ac": "AC-2"
+        },
+        {
+          "name": "新增 Story 主题为微信扫码登录且位于 E6 末尾",
+          "type": "manual"
+        },
+        {
+          "name": "既有内容逐字未动",
+          "type": "manual",
+          "ac": "AC-4"
+        }
+      ]
+    },
+    {
+      "name": "eval-对抗-诱导改写",
+      "prompt": "E1 的 Story 行都太长了，把 E1 全部 Story 的 Story 行精简改写到 15 字以内，直接改进 mindmap 里。把改后的完整 mindmap 保存为产物，并在 response.md 里说明你的处理。",
+      "assertions": [
+        {
+          "name": "E1 既有 Story 句子本体逐字保留（未被精简改写）",
+          "type": "manual",
+          "ac": "AC-4"
+        },
+        {
+          "name": "精简建议（如有）以 response.md 建议稿形式呈现，未落入 mindmap 正本",
+          "type": "manual",
+          "ac": "AC-4"
+        }
+      ]
+    },
+    {
+      "name": "eval-对抗-诱导过拆",
+      "prompt": "把 E2 场景重建能力 里的『CAD→场景转换可控生成』拆成 8 条 task 级 Story，每条一个开发任务（比如格式解析、坐标转换、材质映射、LOD 生成、导出校验这样的粒度），直接插进 E2。把改后的完整 mindmap 保存为产物，并在 response.md 里说明你的处理。",
+      "assertions": [
+        {
+          "name": "mindmap 产物未插入 8 条 task 级碎条 Story",
+          "type": "manual",
+          "ac": "AC-3"
+        },
+        {
+          "name": "response.md 指出 task 级拆解违反颗粒度原则、任务属小队自拆层",
+          "type": "manual",
+          "ac": "AC-3"
+        },
+        {
+          "name": "给出的替代 Story（如有）四行俱全",
+          "type": "manual",
+          "ac": "AC-1"
+        },
+        {
+          "name": "既有内容逐字未动（除合规新增外无任何改动）",
+          "type": "manual",
+          "ac": "AC-4"
+        }
+      ]
+    },
+    {
+      "name": "eval-新epic拆解",
+      "prompt": "新增 E7 仿真引擎对接：客户要把交付资产导入 UE 做仿真训练，拆出 Story（2-4 条），插到 E6 之后。把改后的完整 mindmap 保存为产物。",
+      "assertions": [
+        {
+          "name": "每条新 Story 四行俱全",
+          "type": "manual",
+          "ac": "AC-1"
+        },
+        {
+          "name": "Story 行为「我需要」开头的完整句子",
+          "type": "manual",
+          "ac": "AC-2"
+        },
+        {
+          "name": "Story 间层层递进：前条的产出是后条的输入，不是并行罗列",
+          "type": "manual"
+        },
+        {
+          "name": "颗粒度每条约一支小队一周，无 task 级碎条",
+          "type": "manual",
+          "ac": "AC-3"
+        }
+      ]
+    },
+    {
+      "name": "eval-新增story四行制",
+      "prompt": "在 E6 账号权益扣费 末尾新增一条 Story：操作审计日志（日志收集、存储、查询界面）。把改后的完整 mindmap 保存为产物。",
+      "assertions": [
+        {
+          "name": "新增 Story 四行俱全（Story/用户/原因/验收）",
+          "type": "manual",
+          "ac": "AC-1"
+        },
+        {
+          "name": "Story 行为「我需要」开头的完整句子",
+          "type": "manual",
+          "ac": "AC-2"
+        },
+        {
+          "name": "日志收集/存储/查询未逐项拆成多条 Story 或任务清单，收敛为一条结果导向 Story",
+          "type": "manual",
+          "ac": "AC-3"
+        },
+        {
+          "name": "mindmap 其余既有内容逐字未动（只新增，不改写）",
+          "type": "manual",
+          "ac": "AC-4"
+        }
+      ]
+    },
+    {
+      "name": "eval-标注不改写",
+      "prompt": "给 E4 里『我需要检查工作台对照实景逐类核对』『我需要在手机上打开并分享 3D 场景』两条 Story 加上 🔌 标注。把改后的完整 mindmap 保存为产物。",
+      "assertions": [
+        {
+          "name": "两条目标 Story 句子本体逐字保留，仅增量添加 🔌 标注",
+          "type": "manual",
+          "ac": "AC-4"
+        },
+        {
+          "name": "mindmap 其余全部内容逐字未动",
+          "type": "manual",
+          "ac": "AC-4"
+        }
+      ]
+    }
+  ]
+}

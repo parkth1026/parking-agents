@@ -1,0 +1,7 @@
+interface:
+  display_name: "story-principles"
+  short_description: "Create and use the Story Principles skill"
+  default_prompt: "Use $story-principles to handle a Story Principles task."
+
+policy:
+  allow_implicit_invocation: true
