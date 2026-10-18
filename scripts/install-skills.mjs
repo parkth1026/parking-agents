@@ -9,15 +9,16 @@
  *                                                                 back to a plain
  *                                                                 menu when not a
  *                                                                 terminal)
- *   node scripts/install-skills.mjs --target both --set default  non-interactive
+ *   node scripts/install-skills.mjs --target all --set default   non-interactive
  *   node scripts/install-skills.mjs --target agents --set progress --dry-run
- *   node scripts/install-skills.mjs --target claude --only deprecated --dry-run
+ *   node scripts/install-skills.mjs --target workbuddy --only deprecated --dry-run
  *   node scripts/install-skills.mjs --skills cpu-monitor --dry-run
  *   node scripts/install-skills.mjs --list
  *
  * Any argument switches to pure non-interactive mode (CI/agent safe) with
- * defaults target=both, set=default. Zero arguments opens an interactive
- * menu (readline). Exit codes: 0 ok, 1 failure, 2 usage error.
+ * defaults set=default and target = agents + claude (+ workbuddy when
+ * ~/.workbuddy/skills exists). Zero arguments opens an interactive menu
+ * (readline). Exit codes: 0 ok, 1 failure, 2 usage error.
  *
  * --only <category> / --skills a,b,c are explicit selections that BYPASS the
  * set exclusion (--only deprecated installs deprecated; --skills can reach
@@ -30,25 +31,30 @@ import readline from "node:readline/promises";
 import * as clack from "./vendor/clack-prompts.mjs";
 import {
   SETS,
+  TARGET_DIRS,
   discoverRepoSkills,
   installSkills,
   repoRoot,
   repoSources,
+  resolveTargetKeys,
+  workbuddyDetected,
 } from "./skill-links.mjs";
 
-const TARGETS = {
-  agents: () => join(homedir(), ".agents", "skills"),
-  claude: () => join(homedir(), ".claude", "skills"),
-};
+const TARGETS = TARGET_DIRS;
 
 function usage() {
+  const wbNote = workbuddyDetected()
+    ? "检测到 ~/.workbuddy/skills —— 默认（不带 --target）会附带安装"
+    : "未检测到 ~/.workbuddy/skills —— 默认不装 workbuddy";
   console.log(`用法: node scripts/install-skills.mjs [选项]
 
 不带参数进入交互安装（真终端为方向键 clack TUI，回车取高亮推荐项；
-管道/CI/哑终端自动退回 plain 菜单，每步直接回车即取默认）。目标=both，
-套档=default；带任意参数则纯非交互（默认 target=both, set=default）。
+管道/CI/哑终端自动退回 plain 菜单，每步直接回车即取默认）。带任意参数则
+纯非交互。目标解析规则：--target 缺省 = agents + claude +（检测到
+~/.workbuddy/skills 时附加 workbuddy）；当前机器：${wbNote}。
 
-  --target agents|claude|both   安装目标（默认 both）
+  --target agents|claude|workbuddy|both|all   安装目标（both=agents+claude 旧语义不变；
+                                               all=含 workbuddy 在内的全部目标）
   --set default|progress|all    套档（默认 default；deprecated/in-progress 默认不装；
                                  整档安装会收走套装外的本仓旧链接）
   --only <分类>                 只装某个分类（绕过套档排除，如 --only deprecated；
@@ -58,6 +64,14 @@ function usage() {
   --dry-run                     只报告，不改任何东西
   --list                        按分类列出技能与各套档是否包含，然后退出`);
 }
+
+const TARGET_KEYS = Object.keys(TARGETS);
+const TARGET_LABELS = {
+  agents: "~/.agents/skills",
+  claude: "~/.claude/skills",
+  workbuddy: "~/.workbuddy/skills",
+};
+const keysLabel = (keys) => keys.map((k) => TARGET_LABELS[k]).join(" + ");
 
 function parseArgs(argv) {
   const options = { target: null, set: null, dryRun: false, only: null, skillNames: null, list: false };
@@ -85,8 +99,8 @@ function parseArgs(argv) {
       throw new Error(`未知参数: ${arg}`);
     }
   }
-  if (options.target !== null && !["agents", "claude", "both"].includes(options.target)) {
-    throw new Error(`非法 --target '${options.target}'（可选: agents, claude, both）`);
+  if (options.target !== null && ![...TARGET_KEYS, "both", "all"].includes(options.target)) {
+    throw new Error(`非法 --target '${options.target}'（可选: ${[...TARGET_KEYS, "both", "all"].join(", ")}）`);
   }
   if (options.set !== null && !(options.set in SETS)) {
     throw new Error(`非法 --set '${options.set}'（可选: ${Object.keys(SETS).join(", ")}）`);
@@ -123,7 +137,7 @@ function listMode(skills) {
 }
 
 function runInstall({ target, set, dryRun, only, skillNames }) {
-  const targets = target === "both" ? ["agents", "claude"] : [target];
+  const targets = resolveTargetKeys(target);
   let failed = false;
   for (const key of targets) {
     if (targets.length > 1) console.log(`\n=== ${key} ===`);
@@ -155,16 +169,25 @@ async function interactiveTui() {
     skills.filter((skill) => !skill.category || !SETS[set].includes(skill.category)).length;
 
   clack.intro("parking-agents 技能安装器");
+  const defaultKeys = resolveTargetKeys(null);
   const target = await clack.select({
     message: "安装目标",
-    initialValue: "both",
+    initialValue: "default",
     options: [
-      { value: "both", label: "两个都装（推荐）", hint: "~/.agents/skills + ~/.claude/skills" },
+      { value: "default", label: `默认（推荐）`, hint: keysLabel(defaultKeys) },
       { value: "agents", label: "只装 ~/.agents/skills" },
       { value: "claude", label: "只装 ~/.claude/skills" },
+      ...(workbuddyDetected()
+        ? [{ value: "workbuddy", label: "只装 ~/.workbuddy/skills" }]
+        : []),
+      { value: "both", label: "agents + claude", hint: "不含 workbuddy" },
+      { value: "all", label: "全部目标", hint: keysLabel(TARGET_KEYS) },
     ],
   });
   if (clack.isCancel(target)) return cancelled();
+  const targetKeys = resolveTargetKeys(
+    target === "default" ? null : target
+  );
 
   const set = await clack.select({
     message: "套档",
@@ -177,12 +200,11 @@ async function interactiveTui() {
   });
   if (clack.isCancel(set)) return cancelled();
 
-  const targetLabel = { agents: "~/.agents/skills", claude: "~/.claude/skills", both: "~/.agents/skills + ~/.claude/skills" }[target];
-  clack.note(`将把 ${setCount(set)} 个技能（${set} 档）junction 到 ${targetLabel}。`, "安装计划");
+  clack.note(`将把 ${setCount(set)} 个技能（${set} 档）junction 到 ${keysLabel(targetKeys)}。`, "安装计划");
   const confirmed = await clack.confirm({ message: "确认执行?", initialValue: true });
   if (clack.isCancel(confirmed) || !confirmed) return cancelled("已取消，未做任何改动。");
 
-  const failed = runInstall({ target, set, dryRun: false, only: null, skillNames: null });
+  const failed = runInstall({ target: targetKeys, set, dryRun: false, only: null, skillNames: null });
   clack.outro(failed ? "安装结束：有失败项，见上方日志" : "安装完成 ✓");
   return failed ? 1 : 0;
 }
@@ -231,12 +253,19 @@ async function interactivePlain() {
   };
 
   try {
-    console.log("一路直接回车 = 默认安装（两个目录都装 + default 档）。\n");
+    const defaultKeys = resolveTargetKeys(null);
+    const wbLine = workbuddyDetected()
+      ? "  [4] 只装 ~/.workbuddy/skills"
+      : "  [4] 只装 ~/.workbuddy/skills（未检测到，不推荐）";
+    console.log("一路直接回车 = 默认安装（" + keysLabel(defaultKeys) + " + default 档）。\n");
     console.log("① 安装目标:");
     console.log("  [1] ~/.agents/skills");
     console.log("  [2] ~/.claude/skills");
-    console.log("  [3] 两个都装（默认）");
-    const targetAnswer = await ask("选择 [1-3]（回车=3）: ", ["1", "2", "3"], "3");
+    console.log(wbLine);
+    console.log("  [3] agents + claude（不含 workbuddy）");
+    console.log("  [5] 全部目标" + (workbuddyDetected() ? "" : "（含未检测到的 workbuddy）"));
+    console.log("  [0] 默认 = " + keysLabel(defaultKeys) + "（回车）");
+    const targetAnswer = await ask("选择 [0-5]（回车=0）: ", ["0", "1", "2", "3", "4", "5"], "0");
 
     console.log("\n② 套档:");
     console.log(`  [1] 默认       (${setCount("default")} 个，排除 deprecated + in-progress)（默认）`);
@@ -244,11 +273,13 @@ async function interactivePlain() {
     console.log(`  [3] 全部       (${setCount("all")} 个)`);
     const setAnswer = await ask("选择 [1-3]（回车=1）: ", ["1", "2", "3"], "1");
 
-    const target = { "1": "agents", "2": "claude", "3": "both" }[targetAnswer];
+    const target =
+      targetAnswer === "0" ? null
+        : { "1": "agents", "2": "claude", "3": "both", "4": "workbuddy", "5": "all" }[targetAnswer];
     const set = { "1": "default", "2": "progress", "3": "all" }[setAnswer];
-    const targetLabel = { agents: "~/.agents/skills", claude: "~/.claude/skills", both: "~/.agents/skills + ~/.claude/skills" }[target];
+    const targetKeys = resolveTargetKeys(target);
 
-    console.log(`\n即将把 ${setCount(set)} 个技能（${set} 档）junction 到 ${targetLabel}。`);
+    console.log(`\n即将把 ${setCount(set)} 个技能（${set} 档）junction 到 ${keysLabel(targetKeys)}。`);
     process.stdout.write("确认执行? [Y/n]: ");
     const confirm = (await nextLine()).trim().toLowerCase();
     if (confirm === "n" || confirm === "no") {
@@ -256,7 +287,7 @@ async function interactivePlain() {
       return 0;
     }
     console.log();
-    return runInstall({ target, set, dryRun: false, only: null, skillNames: null }) ? 1 : 0;
+    return runInstall({ target: targetKeys, set, dryRun: false, only: null, skillNames: null }) ? 1 : 0;
   } finally {
     rl.close();
   }
@@ -283,7 +314,7 @@ try {
     listMode(discoverRepoSkills());
     process.exit(0);
   }
-  const target = options.target ?? "both";
+  const target = options.target ?? null; // null = default: agents+claude+(workbuddy if detected)
   const set = options.set ?? "default";
   if (set !== "default" && (options.only || options.skillNames)) {
     console.warn("warning: --only / --skills 为显式选择，忽略 --set 套档排除（只动选中项，不做套装外清除）");

@@ -43,20 +43,22 @@ gemini-extension.json    # Gemini CLI 扩展清单
 
 ### 本机一键安装（junction 安装器）
 
-给**自己机器上的 agent** 用：双击仓库根的 `install-skills.cmd`（Windows）或 `install-skills.command`（macOS；git clone 直接可双击，zip 下载需先 `chmod +x`）进交互安装——真终端里是方向键 TUI（↑↓ 选择、回车取高亮推荐项：**两个目录都装 + default 档**、Ctrl-C 取消），管道/CI/哑终端自动回退纯文本菜单（每步回车=默认）。命令行等价：
+给**自己机器上的 agent** 用：双击仓库根的 `install-skills.cmd`（Windows）或 `install-skills.command`（macOS；git clone 直接可双击，zip 下载需先 `chmod +x`）进交互安装——真终端里是方向键 TUI（↑↓ 选择、回车取高亮推荐项：**默认目标 + default 档**、Ctrl-C 取消），管道/CI/哑终端自动回退纯文本菜单（每步回车=默认）。命令行等价：
 
 ```bash
-node scripts/install-skills.mjs --target both --set default
+node scripts/install-skills.mjs --set default   # 目标缺省 = agents + claude +（检测到时）workbuddy
 ```
 
-- `--target agents|claude|both`（默认 both）
+- `--target agents|claude|workbuddy|both|all` —— both=agents+claude（旧语义不变）；all=含 workbuddy 的全部目标；**缺省**为 agents + claude，另当 `~/.workbuddy/skills` 存在（说明装了 WorkBuddy）时自动附加 workbuddy
 - `--set default|progress|all` —— 三档套装：**default** 排除 deprecated + in-progress；**progress** 排除 deprecated；**all** 全装
 - `--only <分类>` / `--skills a,b,c` —— 显式选择，**绕过套档排除**（如 `--only deprecated`、`--skills cpu-monitor` 能选中 in-progress 里的技能）
 - `--dry-run` 只报告；`--list` 按分类列出技能与各套档是否包含
 
-每个技能一条 junction 指向 `skills/<分类>/<名字>/`，agent 直读工作区、永不漂移；**整档安装**（菜单或 `--set`）会把套装外的本仓旧链接一并收走（从 all 档切回 default 档时 deprecated/in-progress 链接自动清除），`--only` / `--skills` 则是外科手术式选择、只动选中项。已存在的真实目录先挪进 `skills-backup-<ts>/`；每次安装附带体检：清死链、报告异常项，lark-* 等外来链接不动。POSIX 下退化为普通 symlink。
+每个技能一条 junction 指向 `skills/<分类>/<名字>/`，agent 直读工作区、永不漂移；**整档安装**（菜单或 `--set`）会把套装外的本仓旧链接一并收走（从 all 档切回 default 档时 deprecated/in-progress 链接自动清除），`--only` / `--skills` 则是外科手术式选择、只动选中项。已存在的真实目录先挪进 `skills-backup-<ts>/`；每次安装附带体检：清死链、报告异常项，lark-* 等外来链接不动，WorkBuddy 的 `_bm_*.json`、Claude 的 `.trash` 等宿主自管文件不报不碰。POSIX 下退化为普通 symlink。
 
-卸载：双击 `uninstall-skills.cmd`（Windows）/ `uninstall-skills.command`（macOS）或 `npm run uninstall:skills`，删除目标里**所有**指向本仓 `skills/` 的链接（含历史上装的 deprecated/in-progress），外来项与真实目录不动。
+> **WorkBuddy 注意**：WorkBuddy 扫描器是否跟随 junction 未经官方文档保证（本机实测可用）。若安装后技能未出现在 WorkBuddy 里，改用 `--skills` 明确装一个技能验证；写回风险（WorkBuddy 向技能目录写元数据会经 junction 落到本仓工作树）已知，遇到脏文件 `git checkout` 即可。
+
+卸载：双击 `uninstall-skills.cmd`（Windows）/ `uninstall-skills.command`（macOS）或 `npm run uninstall:skills`，删除目标里**所有**指向本仓 `skills/` 的链接（含历史上装的 deprecated/in-progress），外来项与真实目录不动，目标选择语义与安装器一致。
 
 ### 平台插件安装
 

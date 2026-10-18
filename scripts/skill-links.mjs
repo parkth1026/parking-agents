@@ -72,6 +72,7 @@ import {
   statSync,
   symlinkSync,
 } from "node:fs";
+import { homedir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -86,6 +87,52 @@ export const SETS = {
   progress: ["deprecated"],
   all: [],
 };
+
+/**
+ * Installable targets. `agents` is the cross-client open-standard directory
+ * (Codex, Cursor, Gemini CLI, ... read it too); `claude` is Claude Code's
+ * own personal skills dir (Claude Code does NOT read ~/.agents/skills —
+ * verified against its 2.1.295 binary and official docs); `workbuddy` is the
+ * WorkBuddy desktop app's user skills dir.
+ */
+export const TARGET_DIRS = {
+  agents: () => join(homedir(), ".agents", "skills"),
+  claude: () => join(homedir(), ".claude", "skills"),
+  workbuddy: () => join(homedir(), ".workbuddy", "skills"),
+};
+
+/**
+ * workbuddy opts into the default only when the host actually uses it: the
+ * probe requires the skills dir itself, not just ~/.workbuddy, so a leftover
+ * ~/.workbuddy from an uninstalled WorkBuddy never drags the target in.
+ */
+export function workbuddyDetected() {
+  return existsSync(TARGET_DIRS.workbuddy());
+}
+
+/**
+ * Resolve the target selection:
+ *   "all"   every known target, workbuddy detected-or-not
+ *   "both"  agents + claude (historical meaning, kept for compatibility)
+ *   null    the default: agents + claude, plus workbuddy when detected
+ */
+export function resolveTargetKeys(requested) {
+  if (requested === "all") return Object.keys(TARGET_DIRS);
+  if (requested === "both") return ["agents", "claude"];
+  if (requested !== null && requested !== undefined) return [requested];
+  const keys = ["agents", "claude"];
+  if (workbuddyDetected()) keys.push("workbuddy");
+  return keys;
+}
+
+/**
+ * Entries a host keeps inside its skills dir for its own bookkeeping
+ * (WorkBuddy's _bm_*.json / .disable_*.json migration markers, Claude Code's
+ * .trash). Never installed over, never removed, never reported as anomalies.
+ */
+function isHostMetadata(name) {
+  return name.startsWith(".") || name.startsWith("_");
+}
 
 /** A directory holding SKILL.md is a skill; never descend past one. */
 export function discoverSkills(root) {
@@ -276,6 +323,7 @@ export function installSkills({
   const anomalies = [];
   for (const entry of readdirSync(target, { withFileTypes: true })) {
     if (byName.has(entry.name)) continue; // managed above
+    if (isHostMetadata(entry.name)) continue; // host bookkeeping (_bm_*.json, .trash) — invisible to us
     const entryPath = join(target, entry.name);
     try {
       const st = lstatSync(entryPath);
@@ -307,7 +355,7 @@ export function installSkills({
   }
 
   const foreign = readdirSync(target, { withFileTypes: true })
-    .filter((e) => !byName.has(e.name) && !removedNames.has(e.name))
+    .filter((e) => !byName.has(e.name) && !removedNames.has(e.name) && !isHostMetadata(e.name))
     .map((e) => e.name);
 
   const section = (title, rows) => {
@@ -376,6 +424,7 @@ export function uninstallSkills({ sources = repoSources, target, dryRun = false 
   const ownedRoots = sources.map((s) => normalizeLinkTarget(s));
 
   for (const entry of readdirSync(target, { withFileTypes: true })) {
+    if (isHostMetadata(entry.name)) continue; // host bookkeeping — never ours
     const entryPath = join(target, entry.name);
     try {
       if (!lstatSync(entryPath).isSymbolicLink()) continue; // never touch real entries
@@ -392,7 +441,7 @@ export function uninstallSkills({ sources = repoSources, target, dryRun = false 
   }
 
   const remaining = readdirSync(target, { withFileTypes: true })
-    .filter((e) => !removedNames.has(e.name))
+    .filter((e) => !removedNames.has(e.name) && !isHostMetadata(e.name))
     .map((e) => e.name);
 
   const backups = readdirSync(dirname(target)).filter((n) => /^skills-backup-/.test(n));

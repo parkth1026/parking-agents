@@ -35,7 +35,12 @@ import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { installSkills, normalizeLinkTarget, uninstallSkills } from "../../scripts/skill-links.mjs";
+import {
+  installSkills,
+  normalizeLinkTarget,
+  resolveTargetKeys,
+  uninstallSkills,
+} from "../../scripts/skill-links.mjs";
 
 const failures = [];
 const fail = (msg) => failures.push(msg);
@@ -46,6 +51,33 @@ const linkTarget = (p) => normalizeLinkTarget(readlinkSync(p));
 const isLink = (p) => lstatSync(p).isSymbolicLink();
 
 const root = mkdtempSync(join(tmpdir(), "install-skills-test-"));
+
+// --- resolveTargetKeys: selection semantics, no real home dirs touched ------
+// The default is environment-dependent (workbuddy detected or not), so only
+// assert its agents+claude base and that the optional third key is workbuddy.
+const defaultKeys = resolveTargetKeys(null);
+expect(
+  defaultKeys.slice(0, 2).join(",") === "agents,claude",
+  `default targets must start with agents,claude (got: ${defaultKeys.join(",")})`
+);
+expect(
+  defaultKeys.every((k) => ["agents", "claude", "workbuddy"].includes(k)),
+  `default targets contain an unknown key: ${defaultKeys.join(",")}`
+);
+expect(
+  resolveTargetKeys("both").join(",") === "agents,claude",
+  "both must stay agents+claude"
+);
+expect(
+  resolveTargetKeys("all").join(",") === "agents,claude,workbuddy",
+  `all must expand to every target (got: ${resolveTargetKeys("all").join(",")})`
+);
+for (const key of ["agents", "claude", "workbuddy"]) {
+  expect(
+    resolveTargetKeys(key).join(",") === key,
+    `explicit target '${key}' must resolve to itself`
+  );
+}
 
 try {
   // --- fixtures ---------------------------------------------------------------
@@ -81,6 +113,9 @@ try {
   // --- stage A: create / keep / repoint / convert + health pass ---------------
   const target = join(root, "target");
   mkdirSync(target, { recursive: true });
+  writeFileSync(join(target, "_bm_skillid_migration.json"), "{}"); // WorkBuddy marker
+  writeFileSync(join(target, ".disable_to_model.json"), "{}"); // WorkBuddy marker
+  mkdirSync(join(target, ".trash")); // Claude Code's trash dir
   symlinkSync(wfDevDir, join(target, "wf-dev"), "junction"); // already correct
   symlinkSync(join(src, "workflow", "gone"), join(target, "wf-stale"), "junction"); // wrong target
   mkdirSync(join(target, "eng-pub")); // real copy to convert
@@ -124,6 +159,23 @@ try {
   expect(!existsSync(join(target, "dead-link")), "dead-link still present after health pass");
   expect(existsSync(join(target, "loose.txt")), "loose.txt was touched (report only)");
   expect(existsSync(join(target, "empty-skill")), "empty-skill was touched (report only)");
+
+  // host bookkeeping markers must be invisible: not anomalies, not foreign,
+  // never touched (the loose-file count above stays 3 because of them).
+  expect(!result.anomalies.some((a) => a.startsWith("_bm_") || a.startsWith(".disable") || a.startsWith(".trash")),
+    `host metadata reported as anomaly: ${result.anomalies.join("; ")}`);
+  expect(!result.foreign.includes("_bm_skillid_migration.json") && !result.foreign.includes(".disable_to_model.json") && !result.foreign.includes(".trash"),
+    `host metadata listed as foreign: ${result.foreign.join(", ")}`);
+  expect(existsSync(join(target, "_bm_skillid_migration.json")), "WorkBuddy marker was touched");
+  expect(existsSync(join(target, ".disable_to_model.json")), "WorkBuddy marker was touched");
+  expect(existsSync(join(target, ".trash")), ".trash was touched");
+
+  // uninstall likewise never touches host metadata
+  const unMeta = uninstallSkills({ sources: [src], target, dryRun: true });
+  expect(
+    !unMeta.remaining.includes("_bm_skillid_migration.json") && !unMeta.remaining.includes(".trash"),
+    `uninstall listed host metadata as remaining: ${unMeta.remaining.join(", ")}`
+  );
 
   // --- stage B: set exclusion + out-of-set sweep --------------------------------
   const target2 = join(root, "target2");

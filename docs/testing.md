@@ -23,7 +23,7 @@ npm test
 | 文件 | 守住什么 |
 |---|---|
 | `test-skill-discovery.mjs` | `skills/` 树能被发现：递归到 `SKILL.md` 为止、category=第一段（matt-skills 子组归为 matt-skills）、frontmatter 可解析且 `name` 与目录名一致、套装排除的分类真实存在、`agents/openai.yaml` 命名正确、`.agents/skills/` 孵化位保持扁平、仓库根 `AGENTS.md` 存在（session-start 注入源） |
-| `test-install-skills.mjs` | junction 的全量语义（create/keep/repoint/convert）、三档套装排除、套装外清除、`--only` / `--skills` 绕过排除、跨分类同名 clash、卸载全清；同一段还调用 evals 入口夹具 |
+| `test-install-skills.mjs` | junction 的全量语义（create/keep/repoint/convert）、三档套装排除、套装外清除、`--only` / `--skills` 绕过排除、跨分类同名 clash、卸载全清、`resolveTargetKeys` 目标解析矩阵（缺省/both/all/显式，含 workbuddy 检测）、宿主自管文件（`_bm_*.json`、`.trash`）不报不碰；同一段还调用 evals 入口夹具 |
 | `test-run-evals.mjs` | evals 按名字在 `.agents/skills/` 与整个 `skills/` 树解析技能、`--list` 零成本盘点与真跑汇总、失败退出码的一致性 |
 | `test-no-tool-names.mjs` | **铁律一**：技能正文只写动作，不写任何 harness 的工具名 |
 

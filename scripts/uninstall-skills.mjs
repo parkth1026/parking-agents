@@ -7,7 +7,10 @@
  *   node scripts/uninstall-skills.mjs                    interactive TUI
  *                                                        (plain menu when not
  *                                                        a terminal)
- *   node scripts/uninstall-skills.mjs --target both      non-interactive (default)
+ *   node scripts/uninstall-skills.mjs --target all       non-interactive
+ *                                                        (default target =
+ *                                                        agents + claude +
+ *                                                        workbuddy-if-present)
  *   node scripts/uninstall-skills.mjs --target claude --dry-run
  *
  * Foreign links (lark-*), real directories, and loose files are never touched;
@@ -16,24 +19,37 @@
  * 1 failure, 2 usage error.
  */
 
-import { homedir } from "node:os";
-import { join } from "node:path";
 import readline from "node:readline/promises";
 import * as clack from "./vendor/clack-prompts.mjs";
-import { repoSources, uninstallSkills } from "./skill-links.mjs";
+import {
+  TARGET_DIRS,
+  repoSources,
+  resolveTargetKeys,
+  uninstallSkills,
+  workbuddyDetected,
+} from "./skill-links.mjs";
 
-const TARGETS = {
-  agents: () => join(homedir(), ".agents", "skills"),
-  claude: () => join(homedir(), ".claude", "skills"),
+const TARGETS = TARGET_DIRS;
+const TARGET_LABELS = {
+  agents: "~/.agents/skills",
+  claude: "~/.claude/skills",
+  workbuddy: "~/.workbuddy/skills",
 };
+const keysLabel = (keys) => keys.map((k) => TARGET_LABELS[k]).join(" + ");
 
 function usage() {
+  const wbNote = workbuddyDetected()
+    ? "检测到 ~/.workbuddy/skills —— 默认（不带 --target）会一并卸载"
+    : "未检测到 ~/.workbuddy/skills";
   console.log(`用法: node scripts/uninstall-skills.mjs [选项]
 
 不带参数进入交互卸载（真终端为方向键 clack TUI，回车取高亮推荐项；
-管道/CI/哑终端自动退回 plain 菜单，每步回车即默认）；带任意参数则纯非交互（默认 target=both）。
+管道/CI/哑终端自动退回 plain 菜单，每步回车即默认）；带任意参数则纯非交互。
+目标解析规则与安装器一致：缺省 = agents + claude +（检测到
+~/.workbuddy/skills 时附加 workbuddy）；当前机器：${wbNote}。
 
-  --target agents|claude|both   卸载目标（默认 both）
+  --target agents|claude|workbuddy|both|all   卸载目标（both=agents+claude；
+                                               all=含 workbuddy 的全部目标）
   --dry-run                     只报告，不改任何东西`);
 }
 
@@ -54,14 +70,15 @@ function parseArgs(argv) {
       throw new Error(`未知参数: ${arg}`);
     }
   }
-  if (options.target !== null && !["agents", "claude", "both"].includes(options.target)) {
-    throw new Error(`非法 --target '${options.target}'（可选: agents, claude, both）`);
+  const valid = [...Object.keys(TARGETS), "both", "all"];
+  if (options.target !== null && !valid.includes(options.target)) {
+    throw new Error(`非法 --target '${options.target}'（可选: ${valid.join(", ")}）`);
   }
   return options;
 }
 
 function runUninstall({ target, dryRun }) {
-  const targets = target === "both" ? ["agents", "claude"] : [target];
+  const targets = resolveTargetKeys(target);
   let failed = false;
   for (const key of targets) {
     if (targets.length > 1) console.log(`\n=== ${key} ===`);
@@ -79,27 +96,33 @@ async function interactive() {
 async function interactiveTui() {
   clack.intro("parking-agents 技能卸载器");
   clack.log.info("只删指向本仓 skills/ 的链接，lark-* 等外来项不动。");
+  const defaultKeys = resolveTargetKeys(null);
   const target = await clack.select({
     message: "卸载目标",
-    initialValue: "both",
+    initialValue: "default",
     options: [
-      { value: "both", label: "两个都卸（推荐）", hint: "~/.agents/skills + ~/.claude/skills" },
+      { value: "default", label: `默认（推荐）`, hint: keysLabel(defaultKeys) },
       { value: "agents", label: "只卸 ~/.agents/skills" },
       { value: "claude", label: "只卸 ~/.claude/skills" },
+      ...(workbuddyDetected()
+        ? [{ value: "workbuddy", label: "只卸 ~/.workbuddy/skills" }]
+        : []),
+      { value: "both", label: "agents + claude", hint: "不含 workbuddy" },
+      { value: "all", label: "全部目标", hint: keysLabel(Object.keys(TARGETS)) },
     ],
   });
   if (clack.isCancel(target)) {
     clack.cancel("已取消");
     return 0;
   }
-  const targetLabel = { agents: "~/.agents/skills", claude: "~/.claude/skills", both: "~/.agents/skills + ~/.claude/skills" }[target];
-  clack.note(`将删除 ${targetLabel} 里所有指向本仓 skills/ 的链接（外来项不动）。`, "卸载计划");
+  const targetKeys = resolveTargetKeys(target === "default" ? null : target);
+  clack.note(`将删除 ${keysLabel(targetKeys)} 里所有指向本仓 skills/ 的链接（外来项不动）。`, "卸载计划");
   const confirmed = await clack.confirm({ message: "确认执行?", initialValue: true });
   if (clack.isCancel(confirmed) || !confirmed) {
     clack.cancel("已取消，未做任何改动。");
     return 0;
   }
-  const failed = runUninstall({ target, dryRun: false });
+  const failed = runUninstall({ target: targetKeys, dryRun: false });
   clack.outro(failed ? "卸载结束：有失败项，见上方日志" : "卸载完成 ✓");
   return failed ? 1 : 0;
 }
@@ -137,14 +160,20 @@ async function interactivePlain() {
     }
   };
   try {
+    const defaultKeys = resolveTargetKeys(null);
     console.log("卸载目标:");
     console.log("  [1] ~/.agents/skills");
     console.log("  [2] ~/.claude/skills");
-    console.log("  [3] 两个都卸（默认）");
-    const answer = await ask("选择 [1-3]（回车=3）: ", ["1", "2", "3"], "3");
-    const target = { "1": "agents", "2": "claude", "3": "both" }[answer];
-    const targetLabel = { agents: "~/.agents/skills", claude: "~/.claude/skills", both: "~/.agents/skills + ~/.claude/skills" }[target];
-    console.log(`\n即将删除 ${targetLabel} 里所有指向本仓 skills/ 的链接（外来项不动）。`);
+    console.log("  [3] agents + claude（不含 workbuddy）");
+    console.log("  [4] 只卸 ~/.workbuddy/skills" + (workbuddyDetected() ? "" : "（未检测到）"));
+    console.log("  [5] 全部目标");
+    console.log("  [0] 默认 = " + keysLabel(defaultKeys) + "（回车）");
+    const answer = await ask("选择 [0-5]（回车=0）: ", ["0", "1", "2", "3", "4", "5"], "0");
+    const target =
+      answer === "0" ? null
+        : { "1": "agents", "2": "claude", "3": "both", "4": "workbuddy", "5": "all" }[answer];
+    const targetKeys = resolveTargetKeys(target);
+    console.log(`\n即将删除 ${keysLabel(targetKeys)} 里所有指向本仓 skills/ 的链接（外来项不动）。`);
     process.stdout.write("确认执行? [Y/n]: ");
     const confirm = (await nextLine()).trim().toLowerCase();
     if (confirm === "n" || confirm === "no") {
@@ -153,7 +182,7 @@ async function interactivePlain() {
     }
     rl.close();
     console.log();
-    return runUninstall({ target, dryRun: false }) ? 1 : 0;
+    return runUninstall({ target: targetKeys, dryRun: false }) ? 1 : 0;
   } finally {
     rl.close();
   }
@@ -174,7 +203,7 @@ try {
     usage();
     process.exit(0);
   }
-  const failed = runUninstall({ target: options.target ?? "both", dryRun: options.dryRun });
+  const failed = runUninstall({ target: options.target ?? null, dryRun: options.dryRun });
   process.exit(failed ? 1 : 0);
 } catch (error) {
   console.error(`ERROR: ${error.message}`);
