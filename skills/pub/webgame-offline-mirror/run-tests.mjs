@@ -73,6 +73,46 @@ rc = 0;
 try { run(["scripts/audit-closure.mjs"]); } catch (e) { rc = e.status; }
 check("audit: 缺 --mirror 报用法错(退出码 2)", rc === 2);
 
+// ---------- normalize.mjs: build-id-suffixed mini site ----------
+// hash 形态实测样本：含 '-' 的 hash（B-giygOW）、含 '_' 的（DpD8SOQ_）、
+// 语义短横 stem（cyrillic-600-Cd-lEtjQ）、两个 main-* 撞名、无 build-id 的
+// three chunk（只认 --rule）、真实资源名 type-electric.png（不得误伤）、
+// 裸 build id 数据字面量（不得重写）。
+const NORM = join(TMP, "norm");
+mkdirSync(join(NORM, "assets"), { recursive: true });
+writeFileSync(join(NORM, "index.html"),
+  `<script type=module src="./assets/main-B-giygOW-b1aa22.js"></script>` +
+  `<link rel=modulepreload href="./assets/i18n-Q1w2e3r4-b1aa22.js">`);
+writeFileSync(join(NORM, "assets", "main-B-giygOW-b1aa22.js"),
+  `import './main-CNPvahTq-b1aa22.js'; import './three-QAPlWxlR.js'; import('./zh-Zx9w8v7U-b1aa22.js'); const BUILD='b1aa22';`);
+writeFileSync(join(NORM, "assets", "main-CNPvahTq-b1aa22.js"), "export const app=1; // ref ./assets/hero-9zXy876A-b1aa22.png");
+writeFileSync(join(NORM, "assets", "i18n-Q1w2e3r4-b1aa22.js"), "export const i18n=1");
+writeFileSync(join(NORM, "assets", "zh-Zx9w8v7U-b1aa22.js"), "export const zh=1");
+writeFileSync(join(NORM, "assets", "cyrillic-600-Cd-lEtjQ-b1aa22.css"), "@font-face{src:url(./nunito-latin-800-DpD8SOQ_-b1aa22.woff2)}");
+for (const f of ["assets/three-QAPlWxlR.js", "assets/nunito-latin-800-DpD8SOQ_-b1aa22.woff2", "assets/hero-9zXy876A-b1aa22.png", "assets/type-electric.png"]) {
+  writeFileSync(join(NORM, f), Buffer.from("x"));
+}
+const normDry = run(["scripts/normalize.mjs", "--mirror", NORM, "--rule", "^three-[A-Za-z0-9_-]{8}\\.js$=three.js", "--dry"]);
+check("normalize: dry 自动探测 build id 与 hash 长度", /build id b1aa22, hash length 8/.test(normDry));
+check("normalize: dry 含 '-' 的 hash 剥净（→ main.js）", /main-B-giygOW-b1aa22\.js -> main\.js/.test(normDry));
+check("normalize: dry 撞名组 entry 保留、app 让位 main-2.js", /main-CNPvahTq-b1aa22\.js -> main-2\.js/.test(normDry));
+check("normalize: dry 语义短横 stem 不丢 weight", /Cd-lEtjQ-b1aa22\.css -> cyrillic-600\.css/.test(normDry));
+check("normalize: dry 不落盘", existsSync(join(NORM, "assets", "main-B-giygOW-b1aa22.js")));
+const normRun = run(["scripts/normalize.mjs", "--mirror", NORM, "--rule", "^three-[A-Za-z0-9_-]{8}\\.js$=three.js"]);
+check("normalize: 改名落地（main/three/zh/woff2/cyrillic）",
+  existsSync(join(NORM, "assets/main.js")) && existsSync(join(NORM, "assets/three.js")) &&
+  existsSync(join(NORM, "assets/zh.js")) && existsSync(join(NORM, "assets/nunito-latin-800.woff2")) &&
+  existsSync(join(NORM, "assets/cyrillic-600.css")));
+check("normalize: 真实资源名 type-electric.png 未被误伤", existsSync(join(NORM, "assets/type-electric.png")));
+check("normalize: 引用已重写（html/js/css）",
+  readFileSync(join(NORM, "index.html"), "utf8").includes("./assets/main.js") &&
+  readFileSync(join(NORM, "assets/main.js"), "utf8").includes("'./main-2.js'") &&
+  readFileSync(join(NORM, "assets/cyrillic-600.css"), "utf8").includes("nunito-latin-800.woff2"));
+check("normalize: 裸 build id 数据字面量保留", readFileSync(join(NORM, "assets/main.js"), "utf8").includes("const BUILD='b1aa22'"));
+check("normalize: 自检 roundtrip 零坏档", /roundtrip ok \d+ bad 0/.test(normRun));
+const normAgain = run(["scripts/normalize.mjs", "--mirror", NORM]);
+check("normalize: 幂等（二跑零改名零残留）", /no build-id suffixes detected/.test(normAgain) || /normalized 0 files/.test(normAgain));
+
 rmSync(TMP, { recursive: true, force: true });
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -21,7 +21,8 @@ description: 把线上网页游戏完整恢复成本地离线可运行的副本�
 第2层 家族全枚举 → 注册表抽取 / id 空间 / 词候选
 第3层 运行时录制回灌 → verify-offline.mjs 驱动录制
 第4层 后端本地化 → 录制形状 + patch + 本地实现
-第5层 三零终验 → --block-external 全流程
+第5层 文件名规范化 → normalize.mjs 去 hash 落盘（缓存+映射+roundtrip）
+第6层 三零终验 → --block-external 全流程（必须在规范化后的树上跑）
 ```
 
 三层抓取缺一不可：每层都独立命中过其他层永远找不到的文件。任何单层方案（wget/HTTrack/单跑闭包）对网页游戏都有系统性盲区。
@@ -67,13 +68,23 @@ node scripts/verify-offline.mjs --mirror ./mirror --flow flow.json
 
 完整流程见 [references/backend-mock.md](references/backend-mock.md)。要点：形状只录不猜（真实流量做蓝本）；patch 客户端 base 一处（备份 `.orig`）；闸门接口时效字段推到远未来；未实现的端点惰性应答而不是假成功；进度落库用事务。核心玩法在服务端的游戏（服务端权威/双向流）在此层判定不可行，向用户说明。
 
-## 第 5 层：三零终验
+## 第 5 层：文件名规范化
+
+```bash
+node scripts/normalize.mjs --mirror ./mirror --dry          # 先看计划
+node scripts/normalize.mjs --mirror ./mirror \
+  --rule '^three-[A-Za-z0-9_-]{8}\.js$=three.js'            # 无 build-id chunk 显式登记
+```
+
+Vite 产物的 `-hash-buildid` 后缀让每次版本更新全量改名。规范化剥成稳定语义名（`main.js`/`zh.js`）并重写字面量引用；server 原始字节进 `.mirror-cache/`、映射进 `rename-map.json`，脚本自检 roundtrip 与零残留。dry 先行：**无 build-id 的哈希名禁止模式识别**（会误伤 `never-melt-ice.png` 这类真实名），只认 build-id 锚定 + 显式 `--rule`。完整算法与陷阱见 [references/normalize.md](references/normalize.md)。
+
+## 第 6 层：三零终验
 
 ```bash
 node scripts/verify-offline.mjs --mirror ./mirror --block-external --flow flow.json --out verdict.json
 ```
 
-**必须屏蔽外网**：不屏蔽时缺失文件被线上静默补上，验证是假的。全流程（登录→菜单→对局→结算→刷新存档）跑通，三零 + 截图留证。交付 README 写清运行方式与更新流程（build id 变化时重跑管线）。
+**必须屏蔽外网**：不屏蔽时缺失文件被线上静默补上，验证是假的。全流程（登录→菜单→对局→结算→刷新存档）跑通，三零 + 截图留证。交付 README 写清运行方式与更新流程（build id 变化时重跑管线）。上游自身 404 的资产（客户端请求但原站也 404）不是镜像缺口：探测确认后进终验豁免集，详见 normalize.md「上游 404」。
 
 ## 何时读哪个文件
 
@@ -81,8 +92,9 @@ node scripts/verify-offline.mjs --mirror ./mirror --block-external --flow flow.j
 | --- | --- |
 | references/engine-playbooks.md | 第 0 层，识别引擎后看对应资产模式与策略 |
 | references/methodology.md | 开始前通读；每层的收敛判据与细节 |
-| references/pitfalls.md | 抓取/验证结果异常时对号入座；14 条实测坑 |
+| references/pitfalls.md | 抓取/验证结果异常时对号入座；17 条实测坑 |
 | references/backend-mock.md | 确认有后端时；客户端分析方法与实现分级 |
+| references/normalize.md | 第 5 层规范化；normalize.mjs 计划/自检异常时 |
 
 ## 测试
 

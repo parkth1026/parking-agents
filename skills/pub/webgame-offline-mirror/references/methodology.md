@@ -1,4 +1,4 @@
-# 方法论：三层抓取 + 后端本地化 + 三零终验
+# 方法论：三层抓取 + 后端本地化 + 文件名规范化 + 三零终验
 
 任何单层抓取都有系统性盲区。三层各自独立命中过其他层永远找不到的文件，缺一不可。
 
@@ -38,10 +38,14 @@
 
 见 backend-mock.md。核心：录制真实流量做形状蓝本，patch 客户端 base 指向本地，本地服务按录制形状应答，进度落库。
 
-## 第 5 层：三零终验
+## 第 5 层：文件名规范化
+
+`scripts/normalize.mjs`：把 `-hash-buildid` 后缀的产物名剥成稳定语义名并重写字面量引用（幂等，dry 先行）。动机与算法细节见 normalize.md；三要点：无 build-id 哈希名只认显式 `--rule`（防误伤真实资源名）、server 原始字节进 cache + 映射表入库（roundtrip 可审计）、cache busting 转移到服务端 `Cache-Control: no-cache`。终验必须在其后跑。
+
+## 第 6 层：三零终验
 
 `verify-offline.mjs --block-external`：网络层阻断一切外部请求，全流程（登录→主菜单→对局→结算→刷新）。三零 = 零 404 / 零外网请求 / 零 console 错误。截图留证。**「看起来能跑」不算数**——不屏蔽外网时，缺的文件会被线上静默补上，验证就是假的。
 
 ## 交付物清单
 
-镜像目录 + 本地服务（含 mock 后端）+ 三零报告 + 截图 + README（运行方式/更新流程/已知边界）。更新流程：重跑 mirror → audit → patch → verify；build id 变化时更新参数。
+镜像目录 + 本地服务（含 mock 后端）+ 三零报告 + 截图 + README（运行方式/更新流程/已知边界）。更新流程：重跑 mirror → audit → patch → normalize → verify；build id 变化时更新参数。

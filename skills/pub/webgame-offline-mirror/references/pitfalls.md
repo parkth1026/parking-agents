@@ -40,3 +40,11 @@
 **12.（Unity WebGL）**：入口 `.loader.js` → `.data` + `.wasm` + StreamingAssets；URL 由 loader 计算，闭包抓不全时优先运行时录制。
 **13.（Godot 4 web）**：`index.pck` 单文件打包了几乎全部资源，抓到 pck 就抓到 90%；pck 内资源不需要单独镜像。
 **14.（Phaser/PixiJS）**：图集 atlas JSON 引用 png 是相对路径且常无引号（JSON 键），抓完 atlas 后解析其 `image`/`meta.image` 字段。
+
+## 文件名规范化类（详见 normalize.md）
+
+**15.（通用）无 build-id 的哈希名禁止模式识别**：`-([A-Za-z0-9_-]{8})\.ext` 形模式会命中真实资源名（实测误伤 `never-melt-ice.png`、`type-electric.png`、`map-freeball.png`）。只有 build-id 锚定的切分才安全；无 build-id 的哈希 chunk（如 vendor 包）只认显式 `--rule`，dry-scan 先验证改名计划。
+
+**16.（通用）stem/hash 切分三要素**：剥 `-hash-buildid` 后缀时，**build id 锚定 + stem 惰性 + hash 精确长度**缺一不可（各错出过一种产物）：贪心 stem 把含 `-` 的 hash 劈开泄漏（`main-B-giygOW-…` → `main-B.js`）；变长 hash 把语义段吞掉（`cyrillic-600-Cd-lEtjQ-…` → 丢 weight 撞名）。hash 长度 = 全部后缀文件里 hash run 的最小值。
+
+**17.（通用）改名的三个配套不能省**：① cache busting 从文件名转移到服务端响应头（`Cache-Control: no-cache`），否则浏览器永久用旧缓存；② server 原始字节留 cache + 映射表入库，roundtrip 自检保证「site ≡ rewrite(cache)」；③ 裸 build id 字符串（版本漂移检测、`?v=` fallback）是数据不是文件引用，残留检查只认文件名形状，别把它们重写掉。
