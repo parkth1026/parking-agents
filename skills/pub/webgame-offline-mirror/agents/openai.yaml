@@ -1,0 +1,7 @@
+interface:
+  display_name: "webgame-offline-mirror"
+  short_description: "Create and use the Webgame Offline Mirror skill"
+  default_prompt: "Use $webgame-offline-mirror to handle a Webgame Offline Mirror task."
+
+policy:
+  allow_implicit_invocation: true
