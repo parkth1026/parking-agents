@@ -906,6 +906,10 @@ function cmdFinalize(argv) {
     // 重新走完全部闸门的这份 validation 是现行的，打回标记随之解除。
     delete m.validation.stale;
     delete m.validation.stale_reason;
+  } else {
+    // 失败分支同步提示：否则 status 残留 ready、next_action 还是旧的「发给执行 Agent」，
+    // list 裸显 ready 误导交接（2026-10-20 语料：done 后修订、重 finalize 失败的场景）。
+    m.next_action = `finalize 未通过：按上方失败项修正契约后重跑。契约：${cpath}`;
   }
   writeManifest(dir, m);
   return failed ? 1 : 0;
@@ -918,7 +922,9 @@ function cmdFinalize(argv) {
 function contractStaleNote(dir, m) {
   if (!m.validation || !m.validation.status) return '';
   if (m.validation.stale) return '⚠已打回待修订';
-  if (m.validation.status !== 'valid') return '';
+  // 非 valid（含 invalid）也要可见：否则残留 ready 在列表里裸奔（与 finalize 失败分支的
+  // next_action 修复同案）。
+  if (m.validation.status !== 'valid') return '⚠finalize未通过';
   const limit = Date.parse(m.validation.ran_at) + 2000;
   const cdir = join(dir, '3-contract');
   if (!existsSync(cdir)) return '';

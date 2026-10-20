@@ -35,6 +35,15 @@ node <skill-dir>/scripts/session.mjs init <date>-<任务词组>
 `manifest.json` 是这个目录的状态与入口。**它只由 `session.mjs` 写**，任何技能、任何
 subagent 都不许用 Edit/Write 直接改它。
 
+### 目录归属：随 Target 仓走
+
+issue 目录是不可拆分的治理单元（契约相对引用 + 底本快照 + dossier 依赖共同锁定其结构），
+最终落在契约 Target 集合内的仓。init 通常在任务发起的相关仓跑——Target 要到访谈里才
+定型；3-contract 落盘前核对一次宿主仓是否属于 Target 集合，不属于则整体迁移（同盘 mv
+保 mtime），残留旧副本以 revert 或删除 commit 清除——双份即双事实源。Supersedes 引用
+与底本快照的来源路径保持指向旧仓绝对路径，不随迁移改写。
+（2026-10-20 owner 裁决；实践先例：2026-10-20-rust-monorepo-manager-worker 迁移新仓）
+
 ## 怎么流转
 
 1. 从用户请求派生 slug，跑 `init`，拿到 issue 目录与当前阶段。
@@ -75,6 +84,20 @@ subagent 都不许用 Edit/Write 直接改它。
 撤掉 `ready`、把 validation 标为 stale、清掉该阶段的 closed_at——旧结论不再代表
 当前状态；重新 finalize 过全部闸门后 stale 才解除，且打回后没改过契约就想重新
 finalize 会被当场拒。
+
+## done 之后的自愿复审环
+
+done 不是复审终点：交接前（或执行期任何时点）用户要求对抗式复审契约时，走**直接路径**，
+不报 needs_reinterview（它会重置 1-interview，对纯契约修订副作用过重）：
+
+1. 修订 contract.md（Updated 行记版本与理由），rounds 落一行，triggered_by 指向审查产物；
+2. 重跑 finalize；过了再重跑 stage done。
+
+护栏与已知语义：状态机不保留第一版痕迹，修订史考据点 = rounds + 契约 Updated 行（契约
+草稿存档见 aes-goal-contract 的 drafts 惯例）；`list` 显示「⚠契约改动晚于finalize」时
+禁止交接，先走完 1–2；**实现开始后慎重重跑 finalize**——它会覆写 verify.txt（「实现前
+全红」证据），重跑前确认该证据已进 git 或已另存。
+（2026-10-20 owner 裁决；实践先例：2026-10-20-rust-monorepo 契约 v1→v2 三路审查 18 处修订）
 
 ## 终态报告
 
