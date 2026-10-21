@@ -108,6 +108,7 @@ try {
   // 场景二：finalize 通过后（手改 manifest.validation 模拟）——契约节投影进 final 视图。
   const manifestPath = join(dir, 'manifest.json');
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+  manifest.status = 'ready';
   manifest.validation = { status: 'valid', ac_count: 1, warnings: [], ran_at: new Date().toISOString() };
   writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
   const after = run(EXPORT, '--issue-dir', dir);
@@ -123,11 +124,13 @@ try {
   //   manifest 用带/不带扩展名混写的确认名（与 session.mjs 口径一致）；diagram-detail 在盘上但未确认；
   //   contract.md 含围栏代码里的假标题与带 \| 的表格；--output 指到 issue 之外两层的目录。
   mkdirSync(join(dir, '2-prototype'), { recursive: true });
+  writeFileSync(join(dir, '2-prototype', 'shape.svg'), '<svg/>', 'utf8');
+  writeFileSync(join(dir, '2-prototype', 'model.json'), '{}', 'utf8');
   writeFileSync(join(dir, '2-prototype', 'mock.html'), '<!doctype html><title>mock</title><p>mock</p>', 'utf8');
   writeFileSync(join(dir, '2-prototype', 'diagram-detail.html'), '<!doctype html><title>detail</title>', 'utf8');
   writeFileSync(join(dir, '2-prototype', 'behavior.md'), '# 行为\n\n| 输入 | 行为 |\n|-|-|\n| a \\| b | `x \\| y` |\n', 'utf8');
   const withPrototype = JSON.parse(readFileSync(manifestPath, 'utf8'));
-  withPrototype.stage_gates = { ...(withPrototype.stage_gates ?? {}), '2-prototype': { status: 'done', artifacts_confirmed: ['mock', 'Behavior.md'] } };
+  withPrototype.stage_gates = { ...(withPrototype.stage_gates ?? {}), '2-prototype': { status: 'done', artifacts_confirmed: ['mock', 'Behavior.md', 'shape.svg', 'model.json'] } };
   writeFileSync(manifestPath, `${JSON.stringify(withPrototype, null, 2)}\n`, 'utf8');
   writeFileSync(join(dir, '3-contract', 'contract.md'), [
     '# 目标契约', '',
@@ -149,6 +152,28 @@ try {
     '缺相对路径 iframe');
   check('export/表格渲染且 \\| 是字面管道',
     thirdHtml.includes('<td>a | b</td>') && thirdHtml.includes('<td><code>x | y</code></td>'), '表格单元格不对');
+
+  const thirdData = JSON.parse(thirdHtml.match(/<script type="application\/json" id="decision-dossier-data">([\s\S]*?)<\/script>/)[1]);
+  check('export/SVG与JSON确认状态按实际文件保留',
+    ['shape.svg','model.json'].every(name=>thirdData.prototype.artifacts.some(a=>a.path.endsWith('/'+name)&&a.confirmed)));
+  const minimal = run(SESSION,'init','minimal-export','--request','只保留目标与验收，格式由Agent决定');
+  check('export/最小任务入口可创建',minimal.status===0);
+  const minDir=join(ROOT,'.aes-workflow','grilling','minimal-export');
+  const cp=join(minDir,'3-contract','contract.md');
+  writeFileSync(cp,'## 目标\n\n已经授权的可观察目标。\n\n## 验收条件\n\n- AC-003: 一个能够复核的明确交付结果\n  - Verify: [D] 检查实际交付文件的具体内容\n');
+  run(SESSION,'stage',minDir,'1-interview','done');
+  run(SESSION,'stage',minDir,'2-prototype','done');
+  check('export/最小契约机器校验通过',run(SESSION,'finalize',minDir).status===0);
+  const readExport=()=>{
+    const r=run(EXPORT,'--issue-dir',minDir);
+    const html=readFileSync(JSON.parse(r.stdout).path,'utf8');
+    return JSON.parse(html.match(/<script type="application\/json" id="decision-dossier-data">([\s\S]*?)<\/script>/)[1]);
+  };
+  check('export/机器valid不变成用户已确认',readExport().status!=='contract');
+  run(SESSION,'stage',minDir,'3-contract','done');
+  check('export/无需context也能交接并保留原始请求',readExport().status==='contract' && readExport().state.opening.includes('格式由Agent决定'));
+  writeFileSync(cp,readFileSync(cp,'utf8').replace('已经授权','未经重新校验'));
+  check('export/同秒修改后不投影为当前正式契约',readExport().status!=='contract' && !readExport().state.final);
   const tocTitles = [...thirdHtml.matchAll(/<a href="#contract-section-(\d+)">([^<]*)<\/a>/g)].map((m) => `${m[1]}:${m[2]}`);
   const headingIds = [...thirdHtml.matchAll(/<h3 id="contract-section-(\d+)">([^<]*)<\/h3>/g)].map((m) => `${m[1]}:${m[2]}`);
   check('export/目录与正文锚点一一对应，围栏代码里的 ## 不计',

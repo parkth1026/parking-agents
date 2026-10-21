@@ -333,6 +333,16 @@ export function masterClaim(options = {}) {
       return { ok: true, outcome: 'ALREADY_CLAIMED', jobId, state: existing.state, idempotent: true };
     }
 
+    // 新正文绑定或契约修订可改变 jobId，但不能让同一 Issue 出现第二个活跃 owner。
+    // 保留旧任务与证据，恢复/重派仍走已有生命周期，不在 claim 时迁移记录。
+    const activeIssue = Object.values(registry.jobs).find((job) => job.repo === issue.repo
+      && job.issue === issue.number && !['closed', 'abandoned'].includes(job.state));
+    if (activeIssue) {
+      return { ok: false, code: 'ISSUE_ALREADY_ACTIVE_WITH_OTHER_CONTRACT', jobId: activeIssue.jobId,
+        state: activeIssue.state, workerFailure: false,
+        message: '同一 Issue 仍有活跃工单；恢复既有 job，或按既有生命周期完成契约修订与重派。旧摘要和证据未改写。' };
+    }
+
     const free = Object.values(registry.runners).filter((runner) => runner.claimable);
     if (!free.length) {
       // E2: 所有 slot 不可用时不 claim，输出每个 slot 的原因和恢复命令，不标 complete。

@@ -1,5 +1,14 @@
 # Web 回合协议
 
+## 人工 follow-up 主路径
+
+发布后结束模型回合，不启动模型等待器。用户提交后页面显示 persisted，并提示回当前
+会话输入“请继续”；下一回合先扫描并吸收持久提交，成功后才标 consumed。server 保活
+交互入口，不保活 Agent；未取得明确宿主 authority 时不承诺自动续接。
+
+- Node 不可用 → 纯文本：沿 workflow-interview 完成同一目标与验收职责。
+- 浏览器不可用 → 纯文本：保留已有记录，不降低用户确认的要求。
+
 ## 目录与命令
 
 所有运行状态都在 `<issue>/web/`：
@@ -178,7 +187,7 @@ transport 的顺序固定为：建立 `<issue>/web/submissions/` watch → 立�
 `multi_select` 的数量边界写作 `min`/`max`（如上表与示例）；`publish` 接受这两个名字，
 落盘时统一正规化为 `min_selections`/`max_selections`，两者同时给出且不一致会被拒绝。
 `boolean` 不给 `options` 时用 `true_label`/`false_label` 做按钮文案（缺省 是/否）；
-给 `options` 则必须恰好两项。除 `single_select` 外，其他响应类型的选项都不要求 `pct`。
+给 `options` 则必须恰好两项。所有响应类型的选项都不要求 `pct`。
 
 多选示例：
 
@@ -196,11 +205,10 @@ transport 的顺序固定为：建立 `<issue>/web/submissions/` watch → 立�
 ```
 
 `multi_select` 的每个候选都在题目自己的固定详情表中占一行；选择只改变行状态，不改变该题
-高度。`exclusive_keys` 与其他选项互斥。`q_id` 在 round 内唯一。只有 `single_select` 要求 pct
-和落在 100±2；其他响应类型不要求概率。默认项未显式翻掉时提交为 `accept`；ask 与 confirm
+高度。`exclusive_keys` 与其他选项互斥。`q_id` 在 round 内唯一。所有类型的 pct 均可省略，保留时只校验数值格式，不校验加和。历史数值原样保留。默认项未显式翻掉时提交为 `accept`；ask 与 confirm
 是必答，除非 ask 明写 `required:false`。
 
-契约视图把 `round.view` 设成 `"contract"`，并增加 `final`。`final.round` 指向该 round：
+需要展示契约候选时，把 `round.view` 设成 `"contract"`，并增加 `final`。`final.round` 指向该 round：
 
 ```json
 {

@@ -137,3 +137,9 @@ WS 基础形态与本地视觉 companion 的早期参考来自 Jesse Vincent 的
 | 2026-08-23 | 把页面提升为 Goal Contract 全流程决策档案：新增九类结构化回答、多选固定解释表、canonical server 投影、摘要链 ledger、完整轨迹视图与自包含静态导出。 | 从“交互结束后只剩摘要”升级为可独立审计的需求轨迹；协议 schema v2 保持 v1 单选兼容 | 共享 dossier 投影已抽到 `scripts/lib/dossier.mjs`；仍属本技能内部，不拆新技能。 |
 | 2026-08-23 | 修复 issue #1/#2：pct 只对 single_select 强制；multi_select 接受文档 `min`/`max` 并在发布时正规化为 `min_selections`；boolean 支持 `true_label`/`false_label` 无 options 形态；sticky 端口迁入 `<issue>/web/.last-port`，不再向 issue 目录外写 `.aes-workflow`。 | 回归 16/16；按协议文档构造的 round 发布、边界强制、提交、导出全链复测通过 | 不改变。 |
 | 2026-08-24 | 首跑触发评测并沉淀题库与成绩：21 条 query（10 正 11 负，负例以 near-miss 为主）× 3 探针，同宿主 GLM-5.3 独立单轮会话；train/test 均 1.00 触发、0.00 误触发，description 无需迭代。 | 触发面首次有据；结构审查信号 4（误触发集中）由无数据变为不命中——零误触发 | 拆 transport 建议维持仅建议、用户未裁定；触发题库已定稿不再改。 |
+
+## 2026-10-21 方法自主权修订
+
+Web 继续保障持久提交、明确确认、幂等吸收和可恢复状态。问题不要求偏好概率，历史 pct 原样保留；是否出原型、采用何种载体和是否需要额外确认，由目标与已有授权决定。固定界面布局不作为访谈方法要求。
+
+家族与 Web 目前分别维护投影适配；本轮同步协议兼容，不以文档声称两份实现已合并。无需 context 或完整过程材料也能提交和导出；不以文件存在推断用户确认。

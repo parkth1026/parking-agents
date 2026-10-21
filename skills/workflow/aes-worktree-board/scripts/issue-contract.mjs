@@ -210,6 +210,7 @@ export function parseIssueContract(issue) {
     invalid,
     contract: {
       goal,
+      ...(typeof issue?.body === 'string' && issue.body.trim() ? { sourceBody: issue.body } : {}),
       workflowRole,
       acceptanceCriteria: acceptanceCriteria || [],
       dependencies: Array.isArray(contract.dependencies) ? contract.dependencies : [],
@@ -221,11 +222,15 @@ export function parseIssueContract(issue) {
   };
 }
 
-// contractDigest 绑定 AC 与副作用边界的精确内容。Issue 正文改动使 digest 变化，
+// contractDigest 绑定目标、AC 与副作用边界。新传递的正文快照也参与绑定，
+// 防止背景、范围或强约束变化却复用同一摘要；没有正文的旧输入保持原有摘要形状。
+// 绑定正文不表示其中每句叙述都是已确认要求。
+// Issue 正文改动使 digest 变化，
 // 从而使旧 review/QA 的 spec 轴证据失效 —— 与 candidate commit 前进同样的失效语义。
 export function contractDigestOf(parsed) {
   return digestOf({
     goal: parsed.contract.goal,
+    ...(parsed.contract.sourceBody === undefined ? {} : { sourceBody: parsed.contract.sourceBody }),
     workflowRole: parsed.contract.workflowRole,
     acceptanceCriteria: parsed.contract.acceptanceCriteria.map((ac) => ({ id: ac.id, text: ac.text, evidenceClass: ac.evidenceClass })),
     dependencies: parsed.contract.dependencies,
@@ -280,6 +285,10 @@ export function buildWorkOrder({
       url: issue.url,
       title: issue.title,
       contractDigest,
+      goal: parsed.contract.goal,
+      // 随工单携带已有上下文，避免 worker 必须新增网络授权才能理解背景与范围。
+      // 正文仍需区分已确认要求与建议，不把所有叙述自动升级为 AC。
+      ...(parsed.contract.sourceBody === undefined ? {} : { sourceBody: parsed.contract.sourceBody }),
       workflowRole: parsed.contract.workflowRole,
       executionPolicy: parsed.contract.executionPolicy,
       acceptanceCriteria: parsed.contract.acceptanceCriteria,

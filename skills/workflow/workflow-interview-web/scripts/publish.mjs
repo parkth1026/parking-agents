@@ -110,23 +110,17 @@ function validateResponse(at, item, errors) {
   if (OPTION_RESPONSE_TYPES.has(type) && !booleanLabelForm) {
     if (!Array.isArray(item.options) || item.options.length < 2) errors.push(`${at}.options 至少两项。`);
     const keys = new Set();
-    let total = 0;
-    let shapeValid = true;
     for (const [optionIndex, option] of (item.options ?? []).entries()) {
       if (!nonEmpty(option?.key) || !nonEmpty(option?.text)) {
         errors.push(`${at}.options[${optionIndex}] 要有 key 和 text。`);
-        shapeValid = false;
         continue;
       }
-      if (type === 'single_select' && !Number.isFinite(option?.pct)) {
+      if (option.pct !== undefined && !Number.isFinite(option.pct)) {
         errors.push(`${at}.options[${optionIndex}].pct 要是数字。`);
-        shapeValid = false;
       }
       if (keys.has(option.key)) errors.push(`${at}.options key 重复：${option.key}。`);
       keys.add(option.key);
-      if (Number.isFinite(option.pct)) total += option.pct;
     }
-    if (shapeValid && type === 'single_select' && Math.abs(total - 100) > 2) errors.push(`${at}.options 的 pct 加和是 ${total}，必须在 100±2。`);
     if (type === 'boolean' && item.options?.length !== 2) errors.push(`${at}.boolean 必须正好两个 options。`);
     if (type === 'multi_select') {
       const min = item.response?.min_selections ?? (item.required === false ? 0 : 1);
@@ -204,7 +198,7 @@ function defaultPhases(stage) {
   return STAGES.map((id, index) => ({
     id,
     label: labels[index],
-    status: index < activeIndex ? 'done' : index === activeIndex ? 'active' : 'pending',
+    status: index === activeIndex ? 'active' : 'pending',
   }));
 }
 

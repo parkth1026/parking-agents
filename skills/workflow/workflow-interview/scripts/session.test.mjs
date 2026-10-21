@@ -100,289 +100,91 @@ const askRow = (pcts) => JSON.stringify({
   options: pcts.map((pct, i) => ({ key: String.fromCharCode(97 + i), text: `选项${i}`, pct })),
 });
 
-// ─────────────────────────────── round：行级 schema ───────────────────────────────
-
+// 问答结构继续校验；偏好概率不再必填或强制加和。
 {
   const dir = mkIssue();
-  expect('round/default 合法行落盘', run('round', dir, ROUND_OK), 0, 'appended');
-  expect('round/default 缺 item 拒收', run('round', dir, JSON.stringify({ stage: '1-interview', round: 1, tier: 'default' })), 1, 'item');
-  expect('round/tier 非法拒收', run('round', dir, JSON.stringify({ stage: '1-interview', round: 1, tier: 'guess', item: 'x' })), 1, 'tier');
-  expect('round/缺 stage 拒收', run('round', dir, JSON.stringify({ round: 1, tier: 'default', item: 'x' })), 1, 'stage');
-  expect('round/非法 JSON 用法错', run('round', dir, '{oops'), 2, '不是合法 JSON');
-  expect('round/ask 缺 question 拒收', run('round', dir, JSON.stringify({ stage: '1-interview', round: 1, tier: 'ask' })), 1, 'question');
-  expect('round/ask options 空数组拒收', run('round', dir, JSON.stringify({ stage: '1-interview', round: 1, tier: 'ask', question: 'q', options: [] })), 1, '非空数组');
-  expect('round/ask option 缺 pct 拒收', run('round', dir, JSON.stringify({ stage: '1-interview', round: 1, tier: 'ask', question: 'q', options: [{ key: 'a', text: 'x' }] })), 1, 'pct');
-  expect('round/pct 加和 97 超容差拒收', run('round', dir, askRow([50, 30, 17])), 1, '100±2');
-  expect('round/pct 加和 99 容差内放行', run('round', dir, askRow([33, 33, 33])), 0, 'appended');
-  expect('round/pct 加和 100 放行', run('round', dir, askRow([60, 40])), 0, 'appended');
-  expect('round/pct 加和 103 超容差拒收', run('round', dir, askRow([60, 43])), 1, '100±2');
-}
-
-// ─────────────────────── round：response 结构化应答 ───────────────────────
-
-{
-  const dir = mkIssue();
-  const multiRow = (response, options) => JSON.stringify({
-    stage: '1-interview', round: 1, tier: 'ask', question: '覆盖哪些范围？',
-    response, options,
-  });
-  const noPctOptions = [
-    { key: 'A', text: '任务原文', covers: '保留目标语境' },
-    { key: 'B', text: '全部决策', pros: ['可复盘'] },
-    { key: 'C', text: '只留摘要', cons: ['无法解释为什么'] },
-  ];
-  // 多选选项是候选集合不是互斥概率：不带 pct 必须能落进家族真源（与 web 发布 schema 同口径）。
-  expect('round/multi_select 无 pct 放行',
-    run('round', dir, multiRow({ type: 'multi_select', min: 1, max: 2 }, noPctOptions)), 0, 'appended');
-  {
-    const line = readFileSync(join(dir, '1-interview', 'rounds.jsonl'), 'utf8').trim().split(/\r?\n/).pop();
-    const obj = JSON.parse(line);
-    check('round/min/max 别名正规化为 min_selections/max_selections',
-      obj.response.min_selections === 1 && obj.response.max_selections === 2
-      && obj.response.min === undefined && obj.response.max === undefined,
-      JSON.stringify(obj.response));
-  }
-  expect('round/min 与 min_selections 冲突拒收',
-    run('round', dir, multiRow({ type: 'multi_select', min: 1, min_selections: 2, max_selections: 2 }, noPctOptions)), 1, '不一致');
-  expect('round/response.type 未知拒收',
-    run('round', dir, multiRow({ type: 'dropdown' }, noPctOptions)), 1, 'response.type');
-  expect('round/response 非对象拒收',
-    run('round', dir, multiRow('multi_select', noPctOptions)), 1, 'response 要是对象');
-  expect('round/single_select 显式声明仍强制 pct',
-    run('round', dir, multiRow({ type: 'single_select' }, noPctOptions)), 1, 'pct');
-  expect('round/multi_select 选项缺 key 拒收',
-    run('round', dir, multiRow({ type: 'multi_select' }, [{ text: '没 key' }])), 1, 'key');
-  expect('round/multi_select 选项 pct 非数字拒收',
-    run('round', dir, multiRow({ type: 'multi_select' }, [{ key: 'A', text: 'x', pct: '高' }])), 1, 'pct');
-  // 无 response 缺省 single_select：老规则原样生效，防止本次放宽把单选闸门一起放掉。
-  expect('round/无 response 缺省单选仍强制 pct',
-    run('round', dir, JSON.stringify({ stage: '1-interview', round: 1, tier: 'ask', question: 'q', options: noPctOptions })), 1, 'pct');
-}
-
-// ─────────────────────────────── stage：参数校验 ───────────────────────────────
-
-{
-  const dir = mkIssue();
-  expect('stage/非法阶段名用法错', run('stage', dir, '9-nope', 'done'), 2, '阶段名');
-  expect('stage/非法状态用法错', run('stage', dir, '1-interview', 'perfect'), 2, '状态');
-}
-
-// ─────────────────────────────── 1-interview done 闸门 ───────────────────────────────
-
-{
-  const dir = mkIssue();
-  expect('gate1/空目录报 done 拒收', doneInterview(dir), 1, 'context.md 不存在');
-  check('gate1/拒收后 manifest 未被写入', manifest(dir).stage_gates['1-interview'].status === 'pending',
-    `status=${manifest(dir).stage_gates['1-interview'].status}`);
+  expect('round/default 合法行落盘', run('round', dir, ROUND_OK), 0);
+  expect('round/default 缺 item 拒收', run('round', dir, JSON.stringify({stage:'1-interview', round:1, tier:'default'})), 1, 'item');
+  expect('round/未知 stage 拒收', run('round', dir, JSON.stringify({stage:'unknown', round:1, tier:'default', item:'x'})), 1);
+  expect('round/未知 tier 拒收', run('round', dir, JSON.stringify({stage:'1-interview', round:1, tier:'guess', item:'x'})), 1);
+  expect('round/非法 JSON 拒收', run('round', dir, '{oops'), 2);
+  expect('round/ask 缺 question 拒收', run('round', dir, JSON.stringify({stage:'1-interview', round:1, tier:'ask'})), 1);
+  expect('round/空 options 拒收', run('round', dir, JSON.stringify({stage:'1-interview', round:1, tier:'ask', question:'q', options:[]})), 1);
+  const row = {stage:'1-interview', round:1, tier:'ask', question:'选哪个？', options:[{key:'A', text:'甲'}, {key:'B', text:'乙'}]};
+  expect('round/单选不必填 pct', run('round', dir, JSON.stringify(row)), 0);
+  expect('round/显式单选不必填 pct', run('round', dir, JSON.stringify({...row, response:{type:'single_select'}})), 0);
+  expect('round/历史非百分之百分布继续可读', run('round', dir, askRow([50,30,17])), 0);
+  expect('round/已有百分比原样保留', run('round', dir, askRow([50,30,20])), 0);
+  const saved = readFileSync(join(dir,'1-interview','rounds.jsonl'),'utf8');
+  check('round/历史数值不被重算', saved.includes('"pct":17') && saved.includes('"pct":20'));
+  expect('round/可选 pct 非数字仍拒收', run('round', dir, JSON.stringify({...row, options:[{key:'A',text:'甲',pct:'x'}]})), 1, 'pct');
+  expect('round/未知应答类型拒收', run('round', dir, JSON.stringify({...row,response:{type:'invalid'}})), 1);
+  expect('round/应答类型对象无效拒收', run('round', dir, JSON.stringify({...row,response:[]})), 1);
+  expect('round/多选无需 pct', run('round', dir, JSON.stringify({...row,response:{type:'multi_select',min:1,max:2},choices:['A']})), 0);
+  const last=JSON.parse(readFileSync(join(dir,'1-interview','rounds.jsonl'),'utf8').trim().split('\n').at(-1));
+  check('round/多选别名正规化',last.response.min_selections===1 && last.response.max_selections===2 && !('min' in last.response));
+  expect('round/冲突别名拒收',run('round',dir,JSON.stringify({...row,response:{type:'multi_select',min:1,min_selections:2}})),1,'不一致');
 }
 {
-  const dir = mkIssue({ interview: true });
-  expect('gate1/产物齐全 + 五维已定放行', doneInterview(dir), 0);
+  const dir=mkIssue();
+  expect('stage/未知职责拒收',run('stage',dir,'unknown','done'),2);
+  expect('stage/未知状态拒收',run('stage',dir,'1-interview','unknown'),2);
+  expect('gate1/可无 context rounds 和自评',run('stage',dir,'1-interview','done'),0);
+  check('gate1/不从角色声明推断整件任务 ready',manifest(dir).status==='in_progress');
+  writeFileSync(join(dir,'1-interview','context.md'),'# 调查摘要\n无需固定章节。');
+  expect('gate1/已有简短 context 可复用',run('stage',dir,'1-interview','done'),0);
+  writeFileSync(join(dir,'1-interview','rounds.jsonl'),'{broken');
+  expect('gate1/已有坏问答仍拒收',run('stage',dir,'1-interview','done'),1,'不是合法 JSON');
 }
 {
-  const dir = mkIssue({ interview: true });
-  expect('gate1/自评停在「未定」拒收',
-    run('stage', dir, '1-interview', 'done', '--assessment', JSON.stringify({ 意图: '已定', 结果: '未定', 边界: '已定', 约束: '已定', 现状: '已定' })),
-    1, '未定');
-  expect('gate1/缺自评拒收', run('stage', dir, '1-interview', 'done'), 1, '五维自评');
+  const dir=mkIssue();
+  expect('gate2/不强制 impact 或对照物',run('stage',dir,'2-prototype','done'),0);
+  expect('gate2/声明缺失材料仍拒收',run('stage',dir,'2-prototype','done','--artifacts','missing.svg'),1,'找不到');
+  writeFileSync(join(dir,'2-prototype','dependency.svg'),'<svg/>');
+  expect('gate2/自由命名和载体',run('stage',dir,'2-prototype','done','--artifacts','dependency.svg'),0);
+  writeFileSync(join(dir,'2-prototype','impact-surface.md'),'架构与依赖：有');
+  expect('gate2/架构变化不强制 HTML 图',run('stage',dir,'2-prototype','done'),0);
+  expect('skip/原型无需独立材料',run('stage',dir,'2-prototype','skipped','--reason','已有用户要求足够具体'),0);
+  expect('skip/无依据拒收',run('stage',dir,'2-prototype','skipped','--reason',''),1);
+  expect('skip/契约职责不能省略',run('stage',dir,'3-contract','skipped','--reason','x'),1);
 }
 {
-  const dir = mkIssue({ interview: true });
-  writeFileSync(join(dir, '1-interview', 'context.md'), CONTEXT.replace('## 四分类', '## 其它'), 'utf8');
-  expect('gate1/context.md 缺节拒收', doneInterview(dir), 1, '四分类');
+  const dir=mkIssue({interview:true,impact:true,artifacts:['custom-view.md']});
+  run('stage',dir,'1-interview','done');
+  run('stage',dir,'2-prototype','done','--artifacts','custom-view');
+  unlinkSync(join(dir,'1-interview','context.md'));
+  unlinkSync(join(dir,'2-prototype','impact-surface.md'));
+  expect('rebuild/缺可选材料不撤已有声明',run('rebuild',dir),0);
+  check('rebuild/确认材料和职责保留',manifest(dir).stage_gates['2-prototype'].status==='done' && manifest(dir).stage_gates['1-interview'].status==='done');
+  unlinkSync(join(dir,'2-prototype','custom-view.md'));
+  expect('rebuild/已声明依据丢失可恢复但降级',run('rebuild',dir),0);
+  check('rebuild/依据丢失不保持完成',manifest(dir).stage_gates['2-prototype'].status==='in_progress');
 }
 {
-  const dir = mkIssue({ interview: true });
-  writeFileSync(join(dir, '1-interview', 'rounds.jsonl'), `${JSON.stringify({ stage: '1-interview', round: 1, tier: 'default' })}\n`, 'utf8');
-  expect('gate1/rounds.jsonl 有坏行拒收', doneInterview(dir), 1, 'rounds.jsonl 第 1 行');
-}
-
-// ─────────────────────────────── 2-prototype done 闸门 ───────────────────────────────
-
-{
-  const dir = mkIssue();
-  expect('gate2/缺 impact-surface 拒收', run('stage', dir, '2-prototype', 'done', '--artifacts', 'behavior'), 1, 'impact-surface.md 不存在');
+  const dir=mkIssue({interview:true,impact:true,artifacts:['mock.html','behavior.md']});
+  run('stage',dir,'2-prototype','done','--artifacts','mock');
+  unlinkSync(join(dir,'manifest.json'));
+  expect('rebuild/manifest 丢失仍能恢复入口',run('rebuild',dir),0);
+  const m=manifest(dir);
+  check('rebuild/不由文件存在推断确认',m.status!=='ready' && m.stage_gates['2-prototype'].status==='pending' && !m.stage_gates['2-prototype'].artifacts_confirmed);
 }
 {
-  const dir = mkIssue({ impact: true });
-  expect('gate2/无 --artifacts 拒收', run('stage', dir, '2-prototype', 'done'), 1, '至少要用 --artifacts');
-  expect('gate2/artifacts 指向不存在的文件拒收', run('stage', dir, '2-prototype', 'done', '--artifacts', 'behavior'), 1, '找不到对应文件');
-  expect('gate2/impact-surface 凑数拒收', run('stage', dir, '2-prototype', 'done', '--artifacts', 'impact-surface'), 1, '凑不了数');
+  const dir=mkIssue();
+  run('stage',dir,'2-prototype','skipped','--reason','复用原始请求');
+  expect('rebuild/保留有依据的 skip',run('rebuild',dir),0);
+  check('rebuild/理由不丢失',manifest(dir).stage_gates['2-prototype'].reason==='复用原始请求');
+  expect('gate3/无契约仍拒收',run('stage',dir,'3-contract','done'),1,'不存在');
+  writeFileSync(join(dir,'3-contract','contract.md'),'## 目标\n目标。');
+  expect('gate3/无 finalize 仍拒收',run('stage',dir,'3-contract','done'),1,'finalize');
 }
 {
-  const dir = mkIssue({ impact: true, artifacts: ['behavior.md'] });
-  expect('gate2/behavior.md 在盘放行', run('stage', dir, '2-prototype', 'done', '--artifacts', 'behavior'), 0);
+  const dir=mkIssue();
+  expect('verify/无契约用法错',run('verify',dir),2,'不存在');
+  expect('finalize/无契约用法错',run('finalize',dir),2,'不存在');
+  const before=readFileSync(join(dir,'manifest.json'),'utf8');
+  expect('init/幂等续跑',run('init',dir.split(/[\\/]/).pop()),0,'已存在');
+  check('init/不重写历史记录',readFileSync(join(dir,'manifest.json'),'utf8')===before);
 }
-{
-  const dir = mkIssue({ impact: true, artifacts: ['custom-view.md'] });
-  expect('gate2/自定义命名对照物放行', run('stage', dir, '2-prototype', 'done', '--artifacts', 'custom-view'), 0);
-}
-{
-  const dir = mkIssue({ legacyImpact: true, artifacts: ['behavior.md'] });
-  expect('gate2/缺第七面「架构与依赖」done 拒收', run('stage', dir, '2-prototype', 'done', '--artifacts', 'behavior'), 1, '架构与依赖');
-  check('gate2/第七面拒收后 manifest 未被写入', manifest(dir).stage_gates['2-prototype'].status === 'pending',
-    `status=${manifest(dir).stage_gates['2-prototype'].status}`);
-}
-{
-  const dir = mkIssue({ impact: true, artifacts: ['diagram.html'] });
-  expect('gate2/--artifacts diagram 命中 .html 候选', run('stage', dir, '2-prototype', 'done', '--artifacts', 'diagram'), 0);
-}
-{
-  const dir = mkIssue({ impact: IMPACT_ARCH_YES, artifacts: ['behavior.md'] });
-  expect('gate2/判「有」缺 diagram 拒收', run('stage', dir, '2-prototype', 'done', '--artifacts', 'behavior'), 1, '必须包含 diagram');
-}
-{
-  // 拿 diagram.md 文本文件顶名不算图——联动锚定 diagram.html 本尊在盘。
-  const dir = mkIssue({ impact: IMPACT_ARCH_YES, artifacts: ['behavior.md', 'diagram.md'] });
-  expect('gate2/判「有」用 diagram.md 顶名仍拒收', run('stage', dir, '2-prototype', 'done', '--artifacts', 'behavior,diagram'), 1, '必须包含 diagram');
-}
-{
-  const dir = mkIssue({ impact: IMPACT_ARCH_YES, artifacts: ['behavior.md', 'diagram.html'] });
-  expect('gate2/判「有」+ diagram 放行', run('stage', dir, '2-prototype', 'done', '--artifacts', 'behavior,diagram'), 0);
-}
-{
-  // missingArtifacts 认可带扩展名写法（第三候选=原名），联动按去扩展名比较，同口径放行。
-  const dir = mkIssue({ impact: IMPACT_ARCH_YES, artifacts: ['behavior.md', 'diagram.html'] });
-  expect('gate2/判「有」diagram.html 带扩展名写法放行', run('stage', dir, '2-prototype', 'done', '--artifacts', 'behavior,diagram.html'), 0);
-}
-{
-  const dir = mkIssue({ impact: IMPACT_ARCH_YES_TABLE, artifacts: ['behavior.md'] });
-  expect('gate2/表格格式判「有」同样触发联动', run('stage', dir, '2-prototype', 'done', '--artifacts', 'behavior'), 1, '必须包含 diagram');
-}
-{
-  const dir = mkIssue({ impact: IMPACT_ARCH_YES_VERDICT, artifacts: ['behavior.md'] });
-  expect('gate2/「判『有』」措辞同样触发联动', run('stage', dir, '2-prototype', 'done', '--artifacts', 'behavior'), 1, '必须包含 diagram');
-}
-{
-  const dir = mkIssue({ impact: IMPACT_ARCH_YES_BOLD, artifacts: ['behavior.md'] });
-  expect('gate2/面名加粗写法同样触发联动', run('stage', dir, '2-prototype', 'done', '--artifacts', 'behavior'), 1, '必须包含 diagram');
-}
-
-// ─────────────────────────────── skipped：只许 2-prototype，且七面在盘 ───────────────────────────────
-
-{
-  const dir = mkIssue({ interview: true, impact: true });
-  expect('skip/1-interview 不能 skipped', run('stage', dir, '1-interview', 'skipped', '--reason', 'x'), 1, '不能 skipped');
-  expect('skip/3-contract 不能 skipped', run('stage', dir, '3-contract', 'skipped', '--reason', 'x'), 1, '不能 skipped');
-  expect('skip/2-prototype 无 reason 拒收', run('stage', dir, '2-prototype', 'skipped'), 1, '--reason');
-}
-{
-  const dir = mkIssue({ interview: true });
-  expect('skip/无 impact-surface 拒收', run('stage', dir, '2-prototype', 'skipped', '--reason', '差异极小'), 1, '不豁免七面扫描');
-}
-{
-  const dir = mkIssue({ interview: true, legacyImpact: true });
-  expect('skip/缺第七面「架构与依赖」拒收', run('stage', dir, '2-prototype', 'skipped', '--reason', '差异极小'), 1, '架构与依赖');
-}
-{
-  const dir = mkIssue({ interview: true, impact: true });
-  doneInterview(dir);
-  expect('skip/七面在盘 + reason 放行', run('stage', dir, '2-prototype', 'skipped', '--reason', '差异极小'), 0);
-  const m = manifest(dir);
-  check('skip/放行后推进到 3-contract 而非 ready', m.stage === '3-contract' && m.status === 'in_progress',
-    `stage=${m.stage} status=${m.status}`);
-}
-
-// ─────────────────────────────── 3-contract done 闸门 ───────────────────────────────
-
-{
-  const dir = mkIssue();
-  expect('gate3/无 contract.md 拒收', run('stage', dir, '3-contract', 'done'), 1, 'contract.md 不存在');
-  writeFileSync(join(dir, '3-contract', 'contract.md'), '## 目标\n\n占位。\n', 'utf8');
-  expect('gate3/finalize 没跑过拒收', run('stage', dir, '3-contract', 'done'), 1, 'finalize');
-}
-
-// ─────────────────────────────── rebuild：与 done 闸门同口径 ───────────────────────────────
-
-{
-  const dir = mkIssue({ impact: true, artifacts: ['custom-view.md'] });
-  run('stage', dir, '2-prototype', 'done', '--artifacts', 'custom-view');
-  unlinkSync(join(dir, 'manifest.json'));
-  expect('rebuild/manifest 损坏可重建', run('rebuild', dir), 0);
-  const m = manifest(dir);
-  check('rebuild/自定义命名对照物恢复为 done',
-    m.stage_gates['2-prototype'].status === 'done' && m.stage_gates['2-prototype'].artifacts_confirmed.includes('custom-view'),
-    JSON.stringify(m.stage_gates['2-prototype']));
-}
-{
-  const dir = mkIssue({ impact: true, artifacts: ['behavior.md', 'diagram.html'] });
-  run('stage', dir, '2-prototype', 'done', '--artifacts', 'behavior,diagram');
-  // 换回缺第七面的存量 impact-surface：rebuild 与 done 闸门同口径，应降级
-  writeFileSync(join(dir, '2-prototype', 'impact-surface.md'), IMPACT_LEGACY, 'utf8');
-  expect('rebuild/缺第七面「架构与依赖」时 2-prototype 降级', run('rebuild', dir), 0);
-  const m = manifest(dir);
-  check('rebuild/降级后 issue 不再 ready',
-    m.stage_gates['2-prototype'].status === 'in_progress' && m.status === 'in_progress',
-    JSON.stringify({ gate: m.stage_gates['2-prototype'].status, stage: m.stage, status: m.status }));
-  check('rebuild/降级保留已确认对照物清单',
-    (m.stage_gates['2-prototype'].artifacts_confirmed || []).includes('diagram'),
-    JSON.stringify(m.stage_gates['2-prototype']));
-}
-{
-  const dir = mkIssue({ impact: IMPACT_ARCH_YES_TABLE, artifacts: ['behavior.md'] });
-  unlinkSync(join(dir, 'manifest.json'));
-  // manifest 损坏重建：扫描到 behavior 一份对照物，判「有」缺 diagram → 与 done 闸门同口径不判 done
-  expect('rebuild/判「有」缺 diagram 不判 done', run('rebuild', dir), 0);
-  check('rebuild/联动降级后 gate 为 in_progress',
-    manifest(dir).stage_gates['2-prototype'].status === 'in_progress',
-    JSON.stringify(manifest(dir).stage_gates['2-prototype']));
-}
-{
-  const dir = mkIssue({ interview: true, impact: IMPACT_ARCH_YES, artifacts: ['behavior.md', 'diagram.html'] });
-  doneInterview(dir);
-  run('stage', dir, '2-prototype', 'done', '--artifacts', 'behavior,diagram');
-  // 手工把 manifest 推到 ready（模拟三阶段全闭的存量 issue），再删掉 diagram.html：
-  // rebuild 降级 2-prototype 的同时，ready 这个推论必须跟着回落，不许残留。
-  const mp = join(dir, 'manifest.json');
-  const m = JSON.parse(readFileSync(mp, 'utf8'));
-  m.stage_gates['3-contract'] = { status: 'done' };
-  m.stage = '3-contract';
-  m.status = 'ready';
-  writeFileSync(mp, JSON.stringify(m), 'utf8');
-  unlinkSync(join(dir, '2-prototype', 'diagram.html'));
-  expect('rebuild/联动降级时 ready 随之回落', run('rebuild', dir), 0);
-  const after = manifest(dir);
-  check('rebuild/降级后 status 不再残留 ready',
-    after.stage_gates['2-prototype'].status === 'in_progress' && after.status === 'in_progress',
-    JSON.stringify({ gate: after.stage_gates['2-prototype'].status, status: after.status }));
-}
-{
-  const dir = mkIssue({ interview: true, impact: true });
-  doneInterview(dir);
-  run('stage', dir, '2-prototype', 'skipped', '--reason', '差异极小');
-  run('rebuild', dir);
-  const g = manifest(dir).stage_gates['2-prototype'];
-  check('rebuild/保留 skipped 裁决与 reason', g.status === 'skipped' && g.reason === '差异极小', JSON.stringify(g));
-}
-
-// ─────────────────────────────── verify / finalize / 其它 ───────────────────────────────
-
-{
-  const dir = mkIssue();
-  expect('verify/无 contract.md 用法错', run('verify', dir), 2, '不存在');
-  expect('finalize/无 contract.md 用法错', run('finalize', dir), 2, '不存在');
-  writeFileSync(join(dir, '3-contract', 'contract.md'),
-    '## 验收条件\n\n- AC-001: 界面按 mock 呈现\n  - Verify: [C] 人工对照 mock 逐处看\n', 'utf8');
-  expect('verify/全非 [A] 档时无可执行项', run('verify', dir), 0, '没有 [A] 档');
-}
-{
-  const dir = mkIssue();
-  const slug = dir.split(/[\\/]/).pop();
-  expect('init/幂等续跑不覆盖', run('init', slug), 0, '已存在');
-}
-{
-  const dir = mkIssue({ interview: true, impact: true });
-  doneInterview(dir);
-  expect('reinterview/2-prototype 打回', run('stage', dir, '2-prototype', 'needs_reinterview', '--reason', '撞出歧义'), 0);
-  const m = manifest(dir);
-  check('reinterview/回到 1-interview 且 next_action 更新',
-    m.stage === '1-interview' && m.stage_gates['1-interview'].status === 'in_progress' && m.next_action.includes('撞出'),
-    `stage=${m.stage} next=${m.next_action}`);
-}
-
-// ─────────────────────────────── 收尾 ───────────────────────────────
-
-// ─────────────────────── 首档遮蔽修复：一行多档的内嵌 [A] 段 ───────────────────────
 
 const VALID_CONTRACT = [
   '# Goal Contract: 测试占位',
@@ -478,11 +280,12 @@ function forceReady(dir, contract) {
   const cp = join(dir, '3-contract', 'contract.md');
   utimesSync(cp, new Date('2026-08-30T00:00:00Z'), new Date('2026-08-30T00:00:00Z'));
   run('stage', dir, '3-contract', 'needs_reinterview', '--reason', '整族打回');
-  expect('lifecycle/打回后契约未修订即拒', run('finalize', dir), 1, '还没折进契约');
+  expect('lifecycle/澄清不改变契约也可机器复验', run('finalize', dir), 0);
+  check('lifecycle/机器复验不恢复未完成的授权声明', manifest(dir).status === 'in_progress');
   writeFileSync(cp, VALID_CONTRACT.replace('占位目标', '修订后的占位目标'), 'utf8');
   const res = run('finalize', dir);
   check('lifecycle/修订后重新通过并清 stale',
-    res.status === 0 && manifest(dir).validation.stale === undefined && manifest(dir).status === 'ready',
+    res.status === 0 && manifest(dir).validation.stale === undefined && manifest(dir).status === 'in_progress',
     `${res.status}\n${JSON.stringify(manifest(dir).validation)}`);
 }
 {
@@ -505,7 +308,7 @@ function forceReady(dir, contract) {
   writeFileSync(m2, '# M2 占位\n', 'utf8');
   const future = new Date(Date.now() + 8000);
   utimesSync(m2, future, future);
-  expect('lifecycle/家族契约改动后 done 拒', run('stage', dir, '3-contract', 'done'), 1, 'contract-m2.md 在上次 finalize 之后又改过');
+  expect('lifecycle/家族契约改动后 done 拒', run('stage', dir, '3-contract', 'done'), 1, '契约在上次 finalize 之后又改过');
 }
 
 // ─────────────────────── 口径闸门：复刻精度必须问过 ───────────────────────
@@ -531,7 +334,7 @@ const CALIBER_ASK = JSON.stringify({
 {
   const dir = mkIssue();
   writeFileSync(join(dir, '3-contract', 'contract.md'), MOCK_CONTRACT, 'utf8');
-  expect('caliber/契约引用 mock 未问口径拒', run('finalize', dir), 1, '复刻精度');
+  expect('caliber/文件名不强制新一轮确认', run('finalize', dir), 0);
 }
 {
   const dir = mkIssue();
@@ -545,7 +348,7 @@ const CALIBER_ASK = JSON.stringify({
   doneInterview(dir);
   run('stage', dir, '2-prototype', 'done', '--artifacts', 'mock');
   writeFileSync(join(dir, '3-contract', 'contract.md'), VALID_CONTRACT, 'utf8');
-  expect('caliber/确认清单含 mock 同样触发', run('finalize', dir), 1, '复刻精度');
+  expect('caliber/已有确认清单不强制关键词', run('finalize', dir), 0);
 }
 {
   // 声明逐像素而规格源没点名 → 只警告不拦。
@@ -553,8 +356,8 @@ const CALIBER_ASK = JSON.stringify({
   writeFileSync(join(dir, '3-contract', 'contract.md'),
     VALID_CONTRACT.replace('占位目标一句话可观察。', '整页逐像素还原的占位目标。'), 'utf8');
   const res = run('finalize', dir);
-  check('caliber/逐像素无规格源只警告',
-    res.status === 0 && `${res.stdout || ''}`.includes('规格源'),
+  check('caliber/不以关键字替代意图判定',
+    res.status === 0 && !`${res.stderr || ''}`.includes('复刻精度'),
     `${res.status}\n${`${res.stdout || ''}${res.stderr || ''}`.slice(0, 400)}`);
 }
 
@@ -617,6 +420,74 @@ const CALIBER_ASK = JSON.stringify({
     `${res.status}\n${out.trim().slice(0, 400)}`);
 }
 
+
+{
+  const dir = mkIssue();
+  const cp = join(dir,'3-contract','contract.md');
+  const contract = VALID_CONTRACT + '\n## 强约束\n\n- 用户已确认旧任务必须使用锁定 spec、逐像素口径和连续三次运行。\n';
+  writeFileSync(cp,contract);
+  expect('handoff/无需过程文件也可校验',run('finalize',dir),0);
+  check('handoff/校验成功不冒充用户确认',manifest(dir).status==='in_progress');
+  expect('handoff/已有授权可合并履行访谈职责',run('stage',dir,'1-interview','done','--reason','原始请求与已确认契约'),0);
+  expect('handoff/原型按实际需要省略',run('stage',dir,'2-prototype','skipped','--reason','复用既有规格'),0);
+  expect('handoff/省略原型不制造风险义务',run('finalize',dir),0);
+  expect('handoff/声明内容对齐后就绪',run('stage',dir,'3-contract','done'),0);
+  check('handoff/ready 有职责声明与有效校验',manifest(dir).status==='ready');
+  expect('handoff/恢复不要求补齐过程文件',run('rebuild',dir),0);
+  check('handoff/已确认旧约束逐字保留',readFileSync(cp,'utf8')===contract);
+  check('handoff/恢复保留已有 ready',manifest(dir).status==='ready');
+  const time = new Date(manifest(dir).validation.ran_at);
+  writeFileSync(cp,contract.replace('占位目标','新的占位目标'));
+  utimesSync(cp,time,time);
+  expect('binding/同秒或旧mtime不能掩盖契约变化',run('stage',dir,'3-contract','done'),1,'改过');
+  check('binding/list 暴露内容失效',run('list').stdout.includes('契约改动晚于finalize'));
+  run('rebuild',dir);
+  check('binding/恢复撤销失效 ready',manifest(dir).status==='in_progress');
+}
+{
+  const dir=mkIssue();
+  writeFileSync(join(dir,'3-contract','contract.md'),VALID_CONTRACT);
+  run('finalize',dir);
+  const before=manifest(dir);
+  before.status='ready';
+  writeFileSync(join(dir,'manifest.json'),JSON.stringify(before));
+  writeFileSync(join(dir,'3-contract','contract.md'),'## 验收条件\n没有合法条件。');
+  expect('binding/无效契约复验拒收',run('finalize',dir),1);
+  check('binding/失败不残留ready或valid',manifest(dir).status!=='ready' && manifest(dir).validation.status==='invalid');
+}
+{
+  const dir=mkIssue();
+  writeFileSync(join(dir,'3-contract','contract.md'),VALID_CONTRACT+'\n## 残留风险\n\n- 已接受的真实风险。\n');
+  const m=manifest(dir);
+  m.residual_risk='已接受的真实风险';
+  writeFileSync(join(dir,'manifest.json'),JSON.stringify(m));
+  expect('risk/明确风险随交接保留',run('finalize',dir),0);
+  writeFileSync(join(dir,'3-contract','contract.md'),VALID_CONTRACT);
+  expect('risk/不得因流程简化丢弃明确风险',run('finalize',dir),1,'残留风险');
+}
+
+{
+  const dir=mkIssue();
+  writeFileSync(join(dir,'3-contract','contract.md'),VALID_CONTRACT.replace('[A] `node -e "process.exit(1)"` → 退出码 1（此刻应为红）','[C] 主管核对真实交付后签字确认'));
+  const r=run('finalize',dir);
+  const out=r.stdout+r.stderr;
+  check('human/纯人验不被建议移出完成义务',r.status===0 && out.includes('保留待人验') && !/必须移走|真人才能判的部分移|等于没有终止条件/.test(out));
+}
+{
+  const dir=mkIssue();
+  const cp=join(dir,'3-contract','contract.md');
+  const goal='下游能够稳定消费审计结果。\n\n- JSON 字段含义明确。\n- 默认文本消费者仍然兼容。';
+  const contract=VALID_CONTRACT.replace('占位目标一句话可观察。',goal);
+  writeFileSync(cp,contract);
+  const r=run('finalize',dir);
+  const command=r.stdout.split(/\r?\n/).find(line=>line.startsWith('/goal '));
+  check('handoff/多段目标完整进入交接',r.status===0 && command?.includes('JSON 字段含义明确') && command.includes('默认文本消费者仍然兼容'));
+  const longContract=contract.replace(goal,goal+'\n\n'+'必要的期望行为说明。'.repeat(420));
+  writeFileSync(cp,longContract);
+  const fallback=run('finalize',dir);
+  check('handoff/超长目标切换会话式交接不阻塞契约',fallback.status===0 && fallback.stdout.includes('已改用会话式交接') && !fallback.stdout.split(/\r?\n/).some(line=>line.startsWith('/goal ')));
+  check('handoff/切换工具保留完整目标与旧验收',readFileSync(cp,'utf8')===longContract);
+}
 console.log(`\n${total - failed}/${total} 通过`);
 rmSync(ROOT, { recursive: true, force: true });
 process.exit(failed > 0 ? 1 : 0);

@@ -273,9 +273,10 @@ function renderPhases() {
 }
 
 function detailFact(label, value) {
-  return node('div', { class: 'decision-fact' }, [
+  const text = Array.isArray(value) ? value.join(' · ') : value;
+  return node('div', { class: 'decision-fact', hidden: !text }, [
     node('span', { class: 'decision-fact-label', text: label }),
-    node('span', { class: 'decision-fact-value', text: value || '未说明' }),
+    node('span', { class: 'decision-fact-value', text: text || '' }),
   ]);
 }
 

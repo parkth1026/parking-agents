@@ -2249,6 +2249,31 @@ export async function integrationBaseAdvanceStaleEvidence() {
 // - v2 缺 baseCommit 必须 fail closed（AC-1）。
 // - v2 的 baseCommit 与当前 job base 不一致时必须判 STALE（AC-2），
 //   v1 对同一 mismatch 免疫（它从未声明过这个字段，不能回溯性地判它不合格）。
+export async function contractContextUpgradeScenario() {
+  const fixture = makeFixture('context-upgrade', { workers: [{ id: 'worker-1' }, { id: 'worker-2' }] });
+  try {
+    writeSlots(fixture);
+    master.masterStart({ ...base(fixture) });
+    const issue = issuePayload({ number: 569 });
+    // 升级前正文不进摘要，等价于旧字段形状的已存 job。
+    const claim = master.masterClaim({ ...base(fixture), issue, slotId: 'worker-1' });
+    assert.equal(claim.outcome, 'CLAIMED');
+    const before = readV4Registry(fixture.v4Dir);
+    const receipts = readReceipts(fixture.v4Dir);
+    const upgraded = master.masterClaim({ ...base(fixture), slotId: 'worker-2',
+      issue: { ...issue, body: '## 背景\n下游使用稳定的身份绑定。\n## 强约束\n不改变既有账号。' } });
+    assert.equal(upgraded.ok, false);
+    assert.equal(upgraded.code, 'ISSUE_ALREADY_ACTIVE_WITH_OTHER_CONTRACT');
+    assert.equal(upgraded.jobId, claim.jobId);
+    const after = readV4Registry(fixture.v4Dir);
+    assert.deepEqual(after.jobs, before.jobs, '升级后重复 claim 不重写旧 job、摘要或约束');
+    assert.deepEqual(after.attempts, before.attempts, '不得新增第二个 attempt/owner');
+    assert.deepEqual(readReceipts(fixture.v4Dir), receipts, '不得重写旧工单或 QA 回执');
+  } finally {
+    fixture.cleanup();
+  }
+}
+
 export async function stageResultSchemaBackwardCompat() {
   const fixture = makeFixture('schema-compat', { workers: [{ id: 'worker-1' }, { id: 'worker-2' }] });
   try {

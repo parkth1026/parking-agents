@@ -176,8 +176,8 @@ const ordinaryRound = {
       tier: 'ask',
       question: '普通访谈问题',
       options: [
-        { key: 'A', text: '选项 A', pct: 60 },
-        { key: 'B', text: '选项 B', pct: 40 },
+        { key: 'A', text: '选项 A' },
+        { key: 'B', text: '选项 B' },
       ],
     }],
   },

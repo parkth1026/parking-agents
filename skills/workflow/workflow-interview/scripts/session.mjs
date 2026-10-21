@@ -7,10 +7,10 @@
  *
  *   init <slug> [--request <原话>]        建/读 issue 目录（幂等）
  *   round <dir> <json>                    追加一行到 rounds.jsonl（先过 schema 校验）
- *   stage <dir> <stage> <status> [flags]  推进阶段状态（done/skipped 先过结构闸门）
+ *   stage <dir> <stage> <status> [flags]  记录职责状态（检查记录与引用有效性）
  *   verify <dir> [--write]                跑 contract.md 里全部 [A] 档段（含内嵌）；
  *                                         --write 落 verify-evidence.txt，不碰冒烟快照
- *   rebuild <dir>                         从目录扫描重建 manifest
+ *   rebuild <dir>                         恢复已有状态，不由文件存在推断确认
  *   finalize <dir>                        校验 + 冒烟 + 交接闸门 + 生成交接指令
  *   list                                  现扫全部 issue，输出一张表
  *
@@ -21,6 +21,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync,
 import { dirname, join, resolve, basename, relative, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
+import { contractDigests, validationIsCurrent } from './lib/validation.mjs';
 
 const SCHEMA_VERSION = 1;
 const STAGES = ['1-interview', '2-prototype', '3-contract'];
@@ -138,16 +139,10 @@ function resolveIssueDir(arg) {
 
 // ─────────────────────────────── 阶段闸门校验 ───────────────────────────────
 //
-// 只验结构，不验质量：节齐不齐、行合不合 schema、文件在不在是机器能判的；问得好不好、
-// mock 像不像只有用户能判，写进脚本只会造出为过检而写的仪式。产出方自查自报是自陈，
-// 同一份检查在 stage done 时强制执行才是判据——和 finalize 拦 UNRUNNABLE、拦残留风险
-// 对不上账是同一个信任模型。闸门只查本阶段自己的产物，不查上游阶段状态：子技能允许
-// 被单独调用，上游门禁由编排器负责。
+// 阶段完成是宿主对已知授权与内容的声明；校验器只检查记录和所引用的工件，
+// 不从文件名、自评分或问法推断用户确认。
 
 const ROUND_TIERS = ['default', 'confirm', 'ask'];
-const ASSESS_DIMS = ['意图', '结果', '边界', '约束', '现状'];
-const CONTEXT_SECTIONS = ['任务陈述', '用户提出的方案', '意图假设', '已查事实', '验证基建候选池', '四分类'];
-const IMPACT_SURFACES = ['用户可见界面', '可观察行为', '可运行输出', '对外接口报文', '用户配置', '历史兼容性', '架构与依赖'];
 /** 结构化应答类型，与 workflow-interview-web 的发布 schema 同源（web-protocol.md）。 */
 const RESPONSE_TYPES = ['single_select', 'multi_select', 'boolean', 'short_text', 'long_text', 'number', 'date_time', 'ranking', 'evidence'];
 
@@ -175,35 +170,15 @@ function validateRoundObj(obj) {
       if (!Array.isArray(obj.options) || obj.options.length === 0) {
         errs.push('options 要是非空数组。');
       } else {
-        // pct 是互斥概率，只在 single_select 语义下必填并卡加和——多选/排序的选项是
-        // 候选集合不是概率分布，硬要加和只会逼人编数字（web 版发布 schema 同口径）。
-        const pctRequired = responseType === 'single_select';
-        let sum = 0;
-        let shapeOk = true;
         obj.options.forEach((o, i) => {
           if (!o || typeof o !== 'object' || !o.key || !o.text) {
-            shapeOk = false;
-            errs.push(`options[${i}] 每项要有 key、text${pctRequired ? ' 和数字 pct' : ''}。`);
+            errs.push(`options[${i}] 每项要有 key 和 text。`);
             return;
           }
-          if (o.pct === undefined) {
-            if (pctRequired) {
-              shapeOk = false;
-              errs.push(`options[${i}] 每项要有数字 pct。`);
-            }
-            return;
-          }
-          if (typeof o.pct !== 'number') {
-            shapeOk = false;
+          if (o.pct !== undefined && !Number.isFinite(o.pct)) {
             errs.push(`options[${i}] 的 pct 要是数字。`);
-            return;
           }
-          sum += o.pct;
         });
-        // pct 是主观估计，卡整不卡准：±2 容差消掉凑整摩擦，整体给虚照样挡。
-        if (shapeOk && pctRequired && Math.abs(sum - 100) > 2) {
-          errs.push(`options 的 pct 加和是 ${sum}，要落在 100±2 内——百分比先决定分诊档位，给虚了会把该问的误分进默认区。`);
-        }
       }
     }
   } else if (typeof obj.item !== 'string' || !obj.item.trim()) {
@@ -212,22 +187,9 @@ function validateRoundObj(obj) {
   return errs;
 }
 
-function validateContextFile(dir) {
-  const p = join(dir, '1-interview', 'context.md');
-  if (!existsSync(p)) return ['1-interview/context.md 不存在。'];
-  const content = readFileSync(p, 'utf8');
-  const errs = [];
-  for (const name of CONTEXT_SECTIONS) {
-    if (!new RegExp(`^##\\s+${name}`, 'm').test(content)) {
-      errs.push(`context.md 缺「## ${name}」一节。`);
-    }
-  }
-  return errs;
-}
-
 function validateRoundsFile(dir) {
   const p = roundsPath(dir);
-  if (!existsSync(p)) return ['1-interview/rounds.jsonl 不存在。'];
+  if (!existsSync(p)) return [];
   const errs = [];
   readFileSync(p, 'utf8').split(/\r?\n/).forEach((line, i) => {
     if (!line.trim()) return;
@@ -243,53 +205,11 @@ function validateRoundsFile(dir) {
   return errs;
 }
 
-function validateAssessment(assessment) {
-  if (!assessment || typeof assessment !== 'object') {
-    return [`缺五维自评。用 --assessment 交齐：${ASSESS_DIMS.join('、')}。`];
-  }
-  const errs = [];
-  for (const dim of ASSESS_DIMS) {
-    if (!(dim in assessment)) errs.push(`自评缺维度「${dim}」。`);
-    else if (assessment[dim] === '未定') errs.push(`自评维度「${dim}」停在「未定」，不能报 done。`);
-  }
-  return errs;
-}
-
-function validateImpactSurfaceFile(dir) {
-  const p = join(dir, '2-prototype', 'impact-surface.md');
-  if (!existsSync(p)) return ['2-prototype/impact-surface.md 不存在。'];
-  const content = readFileSync(p, 'utf8');
-  const errs = [];
-  for (const s of IMPACT_SURFACES) {
-    if (!content.includes(s)) {
-      errs.push(`impact-surface.md 没提到影响面「${s}」。七面逐面扫，判「无」也要写下来。`);
-    }
-  }
-  return errs;
-}
-
-/**
- * 架构与依赖是否判了「有」。判读取该面名后第一个 有/无（表格单元格或冒号后，
- * 兼容 **有** 加粗、面名加粗、判「有」写法）。判不出（只写字没写判定）不算
- * 「有」——闸门挡结构不挡判读质量。
- */
-function architectureJudgedPresent(dir) {
-  const p = join(dir, '2-prototype', 'impact-surface.md');
-  if (!existsSync(p)) return false;
-  const re = /架构与依赖\*{0,2}(?:\s*\|+\s*|\s*[：:]\s*)\*{0,2}(?:判\s*[「'\[]?\s*)?\*{0,2}(有|无)/;
-  for (const line of readFileSync(p, 'utf8').split(/\r?\n/)) {
-    if (!line.includes('架构与依赖')) continue;
-    const m = line.match(re);
-    if (m && m[1] === '有') return true;
-  }
-  return false;
-}
-
 /** artifacts 名到确认版文件的映射；未知名字按 2-prototype/<name>[.md|.html] 找。 */
 function missingArtifacts(dir, names) {
   const errs = [];
   for (const name of names) {
-    const candidates = name === 'mock' ? ['mock.html'] : [`${name}.md`, `${name}.html`, name];
+    const candidates = [name, `${name}.md`, `${name}.html`];
     if (!candidates.some((f) => existsSync(join(dir, '2-prototype', f)))) {
       errs.push(`--artifacts 列了「${name}」，但 2-prototype/ 下找不到对应文件（找过 ${candidates.join('、')}）。`);
     }
@@ -297,65 +217,22 @@ function missingArtifacts(dir, names) {
   return errs;
 }
 
-/** rebuild 用：扫 2-prototype/ 根下的对照物（除影响面清单外的 .md/.html），名字去扩展名。 */
-function scanArtifacts(dir) {
-  const p = join(dir, '2-prototype');
-  if (!existsSync(p)) return [];
-  return readdirSync(p)
-    .filter((f) => statSync(join(p, f)).isFile() && /\.(md|html)$/i.test(f) && !/^impact-surface\.md$/i.test(f))
-    .map((f) => f.replace(/\.(md|html)$/i, ''));
-}
-
 function gateDone(dir, stage, gate, m) {
   if (stage === '1-interview') {
-    return [
-      ...validateContextFile(dir),
-      ...validateRoundsFile(dir),
-      ...validateAssessment(gate.self_assessment),
-    ];
+    return validateRoundsFile(dir);
   }
   if (stage === '2-prototype') {
-    const errs = validateImpactSurfaceFile(dir);
-    // 影响面清单是扫描记录，不是给用户确认过的对照物——拿它填 --artifacts 是凑数。
-    const artifacts = [];
-    for (const n of gate.artifacts_confirmed || []) {
-      if (/^impact-surface(\.md)?$/i.test(n)) {
-        errs.push(`--artifacts 列了「${n}」，但影响面清单不是对照物，凑不了数。`);
-      } else {
-        artifacts.push(n);
-      }
-    }
-    if (artifacts.length === 0) {
-      errs.push('done 至少要用 --artifacts 列一份确认版对照物。七面全「无」该报 needs_reinterview；差异极小且用户文字确认过才是 skipped。');
-    } else {
-      errs.push(...missingArtifacts(dir, artifacts));
-    }
-    // 判「有」必出架构视图——这条承诺不靠自觉：判了「有」而清单没有 diagram.html，当场拦。
-    // 名字按去扩展名比较（diagram / diagram.html 都认）；锚定 .html 本尊在盘，
-    // 拿 diagram.md 顶名不算图（mock 特例同款思路，不动开放命名本体）。
-    const diagramListed = artifacts.some((n) => n.replace(/\.(md|html)$/i, '').toLowerCase() === 'diagram');
-    if (architectureJudgedPresent(dir) && !(diagramListed && existsSync(join(dir, '2-prototype', 'diagram.html')))) {
-      errs.push('架构与依赖判「有」，--artifacts 必须包含 diagram（diagram.html 架构视图，diagram.md 顶名不算图）。确无拓扑变化就回 impact-surface.md 改判「无」，判「无」也要写下来。');
-    }
-    return errs;
+    return missingArtifacts(dir, gate.artifacts_confirmed || []);
   }
   // 3-contract：先 finalize 后 done。顺序反了，或 finalize 之后又改了契约，这道闸就是空的。
-  const cdir = join(dir, '3-contract');
   const cpath = contractPath(dir);
   if (!existsSync(cpath)) return ['3-contract/contract.md 不存在。'];
   const errs = [];
   const v = m.validation;
-  if (!v || v.status !== 'valid') {
+  if (!v || v.status !== 'valid' || v.stale) {
     errs.push('finalize 还没通过（manifest.validation.status ≠ valid）。先跑 finalize 再报 done。');
   } else {
-    // 对账盯 3-contract/ 下全部契约文件（contract.md 及 contract-*.md）：里程碑家族里
-    // 只盯主契约，m1b/m2 改动能绕过「重跑 finalize」（2026-08-31 实锤）。
-    const limit = Date.parse(v.ran_at) + 2000;
-    for (const f of readdirSync(cdir).filter((x) => /^contract.*\.md$/i.test(x)).sort()) {
-      if (statSync(join(cdir, f)).mtimeMs > limit) {
-        errs.push(`${f} 在上次 finalize 之后又改过。重跑 finalize，别让改动绕过校验和冒烟。`);
-      }
-    }
+    if (!validationIsCurrent(dir, v)) errs.push('契约在上次 finalize 之后又改过。重跑 finalize。');
   }
   return errs;
 }
@@ -416,7 +293,7 @@ function cmdRound(argv) {
   const schemaErrs = validateRoundObj(obj);
   if (schemaErrs.length > 0) {
     for (const e of schemaErrs) console.error(`round: ${e}`);
-    die('这行不合 rounds.jsonl 的 schema（字段表见 aes-interview 的 SKILL.md），没有写入。', 1);
+    die('这行不合 rounds.jsonl 的 schema（字段表见 workflow-interview/references/session.md），没有写入。', 1);
   }
   mkdirSync(dirname(roundsPath(dir)), { recursive: true });
   // 追加一行是单次 O_APPEND 写，短行天然原子；这是并发点上唯一安全的写法。
@@ -457,17 +334,15 @@ function cmdStage(argv) {
   if (typeof flags.reason === 'string') gate.reason = flags.reason;
   m.stage_gates[stage] = gate;
 
-  // 阶段闸门：done 不是自报的。产出方自查自报是自陈，这里当场验结构才是判据。
+  // done 声明内容已对齐；机器检查记录有效，不检查固定材料是否齐套。
   if (status === 'done') {
     const gateErrs = gateDone(dir, stage, gate, m);
     if (gateErrs.length > 0) {
       for (const e of gateErrs) console.error(`gate: ${e}`);
-      die(`${stage} 的阶段闸门没过，done 没有写入。挡的是结构不是质量，逐条补齐再来。`, 1);
+      die(`${stage} 的记录或引用无效，done 没有写入。`, 1);
     }
   }
-  // 跳过是一次下注，finalize 会拿 reason 跟契约「残留风险」对账，没写理由就没法对。
-  // skipped 的语义只在对照物阶段成立：差异极小且用户文字确认过。访谈或契约被跳过，
-  // 工作流就没有产出了，却照样能点亮 ready——那是 done 闸门旁边的旁门，一并堵上。
+  // 不单独制作对照物不等于存在风险；实际未解决的风险用 residual-risk 记录。
   if (status === 'skipped') {
     if (stage !== '2-prototype') {
       die(`${stage} 不能 skipped：跳过访谈或契约，这个流程就没有产出了。走不下去用 needs_reinterview 打回。`, 1);
@@ -475,12 +350,8 @@ function cmdStage(argv) {
     if (typeof gate.reason !== 'string' || !gate.reason.trim()) {
       die('skipped 必须带 --reason 写清为什么跳、赌的是什么。', 1);
     }
-    // skipped 的前提是七面扫过了、只是差异极小——扫过的证据就是 impact-surface.md 在盘。
-    const skipErrs = validateImpactSurfaceFile(dir);
-    if (skipErrs.length > 0) {
-      for (const e of skipErrs) console.error(`gate: ${e}`);
-      die('skipped 不豁免七面扫描。理由写进 impact-surface.md（见 aes-prototype 的 SKILL.md），再来跳。', 1);
-    }
+    const skipErrs = missingArtifacts(dir, gate.artifacts_confirmed || []);
+    if (skipErrs.length > 0) die(skipErrs.join('\n'), 1);
   }
 
   if (typeof flags.next === 'string') m.next_action = flags.next;
@@ -513,9 +384,11 @@ function cmdStage(argv) {
   } else if (status === 'done' || status === 'skipped') {
     const next = STAGES.find((s) => !['done', 'skipped'].includes(m.stage_gates[s].status));
     m.stage = next || stage;
-    if (!next) m.status = contractIsBlocked(dir) ? 'blocked' : 'ready';
+    if (!next) m.status = contractIsBlocked(dir) ? 'blocked'
+      : (validationIsCurrent(dir, m.validation) ? 'ready' : 'in_progress');
   } else {
     m.stage = stage;
+    if (m.status === 'ready') m.status = 'in_progress';
   }
 
   writeManifest(dir, m);
@@ -652,53 +525,28 @@ function cmdRebuild(argv) {
     console.log('manifest 缺失或损坏，从目录扫描重建（original_request 等纯记录字段无法恢复）。');
   }
 
-  const has = (...p) => existsSync(join(dir, ...p));
+  // 文件存在只证明有材料，不能恢复丢失的用户确认。
   const gates = m.stage_gates || {};
-  // skipped 是人裁决过的状态，盘上本来就没有对应产物，重扫不该把它冲掉。
-  const keep = (s, next) => (gates[s]?.status === 'skipped' ? 'skipped' : next);
-
-  // 判 done 用和 stage done 同一批结构校验，判定口径不分叉。
-  // 只有五维自评例外：它只活在 manifest 里、盘上没有，rebuild 不因它降级；
-  // 正常流转时 stage done 的闸门会查它。
-  const interviewOk = validateContextFile(dir).length === 0 && validateRoundsFile(dir).length === 0;
-  gates['1-interview'] = { ...(gates['1-interview'] || {}), status: keep('1-interview', interviewOk ? 'done' : 'in_progress') };
-
-  // 对照物判定和 gateDone 同一口径（开放命名）：manifest 记过的清单先用 missingArtifacts
-  // 复核；清单丢了（manifest 损坏重建）就扫目录，根下除影响面清单外的 .md/.html 都算。
-  const recorded = (gates['2-prototype']?.artifacts_confirmed || [])
-    .filter((n) => !/^impact-surface(\.md)?$/i.test(n));
-  const confirmed = recorded.length > 0 && missingArtifacts(dir, recorded).length === 0
-    ? recorded
-    : scanArtifacts(dir);
-  // 与 done 闸门同口径：判「有」而对照物缺 diagram.html 本尊，rebuild 同样不判 done。
-  const archNeedsDiagram = architectureJudgedPresent(dir)
-    && !(confirmed.some((n) => n.replace(/\.(md|html)$/i, '').toLowerCase() === 'diagram')
-      && existsSync(join(dir, '2-prototype', 'diagram.html')));
-  if (validateImpactSurfaceFile(dir).length === 0 && confirmed.length > 0 && !archNeedsDiagram) {
-    gates['2-prototype'] = { ...(gates['2-prototype'] || {}), status: keep('2-prototype', 'done'), artifacts_confirmed: confirmed };
-  } else {
-    if (archNeedsDiagram) {
-      console.log('2-prototype：架构与依赖判「有」但对照物缺 diagram.html，不判 done（与 done 闸门同口径）。');
+  for (const stage of STAGES) {
+    const gate = gates[stage] || { status: 'pending' };
+    if (['done', 'skipped'].includes(gate.status)) {
+      const errors = stage === '2-prototype'
+        ? missingArtifacts(dir, gate.artifacts_confirmed || [])
+        : gateDone(dir, stage, gate, m);
+      if (errors.length) {
+        gate.status = 'in_progress';
+        console.log(stage + '：' + errors.join('；'));
+      }
     }
-    gates['2-prototype'] = {
-      ...(gates['2-prototype'] || {}),
-      status: keep('2-prototype', has('2-prototype', 'impact-surface.md') ? 'in_progress' : 'pending'),
-    };
+    gates[stage] = gate;
   }
-
-  const contractOk = has('3-contract', 'contract.md') && m.validation?.status === 'valid';
-  gates['3-contract'] = {
-    ...(gates['3-contract'] || {}),
-    status: keep('3-contract', contractOk ? 'done' : (has('3-contract', 'contract.md') ? 'in_progress' : 'pending')),
-  };
-
   m.slug = slug;
   m.stage_gates = gates;
-  m.stage = STAGES.find((s) => !['done', 'skipped'].includes(gates[s].status)) || STAGES[STAGES.length - 1];
-  // 阶段闭合只代表契约已校验；契约声明 Blocked 时不能把它重新点亮成 ready。
-  m.status = STAGES.every((s) => ['done', 'skipped'].includes(gates[s].status))
-    ? (contractIsBlocked(dir) ? 'blocked' : 'ready')
-    : 'in_progress';
+  m.stage = STAGES.find((stage) => !['done', 'skipped'].includes(gates[stage].status)) || STAGES.at(-1);
+  m.status = STAGES.every((stage) => ['done', 'skipped'].includes(gates[stage].status))
+    && validationIsCurrent(dir, m.validation)
+    ? (contractIsBlocked(dir) ? 'blocked' : 'ready') : 'in_progress';
+  if (m.status !== 'ready' && m.status !== 'blocked') m.next_action = '核对已有授权与未完成内容；不要从文件存在推断确认。';
 
   const rounds = existsSync(roundsPath(dir))
     ? readFileSync(roundsPath(dir), 'utf8').split(/\r?\n/).filter(Boolean).length
@@ -721,21 +569,6 @@ function extractSection(md, heading) {
   return (end ? rest.slice(0, end.index) : rest).trim();
 }
 
-/** 口径闸门用：rounds 里是否问过/确认过复刻精度（ask/confirm 档 + 像素类关键词）。 */
-function caliberAsked(dir) {
-  const p = roundsPath(dir);
-  if (!existsSync(p)) return false;
-  for (const line of readFileSync(p, 'utf8').split(/\r?\n/)) {
-    if (!line.trim()) continue;
-    try {
-      const row = JSON.parse(line);
-      if ((row.tier === 'ask' || row.tier === 'confirm')
-        && /像素|复刻精度|视觉基准|逐像素/.test(JSON.stringify(row))) return true;
-    } catch { /* 坏行由 1-interview 的 rounds 闸门管，这里不重复报 */ }
-  }
-  return false;
-}
-
 /** 人验软闸用：Verify 段是否疑似以人的确认为通过条件——人称词与认可词邻近共现，
  *  或「等/待……确认」句式。「用户确认版」是合法语境（确认版对照物），先剔除再判。
  *  词级检测必带误伤，只点名不拒绝；真正的防线在 shape 文档的起草规则。 */
@@ -749,18 +582,6 @@ function cmdFinalize(argv) {
   const m = readManifest(dir);
   let failed = false;
 
-  // 0. 打回未修订拦截：3-contract 已被打回，而 contract.md 自上次 finalize 后没改过，
-  //    说明打回的裁决还没折进契约。fail-fast，不跑后续步骤——否则会拿旧稿的冒烟
-  //    覆盖 verify.txt，把好证据也冲掉。（要在下方覆写 m.validation 前读旧 ran_at。）
-  if (m.stage_gates?.['3-contract']?.status === 'needs_reinterview') {
-    const lastRan = m.validation?.ran_at ? Date.parse(m.validation.ran_at) : 0;
-    if (lastRan && statSync(cpath).mtimeMs <= lastRan + 2000) {
-      console.error(`3-contract 已被打回：${m.stage_gates['3-contract'].reason || m.validation?.stale_reason || '见访谈记录'}`);
-      console.error('但 contract.md 自上次 finalize 之后没改过——打回的裁决还没折进契约。先修订契约再 finalize。');
-      return 1;
-    }
-  }
-
   // 1. 结构校验
   const validator = join(HERE, 'validate-goal-contract.mjs');
   const vres = spawnSync(process.execPath, [validator, cpath], { encoding: 'utf8' });
@@ -772,11 +593,12 @@ function cmdFinalize(argv) {
     status: vres.status === 0 ? 'valid' : 'invalid',
     ac_count: acCount,
     warnings,
+    contract_digests: contractDigests(dir),
     ran_at: iso(),
   };
   if (vres.status !== 0) failed = true;
 
-  // 2. [A] 档冒烟（含一行多档的内嵌段）。此刻期望全红——红是对的，跑不起来才是错的。
+  // 2. 冒烟检查命令入口；非零退出仍需结合失败原因判断，不能证明业务断言有效。
   console.log('\n─── [A] 档冒烟 ───');
   const smoke = cmdVerify([dir, '--write', '--smoke']);
   if (smoke !== 0) failed = true;
@@ -805,9 +627,9 @@ function cmdFinalize(argv) {
   const acsWithA = new Set(verifies.filter((v) => v.tier === 'A').map((v) => v.ac));
   console.log(`档位分布（按段计，含内嵌）：[A] ${tiers.A} / [B] ${tiers.B} / [C] ${tiers.C} / [D] ${tiers.D}`);
   if (manual.length > 0) {
-    console.log(`以下 ${manual.length} 段无法自动判定，长时程执行里只有执行 Agent 的自陈：`);
+    console.log(`以下 ${manual.length} 段不由 finalize 自动执行，需要按约定核对相应证据：`);
     for (const v of manual) console.log(`  ${v.ac} [${v.tier}]${v.embedded ? '·内嵌' : ''} ${v.raw.slice(0, 64)}`);
-    console.log('  这不是错。但它们不会在 /goal 每轮的完成审计里被反驳，交接时要当面说清哪几条得人来看。');
+    console.log('  档位不代表证据强弱；交接时说明已取得和未取得的证据，以及人工决定责任。');
   }
   // 人验软闸：Verify 段以人的确认为通过条件（用户/员工确认、签字、审批）。/goal 的
   // 完成审计永远无法判定它——烧 turn 到三连闸 blocked，或执行 Agent 假自陈完成。
@@ -817,77 +639,46 @@ function cmdFinalize(argv) {
     console.log(`WARNING: 以下 ${humanGated.length} 段疑似以人的确认为通过条件：`);
     for (const v of humanGated) console.log(`  ${v.ac} [${v.tier}]${v.embedded ? '·内嵌' : ''} ${v.raw.slice(0, 64)}`);
     console.log('  /goal 的完成审计无法判定人的确认：烧 turn 到三连闸 blocked，或假自陈完成。');
-    console.log('  真人才能判的验收移「交付后人工复核」节；会话式交接可保留，转 /goal 前必须移走。');
+    console.log('  需真人决定的要求保留待人验；可用真实确认凭证承接，或改用会话式交接，不得自行移出完成条件。');
   }
   if (verifies.length > 0 && acsWithA.size === 0) {
-    console.log('WARNING: 一条 [A] 档都没有。完成判定全部依赖自陈，长时程执行等于没有终止条件。');
-    console.log('         回去看有没有哪条能升到 [A]；真人才能判的部分移「交付后人工复核」节，Verify 留执行 Agent 可自证的形态；');
-    console.log('         确实整份验收都靠人，跟用户说清，把人验条目整节落进「交付后人工复核」。');
+    console.log('提示：没有 [A] 命令段；finalize 不执行这些验证，请核对可复核证据与待验责任。');
+    console.log('         验证方式由任务承诺决定，不为档位补命令；需真人确认的不能由 Agent 代答。');
+    console.log('         只有既有授权允许交付后复核时才如此安排；否则保留未满足要求。');
   }
 
-  // 口径闸门：界面对照物在场的契约，复刻精度必须问过。「结构非像素」曾是 aes-prototype
-  // 的默认口径，2026-08-31 aes-agent 实例证明默认档会吞掉验收口径——finalize 全绿后仍被
-  // 「完全复刻」整族打回。口径是尺子，只有用户裁过才算数：rounds 里没有 ask/confirm 档
-  // 的像素类记录即拒，契约正文写没写口径词不作数（写过也可能只是默认档的自述）。
-  const confirmedArtifacts = m.stage_gates?.['2-prototype']?.artifacts_confirmed || [];
-  const uiMockPresent = /mock[\w-]*\.html/i.test(md)
-    || confirmedArtifacts.some((n) => /^mock(\.html)?$/i.test(String(n).trim()));
-  if (uiMockPresent && !caliberAsked(dir)) {
-    console.error('\n契约引用了界面对照物（mock.html），但访谈里从没问过复刻精度口径（结构/状态级/双轨/像素）。');
-    console.error('回契约阶段把「判到多严」带候选问用户，问过用 session.mjs round 落盘（ask/confirm 档，');
-    console.error('含像素/复刻精度/视觉基准关键词），再回来 finalize。像素级要顺带点名不可修改的规格源。');
-    failed = true;
-  }
-  // 尺子锁定：声明了像素级还原，规格源却没点名——尺子还留在执行者手里，改尺子永远
-  // 比改工件容易。只警告：规格源可能就是 mock 本身，机器分不出来。
-  if (/锁像素|像素还原|逐像素/.test(md)) {
-    const rulerHolders = `${extractSection(md, '强约束') || ''}\n${extractSection(md, '读什么') || ''}`;
-    if (!/`[^`]+`/.test(rulerHolders)) {
-      console.log('WARNING: 契约声明像素级还原，但强约束/「读什么」没有反引号点名的规格源路径。');
-      console.log('         像素级要锁尺子：规格源写进强约束并声明不可修改（执行 Agent 改的是产品不是尺子），基准替换记 overturned。');
-    }
-  }
-
-  // 残留风险对账：manifest 记着赌过的东西，契约里却没有这一节时直接拒。
-  // 契约会被单独拿走，manifest 不会跟着走——这一节缺失时，最先丢的就是它。
-  const skippedStages = STAGES.filter((s) => m.stage_gates?.[s]?.status === 'skipped');
-  if ((m.residual_risk || skippedStages.length > 0) && extractSection(md, '残留风险') === null) {
-    console.error('\n这次访谈留了没问清的东西，但契约里没有「残留风险」这一节：');
-    if (m.residual_risk) console.error(`  manifest 记着：${m.residual_risk}`);
-    for (const s of skippedStages) {
-      console.error(`  ${s} 被跳过：${m.stage_gates[s].reason || '未写理由'}`);
-    }
-    console.error('补一节写清没问清什么、错了会怎样，再 finalize。');
+  // 不从 mock 文件名或提问关键词推断验收口径；口径由已有授权与契约明确。
+  if (m.residual_risk && extractSection(md, '残留风险') === null) {
+    console.error('manifest 记有残留风险，但契约未携带：' + m.residual_risk);
     failed = true;
   }
 
   // 4. 交接指令现场生成，不落盘：契约改了它就该跟着变。
   const goal = extractSection(md, '目标');
-  const oneline = ((goal || '').split(/\r?\n/).map((s) => s.trim()).filter(Boolean)[0] || '')
+  const oneline = (goal || '').split(/\r?\n/).map((s) => s.trim()).filter(Boolean).join(' ')
     .replace(/[。.！!]+$/, '');
   // 「自主边界」写了才进这一句：它决定执行 Agent 计划外情况下停不停手，是每 turn 重注入
   // 的 objective 里唯一值得多花的字符。没写就不提，免得指向一节不存在的内容。
   const autonomy = extractSection(md, '自主边界') === null
     ? ''
     : '计划外的事按该文档「自主边界」节自行判断。';
-  const handoff = `/goal 完成 ${cpath} 定义的目标：${oneline}。验收以该文档「验收条件」节全部 Verify 通过、「强约束」节全部保持为准。${autonomy}`;
+  const handoff = `/goal 完成 ${cpath} 定义的目标：${oneline}。先读完整契约及引用，结合原始背景、范围和确认的对照物理解期望结果。完成须有证据支持目标、全部已确认验收条件及强约束；Verify 全过不能覆盖已发现的目标偏差。围绕目标和实际影响选择验证，考虑准备、执行、诊断和维护的时间成本；不擅自降低已确认的要求。${autonomy}`;
   console.log('\n─── 交接指令 ───');
-  console.log(handoff);
   if (handoff.length > GOAL_OBJECTIVE_LIMIT) {
-    console.error(`\n交接指令 ${handoff.length} 字符，超过 codex create_goal 的 ${GOAL_OBJECTIVE_LIMIT} 上限。`);
-    console.error('压缩契约「目标」节那一句话，别指望 codex 截断——它会直接拒收。');
-    failed = true;
+    console.log(`按 ${cpath} 执行。先完整阅读契约及引用，按会话式交接模板完成目标、全部已确认验收条件及强约束；不要以 Verify 全过覆盖已发现的目标偏差。`);
+    console.log(`WARNING: /goal 指令 ${handoff.length} 字符，超过本地 ${GOAL_OBJECTIVE_LIMIT} 字符兼容限制，已改用会话式交接；契约内容未删减。`);
+  } else {
+    console.log(handoff);
   }
 
-  // 交付后人工复核 → 用户待办清单。它不属于执行 Agent 的完成判定（objective 只绑
-  // 「验收条件」和「强约束」），塞进 objective 只会让完成审计多一个永不可判项。
+  // 已授权安排在交付后的人工复核作为用户待办列出，不代替尚未满足的完成条件。
   const postReview = extractSection(md, '交付后人工复核');
   if (postReview) {
     const items = postReview.split(/\r?\n/).filter((line) => /^-\s+/.test(line));
     if (items.length > 0) {
       console.log('\n─── 交付后人工复核（用户待办，不属于执行 Agent 完成判定）───');
       for (const line of items) console.log(line.replace(/^-\s+/, '').trim());
-      console.log('  交接时把这份清单交给用户本人：条目在 /goal 完成审计范围之外，由人交付后复核。');
+      console.log('  交给用户本人；此安排应已有授权，清单存在不表示其中要求已经满足。');
     }
   }
 
@@ -899,16 +690,19 @@ function cmdFinalize(argv) {
         .filter((line) => /^-\s+/.test(line))
         .map((line) => line.replace(/^-\s+/, '').trim())
       : [];
-    m.status = blocked ? 'blocked' : 'ready';
+    const closed = STAGES.every((stage) => ['done', 'skipped'].includes(m.stage_gates?.[stage]?.status));
+    m.status = blocked ? 'blocked' : (closed ? 'ready' : 'in_progress');
     m.next_action = blocked
       ? `契约已校验，但仍有阻塞项；解除后重新核验再交接。契约：${cpath}`
-      : `契约已就绪，把交接指令发给执行 Agent。契约：${cpath}`;
+      : `契约机器校验已通过；核对已有授权后用 stage done 声明交接就绪。契约：${cpath}`;
     // 重新走完全部闸门的这份 validation 是现行的，打回标记随之解除。
     delete m.validation.stale;
     delete m.validation.stale_reason;
   } else {
     // 失败分支同步提示：否则 status 残留 ready、next_action 还是旧的「发给执行 Agent」，
     // list 裸显 ready 误导交接（2026-10-20 语料：done 后修订、重 finalize 失败的场景）。
+    m.validation.status = 'invalid';
+    m.status = 'in_progress';
     m.next_action = `finalize 未通过：按上方失败项修正契约后重跑。契约：${cpath}`;
   }
   writeManifest(dir, m);
@@ -925,14 +719,7 @@ function contractStaleNote(dir, m) {
   // 非 valid（含 invalid）也要可见：否则残留 ready 在列表里裸奔（与 finalize 失败分支的
   // next_action 修复同案）。
   if (m.validation.status !== 'valid') return '⚠finalize未通过';
-  const limit = Date.parse(m.validation.ran_at) + 2000;
-  const cdir = join(dir, '3-contract');
-  if (!existsSync(cdir)) return '';
-  for (const f of readdirSync(cdir)) {
-    if (/^contract.*\.md$/i.test(f) && statSync(join(cdir, f)).mtimeMs > limit) {
-      return '⚠契约改动晚于finalize';
-    }
-  }
+  if (!validationIsCurrent(dir, m.validation)) return '⚠契约改动晚于finalize';
   return '';
 }
 

@@ -6,8 +6,8 @@
  * 退出码：0 通过，1 有 ERROR，2 用法或读文件出错。
  *
  * 查这些：
- *   1. 验收条件 1 到 7 条。超了说明这个任务该拆，不是把条数压回去。
- *   2. AC 编号是连续唯一的三位 AC-001、AC-002。
+ *   1. 至少一条验收条件；条数不决定任务是否应拆分。
+ *   2. AC 编号是唯一的三位标识，允许缺号。
  *   3. 每条 AC 恰好挂一行缩进的 "- Verify: [A|B|C|D] <内容>"。一行内可续写内嵌档段
  *      （「[C] 步骤…；[A] `命令`」），首档是主档。
  *   4. [A] 和 [B] 的 Verify 没写反引号命令或路径时给 WARNING。
@@ -20,9 +20,9 @@
  *  10. [A] 档段没写反引号命令直接拒（含一行多档里的内嵌 [A]）：session.mjs verify
  *      靠反引号抽命令，抽不出就静默漏跑，而漏跑的那段 AC 看起来跟通过了一模一样。
  *  11. 契约在 issue 目录里但同级没有 manifest.json 时给 WARNING。
- *  12. 「读什么」指向 2-prototype 下的对照物但文件不在时给 WARNING。
- *  13. 「自主边界」「残留风险」写了就不能空着，且只能各出现一次。
- *  14. 引用 issue 目录里的过程文件直接拒——契约必须自包含。
+ *  12. 「读什么」明确引用的本地依据不存在时拒收。
+ *  13. 「自主边界」「残留风险」接受有效正文，且只能各出现一次。
+ *  14. 交接可汇总内容或引用可取得的必要依据。
  */
 
 import { existsSync, readFileSync } from 'node:fs';
@@ -99,15 +99,11 @@ for (const legacy of [
   }
 }
 
-// 目标：存不存在由校验器查，这里只查它是不是一句话。写成任务清单是最常见的走形。
+// 目标需要有实质内容；段落、列表和篇幅不能代替对目标含义的判断。
 const goal = section('目标');
 if (goal !== null) {
   if (!meaningful(goal)) {
-    errors.push('目标要写一句能观察到的完成状态。');
-  } else if (/^-\s+/m.test(goal) || /^\d+[.)]\s+/m.test(goal)) {
-    errors.push('目标写成了列表。它是一句话的完成状态，不是任务清单。');
-  } else if (goal.length > 600) {
-    errors.push('目标太长，细节挪进范围、验收条件或者仓库里的文件。');
+    errors.push('目标要说明能观察到的完成状态。');
   }
 }
 
@@ -128,18 +124,8 @@ const uniqueAcceptanceIds = [...new Set(acceptanceIds)];
 if (acceptanceIds.length < 1) {
   errors.push('验收条件至少要有一条 AC。');
 }
-if (acceptanceIds.length > 7) {
-  errors.push('一个任务最多七条 AC。拆成几个能独立交付的任务，不要写成规格书。');
-}
 if (uniqueAcceptanceIds.length !== acceptanceIds.length) {
   errors.push('AC 编号有重复。');
-}
-for (let index = 0; index < acceptanceIds.length; index += 1) {
-  const expected = `AC-${String(index + 1).padStart(3, '0')}`;
-  if (acceptanceIds[index] !== expected) {
-    errors.push(`AC 编号要连续，这里应该是 ${expected}。`);
-    break;
-  }
 }
 for (const match of acMatches) {
   const criterion = match[2].trim();
@@ -228,25 +214,15 @@ for (const optional of ['读什么', '要落盘的东西', '挡着的事', '自�
 // 人都会照此当真，而底下什么都没有。要么写满，要么整节删掉。
 for (const declared of ['自主边界', '残留风险']) {
   const body = section(declared);
-  if (body !== null && bulletLines(body).length < 1) {
-    errors.push(`「${declared}」写了标题就至少给一条，空着看起来像已经想过了。不写就整节删掉。`);
+  if (body !== null && !meaningful(body)) {
+    errors.push(`「${declared}」写了标题就给出有效正文；不需要时省略。`);
   }
 }
 
-// 契约必须自包含：单独拿走它仍然完整可交接。唯一允许指向 issue 目录内部的，是「读什么」
-// 点名的确认版对照物（2-prototype/ 根下那几份）。指回过程文件的契约一旦被单独拿走就残废了,
-// 而它恰恰是这套流程里唯一会被单独拿走的那份文件——交接指令只给它一个路径。
-const processRefs = new Set(
-  [...content.matchAll(/(1-interview\/|2-prototype\/drafts\/|manifest\.json|rounds\.jsonl|impact-surface\.md)/g)]
-    .map((match) => match[1]),
-);
-for (const ref of processRefs) {
-  errors.push(`引用了过程文件 ${ref}，契约就不自包含了。那里的结论要聚进契约本身，不是指回素材。`);
-}
-
+// 实际依赖可以汇总或引用；引用材料的可访问性与固定过程文件名无关。
 const readFirst = section('读什么');
-if (readFirst !== null && bulletLines(readFirst).length < 1) {
-  errors.push('「读什么」写了就至少给一条指路。');
+if (readFirst !== null && !meaningful(readFirst)) {
+  errors.push('「读什么」写了就给出有效依据。');
 }
 
 // 确认版对照物应该从「读什么」指路。引用了 HTML 对照物（mock / diagram）却没有这一节时，
@@ -267,9 +243,11 @@ if (/[\\/]3-contract$/.test(contractDir) && !existsSync(join(issueDir, 'manifest
 // 「读什么」指向的对照物必须真的在。指了一份不存在的文件，执行 Agent 会当作
 // 「这份对照物我读不到，那就自己发明」——比不指还糟。
 if (readFirst !== null) {
-  for (const ref of readFirst.matchAll(/`([^`]*2-prototype\/[^`]+)`/g)) {
-    if (!existsSync(resolve(contractDir, ref[1]))) {
-      warnings.push(`「读什么」指向的对照物不存在：${ref[1]}`);
+  for (const ref of readFirst.matchAll(/`([^`]+)`/g)) {
+    const path = ref[1];
+    if (/^(?:https?:|app:|codex:)/i.test(path)) continue;
+    if (/^(?:\.{1,2}[\\/]|[\\/]|[A-Za-z]:[\\/])/.test(path) || /2-prototype[\\/]/.test(path)) {
+      if (!existsSync(resolve(contractDir, path))) errors.push(`「读什么」指向的依据不存在：${path}`);
     }
   }
 }

@@ -1,3 +1,4 @@
+import { validationIsCurrent } from './validation.mjs';
 // dossier.mjs — 决策档案投影库（家族真源 → 单页档案）
 //
 // 家族版 scripts/export-dossier.mjs 直接 import 本文件。web 版（workflow-interview-web）
@@ -187,7 +188,7 @@ function projectFamilyTrajectory(issueDir) {
   return { rounds, submissions, open_ambiguities: openAmbiguities };
 }
 
-/** contract.md 的 ## 节 → final 视图。只在 finalize 校验通过后投影为契约，未过校验仍是候选。 */
+/** contract.md 的 ## 节 → final 视图；确认状态来自宿主记录，不由文件存在推断。 */
 function projectContractFinal(md, slug) {
   if (!md) return null;
   const sections = [];
@@ -223,19 +224,21 @@ const PROTOTYPE_ARTIFACTS = [
   ['impact-surface', 'impact-surface.md', '影响面扫描'],
 ];
 
-/** manifest 里 artifacts_confirmed 的名字口径与 session.mjs 一致：可带或不带扩展名、不分大小写。 */
-function artifactKey(name) {
-  return String(name).replace(/\.(md|html)$/i, '').toLowerCase();
-}
-
 /** 2-prototype 阶段的结果投影：门禁记录、确认版对照物（固定顺序）、目录里其余顶层产物、草稿清单。
  * markdown / json 对照物的正文投影进档案（超过 MARKDOWN_LIMIT 的只给链接）；HTML 原型不内嵌，按相对路径 iframe 引用。 */
 function projectPrototype(issueDir, manifest) {
   const dir = join(issueDir, '2-prototype');
   if (!existsSync(dir)) return null;
   const gate = manifest?.stage_gates?.['2-prototype'] ?? null;
-  const confirmed = new Set((gate?.artifacts_confirmed ?? []).map(artifactKey));
   const entries = new Map(readdirSync(dir, { withFileTypes: true }).filter((entry) => entry.isFile()).map((entry) => [entry.name, entry]));
+  const confirmed = new Set((gate?.artifacts_confirmed ?? []).map((name) => {
+    const candidates = [String(name), `${name}.md`, `${name}.html`].map((x) => x.toLowerCase());
+    for (const candidate of candidates) {
+      const actual = [...entries.keys()].find((entry) => entry.toLowerCase() === candidate);
+      if (actual) return actual;
+    }
+    return null;
+  }).filter(Boolean));
   const seen = new Set();
   const artifacts = [];
   const push = (key, name, title) => {
@@ -245,7 +248,7 @@ function projectPrototype(issueDir, manifest) {
     const extension = extname(name).toLowerCase();
     const kind = extension === '.html' ? 'html' : extension === '.md' ? 'markdown' : extension === '.json' ? 'json' : 'file';
     const bytes = statSync(pathname).size;
-    const record = { key, path: `2-prototype/${name}`, title, bytes, confirmed: confirmed.has(artifactKey(key)), kind };
+    const record = { key, path: `2-prototype/${name}`, title, bytes, confirmed: confirmed.has(name), kind };
     if (kind === 'markdown' && bytes <= MARKDOWN_LIMIT) record.markdown = readText(pathname);
     if (kind === 'json' && bytes <= MARKDOWN_LIMIT) record.json = readJson(pathname, null);
     artifacts.push(record);
@@ -333,7 +336,8 @@ export function buildDossier(issueDirInput) {
     submissions = family?.submissions ?? {};
   }
   const contractMarkdown = readText(join(issueDir, '3-contract', 'contract.md'));
-  if (!state.final && contractMarkdown && manifest?.validation?.status === 'valid') {
+  const ready = manifest?.status === 'ready' && validationIsCurrent(issueDir, manifest?.validation);
+  if (contractMarkdown && ready) {
     state.final = projectContractFinal(contractMarkdown, state.slug);
   }
   const base = {
@@ -342,7 +346,7 @@ export function buildDossier(issueDirInput) {
     slug: state.slug ?? basename(issueDir),
     title: state.dossier?.title ?? state.slug ?? basename(issueDir),
     generated_at: new Date().toISOString(),
-    status: state.final ? 'contract' : state.open_ambiguities === 0 ? 'aligned' : 'in-progress',
+    status: ready ? 'contract' : state.final ? 'contract-preview' : 'in-progress',
     state,
     manifest,
     context_markdown: readText(join(issueDir, '1-interview', 'context.md')),
@@ -511,14 +515,21 @@ function answerSummary(answer, booleanLabels) {
   return JSON.stringify(answer);
 }
 
+function renderOptionFacts(option) {
+  const facts = [['覆盖', option.covers], ['好处', option.pros], ['代价', option.cons]]
+    .map(([label, value]) => [label, Array.isArray(value) ? value.join(' · ') : value])
+    .filter(([, value]) => value);
+  return facts.length ? '<dl>' + facts.map(([label, value]) => '<div><dt>' + label
+    + '</dt><dd>' + escapeHtml(value) + '</dd></div>').join('') + '</dl>' : '';
+}
+
 function renderOptions(item, answer) {
   const selected = new Set(answer?.type === 'choice' ? [answer.choice] : answer?.type === 'multi' ? answer.choices : []);
   if (!(item.options ?? []).length) return '';
-  const detail = (value) => Array.isArray(value) ? value.join(' · ') : value || '未说明';
   return `<div class="option-records">${item.options.map((option) => `
     <article class="option-record ${selected.has(option.key) ? 'selected' : ''}">
       <header><strong>${selected.has(option.key) ? '✓ ' : ''}${escapeHtml(option.key)}. ${escapeHtml(option.text)}</strong>${option.pct !== undefined ? `<span>${escapeHtml(option.pct)}%</span>` : ''}</header>
-      <dl><div><dt>覆盖</dt><dd>${escapeHtml(option.covers || '未说明')}</dd></div><div><dt>好处</dt><dd>${escapeHtml(detail(option.pros))}</dd></div><div><dt>代价</dt><dd>${escapeHtml(detail(option.cons))}</dd></div></dl>
+      ${renderOptionFacts(option)}
     </article>`).join('')}</div>`;
 }
 

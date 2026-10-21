@@ -146,8 +146,8 @@ const roundOne = {
         q_id: 'Q1', tier: 'ask', question: '跨天提交采用哪条边界？', known_facts: '提交入口可独立存活。',
         irreversible: true, allow_custom: true,
         options: [
-          { key: 'A', text: '48h 缓冲', pct: 65, recommended: true, covers: '提交入盘；不保活 Agent', pros: ['隔天可用'], cons: ['留驻进程'] },
-          { key: 'B', text: '会话内存活', pct: 35, pros: ['收尾简单'], cons: ['关宿主后不可交互'] },
+          { key: 'A', text: '48h 缓冲', recommended: true, covers: '提交入盘；不保活 Agent', pros: ['隔天可用'], cons: ['留驻进程'] },
+          { key: 'B', text: '会话内存活', pros: ['收尾简单'], cons: ['关宿主后不可交互'] },
         ],
       },
       { q_id: 'D1', tier: 'default', line: '草稿 localStorage 保存 — 刷新恢复 — 代价：少量状态管理' },
@@ -174,10 +174,10 @@ try {
   check('server start → plain loopback URL；HTTP/WS 无 key、cookie 或登录');
 
   const invalid = structuredClone(roundOne);
-  invalid.round.items[0].options[1].pct = 20;
+  invalid.round.items[0].options[1].pct = 'invalid';
   const invalidResult = run(PUBLISH, ['round', '--issue-dir', issueDir, '--file', writeJson('invalid-round.json', invalid)]);
-  assert(invalidResult.status === 1 && /100±2/.test(invalidResult.stderr), 'pct 和非法轮次未被拒绝');
-  check('publish 拒绝 pct 和不在 100±2 的 round');
+  assert(invalidResult.status === 1 && /pct/.test(invalidResult.stderr), '非数字 pct 未被拒绝');
+  check('publish 拒绝格式错误的可选 pct');
 
   const attachment = join(workDir, 'prototype.html');
   writeFileSync(attachment, '<!doctype html><title>prototype fixture</title>\n', 'utf8');
@@ -385,7 +385,8 @@ try {
   assert(!runtimeSources[2].includes('armDeferredContinuation') && runtimeSources[2].includes('waitForSubmissionTransport'), 'wait-submit 必须是 transport-only，不得 arm continuation');
   assert(!runtimeSources[0].includes('.aes-workflow') && !runtimeSources[0].includes('repoRootFrom'), 'server 仍向 issue 目录外写 .aes-workflow 或保留 repoRootFrom');
   const skill = readFileSync(join(SKILL_ROOT, 'SKILL.md'), 'utf8');
-  assert(skill.includes('人工 follow-up 主路径') && skill.includes('Node 不可用 → 纯文本') && skill.includes('浏览器不可用 → 纯文本') && skill.includes('不启动') && skill.includes('模型等待器'), 'SKILL.md 降级或人工 follow-up 主路径不完整');
+  const instructions = skill + '\n' + readFileSync(join(SKILL_ROOT, 'references', 'web-protocol.md'), 'utf8');
+  assert(instructions.includes('人工 follow-up 主路径') && instructions.includes('Node 不可用 → 纯文本') && instructions.includes('浏览器不可用 → 纯文本') && instructions.includes('不启动') && instructions.includes('模型等待器'), '入口及协议的降级或人工 follow-up 主路径不完整');
   assert(skill.includes('仅当用户显式调用 $workflow-interview-web') && !skill.includes('disable-model-invocation:'), 'SKILL.md 显式调用边界或标准 frontmatter 不正确');
   const openaiMetadata = readFileSync(join(SKILL_ROOT, 'agents', 'openai.yaml'), 'utf8');
   assert(/allow_implicit_invocation:\s*false/.test(openaiMetadata), 'openai.yaml 没有关闭隐式调用');

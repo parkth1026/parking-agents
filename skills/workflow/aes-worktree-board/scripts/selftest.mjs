@@ -16,7 +16,7 @@ import {
 import { resolveCommand } from './command.mjs';
 import { HEADLESS_CHILD_OPTIONS } from './headless.mjs';
 import { prepareGithubAccess, runGithubJson } from './github-identity.mjs';
-import { parseIssueContract, SECTION_FIELD_NAMES } from './issue-contract.mjs';
+import { buildWorkOrder, contractDigestOf, parseIssueContract, SECTION_FIELD_NAMES } from './issue-contract.mjs';
 import {
   consumeEvent, CONTROL_STATES, createTask, evaluateStop, heartbeatTask, pendingInbox, putInboxEvent,
   EXECUTOR_FINAL_SCHEMA, nextActions, receiveActionReceipt, recordBlock, runPostMergeVerification, setVerdict, startGoal,
@@ -26,7 +26,7 @@ import { defaultSlotsFromWorktrees, discoverWorktrees } from './runner-slots.mjs
 import { readJson, readJsonLines, readRegistry, writeJsonAtomic } from './runtime-store.mjs';
 import {
   deliveryMergeScenario, discoveredWorkScenario, integrationBaseAdvanceStaleEvidence, recoveryScenario, runnerLifecycleScenario,
-  stageResultSchemaBackwardCompat, reviewerIndependenceScenario, missingReviewerSessionIdScenario,
+  stageResultSchemaBackwardCompat, contractContextUpgradeScenario, reviewerIndependenceScenario, missingReviewerSessionIdScenario,
   acceptanceInvalidationScenario, humanOpenEvidenceScenario, attemptReassignScenario,
   outboxCloseScenario, outboxFlushScenario, outboxAckScenario, outboxGateScenario,
   repositoryGateLevelScenario,
@@ -4487,7 +4487,8 @@ async function orchestrationContractMarkers() {
   assert.equal(TASK_STATES.length, 14);
   assert.ok(CONTROL_STATES.includes('orchestration-stop'));
   assert.ok(!TASK_STATES.includes('orchestration-stop'));
-  const skill = readFileSync(join(SKILL_DIR, 'SKILL.md'), 'utf8');
+  const skill = ['SKILL.md', 'references/desktop-orchestration.md', 'references/control-plane.md']
+    .map((file) => readFileSync(join(SKILL_DIR, file), 'utf8')).join('\n');
   for (const marker of [
     'Desktop `create_thread`', 'wait_threads', 'read_thread', 'send_message_to_thread',
     'registry.json', 'inbox pending', '三维 verdict', 'BLOCK 熔断', '全局停止', 'orchestration-stop',
@@ -4753,6 +4754,36 @@ function withDuplicateSection(body, sectionKey) {
 }
 
 async function contractDomain() {
+  await contractContextUpgradeScenario();
+  const issue = { repo: 'example/repo', number: 99, url: 'https://example.invalid/issues/99', title: '目标交接',
+    body: singleContractIssueBody().replace('让 issue-contract 的重复小节可靠地判 invalid。',
+      '下游脚本能稳定消费审计结果。\n- 输出有确定的字段含义。\n- 既有文本消费者仍能工作。') };
+  const parsed = parseIssueContract(issue);
+  assert.equal(parsed.complete, true);
+  const digest = contractDigestOf(parsed);
+  const order = buildWorkOrder({ jobId: 'goal-job', attemptId: 'goal-attempt', issue, parsed,
+    contractDigest: digest, runner: { slotId: 'one', worktreePath: '/tmp/goal', baseCommit: 'abc' } });
+  const transported = JSON.parse(JSON.stringify(order));
+  assert.equal(transported.issue.goal, parsed.contract.goal, '工单完整保留多行目标，而非仅传 AC');
+  assert.equal(transported.issue.sourceBody, issue.body, '原有背景与范围随工单传递，不强求 worker 新增网络权限');
+  assert.equal(transported.issue.contractDigest, digest);
+  assert.deepEqual(transported.issue.acceptanceCriteria, parsed.contract.acceptanceCriteria);
+  assert.deepEqual(transported.issue.allowedSideEffects, parsed.contract.allowedSideEffects);
+  assert.deepEqual(transported.issue.humanGates, parsed.contract.humanGates);
+  const changed = parseIssueContract({ ...issue, body: issue.body.replace('稳定消费', '可靠消费') });
+  assert.notEqual(contractDigestOf(changed), digest, '目标变化继续使旧契约证据失效');
+  const scoped = { ...issue, body: issue.body + '\n## 强约束\n\n保留已有实体 ID。\n' };
+  const revised = { ...scoped, body: scoped.body.replace('保留已有实体 ID。', '允许重新生成实体 ID。') };
+  assert.notEqual(contractDigestOf(parseIssueContract(scoped)), contractDigestOf(parseIssueContract(revised)),
+    '只改正文强约束也必须改变摘要，不能沿用旧 QA');
+  const legacy = parseIssueContract({ contract: { ...parsed.contract, sourceBody: undefined } });
+  const legacyOrder = buildWorkOrder({ jobId: 'old-job', attemptId: 'old-attempt', issue: {}, parsed: legacy,
+    contractDigest: contractDigestOf(legacy), runner: { slotId: 'old', worktreePath: '/tmp/old', baseCommit: 'abc' } });
+  assert.equal(Object.hasOwn(legacyOrder.issue, 'sourceBody'), false, '无正文旧输入不被要求补正文');
+  assert.equal(contractDigestOf(legacy), contractDigestOf(parseIssueContract({ contract: {
+    ...legacy.contract, sourceBody: undefined,
+  } })), '旧结构化输入的摘要继续稳定');
+
   const validBody = singleContractIssueBody();
 
   // 回归：无重复的单份契约块必须逐字段解析成功，不能因为本次修复而破坏既有
@@ -4826,7 +4857,8 @@ async function layoutDomain() {
     cwd: ROOT,
   });
   assert.equal(diff.status, 0, 'run.toml 与 .gitignore 必须恢复原样');
-  const skillSource = readFileSync(join(SKILL_DIR, 'SKILL.md'), 'utf8');
+  const skillSource = ['SKILL.md', 'references/desktop-orchestration.md', 'references/control-plane.md']
+    .map((file) => readFileSync(join(SKILL_DIR, file), 'utf8')).join('\n');
   assert.match(skillSource, /\.agents\/skills\/aes-worktree-board/);
   assert.doesNotMatch(skillSource, /\.claude\/skills\/aes-worktree-board/);
   assert.match(skillSource, /AES_WORKTREE_BOARD_REPO_ROOT/);

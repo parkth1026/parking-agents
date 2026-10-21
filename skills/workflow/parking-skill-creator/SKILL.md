@@ -93,7 +93,7 @@ node scripts/init-skill.mjs <技能名> --structure <workflow|task|reference|cap
 
 写 SKILL.md 的完整方法论见 `references/writing-guide.md`，核心：
 
-- **渐进披露**：description 常驻上下文；正文 <500 行；细节进 references 并在正文留「何时读哪个文件」的指针。
+- **精简与按需读取**：假定 AI 已具备能力，正文只留目的、关键判断与必要边界；模板可详细，协议按需引用。不设字数配额，也不把冗长正文搬成每次必读的附件。
 - **description 形态由第 1 步的触发模式决定**：语境触发=做什么+何时用写全并主动招揽（agent 天生漏触发）；名字触发=只写名字、中英双语；手动专用=只写名字+双开关；「何时使用」信息只在 description，不写正文节。
 - **风格**：祈使句；解释为什么而不是堆 MUST；从反馈泛化而不是过拟合测试例子；写完初稿用新眼光重读一遍。
 

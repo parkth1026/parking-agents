@@ -206,7 +206,7 @@ export function buildDossier(issueDirInput, {
     slug: state.slug ?? basename(issueDir),
     title: state.dossier?.title ?? state.slug ?? basename(issueDir),
     generated_at: new Date().toISOString(),
-    status: state.final ? 'contract' : state.open_ambiguities === 0 ? 'aligned' : 'in-progress',
+    status: state.final ? 'contract-preview' : 'in-progress',
     continuation: continuation ?? readPublicContinuation(issueDir, state),
     state,
     manifest: readJson(join(issueDir, 'manifest.json'), null),
@@ -303,13 +303,21 @@ function answerSummary(answer, booleanLabels) {
   return JSON.stringify(answer);
 }
 
+function renderOptionFacts(option) {
+  const facts = [['覆盖', option.covers], ['好处', option.pros], ['代价', option.cons]]
+    .map(([label, value]) => [label, Array.isArray(value) ? value.join(' · ') : value])
+    .filter(([, value]) => value);
+  return facts.length ? '<dl>' + facts.map(([label, value]) => '<div><dt>' + label
+    + '</dt><dd>' + escapeHtml(value) + '</dd></div>').join('') + '</dl>' : '';
+}
+
 function renderOptions(item, answer) {
   const selected = new Set(answer?.type === 'choice' ? [answer.choice] : answer?.type === 'multi' ? answer.choices : []);
   if (!(item.options ?? []).length) return '';
   return `<div class="option-records">${item.options.map((option) => `
     <article class="option-record ${selected.has(option.key) ? 'selected' : ''}">
       <header><strong>${selected.has(option.key) ? '✓ ' : ''}${escapeHtml(option.key)}. ${escapeHtml(option.text)}</strong>${option.pct !== undefined ? `<span>${escapeHtml(option.pct)}%</span>` : ''}</header>
-      <dl><div><dt>覆盖</dt><dd>${escapeHtml(option.covers || '未说明')}</dd></div><div><dt>好处</dt><dd>${escapeHtml(option.pros?.join(' · ') || '未说明')}</dd></div><div><dt>代价</dt><dd>${escapeHtml(option.cons?.join(' · ') || '未说明')}</dd></div></dl>
+      ${renderOptionFacts(option)}
     </article>`).join('')}</div>`;
 }
 

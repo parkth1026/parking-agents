@@ -23,7 +23,9 @@ aes-qa 的一致锚点：无论输入是代码变更还是需求描述，先推�
 _Avoid_: 测试目标、验收目标
 
 **契约 AC（Contract AC）**:
-有显式来源（goal-contract、issue、需求原文）的验收标准，aes-qa 中唯一判 PASS/FAIL 的依据。
+有显式来源（goal-contract、issue、需求原文）的验收标准，用于补充说明本次期望完成形态中的
+重要成功差异。Verify 提供判断依据；AC 不替代已确认目标、范围与约束，也不等于通用 QA 清单。
+验收判定以这些已确认内容为依据，不能把惯例或额外品质偏好升级为要求。
 _Avoid_: 惯例 AC（判罚地位不同的另一层）
 
 **惯例 AC（Convention AC）**:
