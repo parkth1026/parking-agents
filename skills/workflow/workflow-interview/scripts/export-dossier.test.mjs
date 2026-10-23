@@ -7,7 +7,7 @@
  * 断言纯对话载体（无 web/ 目录）也能产出与 web 版同构的档案。
  */
 
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
@@ -18,6 +18,8 @@ const SESSION = join(HERE, 'session.mjs');
 const EXPORT = join(HERE, 'export-dossier.mjs');
 const ROOT = mkdtempSync(join(tmpdir(), 'dossier-test-'));
 mkdirSync(join(ROOT, '.git'), { recursive: true });
+if (spawnSync('git', ['init', '-q', ROOT]).status !== 0) throw new Error('隔离 Git 初始化失败');
+writeFileSync(join(ROOT, '.gitignore'), '/artifacts/\n', 'utf8');
 
 let total = 0;
 let failed = 0;
@@ -157,6 +159,126 @@ try {
   check('export/五个页签且 hash 路由脚本在场',
     (thirdHtml.match(/<section class="tab-panel" id="tab-/g) ?? []).length === 5 && thirdHtml.includes("addEventListener('hashchange', route)"),
     '页签结构不对');
+
+  // 场景四：旧 Web 已保存用户原答，family 继续记录契约修订。两者是既有来源，
+  // 导出必须合并投影，不改写原来源，也不能让 Web 状态静默遮住新修订。
+  const webSlug = '2026-01-02-Web修订';
+  const webDir = join(ROOT, '.aes-workflow', 'grilling', webSlug);
+  check('web/init 独立任务', run(SESSION, 'init', webSlug).status === 0);
+  const put = (p, value) => { const pathname = join(webDir, p); mkdirSync(dirname(pathname), { recursive: true }); writeFileSync(pathname, value, 'utf8'); };
+  const json = value => `${JSON.stringify(value, null, 2)}\n`;
+  put('1-interview/context.md', '# 上下文\n保留旧 Web 回答和新修订。\n');
+  put('3-contract/contract.md', '# 契约\n\n## 目标\n保留当前契约正文。\n\n## 输入\n[查询预览](../2-prototype/mock.html?mode=wide&theme=dark#x)\n');
+  put('2-prototype/mock.html', '<!doctype html><title>正式查询预览</title><p id="x">query</p>');
+  const webManifest = JSON.parse(readFileSync(join(webDir, 'manifest.json'), 'utf8'));
+  webManifest.stage_gates['1-interview'].status = 'done';
+  webManifest.stage_gates['2-prototype'].status = 'skipped';
+  webManifest.stage_gates['3-contract'].status = 'done';
+  webManifest.status = 'ready'; webManifest.validation = { status: 'valid' };
+  put('manifest.json', json(webManifest));
+  const webRounds = Array.from({ length: 6 }, (_, index) => ({
+    id: `web-r${index + 1}`, no: index + 1, stage: index < 2 ? '1-interview' : '3-contract',
+    title: `旧 Web 第 ${index + 1} 轮`, status: 'submitted',
+    items: [{ q_id: index === 1 ? 'C1' : 'D1', tier: index === 1 ? 'confirm' : 'default', line: `旧事项 ${index + 1} — 代价：保留原证据` }],
+  }));
+  webRounds[0].items[0].source_refs = ['web/original-source'];
+  webRounds[0].items.push({ q_id: 'Q1', tier: 'ask', question: '同一问题应如何处理？', options: [{ key: 'A', text: '旧回答', pct: 50 }, { key: 'B', text: '新回答', pct: 50 }] });
+  webRounds[2].items.push({ q_id: 'T1', tier: 'ask', question: '旧 Web 文本原话？', response: { type: 'long_text' } });
+  const oldState = { schema_version: 2, slug: webSlug, phases: [], open_ambiguities: 0, rounds: webRounds, locked: [], final: { round: 'web-final', title: '旧确认版契约', sections: [{ title: '历史目标', body: '原 Web 确认内容保持' }] } };
+  put('web/state.json', json(oldState));
+  for (const round of webRounds) {
+    const answers = [{ q_id: round.items[0].q_id, type: round.no === 2 ? 'confirm' : 'accept' }];
+    if (round.no === 1) answers.push({ q_id: 'Q1', type: 'choice', choice: 'A' });
+    if (round.no === 3) answers.push({ q_id: 'T1', type: 'text', value: '旧用户文本原话保持' });
+    put(`web/submissions/${round.id}.json`, json({ round: round.id, answers }));
+    put(`web/consumed/${round.id}.json`, json({ round: round.id, applied: true }));
+  }
+  const ledger = Array.from({ length: 18 }, (_, index) => ({ at: `2026-01-01T00:00:${String(index).padStart(2, '0')}Z`, type: 'submitted', round: `web-r${index % 6 + 1}`, event_digest: `old-event-${index}` }));
+  put('web/decision-ledger.jsonl', ledger.map(row => JSON.stringify(row)).join('\n') + '\n');
+  for (const row of [
+    { stage: '1-interview', round: 1, tier: 'default', item: '旧事项 1', cost: '保留原证据', user: '未反对', source_refs: ['family/mirror-source'], triggered_by: 'MIRROR_TRIGGER_SOURCE', maps_to: ['AC-001'] },
+    { stage: '1-interview', round: 1, tier: 'ask', q_id: 'Q1', question: '同一问题应如何处理？', options: [{ key: 'A', text: '旧回答', pct: 50 }, { key: 'B', text: '新回答', pct: 50 }], user_choice: 'A' },
+    { stage: '1-interview', round: 2, tier: 'confirm', item: '旧事项 2', cost: '保留原证据', user: '确认' },
+    { stage: '3-contract', round: 3, tier: 'ask', q_id: 'T1', question: '旧 Web 文本原话？', response: { type: 'long_text' }, user_choice: 'text', user_verbatim: '旧用户文本原话保持' },
+  ]) check('web/写入镜像轮次', run(SESSION, 'round', webDir, JSON.stringify(row)).status === 0);
+  const webFiles = ['manifest.json', '1-interview/context.md', '1-interview/rounds.jsonl', '2-prototype/mock.html', '3-contract/contract.md', 'web/state.json', 'web/decision-ledger.jsonl', ...webRounds.flatMap(round => [`web/submissions/${round.id}.json`, `web/consumed/${round.id}.json`]), 'dossier.html']
+    .map(p => ({ path: p, role: p === 'dossier.html' ? 'derived' : p === 'manifest.json' || p === 'web/state.json' ? 'state' : p.endsWith('contract.md') ? 'contract' : p.endsWith('context.md') ? 'requirement' : p.startsWith('2-prototype/') ? 'prototype' : 'decision' }));
+  const plan = join(ROOT, 'web-plan.json'); writeFileSync(plan, json({ files: webFiles, excluded: [] }));
+  const register = () => run(SESSION, 'delivery', webDir, '--plan', plan);
+  const project = output => {
+    const result = run(EXPORT, '--issue-dir', webDir, ...(output ? ['--output', output] : []));
+    check('web/导出正式档案', result.status === 0, result.stderr);
+    if (result.status !== 0) return null;
+    const html = readFileSync(JSON.parse(result.stdout).path, 'utf8');
+    return { html, visible: html.replace(/<script type="application\/json" id="decision-dossier-data">[\s\S]*?<\/script>/, ''), data: JSON.parse(html.match(/id="decision-dossier-data">([\s\S]*?)<\/script>/)[1]) };
+  };
+  check('web/登记当前正式来源', register().status === 0);
+  const initial = project();
+  check('web/镜像不重复，保留旧六轮与十八条账本', initial?.data.state.rounds.length === 6 && initial.data.ledger.length === 18 && initial.data.state.rounds.flatMap(round => round.items).length === 8);
+  check('web/完全镜像合并来源与验收映射，不吞新增依据', initial?.data.state.rounds[0].items[0].source_refs.includes('web/original-source') && initial.data.state.rounds[0].items[0].source_refs.includes('family/mirror-source') && initial.data.state.rounds[0].items[0].source_refs.includes('MIRROR_TRIGGER_SOURCE') && initial.data.state.rounds[0].items[0].maps_to.includes('AC-001'));
+  check('web/查询链接保留 pathname、query 和 fragment 语义', initial?.visible.includes('href="2-prototype/mock.html?mode=wide&amp;theme=dark#x"') && !initial.visible.includes('mock.html%3F'));
+  check('web/来源 bytes 与磁盘一致，可见页面没有 undefined bytes', initial?.data.sources.every(source => Number.isSafeInteger(source.bytes) && source.bytes === statSync(join(webDir, source.path)).size) && !initial.html.includes('undefined bytes'));
+  const originals = Object.fromEntries(webFiles.filter(file => file.path.startsWith('web/')).map(file => [file.path, readFileSync(join(webDir, file.path), 'utf8')]));
+  const revised = run(SESSION, 'revise', webDir, '--reason', '同一目标下补充可追踪修订');
+  check('web/revise 保留底本后重开契约', revised.status === 0, revised.stderr);
+  const newRows = [
+    { stage: '3-contract', round: 99, tier: 'default', item: 'CURRENT_REVISION_DECISION', why: '只记 Agent 修订，不制造用户确认' },
+    { stage: '1-interview', round: 1, tier: 'default', q_id: 'D1', item: 'SAME_ROUND_REVISION_ITEM', why: '复用已有轮号仍须保留' },
+    { stage: '1-interview', round: 1, tier: 'ask', q_id: 'Q1', question: '同一问题应如何处理？', options: [{ key: 'A', text: '旧回答', pct: 50 }, { key: 'B', text: '新回答', pct: 50 }], user_choice: 'custom', user_verbatim: '当前修订原话：保留旧回答并使用新办法' },
+    { stage: '1-interview', round: 1, tier: 'ask', q_id: 'Q2', question: 'NEW_UNANSWERED_QUESTION', options: [{ key: 'A', text: '待用户决定', pct: 100 }] },
+    { stage: '3-contract', round: 99, tier: 'ask', q_id: 'T1', question: '当前文本修订？', response: { type: 'long_text' }, user_choice: 'text', user_verbatim: 'CURRENT_REVISION_TEXT_VERBATIM' },
+    { stage: '1-interview', round: 1, tier: 'default', q_id: 'D1', item: '旧事项 1', why: 'NEW_REVISION_REASON', cost: 'NEW_REVISION_COST', user: '未反对' },
+    { stage: '1-interview', round: 1, tier: 'ask', q_id: 'Q1', question: '同一问题应如何处理？', options: [{ key: 'A', text: '旧回答', pct: 50 }, { key: 'B', text: 'NEW_REVISION_OPTION', pct: 50 }], user_choice: 'A' },
+    { stage: '1-interview', round: 1, tier: 'ask', q_id: 'Q1', question: '同一问题应如何处理？', options: [{ key: 'A', text: '旧回答', pct: 50 }, { key: 'B', text: '新回答', pct: 50 }], user_choice: 'A', user_verbatim: 'SAME_CHOICE_NEW_BOUNDARY：A仅限新边界使用' },
+  ];
+  for (const row of newRows) check('web/追加当前修订轮次', run(SESSION, 'round', webDir, JSON.stringify(row)).status === 0);
+  appendFileSync(join(webDir, '3-contract/contract.md'), '\n## 当前修订\nCURRENT_CONTRACT_BODY\n');
+  check('web/修订后重新登记', register().status === 0);
+  const current = project();
+  check('web/修订后阶段与顶层状态取当前门禁，旧 final 仍保持', current?.data.status === 'in-progress' && current.data.state.phases.find(phase => phase.id === '3-contract')?.status === 'active' && current.data.state.final.title === oldState.final.title && current.data.manifest.validation.status === 'invalid');
+  const allItems = current?.data.state.rounds.flatMap(round => round.items) ?? [];
+  check('web/新轮次与同轮追加均进入 state 和可见轨迹', ['CURRENT_REVISION_DECISION', 'SAME_ROUND_REVISION_ITEM', 'NEW_UNANSWERED_QUESTION', 'CURRENT_REVISION_TEXT_VERBATIM', '当前修订原话：保留旧回答并使用新办法'].every(text => current?.visible.includes(text)) && allItems.some(item => item.line?.includes('CURRENT_REVISION_DECISION')) && allItems.some(item => item.line?.includes('SAME_ROUND_REVISION_ITEM')));
+  const firstRound = current?.data.state.rounds.find(round => round.id === 'web-r1');
+  const firstAnswers = current?.data.submissions['web-r1']?.answers ?? [];
+  check('web/原问答保持，冲突答案独立保留且不覆盖旧回答', firstRound?.items.filter(item => item.question === '同一问题应如何处理？').length === 4 && firstAnswers.some(answer => answer.q_id === 'Q1' && answer.choice === 'A') && firstAnswers.some(answer => answer.q_id !== 'Q1' && answer.text === '当前修订原话：保留旧回答并使用新办法'));
+  check('web/同问题同选择的新限制原话在各投影完整保留', current?.visible.includes('SAME_CHOICE_NEW_BOUNDARY：A仅限新边界使用') && firstRound.items.some(item => item.user_verbatim === 'SAME_CHOICE_NEW_BOUNDARY：A仅限新边界使用') && firstAnswers.some(answer => answer.q_id !== 'Q1' && answer.choice === 'A' && answer.user_verbatim === 'SAME_CHOICE_NEW_BOUNDARY：A仅限新边界使用') && current.data.traceability.some(row => row.answer?.user_verbatim === 'SAME_CHOICE_NEW_BOUNDARY：A仅限新边界使用'));
+  check('web/同事项同答案的依据代价与选项变化仍保留', ['NEW_REVISION_REASON', 'NEW_REVISION_COST', 'NEW_REVISION_OPTION'].every(text => current?.visible.includes(text)) && firstRound.items.some(item => item.line?.includes('NEW_REVISION_REASON')) && firstRound.items.some(item => item.options?.some(option => option.text === 'NEW_REVISION_OPTION')));
+  check('web/冲突与新增记录有明确来源，追踪矩阵包含新回答', current?.visible.includes('1-interview/rounds.jsonl') && current.data.traceability.some(row => row.answer?.text === '当前修订原话：保留旧回答并使用新办法' && row.source_refs.some(ref => ref.startsWith('1-interview/rounds.jsonl'))));
+  check('web/未回答的修订不冒造确认或接受', current?.data.state.open_ambiguities === 1 && current.data.traceability.find(row => row.round === 'web-r1' && firstRound.items.find(item => item.q_id === row.id)?.question === 'NEW_UNANSWERED_QUESTION')?.answer === null && current.data.traceability.find(row => row.round === '3-contract-r99')?.answer === null, JSON.stringify({ ambiguities: current?.data.state.open_ambiguities, rows: current?.data.traceability }));
+  check('web/全部原 Web 证据字节保持且账本仍十八条', Object.entries(originals).every(([p, bytes]) => readFileSync(join(webDir, p), 'utf8') === bytes) && current?.data.ledger.length === 18);
+  const relocated = project(join(ROOT, 'relocated', 'web-dossier.html'));
+  check('web/同一来源导出位置不改变投影摘要和修订轨迹', current?.data.dossier_digest === relocated?.data.dossier_digest && current?.data.state_digest === relocated?.data.state_digest && relocated?.visible.includes('CURRENT_REVISION_DECISION'));
+  const preview = join(ROOT, 'web-preview');
+  const previewRun = run(SESSION, 'submission-check', webDir, '--output', preview);
+  check('web/修订档案可生成正式提交预览', previewRun.status === 0, previewRun.stdout + previewRun.stderr);
+  if (previewRun.status === 0) {
+    const previewHtml = readFileSync(join(preview, 'issue', 'dossier.html'), 'utf8');
+    const previewData = JSON.parse(previewHtml.match(/id="decision-dossier-data">([\s\S]*?)<\/script>/)[1]);
+    check('web/预览保持相同轨迹和来源字节数', previewData.dossier_digest === current?.data.dossier_digest && previewData.sources.every(source => Number.isSafeInteger(source.bytes) && source.bytes === statSync(join(preview, 'issue', source.path)).size) && !previewHtml.includes('undefined bytes'), JSON.stringify({ digest: [previewData.dossier_digest, current?.data.dossier_digest], sources: previewData.sources.filter(source => source.bytes !== statSync(join(preview, 'issue', source.path)).size) }));
+    check('web/预览查询链接不把 query 编进文件名', previewHtml.includes('href="2-prototype/mock.html?mode=wide&amp;theme=dark#x"') && !previewHtml.includes('mock.html%3F'));
+  }
+  const staleManifest = JSON.parse(readFileSync(join(webDir, 'manifest.json'), 'utf8'));
+  staleManifest.validation = { status: 'valid', stale: true }; staleManifest.status = 'ready'; staleManifest.stage_gates['3-contract'].status = 'done';
+  put('manifest.json', json(staleManifest));
+  check('web/stale-valid 重新登记', register().status === 0);
+  const stale = project();
+  check('web/stale-valid 不冒充当前已定稿契约', stale?.data.status === 'in-progress' && stale.data.state.final.title === oldState.final.title);
+  check('web/导出及预览不写入 Git 索引', spawnSync('git', ['-C', ROOT, 'ls-files'], { encoding: 'utf8' }).stdout === '');
+  const legacyWeb = join(ROOT, 'legacy-web');
+  mkdirSync(join(legacyWeb, '1-interview'), { recursive: true });
+  cpSync(join(webDir, 'web'), join(legacyWeb, 'web'), { recursive: true });
+  cpSync(join(webDir, '1-interview', 'rounds.jsonl'), join(legacyWeb, '1-interview', 'rounds.jsonl'));
+  for (const condition of ['无 manifest', '坏 manifest']) {
+    if (condition === '坏 manifest') writeFileSync(join(legacyWeb, 'manifest.json'), '{malformed', 'utf8');
+    const legacyRun = run(EXPORT, '--issue-dir', legacyWeb);
+    check(`web/旧任务${condition}仍能导出`, legacyRun.status === 0, legacyRun.stderr);
+    if (legacyRun.status === 0) {
+      const legacyPath = JSON.parse(legacyRun.stdout).path;
+      const legacyHtml = readFileSync(legacyPath, 'utf8');
+      const legacyData = JSON.parse(legacyHtml.match(/id="decision-dossier-data">([\s\S]*?)<\/script>/)[1]);
+      check(`web/旧任务${condition}保留六轮十八账本与旧回答`, legacyData.state.rounds.length === 6 && legacyData.ledger.length === 18 && legacyData.submissions['web-r1'].answers.find(answer => answer.q_id === 'Q1').choice === 'A' && legacyPath.includes(join('web', 'exports')));
+    }
+  }
 } finally {
   rmSync(ROOT, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
 }

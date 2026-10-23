@@ -1,0 +1,65 @@
+import fs from 'node:fs';import path from 'node:path';import os from 'node:os';import {spawnSync} from 'node:child_process';import {fileURLToPath} from 'node:url';
+import {ensureGrillingIgnore} from './lib/grilling-ignore.mjs';
+import {makeDelivery} from './lib/delivery.mjs';
+const here=path.dirname(fileURLToPath(import.meta.url)),root=fs.mkdtempSync(path.join(os.tmpdir(),'workflow-delivery-')),issue=path.join(root,'.aes-workflow/grilling/sample');
+fs.mkdirSync(path.join(root,'.git'));fs.mkdirSync(issue,{recursive:true});
+if(spawnSync('git',['init','-q',root]).status!==0)throw new Error('Git fixture init failed');
+fs.writeFileSync(path.join(root,'.gitignore'),'/artifacts/\n');ensureGrillingIgnore(path.dirname(issue));
+let count=0;const check=(name,ok,detail='')=>{count++;if(!ok)throw new Error(name+'\n'+detail);console.log('ok '+name);};
+const write=(p,s)=>{fs.mkdirSync(path.dirname(path.join(issue,p)),{recursive:true});fs.writeFileSync(path.join(issue,p),s);};
+const run=(...args)=>spawnSync(process.execPath,[path.join(here,'session.mjs'),...args],{cwd:root,encoding:'utf8'});
+const exp=()=>spawnSync(process.execPath,[path.join(here,'export-dossier.mjs'),'--issue-dir',issue],{cwd:root,encoding:'utf8'});
+try {
+ const reservedRoot=path.join(root,'reserved-entry-sample');fs.mkdirSync(path.join(reservedRoot,'1-interview'),{recursive:true});
+ for(const p of ['manifest.json','1-interview/context.md','1-interview/rounds.jsonl'])fs.writeFileSync(path.join(reservedRoot,p),'');
+ const reservedCore=[{path:'manifest.json',role:'state'},{path:'1-interview/context.md',role:'requirement'},{path:'1-interview/rounds.jsonl',role:'decision'}];
+ const rejected=[];
+ for(const dir of ['node_modules','drafts','test-results','playwright-report'])for(const name of [dir,dir.toUpperCase()])for(const parent of ['', '3-contract/verification/fixtures/'])for(const role of ['verification','asset','requirement','prototype']){
+  const p=parent+name+'/sample.json',file=path.join(reservedRoot,p);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,'{}');
+  try{makeDelivery(reservedRoot,{files:[...reservedCore,{path:p,role}],excluded:[]});rejected.push(p+' as '+role);}catch(e){if(!e.message.startsWith('INVALID_DELIVERY_ENTRY:'))throw e;}
+ }
+ check('四个保留过程目录在任意层级和正式用途都拒绝登记',rejected.length===0,rejected.join('\n'));
+ const preserved=['drafts/history.json','3-contract/verification/fixtures/test-results/history.json','playwright-report/history.html','node_modules/history.js'].map(p=>{const file=path.join(reservedRoot,p);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,'HISTORY');return{path:p,reason:'保留历史过程材料'};});
+ check('保留过程目录仍可逐文件登记为excluded且原件保持',makeDelivery(reservedRoot,{files:reservedCore,excluded:preserved}).excluded.length===preserved.length&&preserved.every(p=>fs.readFileSync(path.join(reservedRoot,p.path),'utf8')==='HISTORY'));
+ const golden=['3-contract/verification/fixtures/input/request.json','3-contract/verification/fixtures/expected/usage.json'].map(p=>{const file=path.join(reservedRoot,p);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,'{}');return{path:p,role:'verification'};});
+ check('正式fixtures input和expected可登记',makeDelivery(reservedRoot,{files:[...reservedCore,...golden],excluded:[]}).files.length===reservedCore.length+golden.length);
+ write('manifest.json',JSON.stringify({slug:'sample',goal_oneline:'正式目标',original_request:'[历史链接](G:\\missing\\old.md)',stage_gates:{},validation:{status:'valid'}}));
+ write('1-interview/context.md','## 任务\n[原型](../2-prototype/mock.html)\n');write('1-interview/rounds.jsonl','');
+ write('README.md','[档案](dossier.html)');
+ write('2-prototype/impact-surface.md','已扫描');write('2-prototype/mock.html','<html><link rel="stylesheet" href="theme.css"><body>正式界面</body></html>');write('2-prototype/theme.css','body{color:red}');
+ write('2-prototype/drafts/old.html','SECRET_DRAFT');write('3-contract/review-old.md','SECRET_REVIEW');write('3-contract/verify.txt','SECRET_RUN');
+ write('3-contract/contract.md','## 目标\n正式目标\n## 读什么\n[原型](../2-prototype/mock.html)');
+ const files=['manifest.json','README.md','1-interview/context.md','1-interview/rounds.jsonl','2-prototype/impact-surface.md','2-prototype/mock.html','2-prototype/theme.css','3-contract/contract.md','dossier.html'].map(p=>({path:p,role:p==='manifest.json'?'state':p==='dossier.html'?'derived':p.endsWith('contract.md')?'contract':p.endsWith('.css')?'asset':'requirement'}));
+ const excluded=['2-prototype/drafts/old.html','3-contract/review-old.md','3-contract/verify.txt'].map(p=>({path:p,reason:'过程材料留在本地'})),plan=path.join(root,'plan.json');
+ const register=()=>{fs.writeFileSync(plan,JSON.stringify({files,excluded}));return run('delivery',issue,'--plan',plan);};
+ check('未登记提交被拦',run('submission-check',issue).status===1);
+ check('登记正式清单',register().status===0);
+ check('首次没有dossier仍可导出',exp().status===0);
+ const html=fs.readFileSync(path.join(issue,'dossier.html'),'utf8'),data=JSON.parse(html.match(/id="decision-dossier-data">([\s\S]*?)<\/script>/)[1]);
+ check('过滤草稿、审查和运行正文',!html.includes('SECRET_DRAFT')&&!html.includes('SECRET_REVIEW')&&!html.includes('SECRET_RUN'));
+ check('来源仅列正式文件',data.sources.length===7&&!data.sources.some(s=>s.path.includes('drafts')));
+ check('Markdown链接按来源文件重定位',html.includes('href="2-prototype/mock.html"')&&!html.includes('href="../2-prototype/mock.html"'));
+ check('正式清单和依赖通过',run('submission-check',issue).status===0);
+ const stale=JSON.parse(fs.readFileSync(path.join(issue,'manifest.json')));stale.next_action='新状态';write('manifest.json',JSON.stringify(stale));check('旧档案不能冒充当前状态',run('submission-check',issue).status===1);exp();
+ write('3-contract/contract.md','## 读什么\n`../2-prototype/missing.json`');register();check('契约反引号输入缺失被拦',exp().status!==0);write('3-contract/contract.md','## 目标\n正式目标\n## 读什么\n[原型](../2-prototype/mock.html)');register();exp();
+ write('3-contract/verification/usage.json','{}');write('3-contract/verification/spec-lock.json',JSON.stringify({'usage.json':'0'.repeat(64)}));files.push({path:'3-contract/verification/usage.json',role:'verification'},{path:'3-contract/verification/spec-lock.json',role:'verification'});register();check('规格锁不能被清单重新登记绕过',exp().status!==0);files.splice(-2);excluded.push({path:'3-contract/verification/usage.json',reason:'反例夹具'},{path:'3-contract/verification/spec-lock.json',reason:'反例夹具'});register();exp();
+ write('3-contract/new-note.md','未分类');check('新增文件不会默默进入交付',run('submission-check',issue).status===1);excluded.push({path:'3-contract/new-note.md',reason:'过程记录'});register();exp();
+ write('2-prototype/theme.css','body{color:blue}');check('已登记内容变更被拦',run('submission-check',issue).status===1);register();exp();
+ files.splice(files.findIndex(f=>f.path.endsWith('theme.css')),1);excluded.push({path:'2-prototype/theme.css',reason:'误排除'});register();check('已忽略但仍被原型使用的资产被拦',exp().status!==0);files.push({path:'2-prototype/theme.css',role:'asset'});excluded.pop();register();exp();
+ const output=path.join(root,'preview'),r=run('submission-check',issue,'--output',output);check('独立目录生成提交预览',r.status===0,r.stdout+r.stderr);
+ check('预览没有过程材料',!fs.existsSync(path.join(output,'issue/2-prototype/drafts'))&&!fs.existsSync(path.join(output,'issue/3-contract/verify.txt')));
+ check('原始历史全部保留',fs.readFileSync(path.join(issue,'2-prototype/drafts/old.html'),'utf8')==='SECRET_DRAFT'&&fs.existsSync(path.join(issue,'3-contract/verify.txt')));
+ const receipt=JSON.parse(fs.readFileSync(path.join(output,'submission.json')));
+ check('清单带仓库相对路径与指纹',receipt.files.every(f=>(f.path.startsWith('.aes-workflow/grilling/sample/')||f.role==='repository-ignore')&&f.sha256.length===64));
+ check('预览包含共享ignore前提',receipt.repositoryPrerequisites.includes('.aes-workflow/grilling/.gitignore')&&fs.existsSync(path.join(output,'repository-files/.aes-workflow/grilling/.gitignore')));
+ check('不覆盖已有预览',run('submission-check',issue,'--output',output).status!==0);
+ check('预览不能写回源目录',run('submission-check',issue,'--output',path.join(issue,'preview')).status!==0);
+ check('拒绝路径越界',(()=>{files.push({path:'../leak',role:'asset'});return register().status!==0;})());files.pop();register();
+ const external=path.join(root,'external.txt');fs.writeFileSync(external,'outside');fs.symlinkSync(external,path.join(issue,'escape.txt'));files.push({path:'escape.txt',role:'asset'});check('拒绝符号链接输入',register().status!==0);files.pop();excluded.push({path:'escape.txt',reason:'保留拒绝的链接'});register();
+ exp();const hashBefore=fs.readFileSync(path.join(issue,'manifest.json'),'utf8');const checkRun=run('submission-check',issue);check('只读检查不改manifest',checkRun.status===0&&hashBefore===fs.readFileSync(path.join(issue,'manifest.json'),'utf8'));
+ write('3-contract/contract.md','## 验收条件\n- AC-001: 未实现\n  - Verify: [A] `node -e "process.exit(1)"`');register();exp();
+ check('登记后的命令复验可运行',run('verify',issue,'--write').status===0&&run('verify',issue,'--write').status===0);
+ const runs=path.join(root,'artifacts/workflow-interview/sample/runs');check('运行证据包外独立留存',fs.readdirSync(runs).length===2&&fs.readFileSync(path.join(issue,'3-contract/verify.txt'),'utf8')==='SECRET_RUN'&&!fs.existsSync(path.join(issue,'3-contract/verify-evidence.txt')));
+ check('没有Git暂存副作用',spawnSync('git',['-C',root,'ls-files'],{encoding:'utf8'}).stdout==='');
+ console.log(`delivery: ${count}/${count} passed`);
+} finally { fs.rmSync(root,{recursive:true,force:true}); }

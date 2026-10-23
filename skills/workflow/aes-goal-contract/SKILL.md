@@ -175,6 +175,8 @@ Agent 到底要跑什么、跑到什么程度。没到就继续问，问了几�
 一件新的事。改现有标准、补现有实现、修刚发现的缺陷都回原契约重做，把改动过的内容
 换成新版本；只有能独立交付的新事才另开一个 issue。
 
+实质修订前保留可恢复底本；可用session.mjs revise归档并只重开契约阶段，保留已确认的上游。修订、用户裁决和重新交接按[契约修订与复审](../workflow-interview/references/delivery-policy.md#契约修订与复审)执行，不用needs_reinterview代替纯文字复审。
+
 「设计取舍」节允许极简。没有需要取舍的实现路径时，写明「本次无需取舍」及其原因，
 这句话本身就是记录，它证明这件事被问过而不是被忘了。用户说方案他定了、说别问了
 直接干，记录照留：记下他定的那个，另一栏写「为什么没选别的」，一句话就够。
@@ -224,6 +226,8 @@ Agent 到底要跑什么、跑到什么程度。没到就继续问，问了几�
 
 ## 4. 校验与交接
 
+先读[正式交付规则](../workflow-interview/references/delivery-policy.md)。通过session.mjs delivery登记全部正式契约、确认版对照物、锁定验收脚本/黄金数据/规格锁/包锁；过程报告逐项排除。正式黄金输入和期望使用共享规则允许的目录，避开四个保留过程目录名。清单是发布范围的唯一来源。锁定规格属于验收输入，运行日志属于证据，不可混淆或为清理而丢失依赖。
+
 ```bash
 node <workflow-interview>/scripts/session.mjs finalize <issue-dir>
 ```
@@ -234,6 +238,8 @@ node <workflow-interview>/scripts/session.mjs finalize <issue-dir>
 执行性闸门；按 [handoff-prompt.md](references/handoff-prompt.md) 生成交接指令并
 检查它没超 4000 字符，契约含「交付后人工复核」节时同时打出用户待办清单。结构或
 冒烟任何一步失败，validation 都不会停在 valid——done 闸门只认 valid。
+
+finalize前按[共用检查](../workflow-interview/references/delivery-policy.md#契约修订与复审)核对可完成路径、永久失败条件和内部矛盾；非自动验收须有明确完成条件。未来输出不要求提前存在，必要资源缺失记Blocked，不擅自降级SKIP或写占位实现。finalize失败后旧Ready和交接指令失效，修正并重新通过才可交接。
 
 ### 冒烟怎么读
 
@@ -248,9 +254,7 @@ node <workflow-interview>/scripts/session.mjs finalize <issue-dir>
 `UNRUNNABLE` 是这一步唯一要拦的东西。放它过去，执行 Agent 会撞上一条无法执行的验收
 标准，然后自己发明一个替代判据——那条 AC 就被架空了，而报告上看起来跟通过了一样。
 
-冒烟快照落 `verify.txt`；实现之后复验用
-`session.mjs verify <issue-dir> --write`，落 **verify-evidence.txt**——两个文件语义
-相反（期望红 vs 期望绿），分离落盘互不覆盖，谁也别把谁的证据冲掉。
+登记正式清单后，冒烟与实现复验均写入仓库artifacts/workflow-interview/<任务>/runs/的独立运行目录，分别使用verify.txt和verify-evidence.txt，不覆盖旧记录，也不进入需求提交。旧任务未登记时保留原落盘方式。实现之后复验仍用session.mjs verify <issue-dir> --write；它不等于提交检查。
 
 ### 交接可执行性怎么读
 
@@ -275,6 +279,8 @@ node <workflow-interview>/scripts/session.mjs finalize <issue-dir>
 都不证明产品目标已经实现。
 
 ### 收尾
+
+finalize及阶段收尾后，导出dossier并执行session.mjs submission-check <issue-dir>；再加--output <新的包外目录>生成提交预览。提交检查还验证init公共ignore、根artifacts保护及Git实际生效范围；共享ignore前提随预览列出，不假设仅交付issue即可恢复。缺件、依赖越界或未分类文件必须处理，不以文档VALID代替提交闭合，也不以提交检查通过代替产品验收。不要重复维护多份README、审查摘要或校验摘要；按任务需要合并入口。
 
 ```bash
 node <workflow-interview>/scripts/session.mjs stage <issue-dir> 3-contract done --next "<一句话>"

@@ -23,17 +23,19 @@ description: workflow-interview
 
 ## issue 目录
 
-所有过程产物与最终契约都落在同一个 issue 目录下，一个入口看全貌：
+当前需求、结构化问答、确认版对照物和正式契约落在同一个issue目录。旧草稿与运行证据按[正式交付规则](references/delivery-policy.md)分类留存；留存不等于进入Git：
 
 ```bash
 node <skill-dir>/scripts/session.mjs init <date>-<任务词组>
 ```
 
-它幂等：目录已存在就读出当前阶段供续跑，不覆盖任何内容。返回 issue 目录绝对路径，
+它幂等：目录已存在就读出当前阶段供续跑，不覆盖任务正文或刷新已有manifest。初始化还会按技能模板维护grilling/.gitignore的管理区块，保留区块外自定义规则；手改或损坏的管理区块保留并报错，不覆盖。详见[忽略规则配置](references/delivery-policy.md#初始化公共忽略规则)。返回issue目录绝对路径，
 后续所有命令都以它为参数。
 
 `manifest.json` 是这个目录的状态与入口。**它只由 `session.mjs` 写**，任何技能、任何
 subagent 都不许用 Edit/Write 直接改它。
+
+需求只保留一个当前权威入口；明确宿主仓和共享前提，不自动迁仓或删除旧副本。事实、修订和历史规则见[共用交付规则](references/delivery-policy.md)。
 
 ## 怎么流转
 
@@ -76,7 +78,13 @@ subagent 都不许用 Edit/Write 直接改它。
 当前状态；重新 finalize 过全部闸门后 stale 才解除，且打回后没改过契约就想重新
 finalize 会被当场拒。
 
+### 契约复审
+
+目标和边界未变的契约修订走[轻量修订路径](references/delivery-policy.md#契约修订与复审)：修改前保留可恢复底本，可用session.mjs revise撤销Ready并只重开3-contract，保留已确认的前两阶段。修订记录不能代替用户裁决，之后重新登记、校验和导出；目标或边界变化才回访谈。候选按风险或用户要求做有边界的只读对抗审查，不把反复审查变成固定仪式。
+
 ## 终态报告
+
+收尾必须读[正式交付、过程留存与提交预览](references/delivery-policy.md)。四个保留过程目录名不得用于正式交付，正式验收输入按共享规则选目录。先用session.mjs delivery登记当前正式文件和过程排除项，再finalize、导出dossier并跑submission-check。提交预览与档案共用manifest.delivery，不手写第二份权威清单。工具只读检查Git生效范围，不自动暂存、提交或删除历史；根忽略规则须另行授权才能迁移。旧任务须先登记才能通过提交检查。
 
 三阶段走完后报告：契约路径、目标一句话、范围、验收条件条数、校验结果，以及精确
 阻塞项或可复制的启动指令。启动指令由 `aes-goal-contract` 现场生成。有阻塞项时不
@@ -85,7 +93,7 @@ finalize 会被当场拒。
 同时交出决策档案：`finalize` 通过后跑
 `node <skill-dir>/scripts/export-dossier.mjs --issue-dir <issue>`，把导出路径和
 `dossier_digest` 一并报告。档案由任务原文、全部轮次、候选优劣势与契约重投影而成，
-与 issue 目录同放即可离线打开（mock、diagram 等来源按相对路径引用，不内嵌）——它和契约同级，是访谈的交付物，不是 Web 载体的附属品：纯对话访谈一样
+与issue目录同放即可离线打开。登记后的档案只引用正式清单内来源，不扫描草稿和原始运行证据；正文链接按来源文件重定位。它和契约同级，是访谈的交付物：纯对话访谈一样
 产出，与 `$workflow-interview-web` 共用同一投影实现。
 
 `finalize` 列出的非 `[A]` 档验收条件要一并报给用户，点名是哪几条。它们在长时程执行

@@ -17,7 +17,7 @@ description: 锁定需求——调查仓库事实、待定项分诊、批量问�
 node <workflow-interview>/scripts/session.mjs init <date>-<任务词组> --request "<用户原话>"
 ```
 
-幂等，已存在就续跑。拿到 issue 目录绝对路径，下面所有产物都落在它的 `1-interview/` 下。
+幂等，已存在就续跑。init同时维护grilling公共ignore，保留已有自定义规则；发生管理区块冲突时先报告，不能覆盖或另写manifest绕过。拿到issue目录绝对路径，当前快照和结构化问答落在1-interview/下。原始调查输出按[正式交付规则](../workflow-interview/references/delivery-policy.md)放包外过程目录。正式输入不得放入该规则列出的保留过程目录。context.md和rounds.jsonl登记为正式交付；影响裁决的事实与关键否决理由必须可追溯。完整原始日志不默认进入Git，也不为每轮另建重复总结。由session.mjs登记，不直接改manifest。
 
 ## 1. 调查事实
 
@@ -37,6 +37,8 @@ subagent 限定问题、目标路径和所需证据。**每个 subagent 把结�
 
 能由仓库或环境证据回答的事实，查清后写进上下文并告知用户，不占用提问。但事实一旦
 暗示该怎么做（该跟哪个模式、该接受哪种代价、该把什么排除在外），整个决定仍然归用户。
+
+关键事实带简短结论、证据和核验时点。旧分析只作线索；推荐与已锁事实冲突时，先现场重验再判断，沿用现有context或分片即可。详见[事实与现行材料](../workflow-interview/references/delivery-policy.md#事实与现行材料)。
 
 用户用的词与仓库文档或代码里的词冲突、或者一词多义时，拿出具体出处，把「按哪个
 意思走」列为用户决定。仓库语言是证据，不是权威。

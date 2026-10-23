@@ -7,7 +7,7 @@
 //
 // 纯对话载体（无 web/ 目录）从 rounds.jsonl/manifest/contract 投影；web 载体
 // 追加 state/submissions/ledger 证据。输出 JSON 与 web 版 export-static 同构。
-import { existsSync, statSync } from 'node:fs';
+import { existsSync, statSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { exportDossier } from './lib/dossier.mjs';
 
@@ -37,6 +37,10 @@ if (!flags['issue-dir']) fail('用法：export-dossier.mjs --issue-dir <issue> [
 const issueDir = resolve(String(flags['issue-dir']));
 if (!existsSync(issueDir) || !statSync(issueDir).isDirectory()) fail(`issue 目录不存在：${issueDir}`, 2);
 const output = flags.output === undefined ? undefined : resolve(String(flags.output));
+let registered = null;
+try { registered = JSON.parse(readFileSync(resolve(issueDir, 'manifest.json'),'utf8'))?.delivery; }
+catch { /* Keep the shared library's legacy Web-task fallback. */ }
+if (!registered) console.error('WARNING: LEGACY_DELIVERY_UNREGISTERED：本次保留旧导出行为；Git提交前须登记正式清单并通过submission-check。');
 
 const { pathname, dossier } = exportDossier(issueDir, output);
 console.log(JSON.stringify({

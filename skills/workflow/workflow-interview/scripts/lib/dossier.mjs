@@ -8,8 +8,8 @@
 //
 // 档案是契约的轻量可视化预览：轨迹、原型结果、契约与校验结果投影进页面；来源文件
 // （mock / diagram / 附件）按相对路径引用，不内嵌——档案必须与 issue 目录同放。
-// web state 缺失（纯对话载体）时，轨迹从 1-interview/rounds.jsonl 投影——决策档案
-// 不依赖载体存在（issue #146 对齐裁决）。
+// 轨迹保留 web 提交证据，并补入 rounds.jsonl 的后续修订；同一问答的镜像只显示一次。
+// web state 缺失（纯对话载体）时，直接从 rounds.jsonl 投影，不依赖载体存在。
 
 import {
   existsSync,
@@ -22,8 +22,9 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { createHash, randomBytes } from 'node:crypto';
-import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep, posix } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { publishedPaths, checkDelivery, projectMarkdownReferences } from './delivery.mjs';
 
 const MIME_TYPES = new Map([
   ['.html', 'text/html;charset=utf-8'], ['.md', 'text/markdown;charset=utf-8'], ['.txt', 'text/plain;charset=utf-8'],
@@ -96,16 +97,19 @@ function walkFiles(directory, root = directory) {
 
 /** 来源记录只登记路径、类型、字节数与 sha256——正文不进档案，页面按相对路径引用（见 renderSources）。 */
 function fileRecord(file) {
+  const bytes = readFileSync(file.pathname);
   return {
     path: file.relative_path,
     name: basename(file.pathname),
     mime: MIME_TYPES.get(extname(file.pathname).toLowerCase()) ?? 'application/octet-stream',
-    bytes: file.bytes,
-    sha256: sha256File(file.pathname),
+    bytes: bytes.length,
+    sha256: createHash('sha256').update(bytes).digest('hex'),
   };
 }
 
 function collectSources(issueDir) {
+  const paths = publishedPaths(readJson(join(issueDir, 'manifest.json'), null));
+  if (paths) return [...paths].filter(p => p !== 'manifest.json' && p !== 'dossier.html').map(p => fileRecord({ pathname: join(issueDir,p), relative_path: p })).sort((a,b) => a.path.localeCompare(b.path));
   const roots = ['1-interview', '2-prototype', '3-contract', join('web', 'assets')];
   return roots
     .flatMap((name) => walkFiles(join(issueDir, name), issueDir))
@@ -113,7 +117,7 @@ function collectSources(issueDir) {
     .sort((a, b) => a.path.localeCompare(b.path));
 }
 
-// ─────────────────────── 家族载体投影（无 web state 时） ───────────────────────
+// ─────────────────────── 家族载体与 Web 历史投影 ───────────────────────
 
 const PHASE_LABELS = { '1-interview': '访谈·拷问', '2-prototype': '原型确认', '3-contract': '交付标准·契约' };
 
@@ -144,7 +148,9 @@ function projectFamilyTrajectory(issueDir) {
       groups.set(key, { id: `${row.stage}-r${no}`, no, stage: row.stage, title: `第 ${no} 轮`, status: 'done', items: [], answers: [] });
     }
     const group = groups.get(key);
-    const qId = row.q_id ?? `${row.tier === 'ask' ? 'Q' : 'D'}${group.items.length + 1}`;
+    const originalId = row.q_id ?? `${row.tier === 'ask' ? 'Q' : 'D'}${group.items.length + 1}`;
+    let qId = originalId;
+    while (group.items.some(item => item.q_id === qId)) qId += '-revision';
     if (row.tier === 'ask') {
       group.items.push({
         q_id: qId,
@@ -160,6 +166,7 @@ function projectFamilyTrajectory(issueDir) {
         cross_repo_boundary: row.cross_repo_boundary,
       });
       if (Array.isArray(row.choices)) group.answers.push({ q_id: qId, type: 'multi', choices: row.choices, custom: row.custom });
+      else if (['short_text', 'long_text'].includes(row.response?.type) && row.user_verbatim !== undefined) group.answers.push({ q_id: qId, type: 'text', value: row.user_verbatim });
       else if (row.user_choice !== undefined && row.user_choice !== 'custom') group.answers.push({ q_id: qId, type: 'choice', choice: row.user_choice });
       else if (row.user_verbatim !== undefined || row.user_choice === 'custom') group.answers.push({ q_id: qId, type: 'custom', text: row.user_verbatim ?? '' });
     } else {
@@ -176,15 +183,78 @@ function projectFamilyTrajectory(issueDir) {
         group.answers.push({ q_id: qId, ...answer });
       }
     }
+    const item = group.items.at(-1);
+    item.source_refs = [...new Set([...(row.source_refs ?? []), ...(row.triggered_by ? [row.triggered_by] : []), '1-interview/rounds.jsonl'])];
+    if (row.user_verbatim !== undefined) {
+      item.user_verbatim = row.user_verbatim;
+      const answer = group.answers.find(value => value.q_id === qId);
+      if (answer) answer.user_verbatim = row.user_verbatim;
+    }
+    if (qId !== originalId) item.original_q_id = originalId;
+    if (row.maps_to) item.maps_to = row.maps_to;
   }
   const rounds = [...groups.values()].sort((a, b) => a.no - b.no);
-  const answered = new Set(rounds.flatMap((round) => round.answers.map((answer) => answer.q_id)));
   const openAmbiguities = rounds.reduce(
-    (sum, round) => sum + round.items.filter((item) => item.tier !== 'default' && !answered.has(item.q_id)).length,
+    (sum, round) => sum + round.items.filter((item) => item.tier !== 'default' && !round.answers.some(answer => answer.q_id === item.q_id)).length,
     0,
   );
   const submissions = Object.fromEntries(rounds.map((round) => [round.id, { answers: round.answers }]));
   return { rounds, submissions, open_ambiguities: openAmbiguities };
+}
+
+/** Web 问答和 family 镜像可能采用不同 ID。只合并同阶段/轮号、内容和答案都
+ * 一致的记录，并合并来源；说明、选项或答案变化均独立保留，不改写 Web 原答。 */
+function mergeFamilyTrajectory(webState, webSubmissions, family) {
+  if (!family) return { state: webState, submissions: webSubmissions };
+  const state = { ...webState, rounds: (webState.rounds ?? []).map(round => ({ ...round, items: [...(round.items ?? [])] })) };
+  const submissions = Object.fromEntries(Object.entries(webSubmissions).map(([id, value]) => [id, { ...value, answers: [...(value.answers ?? [])] }]));
+  const contentKey = item => {
+    const { q_id, original_q_id, source_refs, maps_to, triggered_by, user_verbatim, ...content } = item;
+    return JSON.stringify(stable(content));
+  };
+  const answerKey = answer => {
+    if (!answer) return 'unanswered';
+    const { q_id, ...value } = answer;
+    if (value.user_verbatim !== undefined && (value.user_verbatim === value.text || value.user_verbatim === value.value)) delete value.user_verbatim;
+    return JSON.stringify(stable(value));
+  };
+  for (const familyRound of family.rounds) {
+    const matches = state.rounds.filter(round => round.stage === familyRound.stage && Number(round.no) === familyRound.no);
+    let target = matches[0];
+    if (!target) {
+      const { answers, ...round } = familyRound;
+      let id = round.id;
+      while (state.rounds.some(existing => existing.id === id)) id += '-family';
+      target = { ...round, id, items: [] };
+      state.rounds.push(target);
+      matches.push(target);
+      submissions[id] = { answers: [] };
+    }
+    for (const item of familyRound.items) {
+      const answer = familyRound.answers.find(value => value.q_id === item.q_id);
+      const mirroredRound = matches.find(round => round.items.some(existing => contentKey(existing) === contentKey(item)
+        && answerKey(submissions[round.id]?.answers?.find(value => value.q_id === existing.q_id)) === answerKey(answer)));
+      if (mirroredRound) {
+        const index = mirroredRound.items.findIndex(existing => contentKey(existing) === contentKey(item)
+          && answerKey(submissions[mirroredRound.id]?.answers?.find(value => value.q_id === existing.q_id)) === answerKey(answer));
+        const existing = mirroredRound.items[index];
+        mirroredRound.items[index] = {
+          ...existing,
+          ...(item.user_verbatim !== undefined && existing.user_verbatim === undefined ? { user_verbatim: item.user_verbatim } : {}),
+          source_refs: [...new Set([...(existing.source_refs ?? (existing.triggered_by ? [existing.triggered_by] : [])), ...(item.source_refs ?? [])])],
+          ...((existing.maps_to || item.maps_to) ? { maps_to: [...new Set([...(existing.maps_to ?? []), ...(item.maps_to ?? [])])] } : {}),
+        };
+        continue;
+      }
+      let id = item.original_q_id ?? item.q_id;
+      while (target.items.some(existing => existing.q_id === id)) id += '-family';
+      target.items.push({ ...item, q_id: id, ...(id !== item.q_id ? { original_q_id: item.original_q_id ?? item.q_id } : {}) });
+      const submission = submissions[target.id] ??= { answers: [] };
+      if (answer) submission.answers.push({ ...answer, q_id: id });
+      else if (item.tier !== 'default') state.open_ambiguities = (state.open_ambiguities ?? 0) + 1;
+    }
+  }
+  return { state, submissions };
 }
 
 /** contract.md 的 ## 节 → final 视图。只在 finalize 校验通过后投影为契约，未过校验仍是候选。 */
@@ -232,13 +302,15 @@ function artifactKey(name) {
  * markdown / json 对照物的正文投影进档案（超过 MARKDOWN_LIMIT 的只给链接）；HTML 原型不内嵌，按相对路径 iframe 引用。 */
 function projectPrototype(issueDir, manifest) {
   const dir = join(issueDir, '2-prototype');
-  if (!existsSync(dir)) return null;
+  if (!existsSync(dir) && !manifest?.delivery) return null;
   const gate = manifest?.stage_gates?.['2-prototype'] ?? null;
   const confirmed = new Set((gate?.artifacts_confirmed ?? []).map(artifactKey));
-  const entries = new Map(readdirSync(dir, { withFileTypes: true }).filter((entry) => entry.isFile()).map((entry) => [entry.name, entry]));
+  const entries = new Map((existsSync(dir) ? readdirSync(dir, { withFileTypes: true }) : []).filter((entry) => entry.isFile()).map((entry) => [entry.name, entry]));
   const seen = new Set();
+  const published = publishedPaths(manifest);
   const artifacts = [];
   const push = (key, name, title) => {
+    if (published && !published.has(`2-prototype/${name}`)) return;
     if (!entries.has(name)) return;
     seen.add(name);
     const pathname = join(dir, name);
@@ -254,7 +326,7 @@ function projectPrototype(issueDir, manifest) {
   for (const name of [...entries.keys()].sort((a, b) => a.localeCompare(b))) {
     if (!seen.has(name)) push(name.replace(/\.[^.]+$/, ''), name, name);
   }
-  const drafts = walkFiles(join(dir, 'drafts'), issueDir).map((file) => file.relative_path).sort();
+  const drafts = published ? [] : walkFiles(join(dir, 'drafts'), issueDir).map((file) => file.relative_path).sort();
   return { gate, artifacts, drafts };
 }
 
@@ -265,10 +337,13 @@ function projectContractExtra(issueDir, manifest) {
   if (!existsSync(dir)) return null;
   const documents = [];
   const files = [];
+  const published = publishedPaths(manifest);
   for (const file of walkFiles(dir, issueDir)) {
+    if (published && !published.has(file.relative_path)) continue;
     const name = basename(file.pathname);
     if (dirname(file.pathname) !== dir || name === 'contract.md' || name === 'verify.txt') continue;
     const record = { path: file.relative_path, name, bytes: file.bytes };
+    if (manifest?.delivery?.files.some(entry => entry.path === file.relative_path && entry.role === 'contract')) record.contract = true;
     if (/\.md$/i.test(name) && file.bytes <= MARKDOWN_LIMIT) documents.push({ ...record, markdown: readText(file.pathname) });
     else files.push(record);
   }
@@ -276,7 +351,7 @@ function projectContractExtra(issueDir, manifest) {
     gate: manifest?.stage_gates?.['3-contract'] ?? null,
     validation: manifest?.validation ?? null,
     next_action: manifest?.next_action ?? null,
-    verify_text: readText(join(dir, 'verify.txt')),
+    verify_text: !published || published.has('3-contract/verify.txt') ? readText(join(dir, 'verify.txt')) : '',
     documents,
     files,
   };
@@ -314,15 +389,18 @@ export function buildDossier(issueDirInput) {
   const issueDir = resolve(issueDirInput);
   const webDir = join(issueDir, 'web');
   const manifest = readJson(join(issueDir, 'manifest.json'), null);
-  const webState = readJson(join(webDir, 'state.json'), null);
-  let submissions = listJsonDirectory(join(webDir, 'submissions'));
-  const consumed = listJsonDirectory(join(webDir, 'consumed'));
+  const published = publishedPaths(manifest);
+  if (published) { const report = checkDelivery(issueDir, manifest, { allowMissingDerived: true }); if (!report.ok) throw new Error('DELIVERY_INVALID: ' + report.errors.join('; ')); }
+  const webState = !published || published.has('web/state.json') ? readJson(join(webDir, 'state.json'), null) : null;
+  const filteredJson = sub => Object.fromEntries(Object.entries(listJsonDirectory(join(webDir,sub))).filter(([key]) => !published || published.has(`web/${sub}/${key}.json`)));
+  let submissions = filteredJson('submissions');
+  const consumed = filteredJson('consumed');
+  const family = projectFamilyTrajectory(issueDir);
   let state = webState;
   if (!state) {
-    const family = projectFamilyTrajectory(issueDir);
     state = {
       schema_version: 2,
-      slug: basename(issueDir),
+      slug: manifest?.slug ?? basename(issueDir),
       opening: manifest?.original_request ?? null,
       phases: projectPhases(manifest),
       open_ambiguities: family?.open_ambiguities ?? 0,
@@ -331,9 +409,13 @@ export function buildDossier(issueDirInput) {
       final: null,
     };
     submissions = family?.submissions ?? {};
+  } else if (published) {
+    ({ state, submissions } = mergeFamilyTrajectory(state, submissions, family));
   }
+  // 登记任务以当前门禁显示进度；Web state 的旧 final 仍保留作历史证据。
+  if (published) state = { ...state, phases: projectPhases(manifest) };
   const contractMarkdown = readText(join(issueDir, '3-contract', 'contract.md'));
-  if (!state.final && contractMarkdown && manifest?.validation?.status === 'valid') {
+  if (!state.final && contractMarkdown && manifest?.validation?.status === 'valid' && !manifest.validation.stale) {
     state.final = projectContractFinal(contractMarkdown, state.slug);
   }
   const base = {
@@ -342,7 +424,8 @@ export function buildDossier(issueDirInput) {
     slug: state.slug ?? basename(issueDir),
     title: state.dossier?.title ?? state.slug ?? basename(issueDir),
     generated_at: new Date().toISOString(),
-    status: state.final ? 'contract' : state.open_ambiguities === 0 ? 'aligned' : 'in-progress',
+    status: published && (manifest?.validation?.status !== 'valid' || manifest.validation.stale) ? 'in-progress'
+      : state.final ? 'contract' : state.open_ambiguities === 0 ? 'aligned' : 'in-progress',
     state,
     manifest,
     context_markdown: readText(join(issueDir, '1-interview', 'context.md')),
@@ -351,7 +434,7 @@ export function buildDossier(issueDirInput) {
     contract_extra: projectContractExtra(issueDir, manifest),
     submissions,
     consumed,
-    ledger: readLedger(webDir),
+    ledger: !published || published.has('web/decision-ledger.jsonl') ? readLedger(webDir) : [],
     sources: collectSources(issueDir),
     traceability: traceability(state, submissions),
   };
@@ -497,7 +580,7 @@ function booleanLabelsFor(item) {
 
 function answerSummary(answer, booleanLabels) {
   if (!answer) return '尚未回答';
-  if (answer.type === 'choice') return `选择 ${answer.choice}`;
+  if (answer.type === 'choice') return `选择 ${answer.choice}${answer.user_verbatim !== undefined ? `；原话：${answer.user_verbatim}` : ''}`;
   if (answer.type === 'multi') return `选择 ${answer.choices.join('、')}${answer.custom ? `；补充：${answer.custom}` : ''}`;
   if (answer.type === 'custom' || answer.type === 'veto') return answer.text;
   if (answer.type === 'text') return answer.value;
@@ -567,6 +650,21 @@ function renderOpenLink(path, sourceBase, label = '在新标签打开') {
   return `<a href="${escapeHtml(relativeHref(path, sourceBase))}" target="_blank" rel="noopener">${escapeHtml(label)}</a>`;
 }
 
+// Rebase rendered anchors only. Source text and machine payload remain intact.
+function renderDocument(markdown, sourcePath, sourceBase, options = {}) {
+  const { contract = /^3-contract\/contract(?:[.-].*)?\.md$/i.test(sourcePath), ...renderOptions } = options;
+  const projection = projectMarkdownReferences(markdown, { contract });
+  return renderMarkdown(projection, renderOptions).replace(/href="([^"]+)"/g, (all, href) => {
+    if (/^(#|[a-z][a-z\d+.-]*:|\/)/i.test(href)) return all;
+    const [, pathname, query = '', fragment = ''] = /^([^?#]*)(\?[^#]*)?(#.*)?$/.exec(href);
+    let decoded;
+    try { decoded = decodeURIComponent(pathname.replaceAll('&amp;', '&')); }
+    catch { return all; }
+    const target = decoded ? posix.normalize(posix.join(posix.dirname(sourcePath), decoded)) : sourcePath;
+    return `href="${relativeHref(target, sourceBase)}${query}${fragment}"`;
+  });
+}
+
 /** 原型确认：门禁与确认清单在前，确认版对照物按固定顺序逐件呈现——HTML 原型 iframe 就地渲染，
  * markdown 对照物渲染成文档（确认版默认展开），json 折叠给出；草稿只列链接，供回溯，不当结果。 */
 function renderPrototype(prototype, sourceBase) {
@@ -576,7 +674,7 @@ function renderPrototype(prototype, sourceBase) {
     const name = basename(artifact.path);
     const head = `<h3>${escapeHtml(artifact.title)}${artifact.title !== name ? ` <span class="muted">${escapeHtml(name)}</span>` : ''}</h3><p class="trace">${artifact.confirmed ? '确认版对照物' : '阶段产物'} · ${artifact.bytes} bytes · ${renderOpenLink(artifact.path, sourceBase)}</p>`;
     if (artifact.kind === 'html') return `<article class="artifact">${head}${renderIframe(artifact.path, sourceBase)}</article>`;
-    if (artifact.markdown !== undefined) return `<article class="artifact">${head}<details${artifact.confirmed ? ' open' : ''}><summary>全文</summary>${renderMarkdown(artifact.markdown)}</details></article>`;
+    if (artifact.markdown !== undefined) return `<article class="artifact">${head}<details${artifact.confirmed ? ' open' : ''}><summary>全文</summary>${renderDocument(artifact.markdown, artifact.path, sourceBase)}</details></article>`;
     if (artifact.json !== undefined) return `<article class="artifact">${head}<details><summary>JSON</summary><pre>${escapeHtml(JSON.stringify(artifact.json, null, 2))}</pre></details></article>`;
     return `<article class="artifact">${head}</article>`;
   }).join('');
@@ -588,7 +686,7 @@ function renderPrototype(prototype, sourceBase) {
 
 /** 契约：门禁、校验结果（AC 数、验证档分布、警告）、下一步与目录在前，契约原文整篇渲染，
  * 分里程碑契约等附属文档各自折叠，verify.txt 的验收实跑记录原样给出。目录与正文锚点出自同一次渲染。 */
-function renderContract(dossier) {
+function renderContract(dossier, sourceBase) {
   const final = dossier.state.final;
   const extra = dossier.contract_extra;
   const validation = extra?.validation;
@@ -598,12 +696,12 @@ function renderContract(dossier) {
     : '');
   const headings = [];
   const original = dossier.contract_markdown
-    ? `<section id="contract-text"><h2>契约原文</h2>${renderMarkdown(dossier.contract_markdown, { headingIds: 'contract-section', headings })}</section>`
+    ? `<section id="contract-text"><h2>契约原文</h2>${renderDocument(dossier.contract_markdown, '3-contract/contract.md', sourceBase, { headingIds: 'contract-section', headings })}</section>`
     : final ? renderFinal(final) : '<section><h2>契约原文</h2><p class="muted">尚未定稿契约。</p></section>';
   const toc = headings.length ? `<ol class="toc">${headings.map(({ index, title }) => `<li><a href="#contract-section-${index}">${escapeHtml(title)}</a></li>`).join('')}</ol>` : '';
   const head = `<section id="contract"><h2>${escapeHtml(final?.title ?? `目标契约 · ${dossier.slug}`)}</h2><p class="muted">${escapeHtml(final?.subtitle ?? '三阶段收口 · 家族载体')}</p><div class="meta">${chips}</div>${extra?.next_action ? `<p class="answer"><strong>下一步</strong>${escapeHtml(extra.next_action)}</p>` : ''}${toc}</section>`;
   const documents = extra?.documents?.length
-    ? `<section><h2>契约附属文档</h2>${extra.documents.map((document) => `<details><summary>${escapeHtml(document.name)} · ${document.bytes} bytes</summary>${renderMarkdown(document.markdown)}</details>`).join('')}</section>`
+    ? `<section><h2>契约附属文档</h2>${extra.documents.map((document) => `<details><summary>${escapeHtml(document.name)} · ${document.bytes} bytes</summary>${renderDocument(document.markdown, document.path, sourceBase, { contract: document.contract ?? /^3-contract\/contract(?:[.-].*)?\.md$/i.test(document.path) })}</details>`).join('')}</section>`
     : '';
   const verify = extra?.verify_text
     ? `<section><h2>验收命令实跑记录 <span class="muted">3-contract/verify.txt</span></h2><pre>${escapeHtml(extra.verify_text)}</pre></section>`
@@ -657,6 +755,9 @@ export function renderDossierHtml(dossier, { sourceBase = '' } = {}) {
   const machineJson = JSON.stringify(dossier).replaceAll('<', '\\u003c');
   const phases = dossier.state.phases ?? [];
   const submissions = dossier.submissions ?? {};
+  const opening = dossier.manifest?.delivery
+    ? `<p>${escapeHtml(dossier.manifest.goal_oneline ?? '')}</p><details><summary>查看原始请求</summary><p>${escapeHtml(dossier.state.opening ?? '未记录原始请求')}</p></details>`
+    : `<p>${escapeHtml(dossier.state.opening ?? '未记录原始请求')}</p>`;
   const panel = (id, body) => `<section class="tab-panel" id="tab-${id}" role="tabpanel">${body}</section>`;
   return `<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>${escapeHtml(dossier.title)}</title>
@@ -668,12 +769,12 @@ iframe.prototype{display:block;width:100%;height:720px;margin:8px 0;border:1px s
 @media(max-width:760px){main{padding:26px 16px}.option-record dl{grid-template-columns:1fr}.option-record dl div{padding:8px 0 0;border-left:0;border-top:1px solid var(--line)}.option-record dl div:first-child{border-top:0}.answer{grid-template-columns:1fr}.toc{columns:1}}
 @media print{body{background:#fff}main{max-width:none;padding:0}.tabs{display:none}.tab-panel[hidden]{display:block}.hero,.round,.decision,.contract-section,details{break-inside:avoid;box-shadow:none}details>pre{display:block}summary{list-style:none}}
 </style></head><body><main>
-<section class="hero"><p>GOAL CONTRACT · DECISION DOSSIER</p><h1>${escapeHtml(dossier.title)}</h1><p>${escapeHtml(dossier.state.opening ?? '未记录原始请求')}</p><div class="meta"><span class="chip">状态 ${escapeHtml(dossier.status)}</span><span class="chip">开放歧义 ${escapeHtml(dossier.state.open_ambiguities)}</span><span class="chip">State ${dossier.state_digest.slice(0, 12)}</span><span class="chip">Dossier ${dossier.dossier_digest.slice(0, 12)}</span></div><div class="phase-row">${phases.map((phase) => `<span class="chip">${escapeHtml(phase.label)} · ${escapeHtml(phase.status)}</span>`).join('')}</div></section>
+<section class="hero"><p>GOAL CONTRACT · DECISION DOSSIER</p><h1>${escapeHtml(dossier.title)}</h1>${opening}<div class="meta"><span class="chip">状态 ${escapeHtml(dossier.status)}</span><span class="chip">开放歧义 ${escapeHtml(dossier.state.open_ambiguities)}</span><span class="chip">State ${dossier.state_digest.slice(0, 12)}</span><span class="chip">Dossier ${dossier.dossier_digest.slice(0, 12)}</span></div><div class="phase-row">${phases.map((phase) => `<span class="chip">${escapeHtml(phase.label)} · ${escapeHtml(phase.status)}</span>`).join('')}</div></section>
 <nav class="tabs" role="tablist">${TABS.map(([id, label]) => `<button type="button" role="tab" data-tab="${id}" aria-selected="${id === 'overview'}" aria-controls="tab-${id}">${label}</button>`).join('')}</nav>
-${panel('overview', `<h2>原始请求与上下文</h2>${dossier.context_markdown ? renderMarkdown(dossier.context_markdown) : `<p>${escapeHtml(dossier.state.opening ?? '')}</p>`}`)}
+${panel('overview', `<h2>原始请求与上下文</h2>${dossier.context_markdown ? renderDocument(dossier.context_markdown, '1-interview/context.md', sourceBase) : `<p>${escapeHtml(dossier.state.opening ?? '')}</p>`}`)}
 ${panel('trajectory', `<h2>完整需求轨迹</h2><div id="trajectory">${(dossier.state.rounds ?? []).map((round) => renderRound(round, submissions[round.id])).join('') || '<p class="muted">尚无轮次记录。</p>'}</div>`)}
 ${panel('prototype', `<h2>原型确认</h2><div id="prototype">${renderPrototype(dossier.prototype, sourceBase)}</div>`)}
-${panel('contract', renderContract(dossier))}
+${panel('contract', renderContract(dossier, sourceBase))}
 ${panel('sources', `<h2>全部来源文件</h2><p class="muted">issue 目录下三阶段的全部文件，按相对路径引用；原型与契约的结果见前两个页签。</p>${renderSources(dossier.sources, sourceBase)}
 <h2>溯源账本</h2>${dossier.ledger.length ? `<table class="ledger"><thead><tr><th>时间</th><th>事件</th><th>主体</th><th>摘要</th></tr></thead><tbody>${dossier.ledger.map((event) => `<tr><td>${escapeHtml(event.at)}</td><td>${escapeHtml(event.type)}</td><td>${escapeHtml(event.actor?.id)}</td><td>${escapeHtml(event.entity?.id ?? event.round ?? '')}<br><small>${escapeHtml(event.event_digest?.slice(0, 16))}</small></td></tr>`).join('')}</tbody></table>` : '<p class="muted">纯对话载体没有 Web 提交事件；过程账本即 1-interview/rounds.jsonl，见上方来源清单。</p>'}
 <h2>追踪矩阵</h2><table class="ledger"><thead><tr><th>ID</th><th>阶段/轮次</th><th>来源</th><th>映射到</th><th>决定</th></tr></thead><tbody>${dossier.traceability.map((row) => `<tr><td>${escapeHtml(row.id)}</td><td>${escapeHtml(row.stage)} / ${escapeHtml(row.round)}</td><td>${escapeHtml(row.source_refs.join(' · ') || '未显式关联')}</td><td>${escapeHtml(row.maps_to.join(' · ') || '未显式关联')}</td><td>${escapeHtml(answerSummary(row.answer))}</td></tr>`).join('')}</tbody></table>
@@ -695,7 +796,7 @@ function sourceBaseFor(outputDir, issueDir) {
 export function exportDossier(issueDir, outputPath) {
   const dossier = buildDossier(issueDir);
   // web 载体默认进 web/exports；纯对话载体没有 web/，落在 issue 根目录与家族产物同层。
-  const fallback = existsSync(join(issueDir, 'web'))
+  const fallback = !dossier.manifest?.delivery && existsSync(join(issueDir, 'web'))
     ? join(issueDir, 'web', 'exports', `${dossier.slug}-decision-dossier.html`)
     : join(issueDir, 'dossier.html');
   const pathname = resolve(outputPath ?? fallback);

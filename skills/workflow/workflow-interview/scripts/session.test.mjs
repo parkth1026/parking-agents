@@ -412,6 +412,106 @@ function forceReady(dir, contract) {
   return m;
 }
 
+// 重新校验是对当前契约的判断。失败后不许沿用上一次的 Ready 和交接提示。
+function assertFinalizeWithdrawn(name, dir) {
+  const m = manifest(dir);
+  const slug = dir.split(/[\\/]/).pop();
+  const row = String(run('list').stdout).split(/\r?\n/).find(line => line.startsWith(slug + ' ')) || '';
+  check(`${name}/失败撤销就绪与关闭时间`,
+    m.status !== 'ready' && m.stage_gates['3-contract'].status !== 'done'
+      && m.stage_gates['3-contract'].closed_at === undefined, JSON.stringify(m));
+  check(`${name}/失败写入非有效校验与修复提示`,
+    m.validation?.status !== 'valid' && /修|重新|重跑|finalize/.test(m.next_action || '')
+      && !/发给执行 Agent|已就绪/.test(m.next_action || ''), JSON.stringify(m));
+  check(`${name}/列表明确告警`, row.includes('⚠'), row);
+}
+
+for (const failure of ['结构失败', 'UNRUNNABLE', '缺契约', '登记漂移', '口径未确认']) {
+  const dir = mkIssue({ interview: true, impact: true });
+  doneInterview(dir);
+  forceReady(dir);
+  expect(`refinalize/${failure}/先校验就绪`, run('finalize', dir), 0);
+  const cpath = join(dir, '3-contract', 'contract.md');
+  if (failure === '登记漂移') {
+    const plan = join(ROOT, `refinalize-${seq}.json`);
+    writeFileSync(plan, JSON.stringify({ files: [
+      { path: 'manifest.json', role: 'state' },
+      { path: '1-interview/context.md', role: 'requirement' },
+      { path: '1-interview/rounds.jsonl', role: 'decision' },
+      { path: '2-prototype/impact-surface.md', role: 'requirement' },
+      { path: '2-prototype/behavior.md', role: 'prototype' },
+      { path: '3-contract/contract.md', role: 'contract' },
+      { path: 'dossier.html', role: 'derived' },
+    ], excluded: [{ path: '3-contract/verify.txt', reason: '旧冒烟过程证据' }] }));
+    expect('refinalize/登记漂移/登记正式文件', run('delivery', dir, '--plan', plan), 0);
+    writeFileSync(cpath, VALID_CONTRACT.replace('占位目标', '未经重新登记的目标'));
+  } else if (failure === '缺契约') unlinkSync(cpath);
+  else if (failure === '口径未确认') writeFileSync(cpath, VALID_CONTRACT.replace('占位目标一句话可观察。', '界面按 mock.html 呈现。'));
+  else writeFileSync(cpath, failure === '结构失败' ? '# 无验收条件\n' : VALID_CONTRACT.replace('`node -e "process.exit(1)"`', '`definitely-missing-refinalize-command-2816`'));
+  const rejected = run('finalize', dir);
+  check(`refinalize/${failure}/重新校验拒绝`, rejected.status !== 0);
+  check(`refinalize/${failure}/失败不输出可执行交接`, !/\/goal\s+完成/.test(`${rejected.stdout || ''}\n${rejected.stderr || ''}`));
+  assertFinalizeWithdrawn(`refinalize/${failure}`, dir);
+  writeFileSync(cpath, VALID_CONTRACT);
+  expect(`refinalize/${failure}/修复后可重新就绪`, run('finalize', dir), 0);
+  check(`refinalize/${failure}/恢复Ready`, manifest(dir).status === 'ready');
+}
+
+{
+  const dir = mkIssue({ interview: true, impact: true });
+  doneInterview(dir);
+  forceReady(dir);
+  const before = manifest(dir);
+  expect('revision-stage/仅重开契约', run('stage', dir, '3-contract', 'in_progress'), 0);
+  const after = manifest(dir);
+  check('revision-stage/保留已经确认的需求与对照物',
+    JSON.stringify(after.stage_gates['1-interview']) === JSON.stringify(before.stage_gates['1-interview'])
+      && JSON.stringify(after.stage_gates['2-prototype']) === JSON.stringify(before.stage_gates['2-prototype']));
+  check('revision-stage/撤销Ready与旧关闭时间', after.status !== 'ready'
+    && after.stage === '3-contract' && !after.stage_gates['3-contract'].closed_at, JSON.stringify(after));
+  check('revision-stage/旧valid不再现行', after.validation?.status !== 'valid' || after.validation?.stale === true, JSON.stringify(after.validation));
+}
+
+// Reopening upstream work invalidates contract completion. Closing upstream
+// again cannot substitute for a successful finalize of the current contract.
+for (const upstream of ['1-interview', '2-prototype']) {
+  const dir = mkIssue({ interview: true, impact: true, artifacts: ['behavior.md'] });
+  expect(`ready-invalidation/${upstream}/访谈完成`, doneInterview(dir), 0);
+  expect(`ready-invalidation/${upstream}/对照物完成`, run('stage', dir, '2-prototype', 'done', '--artifacts', 'behavior'), 0);
+  const cp = join(dir, '3-contract', 'contract.md');
+  writeFileSync(cp, VALID_CONTRACT);
+  expect(`ready-invalidation/${upstream}/首次校验`, run('finalize', dir), 0);
+  expect(`ready-invalidation/${upstream}/契约闭合`, run('stage', dir, '3-contract', 'done'), 0);
+  expect(`ready-invalidation/${upstream}/重开上游`, run('stage', dir, upstream, 'in_progress'), 0);
+  let state = manifest(dir);
+  check(`ready-invalidation/${upstream}/重开立即撤销Ready和契约done`, state.status === 'in_progress'
+    && state.validation.status !== 'valid' && state.stage_gates['3-contract'].status !== 'done'
+    && !state.stage_gates[upstream].closed_at && !state.stage_gates['3-contract'].closed_at, JSON.stringify(state));
+  writeFileSync(cp, '# 缺少验收条件\n');
+  expect(`ready-invalidation/${upstream}/契约损坏校验失败`, run('finalize', dir), 1);
+  check(`ready-invalidation/${upstream}/失败后第三阶段已失效`, manifest(dir).stage_gates['3-contract'].status !== 'done');
+  const flags = upstream === '1-interview' ? ['--assessment', ASSESS] : ['--artifacts', 'behavior'];
+  expect(`ready-invalidation/${upstream}/只关闭上游`, run('stage', dir, upstream, 'done', ...flags), 0);
+  state = manifest(dir);
+  check(`ready-invalidation/${upstream}/关闭上游不能复活无效Ready`, state.status === 'in_progress'
+    && state.validation.status === 'invalid' && state.stage_gates['3-contract'].status === 'in_progress', JSON.stringify(state));
+  expect(`ready-invalidation/${upstream}/无效契约不能闭合`, run('stage', dir, '3-contract', 'done'), 1);
+  writeFileSync(cp, VALID_CONTRACT);
+  expect(`ready-invalidation/${upstream}/修复后重新校验`, run('finalize', dir), 0);
+  expect(`ready-invalidation/${upstream}/修复后关闭契约`, run('stage', dir, '3-contract', 'done'), 0);
+  check(`ready-invalidation/${upstream}/合法路径恢复Ready`, manifest(dir).status === 'ready');
+}
+for (const stale of [false, true]) {
+  const dir = mkIssue({ interview: true, impact: true });
+  doneInterview(dir);
+  const state = forceReady(dir);
+  state.validation = { ...state.validation, status: stale ? 'valid' : 'invalid', stale };
+  writeFileSync(join(dir, 'manifest.json'), JSON.stringify(state));
+  expect(`ready-invalidation/历史全闭${stale ? 'stale' : 'invalid'}/上游收尾`, run('stage', dir, '2-prototype', 'done', '--artifacts', 'behavior'), 0);
+  check(`ready-invalidation/历史全闭${stale ? 'stale' : 'invalid'}/不复活`, manifest(dir).status !== 'ready');
+  expect(`ready-invalidation/历史全闭${stale ? 'stale' : 'invalid'}/done仍拒绝`, run('stage', dir, '3-contract', 'done'), 1, 'finalize');
+}
+
 {
   const dir = mkIssue({ interview: true, impact: true });
   doneInterview(dir);
@@ -466,7 +566,8 @@ function forceReady(dir, contract) {
     after.validation.stale === true && /口径没问/.test(after.validation.stale_reason || ''),
     JSON.stringify(after.validation));
   check('lifecycle/closed_at 清除并记 reverted_at',
-    after.stage_gates['3-contract'].closed_at === undefined && !!after.stage_gates['3-contract'].reverted_at,
+    after.stage_gates['3-contract'].closed_at === undefined && !!after.stage_gates['3-contract'].reverted_at
+      && after.stage_gates['1-interview'].closed_at === undefined,
     JSON.stringify(after.stage_gates['3-contract']));
   check('list/打回态出现告警', `${run('list').stdout || ''}`.includes('⚠已打回待修订'));
 }
@@ -479,6 +580,10 @@ function forceReady(dir, contract) {
   utimesSync(cp, new Date('2026-08-30T00:00:00Z'), new Date('2026-08-30T00:00:00Z'));
   run('stage', dir, '3-contract', 'needs_reinterview', '--reason', '整族打回');
   expect('lifecycle/打回后契约未修订即拒', run('finalize', dir), 1, '还没折进契约');
+  const deferred = manifest(dir);
+  check('lifecycle/未修订的打回仍指向需求访谈', deferred.stage === '1-interview'
+    && /aes-interview|需求访谈/.test(deferred.next_action || '')
+    && /问清|澄清|调查|上游确认/.test(deferred.next_action || ''), JSON.stringify(deferred));
   writeFileSync(cp, VALID_CONTRACT.replace('占位目标', '修订后的占位目标'), 'utf8');
   const res = run('finalize', dir);
   check('lifecycle/修订后重新通过并清 stale',

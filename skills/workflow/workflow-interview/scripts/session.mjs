@@ -12,7 +12,10 @@
  *                                         --write 落 verify-evidence.txt，不碰冒烟快照
  *   rebuild <dir>                         从目录扫描重建 manifest
  *   finalize <dir>                        校验 + 冒烟 + 交接闸门 + 生成交接指令
+ *   revise <dir> --reason <说明>           留存底本，仅重开契约阶段
  *   list                                  现扫全部 issue，输出一张表
+ *   delivery <dir> --plan <json>          登记正式文件和过程排除项，只写manifest
+ *   submission-check <dir> [--output <new-dir>] 检查交付闭合，按需生成包外预览
  *
  * 退出码：0 成功 / 1 有问题需要处理 / 2 用法或路径错
  */
@@ -21,6 +24,11 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync,
 import { dirname, join, resolve, basename, relative, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
+import { makeDelivery, checkDelivery, writePreview } from './lib/delivery.mjs';
+import { exportDossier } from './lib/dossier.mjs';
+import { ensureGrillingIgnore, inspectIgnorePolicy, copyIgnorePrerequisites, resolveSourceDirectory } from './lib/grilling-ignore.mjs';
+import { archiveContractRevision } from './lib/contract-revision.mjs';
 
 const SCHEMA_VERSION = 1;
 const STAGES = ['1-interview', '2-prototype', '3-contract'];
@@ -130,9 +138,9 @@ function parseFlags(argv) {
 function resolveIssueDir(arg) {
   if (!arg) die('缺少 issue 目录参数。');
   const direct = resolve(arg);
-  if (existsSync(direct)) return direct;
+  if (existsSync(direct)) return resolveSourceDirectory(direct);
   const bySlug = join(grillingRoot(), arg);
-  if (existsSync(bySlug)) return bySlug;
+  if (existsSync(bySlug)) return resolveSourceDirectory(bySlug);
   die(`找不到 issue 目录：${arg}`);
 }
 
@@ -345,7 +353,10 @@ function gateDone(dir, stage, gate, m) {
   if (!existsSync(cpath)) return ['3-contract/contract.md 不存在。'];
   const errs = [];
   const v = m.validation;
-  if (!v || v.status !== 'valid') {
+  // Closing this gate changes manifest. Refresh its derived dossier afterwards;
+  // submission-check still requires that final projection to be current.
+  if (m.delivery) errs.push(...checkDelivery(dir, m, { allowMissingDerived: true }).errors);
+  if (!v || v.status !== 'valid' || v.stale) {
     errs.push('finalize 还没通过（manifest.validation.status ≠ valid）。先跑 finalize 再报 done。');
   } else {
     // 对账盯 3-contract/ 下全部契约文件（contract.md 及 contract-*.md）：里程碑家族里
@@ -366,6 +377,7 @@ function cmdInit(argv) {
   const slug = argv[0];
   if (!slug || slug.startsWith('--')) die('用法：init <date>-<任务词组> [--request <原话>]');
   const flags = parseFlags(argv.slice(1));
+  const ignore = ensureGrillingIgnore(grillingRoot());
   const dir = join(grillingRoot(), slug);
 
   const fresh = !existsSync(manifestPath(dir));
@@ -385,6 +397,9 @@ function cmdInit(argv) {
   console.log(`stage: ${manifest.stage}  (${fresh ? '新建' : '已存在，续跑'})`);
   for (const s of STAGES) console.log(`  ${s}: ${manifest.stage_gates[s].status}`);
   if (manifest.next_action) console.log(`next:  ${manifest.next_action}`);
+  console.log(`ignore: ${ignore.path} (${ignore.status})`);
+  const policy=inspectIgnorePolicy(dir,manifest.delivery?.files.map(f=>f.path)??[]);
+  for(const message of [...policy.errors,...policy.warnings])console.error('WARNING: '+message);
   return 0;
 }
 
@@ -430,6 +445,47 @@ function cmdRound(argv) {
 function contractIsBlocked(dir) {
   const path = join(dir, '3-contract', 'contract.md');
   return existsSync(path) && /^- Status:\s*Blocked\s*$/mi.test(readFileSync(path, 'utf8'));
+}
+
+// A prior Ready result does not survive a failed check or an explicit revision.
+// Keep upstream confirmations and previous validation details for diagnosis.
+function withdrawContractReady(m, reason) {
+  m.status = 'in_progress';
+  m.validation = { ...m.validation, status: 'invalid' };
+  const gate = m.stage_gates['3-contract'];
+  delete gate.closed_at;
+  const upstreamClosed = m.stage_gates['1-interview'].status === 'done'
+    && ['done', 'skipped'].includes(m.stage_gates['2-prototype'].status);
+  if (gate.status !== 'needs_reinterview') {
+    gate.status = 'in_progress';
+    if (upstreamClosed) m.stage = '3-contract';
+  }
+  const unfinishedUpstream = STAGES.slice(0, 2).find(s => !['done', 'skipped'].includes(m.stage_gates[s].status));
+  const returnTo = gate.status === 'needs_reinterview' ? '1-interview' : unfinishedUpstream;
+  if (returnTo) m.stage = returnTo;
+  m.next_action = returnTo
+    ? `${reason}；先回 /${returnTo === '1-interview' ? 'aes-interview' : 'aes-prototype'} 完成上游确认：${gate.reason || returnTo}，再修订契约并重新核验。`
+    : `${reason}；修订并重新登记变更文件，再跑 finalize，校验通过后 stage 3-contract done，重新生成 dossier 和提交预览。`;
+}
+
+function cmdRevise(argv) {
+  const dir = resolveIssueDir(argv[0]);
+  const flags = parseFlags(argv.slice(1));
+  if (typeof flags.reason !== 'string' || !flags.reason.trim()) die('revise <dir> --reason <修订说明>：必须说明修订原因。');
+  const m = readManifest(dir);
+  if (m.stage_gates['1-interview'].status !== 'done'
+    || !['done', 'skipped'].includes(m.stage_gates['2-prototype'].status)
+    || m.stage_gates['3-contract'].status === 'needs_reinterview') {
+    die('revise 仅用于目标与边界不变的契约修订；先完成前两阶段，存在新歧义则回访谈。', 1);
+  }
+  const archived = archiveContractRevision(dir, m, flags.reason);
+  withdrawContractReady(m, `契约修订：${flags.reason.trim()}`);
+  m.validation.stale = true;
+  m.validation.stale_reason = `契约修订：${flags.reason.trim()}`;
+  try { writeManifest(dir, m); }
+  catch (error) { throw new Error(`${error.message}；底本已保留在 ${archived.archive}`); }
+  console.log(JSON.stringify({ ...archived, stage: m.stage, status: m.status, next_action: m.next_action }, null, 2));
+  return 0;
 }
 
 function cmdStage(argv) {
@@ -496,14 +552,13 @@ function cmdStage(argv) {
   if (status === 'needs_reinterview') {
     m.stage = STAGES[0];
     m.stage_gates[STAGES[0]].status = 'in_progress';
+    delete m.stage_gates[STAGES[0]].closed_at;
     // 打回撤销的不只是阶段：顶层 ready 和 validation 描述的都是被打回前的那份契约。
     // 残留着，list 和续跑判断就会拿旧结论误导（2026-08-31 实锤：打回后 status 仍 ready、
     // validation 仍是打回前的存量）。ready 回落、validation 标 stale（不删历史）。
-    if (m.status === 'ready' || m.status === 'blocked') m.status = 'in_progress';
-    if (m.validation) {
-      m.validation.stale = true;
-      m.validation.stale_reason = flags.reason || `${stage} 被打回`;
-    }
+    withdrawContractReady(m, flags.reason || `${stage} 被打回`);
+    m.validation.stale = true;
+    m.validation.stale_reason = flags.reason || `${stage} 被打回`;
     delete gate.closed_at;
     gate.reverted_at = iso();
     // 回退时旧的 next_action 一定是陈旧的——它指向的正是刚被打回的那一步。
@@ -511,11 +566,21 @@ function cmdStage(argv) {
       m.next_action = `${stage} 撞出新歧义，回 /aes-interview 问清：${flags.reason || '见该阶段产物'}`;
     }
   } else if (status === 'done' || status === 'skipped') {
+    if (STAGES.every(s => ['done', 'skipped'].includes(m.stage_gates[s].status))
+      && gateDone(dir, '3-contract', m.stage_gates['3-contract'], m).length > 0) {
+      withdrawContractReady(m, '当前契约尚未通过有效校验，上游收尾不能恢复Ready');
+    }
     const next = STAGES.find((s) => !['done', 'skipped'].includes(m.stage_gates[s].status));
     m.stage = next || stage;
     if (!next) m.status = contractIsBlocked(dir) ? 'blocked' : 'ready';
   } else {
     m.stage = stage;
+    withdrawContractReady(m, `${stage}阶段已重开`);
+    gate.status = status;
+    delete gate.closed_at;
+    m.validation.stale = true;
+    m.validation.stale_reason = `${stage}阶段已重开，需重新校验`;
+    if (typeof flags.next === 'string') m.next_action = flags.next;
   }
 
   writeManifest(dir, m);
@@ -626,7 +691,11 @@ function cmdVerify(argv) {
   if (flags.write) {
     // 冒烟快照（finalize 时跑，期望全红）与完成证据（实现后复验，期望转绿）语义相反，
     // 共用一个文件只会互相覆盖——红态证据最后只剩 git 史。分开落盘，谁也不覆盖谁。
-    const out = join(dir, '3-contract', flags.smoke ? 'verify.txt' : 'verify-evidence.txt');
+    const m = readManifest(dir);
+    const out = m.delivery
+      ? join(repoRoot(), 'artifacts', 'workflow-interview', basename(dir), 'runs', `${Date.now()}-${randomUUID()}`, flags.smoke ? 'verify.txt' : 'verify-evidence.txt')
+      : join(dir, '3-contract', flags.smoke ? 'verify.txt' : 'verify-evidence.txt');
+    mkdirSync(dirname(out), { recursive: true });
     writeFileSync(out, `${text}\n`, 'utf8');
     console.log(`\n→ ${out}`);
   }
@@ -686,7 +755,7 @@ function cmdRebuild(argv) {
     };
   }
 
-  const contractOk = has('3-contract', 'contract.md') && m.validation?.status === 'valid';
+  const contractOk = has('3-contract', 'contract.md') && m.validation?.status === 'valid' && !m.validation.stale && (!m.delivery || checkDelivery(dir,m).ok);
   gates['3-contract'] = {
     ...(gates['3-contract'] || {}),
     status: keep('3-contract', contractOk ? 'done' : (has('3-contract', 'contract.md') ? 'in_progress' : 'pending')),
@@ -743,11 +812,37 @@ const HUMAN_GATE_RE = /(用户|员工|人工|客户|真人|评审人?|主管|领
 
 function cmdFinalize(argv) {
   const dir = resolveIssueDir(argv[0]);
-  const cpath = contractPath(dir);
-  if (!existsSync(cpath)) die(`${cpath} 不存在。`);
-  const md = readFileSync(cpath, 'utf8');
   const m = readManifest(dir);
+  try { return finalizeContract(dir, m); }
+  catch (error) {
+    m.validation = { ...m.validation, status: 'invalid', ran_at: iso(), errors: [error.message] };
+    withdrawContractReady(m, `finalize 未通过：${error.message}`);
+    writeManifest(dir, m);
+    throw error;
+  }
+}
+
+function finalizeContract(dir, m) {
+  const cpath = contractPath(dir);
+  if (!existsSync(cpath)) {
+    m.validation = { status: 'invalid', ran_at: iso(), errors: [`${cpath} 不存在。`] };
+    withdrawContractReady(m, 'finalize 未通过：契约不存在');
+    writeManifest(dir, m);
+    console.error(`session: ${cpath} 不存在。`);
+    return 2;
+  }
+  const md = readFileSync(cpath, 'utf8');
   let failed = false;
+  if (m.delivery) {
+    const report = checkDelivery(dir, m, { allowMissingDerived: true });
+    if (!report.ok) {
+      console.error(JSON.stringify(report, null, 2));
+      m.validation = { status: 'invalid', ran_at: iso(), errors: report.errors };
+      withdrawContractReady(m, 'finalize 未通过：正式交付清单校验失败');
+      writeManifest(dir, m);
+      return 1;
+    }
+  } else console.log('WARNING: LEGACY_DELIVERY_UNREGISTERED：旧任务可继续校验；提交前必须登记delivery并通过submission-check。');
 
   // 0. 打回未修订拦截：3-contract 已被打回，而 contract.md 自上次 finalize 后没改过，
   //    说明打回的裁决还没折进契约。fail-fast，不跑后续步骤——否则会拿旧稿的冒烟
@@ -757,6 +852,8 @@ function cmdFinalize(argv) {
     if (lastRan && statSync(cpath).mtimeMs <= lastRan + 2000) {
       console.error(`3-contract 已被打回：${m.stage_gates['3-contract'].reason || m.validation?.stale_reason || '见访谈记录'}`);
       console.error('但 contract.md 自上次 finalize 之后没改过——打回的裁决还没折进契约。先修订契约再 finalize。');
+      withdrawContractReady(m, 'finalize 未通过：打回的裁决尚未折进契约');
+      writeManifest(dir, m);
       return 1;
     }
   }
@@ -871,8 +968,6 @@ function cmdFinalize(argv) {
     ? ''
     : '计划外的事按该文档「自主边界」节自行判断。';
   const handoff = `/goal 完成 ${cpath} 定义的目标：${oneline}。验收以该文档「验收条件」节全部 Verify 通过、「强约束」节全部保持为准。${autonomy}`;
-  console.log('\n─── 交接指令 ───');
-  console.log(handoff);
   if (handoff.length > GOAL_OBJECTIVE_LIMIT) {
     console.error(`\n交接指令 ${handoff.length} 字符，超过 codex create_goal 的 ${GOAL_OBJECTIVE_LIMIT} 上限。`);
     console.error('压缩契约「目标」节那一句话，别指望 codex 截断——它会直接拒收。');
@@ -906,8 +1001,14 @@ function cmdFinalize(argv) {
     // 重新走完全部闸门的这份 validation 是现行的，打回标记随之解除。
     delete m.validation.stale;
     delete m.validation.stale_reason;
+  } else {
+    withdrawContractReady(m, 'finalize 未通过：修复上列结构、冒烟或交接检查问题');
   }
   writeManifest(dir, m);
+  if (!failed) {
+    console.log('\n─── 交接指令 ───');
+    console.log(handoff);
+  }
   return failed ? 1 : 0;
 }
 
@@ -917,8 +1018,9 @@ function cmdFinalize(argv) {
  *  checkout/合并触碰污染（2026-08-31 语料：八份契约同毫秒批量假偏移）。 */
 function contractStaleNote(dir, m) {
   if (!m.validation || !m.validation.status) return '';
-  if (m.validation.stale) return '⚠已打回待修订';
-  if (m.validation.status !== 'valid') return '';
+  if (m.validation.stale) return m.stage_gates?.['3-contract']?.status === 'needs_reinterview'
+    ? '⚠已打回待修订' : '⚠契约待重新校验';
+  if (m.validation.status !== 'valid') return '⚠finalize未通过';
   const limit = Date.parse(m.validation.ran_at) + 2000;
   const cdir = join(dir, '3-contract');
   if (!existsSync(cdir)) return '';
@@ -959,6 +1061,43 @@ function cmdList() {
   return 0;
 }
 
+// A delivery plan is declarative. Registration writes only manifest.json; checks
+// and previews never stage files, delete history, or execute acceptance commands.
+function cmdDelivery(argv) {
+  const dir = resolveIssueDir(argv[0]);
+  const flags = parseFlags(argv.slice(1));
+  const m = readManifest(dir);
+  if (typeof flags.plan !== 'string') die('delivery <dir> --plan <json>：files[{path,role}], excluded[{path,reason}]');
+  m.delivery = makeDelivery(dir, JSON.parse(readFileSync(resolve(flags.plan), 'utf8')));
+  writeManifest(dir, m);
+  console.log(JSON.stringify({ registered: m.delivery.files.length, excluded: m.delivery.excluded.length }));
+  return 0;
+}
+
+function cmdSubmissionCheck(argv) {
+  const dir = resolveIssueDir(argv[0]);
+  const flags = parseFlags(argv.slice(1));
+  const m = readManifest(dir);
+  const report = checkDelivery(dir, m);
+  const ignorePolicy=inspectIgnorePolicy(dir,m.delivery?.files.map(f=>f.path)??[]);
+  report.ignorePolicy=ignorePolicy;
+  report.errors.push(...ignorePolicy.errors);report.warnings.push(...ignorePolicy.warnings);
+  report.ok=report.ok&&ignorePolicy.ok;
+  if (flags.output && report.ok) {
+    if (typeof flags.output !== 'string') die('--output 必须指定新的包外目录');
+    const preview=writePreview(dir,m,flags.output,exportDossier);
+    const prerequisites=copyIgnorePrerequisites(preview.output,ignorePolicy);
+    const receiptPath=join(preview.output,'submission.json'),receipt=JSON.parse(readFileSync(receiptPath,'utf8'));
+    for(const file of prerequisites)if(!receipt.files.some(f=>f.path===file.path))receipt.files.push(file);
+    receipt.ignorePolicy=ignorePolicy;receipt.repositoryPrerequisites=prerequisites.map(f=>f.path);
+    writeFileSync(receiptPath,JSON.stringify(receipt,null,2)+'\n');
+    writeFileSync(join(preview.output,'submission-files.txt'),receipt.files.map(f=>f.path).join('\n')+'\n');
+    preview.ignorePolicy=ignorePolicy;preview.files=receipt.files.length;
+    console.log(JSON.stringify(preview,null,2));
+  } else console.log(JSON.stringify(report, null, 2));
+  return report.ok ? 0 : 1;
+}
+
 // ─────────────────────────────── dispatch ───────────────────────────────
 
 const [sub, ...rest] = process.argv.slice(2);
@@ -969,11 +1108,15 @@ const table = {
   verify: cmdVerify,
   rebuild: cmdRebuild,
   finalize: cmdFinalize,
+  revise: cmdRevise,
   list: cmdList,
+  delivery: cmdDelivery,
+  'submission-check': cmdSubmissionCheck,
 };
 
 if (!sub || !table[sub]) {
-  console.error('用法：session.mjs <init|round|stage|verify|rebuild|finalize|list> [args]');
+  console.error('用法：session.mjs <init|round|stage|verify|rebuild|finalize|revise|list|delivery|submission-check> [args]');
   process.exit(2);
 }
-process.exit(table[sub](rest));
+try { process.exit(table[sub](rest)); }
+catch (error) { console.error(`session: ${error.message}`); process.exit(1); }

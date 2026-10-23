@@ -82,7 +82,7 @@ node <workflow-interview>/scripts/session.mjs stage <issue-dir> 2-prototype need
      状态：superseded by v2 / confirmed -->
 ```
 
-确认后草稿可清，不强制留存。确认版落 `2-prototype/` 根下，用下面的固定文件名。
+确认版落2-prototype/根下，用下面的固定文件名。按[正式交付规则](../workflow-interview/references/delivery-policy.md)将确认版及必要资产登记为正式交付；正式样本避开共享规则的四个保留过程目录名。drafts由init配置的公共ignore保护，默认不提交，原件保留或按用户指令归档，不自动删除。已有跟踪的草稿不会因ignore自动退出索引。重要否决理由进入当前决策记录。dossier与Git预览使用同一清单，不把目录里所有文件视为确认版。
 
 ### `mock.html` — 界面
 
@@ -186,6 +186,8 @@ node <workflow-interview>/scripts/session.mjs round <issue-dir> \
 
 确认版一律声明为**不可修改**：执行 Agent 改的是产品，不是对照物。与优化型目标锁
 测量脚本同理——不锁住尺子，被优化的就会是尺子。
+
+候选收敛后按风险或用户要求做一次只读对抗审查，处置findings后再交用户确认。结构性修订同步检查现行正式材料的旧术语和路径，不改历史记录；规则见[共用交付规则](../workflow-interview/references/delivery-policy.md#契约修订与复审)。
 
 ## 4. 它同时是下一阶段的例子池
 

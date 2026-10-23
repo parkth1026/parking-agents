@@ -1,0 +1,7 @@
+# template-version: 3
+
+# 任意层级的保留过程目录，不登记为正式交付
+node_modules/
+drafts/
+test-results/
+playwright-report/
