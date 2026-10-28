@@ -2,7 +2,7 @@
 
 `10.66.8.27` 是发起端 A；某台被连接电脑是 B。B 的真实 IP 和本地登录用户名需从 B 获取，不用 A 的用户名代替。
 
-在两台电脑各解压相同包。Skill 若放入各自 `%USERPROFILE%\.codex\skills\windows-ssh-link`，可让各自 Codex 使用 `$windows-ssh-link`。B 不装 Codex 也能直接跑 CLI。以下命令均假定当前目录为包内 `windows-ssh-link\bin`；也可将 EXE 换成绝对路径。示例 B 的 `10.66.8.220` 仅作示例，必须用 B 实际网卡地址。每次只选一台 B。
+在两台电脑各解压相同包。Skill 若放入各自 `%USERPROFILE%\.agents\skills\windows-ssh-link`，可让各自 Codex 使用 `$windows-ssh-link`。B 不装 Codex 也能直接跑 CLI。以下命令均假定当前目录为包内 `windows-ssh-link\bin`；也可将 EXE 换成绝对路径。示例 B 的 `10.66.8.220` 仅作示例，必须用 B 实际网卡地址。每次只选一台 B。
 
 ## A：准备客户端
 

@@ -4,7 +4,7 @@ param([string]$Destination,[switch]$Update)
 $ErrorActionPreference='Stop'
 $source=Split-Path -Parent $PSScriptRoot
 if(-not $Destination){
-    $base=$(if($env:CODEX_HOME){$env:CODEX_HOME}else{Join-Path $env:USERPROFILE '.codex'})
+    $base=Join-Path $env:USERPROFILE '.agents'
     $Destination=Join-Path $base 'skills\windows-ssh-link'
 }
 $dest=[IO.Path]::GetFullPath($Destination)
