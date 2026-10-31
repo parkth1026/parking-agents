@@ -23,7 +23,7 @@ description: workflow-interview
 
 ## issue 目录
 
-当前需求、结构化问答、确认版对照物和正式契约落在同一个issue目录。旧草稿与运行证据按[正式交付规则](references/delivery-policy.md)分类留存；留存不等于进入Git：
+当前需求、结构化问答、确认版对照物和正式契约落在同一个issue目录；跑真东西的验证记录跨阶段共用facts/，规则见[正式交付规则](references/delivery-policy.md#验证记录)。旧草稿与运行证据按[正式交付规则](references/delivery-policy.md)分类留存；留存不等于进入Git：
 
 ```bash
 node <skill-dir>/scripts/session.mjs init <date>-<任务词组>

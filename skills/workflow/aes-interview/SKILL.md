@@ -92,7 +92,7 @@ subagent 限定问题、目标路径和所需证据。**每个 subagent 把结�
 
 ### `1-interview/facts/<主题>.md`
 
-只有派了 subagent 时才有。一个 subagent 一份，文件名取调查主题。
+调查分片只有派了 subagent 时才有，一个 subagent 一份，文件名取调查主题。该目录还收各阶段的[验证记录](../workflow-interview/references/delivery-policy.md#验证记录)——跑真东西得出的事实结论，头部标「验证记录」，跨阶段共用同一目录。
 
 ```markdown
 # Fact: <主题>

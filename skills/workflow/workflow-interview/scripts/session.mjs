@@ -510,7 +510,14 @@ function cmdStage(argv) {
   if (typeof flags.artifacts === 'string') {
     gate.artifacts_confirmed = flags.artifacts.split(',').map((s) => s.trim()).filter(Boolean);
   }
-  if (typeof flags.reason === 'string') gate.reason = flags.reason;
+  if (typeof flags.reason === 'string') {
+    gate.reason = flags.reason;
+  } else if (status === 'done') {
+    // done 是终态记录：不现场写 reason，旧文案不保留。它描述的是关闭前的中间态，
+    // 留着比没有更误导（2026-10-25 实锤：契约已 Ready，3-contract 的 reason 仍写「待逐项确认」）。
+    // done 闸门不过时不会写 manifest，删除只在成功关闭时生效。
+    delete gate.reason;
+  }
   m.stage_gates[stage] = gate;
 
   // 阶段闸门：done 不是自报的。产出方自查自报是自陈，这里当场验结构才是判据。

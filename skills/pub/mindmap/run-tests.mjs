@@ -21,8 +21,8 @@ const lint = (...args) => spawnSync(process.execPath, [LINT, ...args], { encodin
 const good = lint(join(SKILL_DIR, "fixtures", "good.mindmap.md"));
 check("good 范例退出码 0", good.status === 0);
 check("good 范例统计 违规 0", /违规 0/.test(good.stdout));
-check("good 范例统计 节点数 80 · 一级分支 3 · 首屏节点 15 · 最大深度 6",
-  /节点数 80 · 一级分支 3 · 首屏节点 15 · 最大深度 6/.test(good.stdout));
+check("good 范例统计 节点数 80 · 一级分支 3 · 首屏节点 15 · 最大深度 6（含档位/卡片新字段）",
+  /档位 A\(结构\).*节点数 80 · 卡片 0 · 一级分支 3 · 首屏节点 15 · 最大深度 6/.test(good.stdout));
 
 // AC-7：违规样例逐类检出（行号 + 原因）
 const bad = lint(join(SKILL_DIR, "fixtures", "bad.mindmap.md"));

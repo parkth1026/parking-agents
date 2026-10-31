@@ -180,6 +180,21 @@ const askRow = (pcts) => JSON.stringify({
   expect('gate1/产物齐全 + 五维已定放行', doneInterview(dir), 0);
 }
 {
+  // done 不传 reason：关闭前 in_progress 记的中间态文案不得冒充终态说明（2026-10-25 实锤）。
+  const dir = mkIssue({ interview: true });
+  expect('stage/in_progress 先记 reason', run('stage', dir, '1-interview', 'in_progress', '--reason', '待逐项确认'), 0);
+  expect('gate1/done 不带 reason 放行', doneInterview(dir), 0);
+  const g = manifest(dir).stage_gates['1-interview'];
+  check('stage/done 不传 reason 不残留关闭前文案', g.reason === undefined, JSON.stringify(g));
+}
+{
+  const dir = mkIssue({ interview: true });
+  expect('gate1/done 带终态 reason 放行',
+    run('stage', dir, '1-interview', 'done', '--assessment', ASSESS, '--reason', '终态说明'), 0);
+  check('stage/done 现写的 reason 落盘', manifest(dir).stage_gates['1-interview'].reason === '终态说明',
+    JSON.stringify(manifest(dir).stage_gates['1-interview']));
+}
+{
   const dir = mkIssue({ interview: true });
   expect('gate1/自评停在「未定」拒收',
     run('stage', dir, '1-interview', 'done', '--assessment', JSON.stringify({ 意图: '已定', 结果: '未定', 边界: '已定', 约束: '已定', 现状: '已定' })),

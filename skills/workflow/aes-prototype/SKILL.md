@@ -72,6 +72,19 @@ node <workflow-interview>/scripts/session.mjs stage <issue-dir> 2-prototype need
 它的具体形态。理由必须写进 `impact-surface.md`——`stage` 命令收到 skipped 时会当场验
 七面扫描在盘，`impact-surface.md` 不齐就跳不了。
 
+## 跑真东西之前：先开验证记录
+
+对照物默认画出来；画回答不了的事实问题——既有系统能不能采用、依赖补丁可不可行、
+真实链路通不通——要跑真东西才知道。撞上[共用规则](../workflow-interview/references/delivery-policy.md#验证记录)
+的任一条明线，先在 `1-interview/facts/` 开一份验证记录（至少「问题」「方法」两节），
+跑完补「结论」「消耗」「处置」，再继续出对照物。本阶段两条底线：
+
+- **消耗真实资源（额度、凭证、外部副作用）的验证，动手前必须先有用户裁决落
+  rounds**（已答的 `ask` 或 `confirm`）。没有记录不许花，事后补记不算授权。
+- **真实运行的过程与结论不进 drafts/**。drafts 只放画出来的对照物迭代；真实运行的
+  结论进验证记录，重证据进包外 artifacts/。隔离副本跑通了也不是实现完成——实验产物
+  不直接转正，正式实现按契约「读什么」的固定来源重建。
+
 ## 2. 出对照物
 
 未确认的草稿放 `2-prototype/drafts/`，一版一个文件，顶部三行元数据：
