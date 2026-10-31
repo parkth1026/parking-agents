@@ -1,0 +1,25 @@
+{
+  "skill": "ambitious",
+  "runs": [
+    {
+      "date": "2026-10-31T09:39:57+08:00",
+      "iteration_ref": "G:\\GIT\\AI_WorkFlow\\parking-agents-manual\\evals\\ambitious-workspace\\iteration-1",
+      "gates": {
+        "with_skill": {
+          "pass_rate": 1,
+          "mean_ms": 180411,
+          "mean_tokens": 228576.75
+        },
+        "without_skill": {
+          "pass_rate": 1,
+          "mean_ms": 195055.5,
+          "mean_tokens": 223968
+        }
+      },
+      "vs_previous": null,
+      "bank_epoch": 1,
+      "current_best": true
+    }
+  ],
+  "current_best": "runs[0]"
+}

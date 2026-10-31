@@ -10,6 +10,8 @@
 
 **浏览器会话类例外**（核心循环依赖宿主浏览器、浏览器单会话且仅主 agent 可控，如 use-deepseek）：subagent 并行评测臂架构上不可行，五件套不适用。替代门槛为：`run-tests.mjs` 绿 + `references/design.md` 迭代记录中有一次带会话链接的实机冒烟记录（发送→等待生成完成→读回全文→转录落盘）。日后设计出可行的触发/输出评测口径时，回到五件套要求。
 
+**手动专用类例外**（双开关硬关、仅用户显式 `/命令` 调用，如 ambitious）：无自动触发面，触发评测没有对象，`trigger-evals.json`/`trigger-benchmark.json` 不适用。替代门槛为：`run-tests.mjs` 绿 + 输出评测两件已沉淀（`output-evals.json`、`history.json`，断言引用 design.md 的 AC 编号）。若日后技能改为可自动触发，回到五件套要求。
+
 ## 步骤
 
 1. **孵化**：技能目录建在 `.agents/skills/<技能名>/`，项目级加载即可试用。

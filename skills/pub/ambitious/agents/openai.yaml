@@ -1,0 +1,7 @@
+interface:
+  display_name: ambitious
+  short_description: "Rewrite a task with more ambition: higher goal, expert depth, cross-field breadth"
+  default_prompt: "Use $ambitious to rewrite this task with more ambition before executing."
+
+policy:
+  allow_implicit_invocation: false
