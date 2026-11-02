@@ -1,0 +1,7 @@
+interface:
+  display_name: "story-workflow"
+  short_description: "确认故事与执行路线，由主 Agent 编排子任务并汇总整体验收证据"
+  default_prompt: "用 $story-workflow 推进这个 Story：先确认需求与路线，获得实施授权后通过子 Agent 持续完成执行票，最后独立整体验收并汇总证据。"
+
+policy:
+  allow_implicit_invocation: true

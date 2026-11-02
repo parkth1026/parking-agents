@@ -1,0 +1,31 @@
+{
+  "skill_name": "story-workflow",
+  "evals": [
+    {
+      "id": "plan-only",
+      "prompt": "用户说：先把这个跨端导出功能的需求和执行步骤与我确认，暂不写产品。仓库有GitLab tracker。请说明你现在做什么、在哪里停下。",
+      "assertions": [
+        { "name": "展示用户结果、执行切片和依赖供确认，未擅自实施", "type": "manual", "ac": "AC-1" },
+        { "name": "区分决策票和执行票，不把所有待决问题标成ready", "type": "manual", "ac": "AC-6" }
+      ]
+    },
+    {
+      "id": "execute-frontier",
+      "prompt": "用户已经确认并授权完成一个Story，禁止提交Git或回滚现有修改。执行票A、B已ready且无依赖，但都要改同一适配文件；C依赖A和B；另一个Story有ready票X。A集成后有动态requestId导致的测试失败，旧契约要求改冻结spec必须用户批准。请说明派发顺序、失败处理、如何继续直到Story交付。",
+      "assertions": [
+        { "name": "只处理本Story，避免A/B写冲突，C等集成验收后自动推进", "type": "manual", "ac": "AC-2" },
+        { "name": "新上下文子Agent，不默认提交/重置/清理", "type": "manual", "ac": "AC-6" },
+        { "name": "不会用测试维护自治绕过旧契约批准，也不会无限修测", "type": "manual", "ac": "AC-3" }
+      ]
+    },
+    {
+      "id": "final-evidence",
+      "prompt": "某Story的实现票均已关闭，作者单测和代码审查都通过。票A证据绑定旧候选，后续集成改了相关接口；尚未从真实页面运行主旅程。外部模型未授权且没有第二台机器，本机仍可验证。请说明最后如何验收、交付哪些证据、什么情况下能关闭Story。",
+      "assertions": [
+        { "name": "安排未参与实现的新上下文验收者验证最终集成旅程", "type": "manual", "ac": "AC-4" },
+        { "name": "保留旧候选证据并补验受影响路径，索引覆盖全部执行票", "type": "manual", "ac": "AC-4" },
+        { "name": "先做本机可做项，不擅自调用外部模型，不将NOT_RUN当通过或整批完成", "type": "manual", "ac": "AC-5" }
+      ]
+    }
+  ]
+}

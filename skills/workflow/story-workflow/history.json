@@ -1,0 +1,20 @@
+{
+  "skill": "story-workflow",
+  "runs": [
+    {
+      "date": "2026-11-02T11:20:51+08:00",
+      "iteration_ref": "D:\\GIT\\parking-agents\\evals\\story-workflow-workspace\\iteration-2",
+      "gates": {
+        "with_skill": {
+          "pass_rate": 1,
+          "mean_ms": null,
+          "mean_tokens": null
+        }
+      },
+      "vs_previous": null,
+      "bank_epoch": 1,
+      "current_best": true
+    }
+  ],
+  "current_best": "runs[0]"
+}

@@ -1,0 +1,32 @@
+{
+  "skill": "story-workflow",
+  "source_iteration": "iteration-2",
+  "evals": [
+    {
+      "name": "eval-root-story",
+      "prompt": "使用story-workflow完成一个实际Story。先把技能fixtures/story-smoke复制到本run的outputs/project（不得包含实现或旧证据）。用户已确认Story需求和执行步骤并授权实施，仅在新project读写，不提交Git或操作外部服务；只能读取技能正文、路由依赖与本project，禁止读评分器、旧评测、其他臂。交付DELIVERY.md、两票实现与原始验证、最终证据索引，按实际宿主能力执行和报告。",
+      "assertions": [
+        {
+          "type": "manual",
+          "ac": "AC-2",
+          "name": "实际派发新上下文实现者，编排者未自行接管产品实现"
+        },
+        {
+          "type": "manual",
+          "ac": "AC-2",
+          "name": "依赖集成后补齐planned票状态并连续推进，认领与关闭有证据"
+        },
+        {
+          "type": "manual",
+          "ac": "AC-4",
+          "name": "实际独立验收者运行API/CLI并绑定最终候选，Story正确关闭"
+        },
+        {
+          "type": "manual",
+          "ac": "AC-4",
+          "name": "证据索引覆盖两执行票、原始结果、失败与最终候选身份"
+        }
+      ]
+    }
+  ]
+}

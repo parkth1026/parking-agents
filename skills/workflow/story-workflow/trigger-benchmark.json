@@ -1,0 +1,64 @@
+{
+  "skill": "story-workflow",
+  "split": {
+    "train": [
+      "p3",
+      "p2",
+      "p9",
+      "p10",
+      "p5",
+      "p7",
+      "n1",
+      "n2",
+      "n6",
+      "n8",
+      "n3",
+      "n5"
+    ],
+    "test": [
+      "p1",
+      "p8",
+      "p4",
+      "p6",
+      "n10",
+      "n7",
+      "n4",
+      "n9"
+    ],
+    "seed": 42,
+    "holdout": 0.4
+  },
+  "rounds": [
+    {
+      "description": "story-workflow / 故事级执行编排",
+      "valid_probes": 60,
+      "train": {
+        "queries": 12,
+        "evaluated": 12,
+        "trigger_rate_on_should": 1,
+        "false_trigger_rate_on_should_not": 0,
+        "correct": 12,
+        "invalid_queries": 0
+      },
+      "test": {
+        "queries": 8,
+        "evaluated": 8,
+        "trigger_rate_on_should": 1,
+        "false_trigger_rate_on_should_not": 0,
+        "correct": 8,
+        "invalid_queries": 0
+      }
+    }
+  ],
+  "best_description": "story-workflow / 故事级执行编排",
+  "best_description_reason": null,
+  "min_test_queries": 6,
+  "valid_probes": 60,
+  "invalid_probes": 0,
+  "evidence_scope": "batched-routing-smoke",
+  "limitations": [
+    "20 queries answered in each of three fresh agent batches; not independent fresh context per query",
+    "No automatic host invocation was executed",
+    "Screening only, not full Creator trigger acceptance"
+  ]
+}

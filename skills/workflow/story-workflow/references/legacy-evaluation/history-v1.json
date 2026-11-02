@@ -1,0 +1,50 @@
+{
+  "iterations": [
+    {
+      "scenarios": {
+        "tokens": null,
+        "model_requested": "gpt-5.6-luna",
+        "count": 3,
+        "without_skill": {
+          "unclear": 1,
+          "fail": 1,
+          "pass": 6
+        },
+        "effective_model_status": "unknown",
+        "grader": "separate fresh-context subagent",
+        "effort_requested": "high",
+        "with_skill": {
+          "unclear": 0,
+          "fail": 0,
+          "pass": 8
+        },
+        "assertions": 8
+      },
+      "limitations": [
+        "小样本文本情境，不是实际派发、tracker写入或产品执行",
+        "探针在审查补充前运行；补充后的最终正文另经独立只读复核与静态回归",
+        "自动触发评测和真实Story长期编排未运行",
+        "未晋级、安装、提交或发布"
+      ],
+      "review": {
+        "changes": [
+          "单一Story编排所有者",
+          "已确认范围及当前资源授权",
+          "风险驱动集成验证",
+          "候选关闭前核对"
+        ],
+        "followup": "未发现阻断通用技能使用的问题；不是生产验收",
+        "initial_material_findings": 4
+      },
+      "raw_evidence": "evals/story-workflow-workspace/iteration-1/",
+      "scope": "incubating",
+      "date": "2026-11-01",
+      "skill_sha256": "91fb7509e6066166d99ab70f9c06574d1f7356e54e5919596d218d17815db363",
+      "checks": {
+        "static_regressions": 4,
+        "quick_validate": "PASS"
+      }
+    }
+  ],
+  "skill": "story-workflow"
+}

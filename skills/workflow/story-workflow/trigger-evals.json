@@ -1,0 +1,25 @@
+{
+  "skill": "story-workflow",
+  "queries": [
+    {"id":"p1","text":"用 story-workflow 把这个已确认的导出Story从拆票推进到整体验收。","should_trigger":true},
+    {"id":"p2","text":"$story-workflow 继续这张Story下面尚未完成的执行票，依赖满足的都做完。","should_trigger":true},
+    {"id":"p3","text":"用故事级执行编排，先跟我确认用户旅程和步骤，再安排子Agent执行。","should_trigger":true},
+    {"id":"p4","text":"/story-workflow 这张地图的需求已经确认，开始组织实现和最后的独立验收。","should_trigger":true},
+    {"id":"p5","text":"按 story-workflow 续跑这个Story，不要重新问已确认的范围，保留全部执行证据。","should_trigger":true},
+    {"id":"p6","text":"故事级执行编排：现在只做需求和执行步骤确认，等我授权再开发。","should_trigger":true},
+    {"id":"p7","text":"请用 story-workflow 处理这批有依赖的Issue，主Agent只编排，子Agent实现。","should_trigger":true},
+    {"id":"p8","text":"用 story-workflow 接手已完成两步的Story，核对现场后继续剩余三步。","should_trigger":true},
+    {"id":"p9","text":"故事级执行编排，给这次文件导入功能安排里程碑、执行和最终证据汇总。","should_trigger":true},
+    {"id":"p10","text":"用story-workflow完成Story，遇到技术摩擦自主处理，改变范围时再问我。","should_trigger":true},
+    {"id":"n1","text":"用 wayfinder 记录这次架构选择的待决问题，暂不安排实现。","should_trigger":false},
+    {"id":"n2","text":"请用 to-tickets 把已确认计划拆成纵向切片，发布后就停。","should_trigger":false},
+    {"id":"n3","text":"按 implement-spec 实现这个已经拆好的规格，保持原有流程。","should_trigger":false},
+    {"id":"n4","text":"只修复这一张Issue里的空值异常，不调整项目编排。","should_trigger":false},
+    {"id":"n5","text":"帮我解释一下Story和Issue有什么区别，不需要创建或执行任务。","should_trigger":false},
+    {"id":"n6","text":"用 workflow-interview 访谈这个产品需求，今天只锁需求。","should_trigger":false},
+    {"id":"n7","text":"审查从main以来的代码改动，重点看接口兼容性。","should_trigger":false},
+    {"id":"n8","text":"查询GitLab里这个Story下面有哪些未关闭Issue，只读列出来。","should_trigger":false},
+    {"id":"n9","text":"总结这批Agent的测试日志，统计失败频次，别启动实现。","should_trigger":false},
+    {"id":"n10","text":"把这份执行证据整理成最终验收摘要，本轮只写报告。","should_trigger":false}
+  ]
+}
