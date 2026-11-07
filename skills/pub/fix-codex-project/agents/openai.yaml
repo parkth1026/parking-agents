@@ -1,0 +1,4 @@
+interface:
+  display_name: "fix-codex-project"
+  short_description: "备份并恢复桌面端换账号后消失的本地项目、工作目录与会话归属"
+  default_prompt: "用 $fix-codex-project 检查项目分组丢失，备份后恢复到当前账号，并验证结果。"
