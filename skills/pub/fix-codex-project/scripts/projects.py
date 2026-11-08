@@ -128,7 +128,7 @@ def inspect(home):
     return result
 
 
-def validate_globals(g):
+def validate_globals(g, local_assignments_only=True):
     if not isinstance(g, dict):
         raise ValueError('Unsupported globals schema')
     for key in KEYS & g.keys():
@@ -143,7 +143,8 @@ def validate_globals(g):
         if any(not isinstance(p, str) for p in project['rootPaths']):
             raise ValueError('Invalid root path')
     for assignment in g.get('thread-project-assignments', {}).values():
-        if not isinstance(assignment, dict) or assignment.get('projectKind') != 'local':
+        kinds = {'local'} if local_assignments_only else {'local', 'remote'}
+        if not isinstance(assignment, dict) or assignment.get('projectKind') not in kinds:
             raise ValueError('Source includes non-local or unknown assignments; narrow manually')
         if not isinstance(assignment.get('projectId'), str):
             raise ValueError('Invalid project assignment')
@@ -156,9 +157,22 @@ def validate_source(source):
     validate_globals(g)
 
 
-def plan(home, source_id=None):
+def local_source(source):
+    """Exclude remote memberships without changing the saved inactive scope."""
+    result = copy.deepcopy(source)
+    g = result.get('globals', {})
+    assignments = g.get('thread-project-assignments', {})
+    excluded = {k for k, v in assignments.items()
+                if isinstance(v, dict) and v.get('projectKind') == 'remote'}
+    for key in MAP_KEYS:
+        if key.startswith('thread-') and isinstance(g.get(key), dict):
+            g[key] = {k: v for k, v in g[key].items() if k not in excluded}
+    return result
+
+
+def plan(home, source_id=None, local_only=False):
     state = load(home)
-    validate_globals(state)
+    validate_globals(state, local_assignments_only=False)
     account = state[ACCOUNT]
     if not isinstance(account.get('owner'), str) or not account['owner']:
         raise ValueError('Current target account is not established')
@@ -171,11 +185,12 @@ def plan(home, source_id=None):
     if source_id not in candidates:
         raise ValueError('Selected source is not an inactive scope with projects')
     source = candidates[source_id]
-    validate_source(source)
+    effective = local_source(source) if local_only else source
+    validate_source(effective)
     return {'schemaVersion': 1, 'home': str(Path(home).resolve()),
             'owner': account['owner'], 'source': source_id, 'sourceHash': digest(source),
-            'keys': sorted(KEYS & source['globals'].keys()),
-            'sourceCounts': summary(source['globals']), 'targetCounts': summary(state)}
+            'keys': sorted(KEYS & source['globals'].keys()), 'localOnly': local_only,
+            'sourceCounts': summary(effective['globals']), 'targetCounts': summary(state)}
 
 
 def desktop_running():
@@ -215,8 +230,8 @@ def merge(source, target):
 
 def backup_files(home, folder):
     folder = Path(folder)
-    skill_root = Path(__file__).resolve().parents[1]
-    if folder.resolve().is_relative_to(skill_root.parent):
+    scan_root = next((p for p in Path(__file__).resolve().parents if p.name == 'skills'), None)
+    if scan_root is not None and folder.resolve().is_relative_to(scan_root):
         raise ValueError('Backup must be outside the skill scan root')
     folder.mkdir(parents=True, exist_ok=False)
     files = {}
@@ -255,7 +270,7 @@ def apply(home, specification, backup):
     initial_bytes = (Path(home) / STATE).read_bytes()
     initial_hash = hashlib.sha256(initial_bytes).hexdigest()
     state = json.loads(initial_bytes.decode('utf-8-sig'))
-    validate_globals(state)
+    validate_globals(state, local_assignments_only=False)
     if specification.get('schemaVersion') != 1 or specification.get('home') != str(Path(home).resolve()):
         raise ValueError('Plan version or Codex Home mismatch')
     if state[ACCOUNT]['owner'] != specification['owner']:
@@ -263,6 +278,9 @@ def apply(home, specification, backup):
     source = state[ACCOUNT]['inactive'].get(specification['source'])
     if source is None or digest(source) != specification['sourceHash']:
         raise ValueError('Inactive source changed')
+    if not isinstance(specification.get('localOnly', False), bool):
+        raise ValueError('Unsupported localOnly flag')
+    source = local_source(source) if specification.get('localOnly', False) else source
     validate_source(source)
     if specification['keys'] != sorted(KEYS & source['globals'].keys()):
         raise ValueError('Plan fields do not match the supported allowlist')
@@ -348,6 +366,7 @@ def main():
         p.add_argument('--home', type=Path, default=Path(os.environ.get('CODEX_HOME', Path.home() / '.codex')))
         if action == 'plan':
             p.add_argument('--source')
+            p.add_argument('--local-only', action='store_true')
             p.add_argument('--out', type=Path, required=True)
         if action == 'apply':
             p.add_argument('--plan', type=Path, required=True)
@@ -358,7 +377,7 @@ def main():
     if a.action == 'inspect':
         result = inspect(a.home)
     elif a.action == 'plan':
-        result = plan(a.home, a.source)
+        result = plan(a.home, a.source, a.local_only)
         if a.out.exists():
             raise FileExistsError('Plan output already exists')
         a.out.parent.mkdir(parents=True, exist_ok=True)

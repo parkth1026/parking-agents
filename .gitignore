@@ -7,6 +7,97 @@ reports/*
 *reports/*
 
 node_modules/
+
+# Python bytecode and compiled extensions
+# Reference: https://github.com/github/gitignore/blob/main/Python.gitignore
+__pycache__/
+*.py[codz]
+*$py.class
+*.so
+*.pyd
+
+# Python distribution / packaging
+.Python
+build/
+dist/
+develop-eggs/
+eggs/
+.eggs/
+sdist/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Python virtual environments and local package-manager state
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+__pypackages__/
+.pdm-python
+.pdm-build/
+.pixi/*
+!.pixi/config.toml
+conda-meta/
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+.envrc
+.pypirc
+
+# Python tests, coverage, linters and type checkers
+.pytest_cache/
+.hypothesis/
+.tox/
+.nox/
+htmlcov/
+.coverage
+.coverage.*
+nosetests.xml
+coverage.xml
+*.cover
+*.py.cover
+*.lcov
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+.ruff_cache/
+
+# Python documentation, notebooks and tool-generated state
+docs/_build/
+.pybuilder/
+.ipynb_checkpoints/
+profile_default/
+ipython_config.py
+.spyderproject
+.spyproject
+.ropeproject
+cython_debug/
+.webassets-cache
+.scrapy/
+celerybeat-schedule*
+celerybeat.pid
+*.sage.py
+tempCodeRunnerFile.py
+__marimo__/
+marimo/_static/
+marimo/_lsp/
+.streamlit/secrets.toml
+
+# Keep dependency lockfiles, Python sources and shared skill assets versioned.
+# Do not blanket-ignore lib/, *.log, *.sqlite*, *.spec or *.manifest in this mixed repository.
+
 /.zcode/plans
 /.claude/launch.json
 

@@ -161,6 +161,29 @@ class RestoreTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'non-local'):
             p.plan(self.home)
 
+    def test_local_only_skips_remote_membership_preserves_source_and_target(self):
+        self.source['globals']['thread-project-assignments']['t-remote'] = {
+            'projectKind': 'remote', 'projectId': 'remote', 'hostId': 'ssh:remote'}
+        self.source['globals']['thread-workspace-root-hints'] = {'t-remote': '/remote', 't-old': 'local'}
+        self.state['thread-project-assignments']['target-remote'] = {
+            'projectKind': 'remote', 'projectId': 'keep'}
+        self.write()
+        specification = p.plan(self.home, local_only=True)
+        self.assertEqual(specification['sourceCounts']['thread-project-assignments'], 2)
+        p.apply(self.home, specification, self.backup)
+        merged = p.read(self.home / p.STATE)
+        self.assertNotIn('t-remote', merged['thread-project-assignments'])
+        self.assertNotIn('t-remote', merged['thread-workspace-root-hints'])
+        self.assertIn('target-remote', merged['thread-project-assignments'])
+        self.assertEqual(merged[p.ACCOUNT], self.state[p.ACCOUNT])
+        self.assertEqual(p.file_hash(self.home / 'state_5.sqlite'), self.db_hash)
+
+    def test_local_only_still_rejects_unknown_assignment_schema(self):
+        self.source['globals']['thread-project-assignments']['t-old']['projectKind'] = 'unknown'
+        self.write()
+        with self.assertRaisesRegex(ValueError, 'non-local'):
+            p.plan(self.home, local_only=True)
+
     def test_unknown_target_field_schema_rejected(self):
         self.state['local-projects'] = ['unexpected-new-schema']
         self.write()
